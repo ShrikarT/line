@@ -1,4 +1,3 @@
-import { createFileRoute } from "@tanstack/react-router";
 import { Shell } from "@/components/line/shell";
 import { DualLedger } from "@/components/line/dual";
 import { ExplorerPanel } from "@/components/line/explorer";
@@ -7,9 +6,8 @@ import { DEMO_STEPS } from "@/lib/line/demo.ts";
 import { available } from "@/lib/line/protocol.ts";
 import { useLine } from "@/lib/line/store.ts";
 
-export const Route = createFileRoute("/")({ component: Home });
 
-function Home() {
+export function Home() {
   const flash = useLine((s) => s.flash);
   const runDemo = useLine((s) => s.runDemo);
   const setDemoStep = useLine((s) => s.setDemoStep);
@@ -30,9 +28,10 @@ function Home() {
           <p className="text-muted">
             Revolving credit, not a spend cap. Issuer underwrites. Agent draws.
             Merchant gets a one-time authorization. Failed proofs write nothing.
+            Wave 1 does not move tokens.
           </p>
           <div className="flex flex-wrap gap-3">
-            <Button onClick={() => setDemoStep(Math.min(8, demoStep + 1))}>
+            <Button onClick={() => setDemoStep(Math.min(10, demoStep + 1))}>
               Next demo step
             </Button>
             <Button variant="ghost" onClick={runDemo}>
@@ -43,7 +42,7 @@ function Home() {
           <FlashBar flash={flash} />
         </section>
 
-        <div className="grid gap-2 sm:grid-cols-3 md:grid-cols-5">
+        <div className="grid gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
           {DEMO_STEPS.map((s) => (
             <button
               key={s.id}
@@ -72,8 +71,8 @@ function Home() {
           </Panel>
           <Panel kicker="Settlement" title="Authorization only">
             <p className="text-sm text-muted">
-              Wave 1 does not move tokens. Escrow redeemable by draw nullifier is
-              Wave 2.
+              Wave 1 does not move tokens. A successful draw is clearance, not a
+              payout. Escrow redeemable by the draw nullifier is Wave 2.
             </p>
           </Panel>
           <Panel kicker="Agent" title="Private capacity">

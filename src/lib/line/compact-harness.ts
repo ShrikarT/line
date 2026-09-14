@@ -1,0 +1,147 @@
+/**
+ * Compact simulator harness.
+ * Instantiates the compiler-generated Contract and runs circuits through
+ * compact-runtime. This is not a TypeScript reimplementation of the VM.
+ */
+import * as RT from "@midnight-ntwrk/compact-runtime";
+import {
+  Contract,
+  ledger as compactLedger,
+  Status,
+  type Ledger as CompactLedger,
+} from "../../../contracts/managed/line/contract/index.js";
+import { pad32 } from "./encoding.ts";
+
+export { Status };
+
+export type PrivateState = {
+  callerSecret: Uint8Array;
+  agentSecret: Uint8Array;
+  salt: Uint8Array;
+  newSalt: Uint8Array;
+  invoiceId: Uint8Array;
+  quoteNonce: Uint8Array;
+  receiptNonce: Uint8Array;
+  paymentRef: Uint8Array;
+};
+
+export const COIN_PK = "0".repeat(64);
+export const CONTRACT_ADDR = RT.dummyContractAddress();
+
+export const WITNESSES = {
+  callerSecret: (ctx: { privateState: PrivateState }) => [ctx.privateState, ctx.privateState.callerSecret] as const,
+  agentSecret: (ctx: { privateState: PrivateState }) => [ctx.privateState, ctx.privateState.agentSecret] as const,
+  salt: (ctx: { privateState: PrivateState }) => [ctx.privateState, ctx.privateState.salt] as const,
+  newSalt: (ctx: { privateState: PrivateState }) => [ctx.privateState, ctx.privateState.newSalt] as const,
+  invoiceId: (ctx: { privateState: PrivateState }) => [ctx.privateState, ctx.privateState.invoiceId] as const,
+  quoteNonce: (ctx: { privateState: PrivateState }) => [ctx.privateState, ctx.privateState.quoteNonce] as const,
+  receiptNonce: (ctx: { privateState: PrivateState }) => [ctx.privateState, ctx.privateState.receiptNonce] as const,
+  paymentRef: (ctx: { privateState: PrivateState }) => [ctx.privateState, ctx.privateState.paymentRef] as const,
+};
+
+export function blankPrivate(overrides: Partial<PrivateState> = {}): PrivateState {
+  const z = new Uint8Array(32);
+  return {
+    callerSecret: z,
+    agentSecret: z,
+    salt: z,
+    newSalt: z,
+    invoiceId: z,
+    quoteNonce: z,
+    receiptNonce: z,
+    paymentRef: z,
+    ...overrides,
+  };
+}
+
+export type Session = {
+  contract: Contract<PrivateState>;
+  state: RT.ContractState | RT.StateValue | RT.ChargedState;
+  privateState: PrivateState;
+};
+
+export async function boot(issuerSk: Uint8Array, merchantSk: Uint8Array, ps?: PrivateState): Promise<Session> {
+  const privateState = ps ?? blankPrivate({ callerSecret: issuerSk });
+  const contract = new Contract(WITNESSES as never);
+  const init = await contract.initialState(
+    RT.createConstructorContext(privateState, COIN_PK),
+    issuerSk,
+    merchantSk,
+  );
+  return {
+    contract,
+    state: init.currentContractState,
+    privateState: init.currentPrivateState,
+  };
+}
+
+export function readLedger(session: Session): CompactLedger {
+  const state = session.state as { data?: RT.ChargedState };
+  if (state && "data" in state && state.data) return compactLedger(state.data);
+  return compactLedger(session.state as RT.StateValue | RT.ChargedState);
+}
+
+function snapshotState(session: Session) {
+  return session.state;
+}
+
+export type CircuitCall =
+  | { name: "openLine"; args: [bigint, bigint] }
+  | { name: "postQuote"; args: [bigint, bigint] }
+  | { name: "draw"; args: [Uint8Array, bigint, bigint, bigint, bigint] }
+  | { name: "acknowledgeRepayment"; args: [bigint, bigint, bigint, bigint, bigint] }
+  | { name: "setStatus"; args: [Status] };
+
+export type CallResult =
+  | { ok: true; session: Session; ledger: CompactLedger }
+  | { ok: false; session: Session; ledger: CompactLedger; error: string };
+
+export async function call(session: Session, ps: PrivateState, op: CircuitCall): Promise<CallResult> {
+  const before = snapshotState(session);
+  const ctx = RT.createCircuitContext(op.name, CONTRACT_ADDR, COIN_PK, before, ps);
+  try {
+    const circuits = session.contract.circuits;
+    let result;
+    if (op.name === "openLine") result = await circuits.openLine(ctx, ...op.args);
+    else if (op.name === "postQuote") result = await circuits.postQuote(ctx, ...op.args);
+    else if (op.name === "draw") result = await circuits.draw(ctx, ...op.args);
+    else if (op.name === "acknowledgeRepayment") {
+      result = await circuits.acknowledgeRepayment(ctx, ...op.args);
+    } else result = await circuits.setStatus(ctx, ...op.args);
+    const next: Session = {
+      contract: session.contract,
+      state: result.context.callContext.currentQueryContext.state,
+      privateState: result.context.callContext.currentPrivateState ?? ps,
+    };
+    return { ok: true, session: next, ledger: readLedger(next) };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return {
+      ok: false,
+      session,
+      ledger: readLedger(session),
+      error: message,
+    };
+  }
+}
+
+export function firstQuote(ledger: CompactLedger): { Q: Uint8Array; expiry: bigint; used: boolean } | null {
+  for (const [Q, meta] of ledger.quotes) {
+    return { Q, expiry: meta.expiry, used: meta.used };
+  }
+  return null;
+}
+
+export function quotesOf(ledger: CompactLedger) {
+  return [...ledger.quotes].map(([Q, meta]) => ({ Q, expiry: meta.expiry, used: meta.used }));
+}
+
+export function nullifiersOf(ledger: CompactLedger) {
+  return [...ledger.nullifiers];
+}
+
+export const DEMO = {
+  issuer: pad32("line:demo:issuer"),
+  merchant: pad32("line:demo:merchant"),
+  agent: pad32("line:demo:agent"),
+};

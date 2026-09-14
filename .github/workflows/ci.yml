@@ -1,0 +1,58 @@
+name: ci
+
+on:
+  push:
+    branches: [main, "fix/**"]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install JavaScript dependencies
+        run: npm ci
+
+      - name: Apache-2.0 LICENSE is the full text
+        run: |
+          grep -q "Apache License" LICENSE
+          grep -q "http://www.apache.org/licenses/" LICENSE
+          test "$(wc -c < LICENSE)" -ge 10000
+
+      - name: Install Compact toolchain 0.34.0
+        run: |
+          curl --proto '=https' --tlsv1.2 -LsSf \
+            https://github.com/midnightntwrk/compact/releases/latest/download/compact-installer.sh | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          echo "$HOME/.compact/bin" >> "$GITHUB_PATH"
+
+      - name: Pin Compact 0.34.0
+        run: compact update 0.34.0
+
+      - name: Compact compiler versions
+        run: |
+          compact compile --version
+          compact compile --language-version
+          compact compile --runtime-version
+          compact compile --ledger-version
+
+      - name: Compile Compact contract
+        run: npm run compact:compile
+
+      - name: Compact simulator tests
+        run: npm run compact:test
+
+      - name: TypeScript reference + encoding + demo + MCP tests
+        run: npm test
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Frontend build
+        run: npm run build

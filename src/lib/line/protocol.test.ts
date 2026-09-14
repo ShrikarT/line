@@ -16,18 +16,15 @@ import {
   setStatus,
 } from "./protocol.ts";
 import type { Ledger, LineWitness, QuotePreimage, RepayReceipt } from "./types.ts";
-import { CONTRACT_ID } from "./types.ts";
+import { AGENT_SK, ISSUER_SK, MERCHANT_SK } from "./keys.ts";
 
-const ISSUER = "issuer-demo-key";
-const MERCHANT = "merchant-demo-key";
-const AGENT = "agent-demo-key";
 const LIMIT = 150;
 
 function opened() {
   const ledger = createLedger();
   const r = openLine(ledger, {
-    caller: ISSUER,
-    agentSecret: AGENT,
+    caller: ISSUER_SK,
+    agentSecret: AGENT_SK,
     limit: LIMIT,
     salt: "salt-0",
     expiry: 10_000,
@@ -39,7 +36,7 @@ function opened() {
 
 function quote(ledger: Ledger, amount: number, invoiceId: string, nonce = invoiceId) {
   const r = postQuote(ledger, {
-    caller: MERCHANT,
+    caller: MERCHANT_SK,
     amount,
     invoiceId,
     expiry: 10_000,
@@ -50,7 +47,7 @@ function quote(ledger: Ledger, amount: number, invoiceId: string, nonce = invoic
   return r;
 }
 
-function receipt(w: LineWitness, C: string, amount: number, nonce: string): RepayReceipt {
+function receipt(w: LineWitness, C: string, amount: number, nonce: string, domain: string): RepayReceipt {
   return {
     identity: w.I,
     currentC: C,
@@ -58,26 +55,35 @@ function receipt(w: LineWitness, C: string, amount: number, nonce: string): Repa
     paymentRef: `pay-${nonce}`,
     nonce,
     expiry: 10_000,
-    contractId: CONTRACT_ID,
+    contractDomain: domain,
   };
 }
 
-describe("openLine", () => {
-  it("opens with a commitment and zero balance, limit not on ledger", () => {
+function publicHasNoBooks(ledger: Ledger) {
+  assert.equal("limit" in ledger, false);
+  assert.equal("outstanding" in ledger, false);
+  assert.equal("balance" in ledger, false);
+  for (const q of ledger.quotes) {
+    assert.equal("amount" in q, false);
+    assert.equal("invoiceId" in q, false);
+  }
+}
+
+describe("reference engine: openLine", () => {
+  it("opens with a commitment and zero balance; limit is not a ledger field", () => {
     const r = opened();
     assert.equal(r.ledger.status, "open");
     assert.ok(r.ledger.lineCommitment);
     assert.equal(r.agent.witness?.B, 0);
     assert.equal(r.agent.witness?.L, 150);
     assert.equal(r.ledger.lineCommitment, lineCommitment(r.agent.witness!));
-    const blob = JSON.stringify(r.ledger);
-    assert.equal(blob.includes("150"), false);
+    publicHasNoBooks(r.ledger);
   });
 
   it("rejects a forged issuer", () => {
     const r = openLine(createLedger(), {
       caller: "attacker",
-      agentSecret: AGENT,
+      agentSecret: AGENT_SK,
       limit: 150,
       salt: "s",
       expiry: 10_000,
@@ -88,24 +94,35 @@ describe("openLine", () => {
   it("rejects a second open while live", () => {
     const first = opened();
     const r = openLine(first.ledger, {
-      caller: ISSUER,
-      agentSecret: AGENT,
+      caller: ISSUER_SK,
+      agentSecret: AGENT_SK,
       limit: 10,
       salt: "s2",
       expiry: 10_000,
     });
     assert.equal(r.ok, false);
   });
+
+  it("rejects zero limit", () => {
+    const r = openLine(createLedger(), {
+      caller: ISSUER_SK,
+      agentSecret: AGENT_SK,
+      limit: 0,
+      salt: "s",
+      expiry: 10_000,
+    });
+    assert.equal(r.ok, false);
+  });
 });
 
-describe("postQuote", () => {
+describe("reference engine: postQuote", () => {
   it("stores only an opaque commitment", () => {
     const { ledger } = opened();
     const q = quote(ledger, 40, "inv-40");
     assert.ok(q.ledger.quotes[0]?.commitment);
     const blob = JSON.stringify(q.ledger);
     assert.equal(blob.includes("inv-40"), false);
-    assert.equal(blob.includes(":40"), false);
+    publicHasNoBooks(q.ledger);
   });
 
   it("rejects an unauthorized merchant", () => {
@@ -123,7 +140,7 @@ describe("postQuote", () => {
   it("rejects zero-amount quotes", () => {
     const { ledger } = opened();
     const r = postQuote(ledger, {
-      caller: MERCHANT,
+      caller: MERCHANT_SK,
       amount: 0,
       invoiceId: "z",
       expiry: 10_000,
@@ -133,12 +150,12 @@ describe("postQuote", () => {
   });
 });
 
-describe("draw", () => {
+describe("reference engine: draw", () => {
   it("clears a 40-unit invoice and rotates C", () => {
     const o = opened();
     const q = quote(o.ledger, 40, "inv-40");
     const r = draw(q.ledger, {
-      agentSecret: AGENT,
+      agentSecret: AGENT_SK,
       witness: o.agent.witness!,
       quote: q.quote,
       newSalt: "salt-1",
@@ -155,7 +172,7 @@ describe("draw", () => {
     const q = quote(o.ledger, 151, "inv-151");
     const before = q.ledger.lineCommitment;
     const r = draw(q.ledger, {
-      agentSecret: AGENT,
+      agentSecret: AGENT_SK,
       witness: o.agent.witness!,
       quote: q.quote,
       newSalt: "salt-x",
@@ -171,7 +188,7 @@ describe("draw", () => {
     const o = opened();
     const q = quote(o.ledger, 40, "inv-40");
     const r1 = draw(q.ledger, {
-      agentSecret: AGENT,
+      agentSecret: AGENT_SK,
       witness: o.agent.witness!,
       quote: q.quote,
       newSalt: "salt-1",
@@ -179,7 +196,7 @@ describe("draw", () => {
     assert.equal(r1.ok, true);
     if (!r1.ok) throw new Error("d1");
     const r2 = draw(r1.ledger, {
-      agentSecret: AGENT,
+      agentSecret: AGENT_SK,
       witness: r1.agent.witness!,
       quote: q.quote,
       newSalt: "salt-2",
@@ -192,7 +209,7 @@ describe("draw", () => {
     const q1 = quote(o.ledger, 40, "a");
     const q2 = quote(q1.ledger, 40, "b");
     const d1 = draw(q2.ledger, {
-      agentSecret: AGENT,
+      agentSecret: AGENT_SK,
       witness: o.agent.witness!,
       quote: q1.quote,
       newSalt: "s1",
@@ -200,8 +217,8 @@ describe("draw", () => {
     assert.equal(d1.ok, true);
     if (!d1.ok) throw new Error("d1");
     const d2 = draw(d1.ledger, {
-      agentSecret: AGENT,
-      witness: o.agent.witness!, // old witness / old C
+      agentSecret: AGENT_SK,
+      witness: o.agent.witness!,
       quote: q2.quote,
       newSalt: "s2",
     });
@@ -215,13 +232,13 @@ describe("draw", () => {
     const q1 = quote(o.ledger, 100, "a");
     const q2 = quote(q1.ledger, 100, "b");
     const proofA = draw(q2.ledger, {
-      agentSecret: AGENT,
+      agentSecret: AGENT_SK,
       witness: o.agent.witness!,
       quote: q1.quote,
       newSalt: "s1",
     });
     const proofB = draw(q2.ledger, {
-      agentSecret: AGENT,
+      agentSecret: AGENT_SK,
       witness: o.agent.witness!,
       quote: q2.quote,
       newSalt: "s2",
@@ -230,7 +247,7 @@ describe("draw", () => {
     assert.equal(proofB.ok, true);
     if (!proofA.ok || !proofB.ok) throw new Error("proofs");
     const includeBAfterA = draw(proofA.ledger, {
-      agentSecret: AGENT,
+      agentSecret: AGENT_SK,
       witness: o.agent.witness!,
       quote: q2.quote,
       newSalt: "s2",
@@ -255,7 +272,23 @@ describe("draw", () => {
     const q = quote(o.ledger, 40, "inv-40");
     const tampered: QuotePreimage = { ...q.quote, amount: 1 };
     const r = draw(q.ledger, {
-      agentSecret: AGENT,
+      agentSecret: AGENT_SK,
+      witness: o.agent.witness!,
+      quote: tampered,
+      newSalt: "x",
+    });
+    assert.equal(r.ok, false);
+  });
+
+  it("rejects a tampered invoice", () => {
+    const o = opened();
+    const q = quote(o.ledger, 40, "inv-40");
+    const tampered: QuotePreimage = {
+      ...q.quote,
+      invoiceId: q.quote.invoiceId.replace(/^./, q.quote.invoiceId[0] === "0" ? "1" : "0"),
+    };
+    const r = draw(q.ledger, {
+      agentSecret: AGENT_SK,
       witness: o.agent.witness!,
       quote: tampered,
       newSalt: "x",
@@ -271,21 +304,57 @@ describe("draw", () => {
       merchantCommitment: merchantCommitment("other-shop"),
     };
     const r = draw(q.ledger, {
-      agentSecret: AGENT,
+      agentSecret: AGENT_SK,
       witness: o.agent.witness!,
       quote: foreign,
       newSalt: "x",
     });
     assert.equal(r.ok, false);
   });
+
+  it("supplying a fake high L fails because it does not open C", () => {
+    const o = opened();
+    const q = quote(o.ledger, 40, "inv-40");
+    const fake: LineWitness = { ...o.agent.witness!, L: 10_000 };
+    const r = draw(q.ledger, {
+      agentSecret: AGENT_SK,
+      witness: fake,
+      quote: q.quote,
+      newSalt: "x",
+    });
+    assert.equal(r.ok, false);
+    if (r.ok) throw new Error("expected stale");
+    assert.match(r.reason, /stale/i);
+  });
+
+  it("supplying a fake low B fails because it does not open C", () => {
+    const o = opened();
+    const q = quote(o.ledger, 40, "inv-40");
+    const d = draw(q.ledger, {
+      agentSecret: AGENT_SK,
+      witness: o.agent.witness!,
+      quote: q.quote,
+      newSalt: "s1",
+    });
+    if (!d.ok) throw new Error("d");
+    const q2 = quote(d.ledger, 10, "inv-10");
+    const fake: LineWitness = { ...d.agent.witness!, B: 0 };
+    const r = draw(q2.ledger, {
+      agentSecret: AGENT_SK,
+      witness: fake,
+      quote: q2.quote,
+      newSalt: "x",
+    });
+    assert.equal(r.ok, false);
+  });
 });
 
-describe("acknowledgeRepayment", () => {
+describe("reference engine: acknowledgeRepayment", () => {
   it("rejects fake repayments without issuer authorization", () => {
     const o = opened();
     const q = quote(o.ledger, 40, "inv-40");
     const d = draw(q.ledger, {
-      agentSecret: AGENT,
+      agentSecret: AGENT_SK,
       witness: o.agent.witness!,
       quote: q.quote,
       newSalt: "s1",
@@ -293,9 +362,9 @@ describe("acknowledgeRepayment", () => {
     assert.equal(d.ok, true);
     if (!d.ok) throw new Error("d");
     const r = acknowledgeRepayment(d.ledger, {
-      caller: AGENT,
+      caller: AGENT_SK,
       witness: d.agent.witness!,
-      receipt: receipt(d.agent.witness!, d.ledger.lineCommitment!, 40, "r1"),
+      receipt: receipt(d.agent.witness!, d.ledger.lineCommitment!, 40, "r1", d.ledger.contractDomain),
       newSalt: "s2",
     });
     assert.equal(r.ok, false);
@@ -305,7 +374,7 @@ describe("acknowledgeRepayment", () => {
     const o = opened();
     const q40 = quote(o.ledger, 40, "inv-40");
     const d40 = draw(q40.ledger, {
-      agentSecret: AGENT,
+      agentSecret: AGENT_SK,
       witness: o.agent.witness!,
       quote: q40.quote,
       newSalt: "s1",
@@ -315,7 +384,7 @@ describe("acknowledgeRepayment", () => {
 
     const q120failLedger = quote(d40.ledger, 120, "inv-120");
     const fail120 = draw(q120failLedger.ledger, {
-      agentSecret: AGENT,
+      agentSecret: AGENT_SK,
       witness: d40.agent.witness!,
       quote: q120failLedger.quote,
       newSalt: "s-fail",
@@ -323,9 +392,15 @@ describe("acknowledgeRepayment", () => {
     assert.equal(fail120.ok, false);
 
     const ack = acknowledgeRepayment(q120failLedger.ledger, {
-      caller: ISSUER,
+      caller: ISSUER_SK,
       witness: d40.agent.witness!,
-      receipt: receipt(d40.agent.witness!, d40.ledger.lineCommitment!, 40, "r1"),
+      receipt: receipt(
+        d40.agent.witness!,
+        d40.ledger.lineCommitment!,
+        40,
+        "r1",
+        d40.ledger.contractDomain,
+      ),
       newSalt: "s2",
     });
     assert.equal(ack.ok, true);
@@ -334,7 +409,7 @@ describe("acknowledgeRepayment", () => {
 
     const q120 = quote(ack.ledger, 120, "inv-120-b");
     const d120 = draw(q120.ledger, {
-      agentSecret: AGENT,
+      agentSecret: AGENT_SK,
       witness: ack.witness,
       quote: q120.quote,
       newSalt: "s3",
@@ -346,18 +421,18 @@ describe("acknowledgeRepayment", () => {
     const o = opened();
     const q = quote(o.ledger, 40, "inv-40");
     const d = draw(q.ledger, {
-      agentSecret: AGENT,
+      agentSecret: AGENT_SK,
       witness: o.agent.witness!,
       quote: q.quote,
       newSalt: "s1",
     });
     if (!d.ok) throw new Error("d");
     const bad: RepayReceipt = {
-      ...receipt(d.agent.witness!, d.ledger.lineCommitment!, 40, "r1"),
+      ...receipt(d.agent.witness!, d.ledger.lineCommitment!, 40, "r1", d.ledger.contractDomain),
       identity: identityCommitment("someone-else"),
     };
     const r = acknowledgeRepayment(d.ledger, {
-      caller: ISSUER,
+      caller: ISSUER_SK,
       witness: d.agent.witness!,
       receipt: bad,
       newSalt: "s2",
@@ -369,15 +444,15 @@ describe("acknowledgeRepayment", () => {
     const o = opened();
     const q = quote(o.ledger, 40, "inv-40");
     const d = draw(q.ledger, {
-      agentSecret: AGENT,
+      agentSecret: AGENT_SK,
       witness: o.agent.witness!,
       quote: q.quote,
       newSalt: "s1",
     });
     if (!d.ok) throw new Error("d");
-    const rec = receipt(d.agent.witness!, d.ledger.lineCommitment!, 40, "r1");
+    const rec = receipt(d.agent.witness!, d.ledger.lineCommitment!, 40, "r1", d.ledger.contractDomain);
     const ack1 = acknowledgeRepayment(d.ledger, {
-      caller: ISSUER,
+      caller: ISSUER_SK,
       witness: d.agent.witness!,
       receipt: rec,
       newSalt: "s2",
@@ -386,60 +461,89 @@ describe("acknowledgeRepayment", () => {
     if (!ack1.ok) throw new Error("ack1");
     const q2 = quote(ack1.ledger, 40, "inv-40b");
     const d2 = draw(q2.ledger, {
-      agentSecret: AGENT,
+      agentSecret: AGENT_SK,
       witness: ack1.witness,
       quote: q2.quote,
       newSalt: "s3",
     });
     if (!d2.ok) throw new Error("d2");
     const r = acknowledgeRepayment(d2.ledger, {
-      caller: ISSUER,
+      caller: ISSUER_SK,
       witness: d2.agent.witness!,
       receipt: rec,
       newSalt: "s4",
     });
     assert.equal(r.ok, false);
   });
+
+  it("rejects repayment greater than B", () => {
+    const o = opened();
+    const q = quote(o.ledger, 40, "inv-40");
+    const d = draw(q.ledger, {
+      agentSecret: AGENT_SK,
+      witness: o.agent.witness!,
+      quote: q.quote,
+      newSalt: "s1",
+    });
+    if (!d.ok) throw new Error("d");
+    const r = acknowledgeRepayment(d.ledger, {
+      caller: ISSUER_SK,
+      witness: d.agent.witness!,
+      receipt: receipt(d.agent.witness!, d.ledger.lineCommitment!, 41, "r1", d.ledger.contractDomain),
+      newSalt: "s2",
+    });
+    assert.equal(r.ok, false);
+  });
 });
 
-describe("setStatus", () => {
+describe("reference engine: setStatus", () => {
   it("defaulted lines reject draws", () => {
     const o = opened();
-    const s = setStatus(o.ledger, { caller: ISSUER, status: "defaulted" });
+    const s = setStatus(o.ledger, { caller: ISSUER_SK, status: "defaulted" });
     assert.equal(s.ok, true);
     if (!s.ok) throw new Error("s");
     const q = quote(s.ledger, 40, "inv-40");
     const d = draw(q.ledger, {
-      agentSecret: AGENT,
+      agentSecret: AGENT_SK,
       witness: o.agent.witness!,
       quote: q.quote,
       newSalt: "x",
     });
     assert.equal(d.ok, false);
   });
+
+  it("unauthorized caller cannot change status", () => {
+    const o = opened();
+    const r = setStatus(o.ledger, { caller: AGENT_SK, status: "closed" });
+    assert.equal(r.ok, false);
+  });
 });
 
-describe("nullifier domains", () => {
+describe("reference engine: nullifier domains", () => {
   it("draw and repay nullifiers do not collide on similar inputs", () => {
-    const I = identityCommitment(AGENT);
-    const Q = quoteCommitment({
-      merchantCommitment: merchantCommitment(MERCHANT),
-      amount: 1,
-      invoiceId: "same",
-      expiry: 1,
-      nonce: "same",
-    });
-    const a = drawNullifier(AGENT, Q);
-    const b = repayNullifier("same", I);
+    const ledger = createLedger();
+    const I = identityCommitment(AGENT_SK);
+    const Q = quoteCommitment(
+      {
+        merchantCommitment: merchantCommitment(MERCHANT_SK),
+        amount: 1,
+        invoiceId: "same",
+        expiry: 1,
+        nonce: "same",
+      },
+      ledger.contractDomain,
+    );
+    const a = drawNullifier(AGENT_SK, Q, ledger.contractDomain);
+    const b = repayNullifier("same", I, Q, 1, "same", ledger.contractDomain);
     assert.notEqual(a, b);
   });
 });
 
-describe("expiry, closed, overflow, zero", () => {
+describe("reference engine: expiry, closed, overflow, zero", () => {
   it("rejects an expired quote", () => {
     const o = opened();
     const q = postQuote(o.ledger, {
-      caller: MERCHANT,
+      caller: MERCHANT_SK,
       amount: 10,
       invoiceId: "old",
       expiry: o.ledger.clock + 1,
@@ -447,9 +551,8 @@ describe("expiry, closed, overflow, zero", () => {
     });
     assert.equal(q.ok, true);
     if (!q.ok) throw new Error("q");
-    // clock advanced on postQuote; expiry == clock now or past
     const r = draw(q.ledger, {
-      agentSecret: AGENT,
+      agentSecret: AGENT_SK,
       witness: o.agent.witness!,
       quote: q.quote,
       newSalt: "x",
@@ -457,22 +560,22 @@ describe("expiry, closed, overflow, zero", () => {
     assert.equal(r.ok, false);
   });
 
-  it("closed lines reject draws; a new epoch can open after closed", () => {
+  it("closed lines reject draws; a new line can open after closed", () => {
     const o = opened();
-    const closed = setStatus(o.ledger, { caller: ISSUER, status: "closed" });
+    const closed = setStatus(o.ledger, { caller: ISSUER_SK, status: "closed" });
     assert.equal(closed.ok, true);
     if (!closed.ok) throw new Error("c");
     const q = quote(closed.ledger, 10, "z");
     const d = draw(q.ledger, {
-      agentSecret: AGENT,
+      agentSecret: AGENT_SK,
       witness: o.agent.witness!,
       quote: q.quote,
       newSalt: "x",
     });
     assert.equal(d.ok, false);
     const reopen = openLine(closed.ledger, {
-      caller: ISSUER,
-      agentSecret: AGENT,
+      caller: ISSUER_SK,
+      agentSecret: AGENT_SK,
       limit: 80,
       salt: "new-epoch",
       expiry: 10_000,
@@ -482,8 +585,8 @@ describe("expiry, closed, overflow, zero", () => {
 
   it("rejects overflow draws", () => {
     const o = openLine(createLedger(), {
-      caller: ISSUER,
-      agentSecret: AGENT,
+      caller: ISSUER_SK,
+      agentSecret: AGENT_SK,
       limit: Number.MAX_SAFE_INTEGER,
       salt: "s",
       expiry: 10_000,
@@ -492,7 +595,7 @@ describe("expiry, closed, overflow, zero", () => {
     if (!o.ok) throw new Error("o");
     const q1 = quote(o.ledger, 1, "one");
     const d1 = draw(q1.ledger, {
-      agentSecret: AGENT,
+      agentSecret: AGENT_SK,
       witness: o.agent.witness!,
       quote: q1.quote,
       newSalt: "s1",
@@ -501,7 +604,7 @@ describe("expiry, closed, overflow, zero", () => {
     if (!d1.ok) throw new Error("d1");
     const q2 = quote(d1.ledger, Number.MAX_SAFE_INTEGER, "huge");
     const d2 = draw(q2.ledger, {
-      agentSecret: AGENT,
+      agentSecret: AGENT_SK,
       witness: d1.agent.witness!,
       quote: q2.quote,
       newSalt: "s2",

@@ -1,15 +1,3 @@
-export const CONTRACT_ID = "line.v1";
-
-export const DOMAIN = {
-  id: "line:id",
-  state: "line:state",
-  quote: "line:quote",
-  merchant: "line:merchant",
-  draw: "line:draw",
-  repay: "line:repay",
-  receipt: "line:receipt",
-} as const;
-
 export type LineStatus = "none" | "open" | "defaulted" | "closed";
 
 export type QuoteRecord = {
@@ -29,11 +17,13 @@ export type LedgerEvent = {
 };
 
 export type Ledger = {
-  contractId: string;
+  /** Compact contractDomain (hex). */
+  contractDomain: string;
   issuerPubKey: string;
   merchantPubKey: string;
   identityCommitment: string | null;
   lineCommitment: string | null;
+  lineExpiry: number;
   status: LineStatus;
   quotes: QuoteRecord[];
   nullifiers: string[];
@@ -77,7 +67,7 @@ export type RepayReceipt = {
   paymentRef: string;
   nonce: string;
   expiry: number;
-  contractId: string;
+  contractDomain: string;
 };
 
 export type CircuitFail = {
@@ -94,3 +84,5 @@ export type CircuitOk<T extends object = object> = { ok: true } & T;
 export type CircuitResult<T extends object = object> = CircuitOk<T> | CircuitFail;
 
 export const GENERIC_DRAW_FAIL = "Clearance could not be proven.";
+
+export const STATUS_FROM_COMPACT = ["none", "open", "defaulted", "closed"] as const;

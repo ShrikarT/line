@@ -1,13 +1,11 @@
-import { createFileRoute } from "@tanstack/react-router";
 import { Shell } from "@/components/line/shell";
 import { ExplorerPanel } from "@/components/line/explorer";
 import { Panel } from "@/components/line/ui";
 import { useLine } from "@/lib/line/store.ts";
 import { Mono } from "@/components/line/ui";
 
-export const Route = createFileRoute("/explorer")({ component: ExplorerPage });
 
-function ExplorerPage() {
+export function ExplorerPage() {
   const quotes = useLine((s) => s.ledger.quotes);
   const nullifiers = useLine((s) => s.ledger.nullifiers);
 

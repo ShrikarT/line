@@ -1,13 +1,11 @@
-import { createFileRoute } from "@tanstack/react-router";
 import { Shell } from "@/components/line/shell";
 import { DualLedger } from "@/components/line/dual";
 import { ExplorerPanel } from "@/components/line/explorer";
 import { Button, FlashBar, Panel } from "@/components/line/ui";
 import { useLine } from "@/lib/line/store.ts";
 
-export const Route = createFileRoute("/lab")({ component: LabPage });
 
-function LabPage() {
+export function LabPage() {
   const flash = useLine((s) => s.flash);
   const doOpen = useLine((s) => s.doOpen);
   const doQuote = useLine((s) => s.doQuote);

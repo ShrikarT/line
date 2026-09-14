@@ -1,51 +1,191 @@
 # Line
 
-**Private revolving credit for autonomous agents.**
+**Private revolving credit authorization for autonomous agents.**
 
-An agent proves a purchase fits an issuer-backed line. The chain never sees score, limit, balance, or counterparty.
+An issuer opens a confidential credit line. An agent proves that an invoice fits remaining capacity. A merchant receives an issuer-backed, non-replayable draw authorization. An issuer-confirmed repayment restores capacity.
 
-Wave 1 of the [Midnight Buildathon](https://app.akindo.io/wave-hacks/jaMZjqPOBsLXvjdG): a merchant receives an **issuer-backed, non-replayable draw authorization**. Simulated settlement is at the issuer desk. Asset movement is Wave 2.
+Wave 1 of the [Midnight Buildathon](https://app.akindo.io/wave-hacks/jaMZjqPOBsLXvjdG).
 
-## Honest privacy
+## Honest Wave 1 limitation
 
-Line hides amounts, limits, balances, and counterparties. It does **not** hide that a given line commitment changed at a time.
+A successful draw is an **authorization**, not a token payout. The merchant is not automatically paid on-chain. Simulated settlement is an issuer acknowledgement. Asset movement is Wave 2.
+
+This is **not production-ready**. It is **not** deployed to Midnight Preprod. Runtime is **local/simulator**.
+
+## What is real vs simulated
+
+| Layer | Status |
+|---|---|
+| Compact contract `contracts/line.compact` | Real Compact 0.26 source. Compiles with toolchain **0.34.0**. |
+| Generated bindings `contracts/managed/line` | Compiler output (`--skip-zk`). No proving keys. |
+| Compact simulator tests | Execute the generated `Contract` via `@midnight-ntwrk/compact-runtime` **0.19.0**. |
+| TypeScript reference engine | Replica of Compact encodings (same `persistentHash` / `persistentCommit`). Drives the UI and MCP. |
+| UI | Local simulator desks. Not a Midnight node. |
+| MCP | Functional local JSON-RPC tools against the same engine. Not network discovery. |
+| On-chain settlement | **Not implemented.** |
+
+## Privacy map
+
+**Private**
+
+- Exact limit `L`, outstanding `B`, quote amount `A`
+- Agent secret, salts, quote preimage, repayment receipt details
+- Merchant identity as a name (only a sealed public key is on the instance)
+
+**Public**
+
+- Identity commitment `I`, line commitment `C`, status, quote commitments `Q`
+- Quote used/expiry metadata, nullifiers, clock / state-transition timing
+- Sealed issuer public key, merchant public key, contract domain
+
+Line does **not** hide that a public state transition happened, or when.
+
+Failed draws always surface: **Clearance could not be proven.** They do not leak whether the cause was balance, limit, default, identity, or anything else.
+
+## Trust assumptions
+
+- The Compact compiler and `compact-runtime` implement `persistentHash` / `persistentCommit` as documented.
+- Issuer and merchant authorization is **DApp-scoped hash-based** (`publicKey(sk) = persistentHash([pad(32,"line:pk"), sk])`), not a wallet signature scheme.
+- Wave 1 has one issuer, one merchant, one live line per contract instance.
+- Demo secrets are deterministic and **not** production keys.
+- Timing and existence of public transitions leak. This is not full unlinkability.
+
+## Threat model (Wave 1)
+
+In scope: forged issuer/merchant, agent self-repay, stale `C`, quote replay, over-limit, wrong agent, tampered quote preimage, receipt reuse, closed/defaulted draws, overflow/zero amounts.
+
+Out of scope: metadata analysis of `C → C′` timing, trusted setup / proving-key compromise, economic slashing, cross-contract composition, network-level deanonymization.
+
+## State commitment
+
+```
+C = persistentCommit<LinePreimage>({ identity: I, limit: L, outstanding: B, epoch }, salt)
+```
+
+This is Compact's documented commitment primitive. The salt is the opening. Equivalent role to `H(domainState, I, L, B, epoch, salt)` with the type providing domain separation.
+
+Every balance-changing circuit proves knowledge of a preimage that opens the current public `C`, then writes `C′` with a fresh salt and `epoch + 1`. Only `acknowledgeRepayment` (issuer) may decrease `B`.
+
+## Quote commitment
+
+```
+Q = persistentHash([
+  pad(32, "line:quote"),
+  merchantPk, invoiceId, encodeU64(A), encodeU64(expiry), nonce, contractDomain
+])
+```
+
+`encodeU64` is Compact's `n as Bytes<32>` (little-endian, 32-byte buffer).
+
+## Nullifiers
+
+```
+N_draw  = persistentHash([pad(32,"line:draw"), agentSecret, Q, contractDomain])
+N_repay = persistentHash([pad(32,"line:repay"), receiptNonce, I, currentC, encodeU64(R), paymentRef, contractDomain])
+```
+
+## Status transitions
+
+| From | `setStatus` to OPEN | DEFAULTED | CLOSED | `openLine` |
+|---|---|---|---|---|
+| NONE | no | no | no | yes |
+| OPEN | yes (idempotent) | yes | yes | no |
+| DEFAULTED | yes | yes | yes | no |
+| CLOSED | no | no | no | yes (new `C0`, epoch 0) |
+
+`CLOSED` is terminal for `setStatus`. Reopening is a **new line** via `openLine`, not a resurrection of the old commitment. DEFAULTED may return to OPEN without rotating `C`; draws stay blocked until then.
 
 ## Circuits
 
 | Circuit | Caller | Effect |
 |---|---|---|
-| `openLine` | Issuer | `C0 = H(I, L, 0, e0, s)` |
+| `openLine` | Issuer | `C0` with `B = 0`, status OPEN |
 | `postQuote` | Merchant | Opaque `Q` |
-| `draw` | Agent | `B+A ≤ L`, rotate `C`, spend nullifier |
+| `draw` | Agent | Prove `B+A ≤ L`, rotate `C`, spend `N_draw` |
 | `acknowledgeRepayment` | Issuer | Only way `B` decreases |
-| `setStatus` | Issuer | `open / defaulted / closed` |
+| `setStatus` | Issuer | OPEN / DEFAULTED / CLOSED |
 
-Agents cannot repay themselves. That would be free credit.
+Five circuits. No on-chain `canPay`. No agent-initiated repay.
 
-## Repo
+## Repository structure
 
 ```
-contracts/line.compact     Circuit spec (Compact)
-src/lib/line/              Executable reference + tests
-src/routes/                Desks, attack lab, circuits, roadmap
-mcp/line-mcp.mjs           Thin agent tool
-docs/                      PLAN, ROADMAP, PROGRESS, HANDOFF, PITCH, AGENTS
+contracts/line.compact          Compact source of truth
+contracts/managed/line/         Compiler output (skip-zk, no proving keys)
+src/lib/line/encoding.ts        compact-runtime persistentHash / persistentCommit
+src/lib/line/protocol.ts        TypeScript reference engine (replica, not the protocol)
+src/lib/line/compact.test.ts    Compact simulator tests
+src/lib/line/protocol.test.ts   Reference-engine tests
+src/pages/                      Issuer / merchant / agent / explorer / lab
+src/App.tsx                     Standalone SPA router
+mcp/line-mcp.mjs                Local MCP tools (status, draw, seed)
+docs/                           Plan, pitch, encoding, roadmap, handoff
 ```
 
-## Tests
+## Versions
+
+| Tool | Version |
+|---|---|
+| Compact toolchain | 0.34.0 |
+| Compact language | 0.26.0 |
+| `@midnight-ntwrk/compact-runtime` | 0.19.0 |
+| Ledger (compiler) | 9.1.0.0-rc.3 |
+| Node | 22 |
+
+## Install
 
 ```bash
-node --experimental-strip-types --test src/lib/line/protocol.test.ts src/lib/line/demo.test.ts
+npm install
+bash scripts/install-compact.sh    # compact toolchain 0.34.0 on PATH
 ```
 
-Forged issuer, fake repay, stale C, double-draw, quote auth, replay, expiry, closed, overflow.
+## Commands
 
-## Demo
+```bash
+npm run compact:compile    # compact compile --skip-zk contracts/line.compact contracts/managed/line
+npm run compact:test       # generated Contract via compact-runtime
+npm test                   # reference engine + Compact simulator + MCP
+npm run test:line          # Line tests only
+npm run typecheck
+npm run build
+npm run dev                # desks on :5173 (local simulator)
+npm run mcp                # MCP stdio server
+```
 
-Use **Next demo step** (not a dump of the final ledger). Attack lab tries replay, fake repay, over-limit, stale C, wrong agent.
+## Demo (11 snapshots, each circuit actually runs)
 
-Read [docs/ROADMAP.md](docs/ROADMAP.md) for Wave 2 (escrow, notes, unlinkability) and Wave 3 (network).
+Private `L = 150`. Use **Next demo step**.
+
+0. Genesis
+1. Issuer `openLine`
+2. Explorer shows `I` / `C` / status — not 150
+3. Merchant posts opaque 40
+4. Agent draws 40; `C` rotates
+5. Replay of the same invoice **runs and fails**
+6. Quote 120; draw **runs and fails** (`40 + 120 > 150`)
+7. Issuer `acknowledgeRepayment(40)`; `C` rotates
+8. Fresh 120 succeeds
+9. Issuer `setStatus(DEFAULTED)`
+10. Further draw **runs and fails**
+
+## MCP
+
+Functional local tools against `.line-mcp-state.json`:
+
+- `line.status` — public snapshot only
+- `line.draw` — same engine as the desks; generic failure string
+- `line.seed` — load a demo snapshot
+
+Not a Midnight network transport.
+
+## Deployment
+
+**Local/simulator deployment.** The Compact contract is not deployed to Midnight Preprod. No contract address, no transaction hash.
+
+Frontend: `npm run build` then `npm run preview`. `vercel.json` rewrites SPA routes. This is the web desks, not the contract.
 
 ## License
 
-Apache-2.0. Tag GitHub topics `midnightntwrk` and `compact`.
+Apache License 2.0. See [LICENSE](LICENSE).
+
+GitHub topics: `midnightntwrk`, `compact`, `privacy`, `typescript`, `zero-knowledge`.

@@ -1,10 +1,8 @@
-import { createFileRoute } from "@tanstack/react-router";
 import { Shell } from "@/components/line/shell";
 import { Panel } from "@/components/line/ui";
 
-export const Route = createFileRoute("/roadmap")({ component: RoadmapPage });
 
-function RoadmapPage() {
+export function RoadmapPage() {
   return (
     <Shell>
       <div className="space-y-6 max-w-3xl">
