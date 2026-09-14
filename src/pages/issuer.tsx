@@ -1,13 +1,11 @@
-import { createFileRoute } from "@tanstack/react-router";
 import { Shell } from "@/components/line/shell";
 import { DualLedger } from "@/components/line/dual";
 import { ExplorerPanel } from "@/components/line/explorer";
 import { Button, FlashBar, Panel, ResetRow, Stat } from "@/components/line/ui";
 import { useLine } from "@/lib/line/store.ts";
 
-export const Route = createFileRoute("/issuer")({ component: IssuerPage });
 
-function IssuerPage() {
+export function IssuerPage() {
   const doOpen = useLine((s) => s.doOpen);
   const doAck = useLine((s) => s.doAck);
   const doStatus = useLine((s) => s.doStatus);

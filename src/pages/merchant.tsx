@@ -1,12 +1,10 @@
-import { createFileRoute } from "@tanstack/react-router";
 import { Shell } from "@/components/line/shell";
 import { ExplorerPanel } from "@/components/line/explorer";
 import { Button, FlashBar, Mono, Panel, Stat } from "@/components/line/ui";
 import { useLine } from "@/lib/line/store.ts";
 
-export const Route = createFileRoute("/merchant")({ component: MerchantPage });
 
-function MerchantPage() {
+export function MerchantPage() {
   const doQuote = useLine((s) => s.doQuote);
   const invoices = useLine((s) => s.invoices);
   const flash = useLine((s) => s.flash);
