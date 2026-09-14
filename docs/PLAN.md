@@ -26,6 +26,7 @@ No on-chain `canPay`. No agent-initiated repay. No economic slashing.
 | M1 | Compact source + TypeScript reference circuits + tests | Tests green |
 | M2 | Three desks + public explorer + scripted demo | Demo 9 steps |
 | M3 | MCP wrapper, README, pitch | Hackathon-ready |
+| M4 | Attack lab, dual ledger, step demo, extra tests, ROADMAP | Non-basic Wave 1 |
 
 ## Stack
 

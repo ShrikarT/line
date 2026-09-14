@@ -7,6 +7,9 @@ const NAV = [
   { to: "/merchant", label: "Merchant" },
   { to: "/agent", label: "Agent" },
   { to: "/explorer", label: "Explorer" },
+  { to: "/lab", label: "Attack lab" },
+  { to: "/circuits", label: "Circuits" },
+  { to: "/roadmap", label: "Roadmap" },
 ];
 
 export function Shell({ children }: { children: React.ReactNode }) {

@@ -27,31 +27,24 @@ Agents cannot repay themselves. That would be free credit.
 ```
 contracts/line.compact     Circuit spec (Compact)
 src/lib/line/              Executable reference + tests
-src/routes/                Issuer / merchant / agent / explorer desks
+src/routes/                Desks, attack lab, circuits, roadmap
 mcp/line-mcp.mjs           Thin agent tool
-docs/                      PLAN, PROGRESS, HANDOFF, PITCH, AGENTS
+docs/                      PLAN, ROADMAP, PROGRESS, HANDOFF, PITCH, AGENTS
 ```
 
 ## Tests
 
 ```bash
-npx --yes node --experimental-strip-types --test src/lib/line/protocol.test.ts
+node --experimental-strip-types --test src/lib/line/protocol.test.ts src/lib/line/demo.test.ts
 ```
 
-The suite covers forged issuer, fake repay, stale `C`, double-draw inclusion, quote auth, replay, and defaulted status.
+Forged issuer, fake repay, stale C, double-draw, quote auth, replay, expiry, closed, overflow.
 
 ## Demo
 
-Open the app, click **Run scripted demo**:
+Use **Next demo step** (not a dump of the final ledger). Attack lab tries replay, fake repay, over-limit, stale C, wrong agent.
 
-1. Open line (150 private)
-2. Quote 40
-3. Draw 40
-4. Replay fails
-5. Draw 120 fails (generic copy)
-6. Issuer acknowledges 40
-7. Draw 120 succeeds
-8. Status → defaulted
+Read [docs/ROADMAP.md](docs/ROADMAP.md) for Wave 2 (escrow, notes, unlinkability) and Wave 3 (network).
 
 ## License
 

@@ -1,27 +1,16 @@
 # Progress
 
-## M0 — Spec and agent files — done
+Pushed to https://github.com/ShrikarT/line (`main`).
 
-- [x] PLAN.md, PROGRESS.md, CLAUDE.md, AGENTS.md, HANDOFF.md, PITCH.md, LICENSE
-- [ ] Push to https://github.com/ShrikarT/line (this commit)
+## M0–M3 — done
 
-## M1 — Protocol — done locally
+Spec, engine, desks, MCP.
 
-- [x] `contracts/line.compact`
-- [x] TypeScript engine + domain-tagged SHA-256
-- [x] 20 adversarial tests passing
-- [ ] Push
+## M4 — Wave 1 raised — done
 
-## M2 — Product UI — in progress
-
-- [x] Issuer / merchant / agent desks
-- [x] Public explorer
-- [x] Scripted demo
-- [ ] Browser QA
-- [ ] Push
-
-## M3 — Distribution
-
-- [x] MCP wrapper
-- [x] README
-- [ ] Push
+- Attack lab (replay, fake repay, over-limit, stale C, wrong agent)
+- Dual public/private pane
+- Step-through demo (not a final-state dump)
+- Circuit inspector + in-app roadmap
+- Extra tests: expiry, closed, overflow
+- docs/ROADMAP.md (Wave 2 settlement, Wave 3 network)

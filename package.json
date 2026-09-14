@@ -5,6 +5,6 @@
   "description": "Private revolving credit authorization for autonomous agents on Midnight.",
   "license": "Apache-2.0",
   "scripts": {
-    "test": "node --experimental-strip-types --test src/lib/line/protocol.test.ts"
+    "test": "node --experimental-strip-types --test src/lib/line/protocol.test.ts src/lib/line/demo.test.ts"
   }
 }

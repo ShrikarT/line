@@ -434,3 +434,78 @@ describe("nullifier domains", () => {
     assert.notEqual(a, b);
   });
 });
+
+describe("expiry, closed, overflow, zero", () => {
+  it("rejects an expired quote", () => {
+    const o = opened();
+    const q = postQuote(o.ledger, {
+      caller: MERCHANT,
+      amount: 10,
+      invoiceId: "old",
+      expiry: o.ledger.clock + 1,
+      nonce: "old",
+    });
+    assert.equal(q.ok, true);
+    if (!q.ok) throw new Error("q");
+    // clock advanced on postQuote; expiry == clock now or past
+    const r = draw(q.ledger, {
+      agentSecret: AGENT,
+      witness: o.agent.witness!,
+      quote: q.quote,
+      newSalt: "x",
+    });
+    assert.equal(r.ok, false);
+  });
+
+  it("closed lines reject draws; a new epoch can open after closed", () => {
+    const o = opened();
+    const closed = setStatus(o.ledger, { caller: ISSUER, status: "closed" });
+    assert.equal(closed.ok, true);
+    if (!closed.ok) throw new Error("c");
+    const q = quote(closed.ledger, 10, "z");
+    const d = draw(q.ledger, {
+      agentSecret: AGENT,
+      witness: o.agent.witness!,
+      quote: q.quote,
+      newSalt: "x",
+    });
+    assert.equal(d.ok, false);
+    const reopen = openLine(closed.ledger, {
+      caller: ISSUER,
+      agentSecret: AGENT,
+      limit: 80,
+      salt: "new-epoch",
+      expiry: 10_000,
+    });
+    assert.equal(reopen.ok, true);
+  });
+
+  it("rejects overflow draws", () => {
+    const o = openLine(createLedger(), {
+      caller: ISSUER,
+      agentSecret: AGENT,
+      limit: Number.MAX_SAFE_INTEGER,
+      salt: "s",
+      expiry: 10_000,
+    });
+    assert.equal(o.ok, true);
+    if (!o.ok) throw new Error("o");
+    const q1 = quote(o.ledger, 1, "one");
+    const d1 = draw(q1.ledger, {
+      agentSecret: AGENT,
+      witness: o.agent.witness!,
+      quote: q1.quote,
+      newSalt: "s1",
+    });
+    assert.equal(d1.ok, true);
+    if (!d1.ok) throw new Error("d1");
+    const q2 = quote(d1.ledger, Number.MAX_SAFE_INTEGER, "huge");
+    const d2 = draw(q2.ledger, {
+      agentSecret: AGENT,
+      witness: d1.agent.witness!,
+      quote: q2.quote,
+      newSalt: "s2",
+    });
+    assert.equal(d2.ok, false);
+  });
+});

@@ -1,7 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Shell } from "@/components/line/shell";
+import { DualLedger } from "@/components/line/dual";
 import { ExplorerPanel } from "@/components/line/explorer";
 import { Button, FlashBar, Panel, ResetRow, Stat } from "@/components/line/ui";
+import { DEMO_STEPS } from "@/lib/line/demo.ts";
 import { available } from "@/lib/line/protocol.ts";
 import { useLine } from "@/lib/line/store.ts";
 
@@ -10,6 +12,8 @@ export const Route = createFileRoute("/")({ component: Home });
 function Home() {
   const flash = useLine((s) => s.flash);
   const runDemo = useLine((s) => s.runDemo);
+  const setDemoStep = useLine((s) => s.setDemoStep);
+  const demoStep = useLine((s) => s.demoStep);
   const agent = useLine((s) => s.agent);
   const ledger = useLine((s) => s.ledger);
 
@@ -24,60 +28,62 @@ function Home() {
             Prove the purchase is affordable. Never publish the books.
           </h1>
           <p className="text-muted">
-            Line is private revolving credit for autonomous agents. An issuer
-            underwrites a limit. An agent draws against it. A merchant receives a
-            one-time authorization — not a public credit file.
+            Revolving credit, not a spend cap. Issuer underwrites. Agent draws.
+            Merchant gets a one-time authorization. Failed proofs write nothing.
           </p>
           <div className="flex flex-wrap gap-3">
-            <Button onClick={runDemo}>Run scripted demo</Button>
+            <Button onClick={() => setDemoStep(Math.min(8, demoStep + 1))}>
+              Next demo step
+            </Button>
+            <Button variant="ghost" onClick={runDemo}>
+              Jump to end
+            </Button>
             <ResetRow />
           </div>
           <FlashBar flash={flash} />
         </section>
 
+        <div className="grid gap-2 sm:grid-cols-3 md:grid-cols-5">
+          {DEMO_STEPS.map((s) => (
+            <button
+              key={s.id}
+              type="button"
+              onClick={() => setDemoStep(s.id)}
+              className={
+                "rounded-md border px-3 py-2 text-left text-xs transition-colors duration-[var(--motion-quick)] " +
+                (demoStep === s.id
+                  ? "border-accent bg-elevated text-fg"
+                  : "border-border text-muted")
+              }
+            >
+              <span className="font-mono text-subtle">{s.id}</span> {s.title}
+            </button>
+          ))}
+        </div>
+
+        <DualLedger />
+
         <div className="grid gap-4 md:grid-cols-3">
           <Panel kicker="Public" title="Explorer">
             <p className="text-sm text-muted">
-              Status {ledger.status}. Commitment rotates on each successful
-              circuit. No 150, no 40, no merchant name.
+              Status {ledger.status}. Clock {ledger.clock}. Commitment rotates;
+              books do not appear.
             </p>
           </Panel>
-          <Panel kicker="Merchant" title="Authorization, not settlement">
+          <Panel kicker="Settlement" title="Authorization only">
             <p className="text-sm text-muted">
-              Wave 1 does not move tokens. A cleared draw is an issuer-backed
-              claim the desk will honor off-chain.
+              Wave 1 does not move tokens. Escrow redeemable by draw nullifier is
+              Wave 2.
             </p>
           </Panel>
           <Panel kicker="Agent" title="Private capacity">
             {agent?.witness ? (
-              <Stat
-                label="Available"
-                privateHint
-                value={available(agent.witness)}
-              />
+              <Stat label="Available" privateHint value={available(agent.witness)} />
             ) : (
               <p className="text-sm text-subtle">No line in the agent store.</p>
             )}
           </Panel>
         </div>
-
-        <ol className="grid gap-3 text-sm text-muted md:grid-cols-2">
-          {[
-            "Issuer opens a line (limit 150, private).",
-            "Merchant posts a 40-unit opaque quote.",
-            "Agent draw 40 rotates C.",
-            "Replay dies on the nullifier.",
-            "Draw 120 cannot be proven.",
-            "Issuer acknowledges repayment of 40.",
-            "Draw 120 clears.",
-            "Issuer defaults the line. Further draws fail.",
-          ].map((step, i) => (
-            <li key={step} className="flex gap-3">
-              <span className="font-mono text-xs text-subtle">{i + 1}</span>
-              <span>{step}</span>
-            </li>
-          ))}
-        </ol>
 
         <ExplorerPanel />
       </div>

@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Shell } from "@/components/line/shell";
+import { DualLedger } from "@/components/line/dual";
 import { ExplorerPanel } from "@/components/line/explorer";
 import { Button, FlashBar, Panel, ResetRow, Stat } from "@/components/line/ui";
 import { useLine } from "@/lib/line/store.ts";
@@ -13,6 +14,7 @@ function IssuerPage() {
   const pending = useLine((s) => s.pendingRepay);
   const lastAcked = useLine((s) => s.lastAcked);
   const status = useLine((s) => s.ledger.status);
+  const receipts = useLine((s) => s.receipts);
   const flash = useLine((s) => s.flash);
 
   return (
@@ -42,8 +44,22 @@ function IssuerPage() {
             </Button>
             <ResetRow />
           </div>
+          <ul className="space-y-2 border-t border-border pt-4 text-sm">
+            {receipts.length === 0 ? (
+              <li className="text-subtle">No issuer receipts yet. Off-chain cash, then ack.</li>
+            ) : (
+              receipts.map((r) => (
+                <li key={r.nonce} className="text-muted">
+                  Receipt {r.amount} · {r.paymentRef}
+                </li>
+              ))
+            )}
+          </ul>
         </Panel>
-        <ExplorerPanel />
+        <div className="space-y-6">
+          <DualLedger />
+          <ExplorerPanel />
+        </div>
       </div>
     </Shell>
   );

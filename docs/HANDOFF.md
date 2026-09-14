@@ -44,3 +44,5 @@ Line is **not** a wallet spend-cap and **not** a private IDO. It is issuer-backe
 ## Next agent after Wave 1
 
 Wave 2: shielded escrow redeemable by `N_draw`; note-style unlinkable draws; portable issuer credential; second merchant.
+
+Read `docs/ROADMAP.md` before expanding scope. Wave 1 leftover is the attack lab, dual ledger, step demo, and extra tests — not escrow.

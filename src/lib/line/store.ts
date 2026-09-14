@@ -9,29 +9,37 @@ import {
   postQuote,
   setStatus,
 } from "./protocol.ts";
+import { snapshotAt } from "./demo.ts";
+import { AGENT, ISSUER, MERCHANT } from "./keys.ts";
 import type {
   AgentStore,
   Ledger,
-  QuotePreimage,
+  LineWitness,
+  MerchantInvoice,
   RepayReceipt,
 } from "./types.ts";
 import { CONTRACT_ID } from "./types.ts";
 
-export const ISSUER = "issuer-demo-key";
-export const MERCHANT = "merchant-demo-key";
-export const AGENT = "agent-demo-key";
-
-export type MerchantInvoice = {
-  invoiceId: string;
-  amount: number;
-  Q: string;
-  used: boolean;
-  preimage: QuotePreimage;
-};
+export { AGENT, ISSUER, MERCHANT } from "./keys.ts";
+export type { MerchantInvoice } from "./types.ts";
 
 export type Flash = {
   tone: "ok" | "fail" | "info";
   text: string;
+};
+
+export type DualNote = {
+  circuit: string;
+  ok: boolean;
+  publicView: string;
+  privateView: string;
+};
+
+export type IssuedReceipt = {
+  nonce: string;
+  amount: number;
+  paymentRef: string;
+  C: string;
 };
 
 type LineState = {
@@ -42,6 +50,9 @@ type LineState = {
   lastAcked: number;
   flash: Flash | null;
   demoStep: number;
+  dual: DualNote | null;
+  staleWitness: LineWitness | null;
+  receipts: IssuedReceipt[];
   reset: () => void;
   setFlash: (flash: Flash | null) => void;
   doOpen: (limit?: number) => void;
@@ -50,6 +61,12 @@ type LineState = {
   doAck: (amount?: number) => void;
   doStatus: (status: "open" | "defaulted" | "closed") => void;
   runDemo: () => void;
+  setDemoStep: (step: number) => void;
+  attackReplay: () => void;
+  attackFakeRepay: () => void;
+  attackOverLimit: () => void;
+  attackStale: () => void;
+  attackWrongAgent: () => void;
 };
 
 function nonce() {
@@ -64,6 +81,9 @@ const empty = () => ({
   lastAcked: 0,
   flash: null as Flash | null,
   demoStep: 0,
+  dual: null as DualNote | null,
+  staleWitness: null as LineWitness | null,
+  receipts: [] as IssuedReceipt[],
 });
 
 export const useLine = create<LineState>()(
@@ -72,6 +92,59 @@ export const useLine = create<LineState>()(
       ...empty(),
       setFlash: (flash) => set({ flash }),
       reset: () => set({ ...empty(), flash: { tone: "info", text: "Ledger reset." } }),
+      setDemoStep: (step) => {
+        const snap = snapshotAt(step);
+        const meta = [
+          "Genesis",
+          "openLine",
+          "postQuote 40",
+          "draw 40",
+          "Replay",
+          "Blocked 120",
+          "Issuer ack 40",
+          "draw 120",
+          "Defaulted",
+        ][snap.step];
+        set({
+          ledger: snap.ledger,
+          agent: snap.agent,
+          invoices: snap.invoices,
+          pendingRepay: snap.pendingRepay,
+          lastAcked: snap.lastAcked,
+          demoStep: snap.step,
+          staleWitness: snap.agent?.witness ?? null,
+          flash: {
+            tone: snap.lastFail ? "info" : "ok",
+            text: snap.lastFail ? `${meta}: ${snap.lastFail}` : `${meta} applied.`,
+          },
+          dual: {
+            circuit: meta ?? "demo",
+            ok: !snap.lastFail,
+            publicView: [
+              "Empty public ledger.",
+              "C0 + open. No limit.",
+              "Opaque Q40.",
+              "C0 → C1. Nullifier set.",
+              "No new public transition.",
+              "No new public transition.",
+              "C1 → C2. Issuer ack.",
+              "C2 → C3.",
+              "Status defaulted.",
+            ][snap.step]!,
+            privateView: [
+              "Keys only.",
+              "L=150 B=0.",
+              "Merchant holds 40.",
+              "B=40 available=110.",
+              "Replay rejected privately.",
+              "40+120>150. Generic fail.",
+              "B=0 available=150.",
+              "B=120 available=30.",
+              "Draws frozen.",
+            ][snap.step]!,
+          },
+        });
+      },
       doOpen: (limit = 150) => {
         const r = openLine(get().ledger, {
           caller: ISSUER,
@@ -81,7 +154,15 @@ export const useLine = create<LineState>()(
           expiry: get().ledger.clock + 10_000,
         });
         if (!r.ok) {
-          set({ flash: { tone: "fail", text: r.message } });
+          set({
+            flash: { tone: "fail", text: r.message },
+            dual: {
+              circuit: "openLine",
+              ok: false,
+              publicView: "No state change.",
+              privateView: r.reason,
+            },
+          });
           return;
         }
         set({
@@ -89,6 +170,12 @@ export const useLine = create<LineState>()(
           agent: r.agent,
           flash: { tone: "ok", text: "Line opened. Limit stays in the agent store." },
           demoStep: 1,
+          dual: {
+            circuit: "openLine",
+            ok: true,
+            publicView: "C0 published. Status open. Limit not on the ledger.",
+            privateView: `L=${limit} B=0 available=${limit}.`,
+          },
         });
       },
       doQuote: (amount, invoiceId) => {
@@ -111,6 +198,12 @@ export const useLine = create<LineState>()(
             { invoiceId: id, amount, Q: r.Q, used: false, preimage: r.quote },
           ],
           flash: { tone: "ok", text: `Quote ${amount} posted as an opaque commitment.` },
+          dual: {
+            circuit: "postQuote",
+            ok: true,
+            publicView: "Opaque Q stored. Amount and merchant are not fields.",
+            privateView: `Merchant invoice ${id} = ${amount}.`,
+          },
         });
       },
       doDraw: (Q) => {
@@ -120,6 +213,7 @@ export const useLine = create<LineState>()(
           set({ flash: { tone: "fail", text: "Clearance could not be proven." } });
           return;
         }
+        const prev = agent.witness;
         const r = draw(get().ledger, {
           agentSecret: agent.secret,
           witness: agent.witness,
@@ -127,17 +221,32 @@ export const useLine = create<LineState>()(
           newSalt: `s-${nonce()}`,
         });
         if (!r.ok) {
-          set({ flash: { tone: "fail", text: r.message } });
+          set({
+            flash: { tone: "fail", text: r.message },
+            dual: {
+              circuit: "draw",
+              ok: false,
+              publicView: "No accepted transition.",
+              privateView: "Clearance could not be proven.",
+            },
+          });
           return;
         }
         set({
           ledger: r.ledger,
           agent: r.agent,
+          staleWitness: prev,
           invoices: get().invoices.map((i) => (i.Q === Q ? { ...i, used: true } : i)),
           pendingRepay: get().pendingRepay + inv.amount,
           flash: {
             tone: "ok",
             text: `Draw authorized. Available ${available(r.agent.witness!)} (private).`,
+          },
+          dual: {
+            circuit: "draw",
+            ok: true,
+            publicView: "C rotated. Nullifier consumed. Amount hidden.",
+            privateView: `B=${r.agent.witness!.B} available=${available(r.agent.witness!)}.`,
           },
         });
       },
@@ -149,12 +258,13 @@ export const useLine = create<LineState>()(
           return;
         }
         const R = amount ?? get().pendingRepay;
+        const n = nonce();
         const receipt: RepayReceipt = {
           identity: agent.witness.I,
           currentC: C,
           amount: R,
-          paymentRef: `desk-${nonce()}`,
-          nonce: nonce(),
+          paymentRef: `desk-${n}`,
+          nonce: n,
           expiry: get().ledger.clock + 10_000,
           contractId: CONTRACT_ID,
         };
@@ -173,7 +283,14 @@ export const useLine = create<LineState>()(
           agent: { ...agent, witness: r.witness },
           pendingRepay: Math.max(0, get().pendingRepay - R),
           lastAcked: R,
+          receipts: [...get().receipts, { nonce: n, amount: R, paymentRef: receipt.paymentRef, C }],
           flash: { tone: "ok", text: "Issuer acknowledged repayment. Capacity restored privately." },
+          dual: {
+            circuit: "acknowledgeRepayment",
+            ok: true,
+            publicView: "C rotated under issuer authentication.",
+            privateView: `B=${r.witness.B} available=${available(r.witness)}.`,
+          },
         });
       },
       doStatus: (status) => {
@@ -182,111 +299,175 @@ export const useLine = create<LineState>()(
           set({ flash: { tone: "fail", text: r.message } });
           return;
         }
-        set({ ledger: r.ledger, flash: { tone: "ok", text: `Status → ${status}.` } });
+        set({
+          ledger: r.ledger,
+          flash: { tone: "ok", text: `Status → ${status}.` },
+          dual: {
+            circuit: "setStatus",
+            ok: true,
+            publicView: `Status is ${status}.`,
+            privateView: "Books unchanged. Draws allowed only if open.",
+          },
+        });
       },
-      runDemo: () => {
-        const base = createLedger({ issuerPubKey: ISSUER, merchantPubKey: MERCHANT });
-        const open = openLine(base, {
-          caller: ISSUER,
-          agentSecret: AGENT,
-          limit: 150,
-          salt: "demo-salt-0",
-          expiry: 10_000,
+      runDemo: () => get().setDemoStep(8),
+      attackReplay: () => {
+        const used = get().invoices.find((i) => i.used);
+        const agent = get().agent;
+        if (!used || !agent?.witness) {
+          set({ flash: { tone: "info", text: "Run a successful draw first." } });
+          return;
+        }
+        const r = draw(get().ledger, {
+          agentSecret: agent.secret,
+          witness: agent.witness,
+          quote: used.preimage,
+          newSalt: "atk-replay",
         });
-        if (!open.ok) return;
-        const q40 = postQuote(open.ledger, {
-          caller: MERCHANT,
-          amount: 40,
-          invoiceId: "demo-40",
-          expiry: 10_000,
-          nonce: "n40",
+        set({
+          flash: { tone: r.ok ? "fail" : "ok", text: r.ok ? "Replay unexpectedly succeeded." : r.message },
+          dual: {
+            circuit: "draw (replay)",
+            ok: r.ok,
+            publicView: r.ok ? "BUG: ledger moved." : "Ledger unchanged.",
+            privateView: r.ok ? "Invariant broken." : "Nullifier / used quote rejected.",
+          },
         });
-        if (!q40.ok) return;
-        const d40 = draw(q40.ledger, {
-          agentSecret: AGENT,
-          witness: open.agent.witness!,
-          quote: q40.quote,
-          newSalt: "demo-salt-1",
-        });
-        if (!d40.ok) return;
-        const q120a = postQuote(d40.ledger, {
-          caller: MERCHANT,
-          amount: 120,
-          invoiceId: "demo-120a",
-          expiry: 10_000,
-          nonce: "n120a",
-        });
-        if (!q120a.ok) return;
-        const fail120 = draw(q120a.ledger, {
-          agentSecret: AGENT,
-          witness: d40.agent.witness!,
-          quote: q120a.quote,
-          newSalt: "demo-salt-fail",
-        });
-        const ack = acknowledgeRepayment(q120a.ledger, {
-          caller: ISSUER,
-          witness: d40.agent.witness!,
+      },
+      attackFakeRepay: () => {
+        const agent = get().agent;
+        const C = get().ledger.lineCommitment;
+        if (!agent?.witness || !C) {
+          set({ flash: { tone: "info", text: "Open a line with outstanding first." } });
+          return;
+        }
+        const r = acknowledgeRepayment(get().ledger, {
+          caller: AGENT,
+          witness: agent.witness,
           receipt: {
-            identity: d40.agent.witness!.I,
-            currentC: d40.ledger.lineCommitment!,
-            amount: 40,
-            paymentRef: "demo-pay",
-            nonce: "demo-r1",
-            expiry: 10_000,
+            identity: agent.witness.I,
+            currentC: C,
+            amount: Math.max(1, agent.witness.B || 1),
+            paymentRef: "fake",
+            nonce: "fake",
+            expiry: get().ledger.clock + 10_000,
             contractId: CONTRACT_ID,
           },
-          newSalt: "demo-salt-2",
+          newSalt: "atk-fake",
         });
-        if (!ack.ok) return;
-        const q120b = postQuote(ack.ledger, {
-          caller: MERCHANT,
-          amount: 120,
-          invoiceId: "demo-120b",
-          expiry: 10_000,
-          nonce: "n120b",
-        });
-        if (!q120b.ok) return;
-        const d120 = draw(q120b.ledger, {
-          agentSecret: AGENT,
-          witness: ack.witness,
-          quote: q120b.quote,
-          newSalt: "demo-salt-3",
-        });
-        if (!d120.ok) return;
-        const frozen = setStatus(d120.ledger, { caller: ISSUER, status: "defaulted" });
-        if (!frozen.ok) return;
         set({
-          ledger: frozen.ledger,
-          agent: d120.agent,
+          flash: {
+            tone: r.ok ? "fail" : "ok",
+            text: r.ok ? "Fake repay succeeded — bug." : "Agent cannot authorize repayment.",
+          },
+          dual: {
+            circuit: "acknowledgeRepayment (forged)",
+            ok: r.ok,
+            publicView: r.ok ? "BUG" : "No transition.",
+            privateView: r.ok ? "Free credit" : "Issuer authentication required.",
+          },
+        });
+      },
+      attackOverLimit: () => {
+        const agent = get().agent;
+        if (!agent?.witness) {
+          set({ flash: { tone: "info", text: "Open a line first." } });
+          return;
+        }
+        const amount = agent.witness.L + 1;
+        const q = postQuote(get().ledger, {
+          caller: MERCHANT,
+          amount,
+          invoiceId: `atk-over-${nonce()}`,
+          expiry: get().ledger.clock + 10_000,
+          nonce: nonce(),
+        });
+        if (!q.ok) {
+          set({ flash: { tone: "fail", text: q.message } });
+          return;
+        }
+        const r = draw(q.ledger, {
+          agentSecret: agent.secret,
+          witness: agent.witness,
+          quote: q.quote,
+          newSalt: "atk-over",
+        });
+        set({
+          ledger: q.ledger,
           invoices: [
-            { invoiceId: "demo-40", amount: 40, Q: q40.Q, used: true, preimage: q40.quote },
+            ...get().invoices,
             {
-              invoiceId: "demo-120a",
-              amount: 120,
-              Q: q120a.Q,
+              invoiceId: q.quote.invoiceId,
+              amount,
+              Q: q.Q,
               used: false,
-              preimage: q120a.quote,
-            },
-            {
-              invoiceId: "demo-120b",
-              amount: 120,
-              Q: q120b.Q,
-              used: true,
-              preimage: q120b.quote,
+              preimage: q.quote,
             },
           ],
-          pendingRepay: 120,
-          lastAcked: 40,
-          demoStep: 9,
-          flash: {
-            tone: fail120.ok ? "ok" : "info",
-            text: "Scripted demo complete. 40 cleared, 120 blocked, issuer ack, 120 cleared, then defaulted.",
+          flash: { tone: r.ok ? "fail" : "ok", text: r.ok ? "Over-limit passed — bug." : r.message },
+          dual: {
+            circuit: "draw (over-limit)",
+            ok: r.ok,
+            publicView: r.ok ? "BUG: C moved." : "No draw transition. Reason not published.",
+            privateView: r.ok ? "Overspent." : "B + A > L rejected in-circuit.",
+          },
+        });
+      },
+      attackStale: () => {
+        const stale = get().staleWitness;
+        const agent = get().agent;
+        const openInv = get().invoices.find((i) => !i.used);
+        if (!stale || !agent || !openInv) {
+          set({
+            flash: {
+              tone: "info",
+              text: "Need a prior witness and a fresh quote. Draw once, then post another quote.",
+            },
+          });
+          return;
+        }
+        const r = draw(get().ledger, {
+          agentSecret: agent.secret,
+          witness: stale,
+          quote: openInv.preimage,
+          newSalt: "atk-stale",
+        });
+        set({
+          flash: { tone: r.ok ? "fail" : "ok", text: r.ok ? "Stale C accepted — bug." : r.message },
+          dual: {
+            circuit: "draw (stale C)",
+            ok: r.ok,
+            publicView: r.ok ? "BUG" : "No transition. Concurrent double-draw blocked.",
+            privateView: r.ok ? "Two proofs spent one C." : "Witness does not open current C.",
+          },
+        });
+      },
+      attackWrongAgent: () => {
+        const inv = get().invoices.find((i) => !i.used) ?? get().invoices[0];
+        const agent = get().agent;
+        if (!inv || !agent?.witness) {
+          set({ flash: { tone: "info", text: "Need a quote and a line." } });
+          return;
+        }
+        const r = draw(get().ledger, {
+          agentSecret: "intruder-key",
+          witness: agent.witness,
+          quote: inv.preimage,
+          newSalt: "atk-agent",
+        });
+        set({
+          flash: { tone: r.ok ? "fail" : "ok", text: r.ok ? "Wrong agent passed — bug." : r.message },
+          dual: {
+            circuit: "draw (wrong agent)",
+            ok: r.ok,
+            publicView: r.ok ? "BUG" : "No transition.",
+            privateView: r.ok ? "Identity broken." : "Secret does not own I.",
           },
         });
       },
     }),
     {
-      name: "line.protocol.v1",
+      name: "line.protocol.v2",
       storage: createJSONStorage(() => {
         if (typeof window === "undefined") {
           return {

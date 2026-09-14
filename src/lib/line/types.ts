@@ -62,6 +62,14 @@ export type QuotePreimage = {
   nonce: string;
 };
 
+export type MerchantInvoice = {
+  invoiceId: string;
+  amount: number;
+  Q: string;
+  used: boolean;
+  preimage: QuotePreimage;
+};
+
 export type RepayReceipt = {
   identity: string;
   currentC: string;
