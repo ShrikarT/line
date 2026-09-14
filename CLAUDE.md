@@ -4,41 +4,46 @@ Instructions for Claude Code / Codex / Cursor working in this repository.
 
 ## What this is
 
-Midnight Buildathon Wave 1 project: **private revolving credit for autonomous agents**.
+Midnight Buildathon Wave 1: **private revolving credit for autonomous agents**.
 
-Compact contract + TypeScript reference engine + three desks (issuer, merchant, agent) + public explorer.
+Compact contract (source of truth) + TypeScript encoding replica + three desks + public explorer.
 
 ## Commands
 
 ```bash
-npm test                 # protocol tests
+npm install
+bash scripts/install-compact.sh
+npm run compact:compile
+npm run compact:test
+npm run test:line
 npm run typecheck
-npm run dev              # web desks
+npm run dev
 ```
 
-MCP (optional):
+MCP:
 
 ```bash
-node mcp/line-mcp.mjs
+npm run mcp
 ```
 
 ## Rules
 
+- Compact is the protocol. The TypeScript engine is a replica.
 - Do not add an on-chain `canPay` circuit.
 - Do not let the agent reduce outstanding balance without an issuer receipt.
 - Do not publish amounts, limits, or merchant identities on the public ledger view.
 - Do not implement slashing economics in Wave 1.
 - Failed proofs must leave ledger state unchanged.
-- Keep `contracts/line.compact` comments in sync with `src/lib/line/protocol.ts`.
+- Do not invent Compact APIs. Pin toolchain 0.34.0 / language 0.26 / runtime 0.19.0.
 
 ## Judging
 
-Engineering 40% is the commitment state machine:
+Engineering is the commitment state machine:
 
 ```
-C = H(line:state, I, L, B, e, s)
+C = persistentCommit<LinePreimage>({I, L, B, epoch}, salt)
 draw proves B + A ≤ L and writes C'
 acknowledgeRepayment is the only way B decreases
 ```
 
-Read `docs/HANDOFF.md` and `docs/PLAN.md` before changing circuits.
+Read `docs/HANDOFF.md`, `docs/ENCODING.md`, and `docs/PLAN.md` before changing circuits.

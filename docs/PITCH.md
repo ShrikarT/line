@@ -20,11 +20,15 @@ This is not a wallet spend-cap. This is revolving credit.
 Private limit 150.
 
 1. Line opens — explorer shows a commitment, not 150.
-2. Draw 40 clears. Replay dies.
+2. Draw 40 clears. Replay actually runs and dies.
 3. Draw 120 cannot be proven.
 4. Issuer acknowledges repay 40.
-5. Draw 120 clears. Default freezes the line.
+5. Draw 120 clears. Default freezes the line. A further draw actually runs and fails.
 
 ## Wave 1 honesty
 
-No on-chain asset settlement. The merchant is authorized, not auto-paid in tokens. Wave 2 adds a shielded escrow redeemable with the same draw nullifier.
+No on-chain asset settlement. The merchant is authorized, not auto-paid in tokens.
+
+The Compact contract compiles with toolchain 0.34.0. The UI is a local simulator of that contract’s encodings — not a Midnight Preprod deployment.
+
+Wave 2 adds a shielded escrow redeemable with the same draw nullifier.
