@@ -1,7 +1,16 @@
-import { domainHash } from "./hash.ts";
 import {
-  CONTRACT_ID,
-  DOMAIN,
+  agentId,
+  contractDomain,
+  drawNullifier as encodeDrawNullifier,
+  fromHex,
+  lineStateCommit,
+  pad32,
+  publicKey,
+  quoteCommit as encodeQuoteCommit,
+  repayNullifier as encodeRepayNullifier,
+  toHex,
+} from "./encoding.ts";
+import {
   GENERIC_DRAW_FAIL,
   type AgentStore,
   type CircuitResult,
@@ -12,6 +21,7 @@ import {
   type QuotePreimage,
   type RepayReceipt,
 } from "./types.ts";
+import { ISSUER_SK, MERCHANT_SK } from "./keys.ts";
 
 export const FAIL = {
   AUTH_ISSUER: "caller is not the registered issuer",
@@ -36,55 +46,96 @@ export const FAIL = {
   RECEIPT_USED: "repayment receipt already used",
   RECEIPT_RANGE: "repayment amount is not in (0, outstanding]",
   EXPIRY: "expiry is not in the future",
+  LINE_EXPIRED: "line expired",
   CLOSED: "closed line cannot be reused in this epoch",
   ZERO: "zero-amount operations are rejected",
+  BAD_STATUS: "status transition is not allowed",
 } as const;
+
+const UINT64_MAX = 18446744073709551615n;
 
 function fail(code: string, reason: string, message = GENERIC_DRAW_FAIL): CircuitResult<never> {
   return { ok: false, code, reason, message };
 }
 
-export function identityCommitment(agentSecret: string): string {
-  return domainHash(DOMAIN.id, [agentSecret]);
+export function asBytes32(input: string): Uint8Array {
+  const clean = input.startsWith("0x") ? input.slice(2) : input;
+  if (/^[0-9a-fA-F]{64}$/.test(clean)) return fromHex(clean);
+  return pad32(input);
 }
 
-export function merchantCommitment(merchantKey: string): string {
-  return domainHash(DOMAIN.merchant, [merchantKey]);
+function u64(n: number): bigint {
+  if (!Number.isInteger(n) || n < 0 || !Number.isSafeInteger(n)) {
+    throw new RangeError("not a Uint<64>-compatible integer");
+  }
+  return BigInt(n);
+}
+
+export function identityCommitment(agentSecret: string): string {
+  return toHex(agentId(asBytes32(agentSecret)));
+}
+
+export function issuerPublicKey(issuerSecret: string): string {
+  return toHex(publicKey(asBytes32(issuerSecret)));
+}
+
+export function merchantPublicKey(merchantSecret: string): string {
+  return toHex(publicKey(asBytes32(merchantSecret)));
+}
+
+export function merchantCommitment(merchantSecret: string): string {
+  return merchantPublicKey(merchantSecret);
 }
 
 export function lineCommitment(w: LineWitness): string {
-  return domainHash(DOMAIN.state, [w.I, w.L, w.B, w.e, w.s]);
+  return toHex(
+    lineStateCommit(
+      {
+        identity: asBytes32(w.I),
+        limit: u64(w.L),
+        outstanding: u64(w.B),
+        epoch: u64(w.e),
+      },
+      asBytes32(w.s),
+    ),
+  );
 }
 
-export function quoteCommitment(q: QuotePreimage, contractId = CONTRACT_ID): string {
-  return domainHash(DOMAIN.quote, [
-    q.merchantCommitment,
-    q.amount,
-    q.invoiceId,
-    q.expiry,
-    q.nonce,
-    contractId,
-  ]);
+export function quoteCommitment(q: QuotePreimage, domain: string): string {
+  return toHex(
+    encodeQuoteCommit({
+      merchantPk: asBytes32(q.merchantCommitment),
+      invoiceId: asBytes32(q.invoiceId),
+      amount: u64(q.amount),
+      expiry: u64(q.expiry),
+      nonce: asBytes32(q.nonce),
+      domain: asBytes32(domain),
+    }),
+  );
 }
 
-export function drawNullifier(agentSecret: string, Q: string, contractId = CONTRACT_ID): string {
-  return domainHash(DOMAIN.draw, [agentSecret, Q, contractId]);
+export function drawNullifier(agentSecret: string, Q: string, domain: string): string {
+  return toHex(encodeDrawNullifier(asBytes32(agentSecret), asBytes32(Q), asBytes32(domain)));
 }
 
-export function repayNullifier(receiptNonce: string, I: string, contractId = CONTRACT_ID): string {
-  return domainHash(DOMAIN.repay, [receiptNonce, I, contractId]);
-}
-
-export function receiptCommitment(r: RepayReceipt): string {
-  return domainHash(DOMAIN.receipt, [
-    r.identity,
-    r.currentC,
-    r.amount,
-    r.paymentRef,
-    r.nonce,
-    r.expiry,
-    r.contractId,
-  ]);
+export function repayNullifier(
+  receiptNonce: string,
+  I: string,
+  currentC: string,
+  amount: number,
+  paymentRef: string,
+  domain: string,
+): string {
+  return toHex(
+    encodeRepayNullifier({
+      nonce: asBytes32(receiptNonce),
+      identity: asBytes32(I),
+      currentC: asBytes32(currentC),
+      amount: u64(amount),
+      paymentRef: asBytes32(paymentRef),
+      domain: asBytes32(domain),
+    }),
+  );
 }
 
 function pushEvent(ledger: Ledger, event: Omit<LedgerEvent, "t">): void {
@@ -93,15 +144,20 @@ function pushEvent(ledger: Ledger, event: Omit<LedgerEvent, "t">): void {
 }
 
 export function createLedger(params?: {
-  issuerPubKey?: string;
-  merchantPubKey?: string;
+  issuerSecret?: string;
+  merchantSecret?: string;
 }): Ledger {
+  const issuerSk = params?.issuerSecret ?? ISSUER_SK;
+  const merchantSk = params?.merchantSecret ?? MERCHANT_SK;
+  const issuerPk = publicKey(asBytes32(issuerSk));
+  const merchantPk = publicKey(asBytes32(merchantSk));
   return {
-    contractId: CONTRACT_ID,
-    issuerPubKey: params?.issuerPubKey ?? "issuer-demo-key",
-    merchantPubKey: params?.merchantPubKey ?? "merchant-demo-key",
+    contractDomain: toHex(contractDomain(issuerPk, merchantPk)),
+    issuerPubKey: toHex(issuerPk),
+    merchantPubKey: toHex(merchantPk),
     identityCommitment: null,
     lineCommitment: null,
+    lineExpiry: 0,
     status: "none",
     quotes: [],
     nullifiers: [],
@@ -119,16 +175,20 @@ export function cloneLedger(ledger: Ledger): Ledger {
   };
 }
 
-function isIssuer(ledger: Ledger, caller: string) {
-  return caller === ledger.issuerPubKey;
+function isIssuer(ledger: Ledger, callerSecret: string) {
+  return issuerPublicKey(callerSecret) === ledger.issuerPubKey;
 }
 
-function isMerchant(ledger: Ledger, caller: string) {
-  return caller === ledger.merchantPubKey;
+function isMerchant(ledger: Ledger, callerSecret: string) {
+  return merchantPublicKey(callerSecret) === ledger.merchantPubKey;
 }
 
 function opens(w: LineWitness, C: string | null): boolean {
   return C != null && lineCommitment(w) === C;
+}
+
+function assertSafeUint(n: number): boolean {
+  return Number.isInteger(n) && n >= 0 && Number.isSafeInteger(n);
 }
 
 export function openLine(
@@ -143,25 +203,24 @@ export function openLine(
 ): CircuitResult<{ ledger: Ledger; agent: AgentStore }> {
   const next = cloneLedger(ledger);
   if (!isIssuer(next, input.caller)) return fail("AUTH_ISSUER", FAIL.AUTH_ISSUER);
-  if (!Number.isInteger(input.limit) || input.limit <= 0) return fail("LIMIT", FAIL.LIMIT);
-  if (input.expiry <= next.clock) return fail("EXPIRY", FAIL.EXPIRY);
-  if (next.status === "open") return fail("LINE_EXISTS", FAIL.LINE_EXISTS);
-
-  const I = identityCommitment(input.agentSecret);
-  if (next.identityCommitment && next.identityCommitment !== I && next.status !== "none") {
+  if (!assertSafeUint(input.limit) || input.limit <= 0) return fail("LIMIT", FAIL.LIMIT);
+  if (!assertSafeUint(input.expiry) || input.expiry <= next.clock) return fail("EXPIRY", FAIL.EXPIRY);
+  if (next.status !== "none" && next.status !== "closed") {
     return fail("LINE_EXISTS", FAIL.LINE_EXISTS);
   }
 
+  const I = identityCommitment(input.agentSecret);
   const witness: LineWitness = {
     I,
     L: input.limit,
     B: 0,
     e: 0,
-    s: input.salt,
+    s: toHex(asBytes32(input.salt)),
   };
   const C = lineCommitment(witness);
   next.identityCommitment = I;
   next.lineCommitment = C;
+  next.lineExpiry = input.expiry;
   next.status = "open";
   pushEvent(next, {
     circuit: "openLine",
@@ -172,7 +231,7 @@ export function openLine(
   return {
     ok: true,
     ledger: next,
-    agent: { secret: input.agentSecret, witness },
+    agent: { secret: toHex(asBytes32(input.agentSecret)), witness },
   };
 }
 
@@ -188,17 +247,17 @@ export function postQuote(
 ): CircuitResult<{ ledger: Ledger; quote: QuotePreimage; Q: string }> {
   const next = cloneLedger(ledger);
   if (!isMerchant(next, input.caller)) return fail("AUTH_MERCHANT", FAIL.AUTH_MERCHANT);
-  if (!Number.isInteger(input.amount) || input.amount <= 0) return fail("ZERO", FAIL.ZERO);
-  if (input.expiry <= next.clock) return fail("EXPIRY", FAIL.EXPIRY);
+  if (!assertSafeUint(input.amount) || input.amount <= 0) return fail("ZERO", FAIL.ZERO);
+  if (!assertSafeUint(input.expiry) || input.expiry <= next.clock) return fail("EXPIRY", FAIL.EXPIRY);
 
   const preimage: QuotePreimage = {
-    merchantCommitment: merchantCommitment(next.merchantPubKey),
+    merchantCommitment: next.merchantPubKey,
     amount: input.amount,
-    invoiceId: input.invoiceId,
+    invoiceId: toHex(asBytes32(input.invoiceId)),
     expiry: input.expiry,
-    nonce: input.nonce,
+    nonce: toHex(asBytes32(input.nonce)),
   };
-  const Q = quoteCommitment(preimage, next.contractId);
+  const Q = quoteCommitment(preimage, next.contractDomain);
   if (next.quotes.some((q) => q.commitment === Q)) {
     return fail("QUOTE_USED", "quote commitment already posted");
   }
@@ -224,6 +283,7 @@ export function draw(
   const next = cloneLedger(ledger);
   if (next.status !== "open") return fail("STATUS", FAIL.STATUS);
   if (!next.lineCommitment) return fail("NO_LINE", FAIL.NO_LINE);
+  if (next.lineExpiry <= next.clock) return fail("LINE_EXPIRED", FAIL.LINE_EXPIRED);
 
   const I = identityCommitment(input.agentSecret);
   if (I !== input.witness.I || I !== next.identityCommitment) {
@@ -233,34 +293,35 @@ export function draw(
     return fail("STALE", FAIL.STALE);
   }
 
-  const Q = quoteCommitment(input.quote, next.contractId);
+  const Q = quoteCommitment(input.quote, next.contractDomain);
   const live = next.quotes.find((q) => q.commitment === Q);
   if (!live) return fail("QUOTE", FAIL.QUOTE);
   if (live.used) return fail("QUOTE_USED", FAIL.QUOTE_USED);
   if (live.expiry <= next.clock) return fail("QUOTE_EXPIRED", FAIL.QUOTE_EXPIRED);
 
-  const expectedM = merchantCommitment(next.merchantPubKey);
-  if (input.quote.merchantCommitment !== expectedM) {
+  if (input.quote.merchantCommitment !== next.merchantPubKey) {
     return fail("QUOTE_AUTH", FAIL.QUOTE_AUTH);
   }
-  if (input.quote.amount <= 0 || !Number.isInteger(input.quote.amount)) {
+  if (!assertSafeUint(input.quote.amount) || input.quote.amount <= 0) {
     return fail("ZERO", FAIL.ZERO);
   }
 
   const { L, B } = input.witness;
   const A = input.quote.amount;
   if (B < 0 || A > Number.MAX_SAFE_INTEGER - B) return fail("OVERFLOW", FAIL.OVERFLOW);
-  if (B + A > L) return fail("CAPACITY", FAIL.CAPACITY);
+  const nextB = B + A;
+  if (nextB > L) return fail("CAPACITY", FAIL.CAPACITY);
+  if (BigInt(nextB) > UINT64_MAX) return fail("OVERFLOW", FAIL.OVERFLOW);
 
-  const N = drawNullifier(input.agentSecret, Q, next.contractId);
+  const N = drawNullifier(input.agentSecret, Q, next.contractDomain);
   if (next.nullifiers.includes(N)) return fail("NULLIFIER", FAIL.NULLIFIER);
 
   const nextWitness: LineWitness = {
     I,
     L,
-    B: B + A,
+    B: nextB,
     e: input.witness.e + 1,
-    s: input.newSalt,
+    s: toHex(asBytes32(input.newSalt)),
   };
   const C2 = lineCommitment(nextWitness);
   live.used = true;
@@ -277,7 +338,7 @@ export function draw(
   return {
     ok: true,
     ledger: next,
-    agent: { secret: input.agentSecret, witness: nextWitness },
+    agent: { secret: toHex(asBytes32(input.agentSecret)), witness: nextWitness },
   };
 }
 
@@ -299,18 +360,18 @@ export function acknowledgeRepayment(
   if (!opens(input.witness, next.lineCommitment)) return fail("STALE", FAIL.STALE);
 
   const r = input.receipt;
-  if (r.contractId !== next.contractId) return fail("RECEIPT", FAIL.RECEIPT);
+  if (r.contractDomain !== next.contractDomain) return fail("RECEIPT", FAIL.RECEIPT);
   if (r.identity !== input.witness.I || r.identity !== next.identityCommitment) {
     return fail("RECEIPT", FAIL.RECEIPT);
   }
   if (r.currentC !== next.lineCommitment) return fail("RECEIPT_STALE", FAIL.RECEIPT_STALE);
-  if (r.expiry <= next.clock) return fail("EXPIRY", FAIL.EXPIRY);
+  if (!assertSafeUint(r.expiry) || r.expiry <= next.clock) return fail("EXPIRY", FAIL.EXPIRY);
 
   const R = r.amount;
   const { B, L, I, e } = input.witness;
-  if (!Number.isInteger(R) || R <= 0 || R > B) return fail("RECEIPT_RANGE", FAIL.RECEIPT_RANGE);
+  if (!assertSafeUint(R) || R <= 0 || R > B) return fail("RECEIPT_RANGE", FAIL.RECEIPT_RANGE);
 
-  const N = repayNullifier(r.nonce, I, next.contractId);
+  const N = repayNullifier(r.nonce, I, next.lineCommitment, R, r.paymentRef, next.contractDomain);
   if (next.nullifiers.includes(N)) return fail("RECEIPT_USED", FAIL.RECEIPT_USED);
 
   const nextWitness: LineWitness = {
@@ -318,14 +379,11 @@ export function acknowledgeRepayment(
     L,
     B: B - R,
     e: e + 1,
-    s: input.newSalt,
+    s: toHex(asBytes32(input.newSalt)),
   };
   const C2 = lineCommitment(nextWitness);
   next.lineCommitment = C2;
   next.nullifiers.push(N);
-  if (next.status === "defaulted" && nextWitness.B === 0) {
-    // stays defaulted until issuer reopens status; capacity restored but draws still blocked
-  }
   pushEvent(next, {
     circuit: "acknowledgeRepayment",
     ok: true,
@@ -342,7 +400,12 @@ export function setStatus(
 ): CircuitResult<{ ledger: Ledger }> {
   const next = cloneLedger(ledger);
   if (!isIssuer(next, input.caller)) return fail("AUTH_ISSUER", FAIL.AUTH_ISSUER);
-  if (!next.lineCommitment) return fail("NO_LINE", FAIL.NO_LINE);
+  if (next.status === "none" || !next.lineCommitment) return fail("NO_LINE", FAIL.NO_LINE);
+  if (input.status === ("none" as LineStatus)) return fail("BAD_STATUS", FAIL.BAD_STATUS);
+  if (next.status === "closed") return fail("CLOSED", FAIL.CLOSED);
+  if (input.status === "open" && next.status !== "open" && next.status !== "defaulted") {
+    return fail("BAD_STATUS", FAIL.BAD_STATUS);
+  }
   next.status = input.status;
   pushEvent(next, {
     circuit: "setStatus",
@@ -370,4 +433,31 @@ export function simulateDraw(
 
 export function available(w: LineWitness): number {
   return w.L - w.B;
+}
+
+export function publicLedgerView(ledger: Ledger): Pick<
+  Ledger,
+  | "contractDomain"
+  | "identityCommitment"
+  | "lineCommitment"
+  | "status"
+  | "quotes"
+  | "nullifiers"
+  | "clock"
+  | "events"
+> {
+  return {
+    contractDomain: ledger.contractDomain,
+    identityCommitment: ledger.identityCommitment,
+    lineCommitment: ledger.lineCommitment,
+    status: ledger.status,
+    quotes: ledger.quotes.map((q) => ({
+      commitment: q.commitment,
+      expiry: q.expiry,
+      used: q.used,
+    })),
+    nullifiers: [...ledger.nullifiers],
+    clock: ledger.clock,
+    events: ledger.events.map((e) => ({ ...e })),
+  };
 }
