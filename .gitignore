@@ -1,3 +1,12 @@
 node_modules
-.DS_Store
+dist
+.vercel
+.line-mcp-state.json
 *.log
+.env
+.env.*
+.DS_Store
+coverage
+.compact-keys
+proving-keys
+*.pk

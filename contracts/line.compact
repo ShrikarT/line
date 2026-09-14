@@ -1,17 +1,23 @@
-// Line — private revolving credit authorization
-// Midnight Compact circuit spec (Wave 1)
+// Line — private revolving credit authorization (Wave 1)
+// Compact language 0.26 / toolchain 0.34.0 / compact-runtime 0.19.0
 //
-// Executable, tested semantics: src/lib/line/protocol.ts
-// Field packing for Uint values in hashes is defined in the TypeScript
-// engine (domain-tagged `type:value` encodings). Keep both files aligned.
+// A successful draw is an issuer-backed, non-replayable authorization.
+// It is not an on-chain asset transfer. The merchant is not automatically paid.
 //
-// Wave 1: a successful draw is an issuer-backed, non-replayable
-// authorization — not an on-chain asset transfer.
+// Source of truth for commitments:
+//   C = persistentCommit<LinePreimage>({ identity: I, limit: L, outstanding: B, epoch }, salt)
+// Compact's persistentCommit is the documented commitment primitive. The salt is the opening.
+// Domain separation for hashes uses pad(32, "line:…") tags, matching Compact pad().
 //
-// Public: I, C, status, Q, nullifiers, clock
-// Private: k, L, B, e, s, quote preimage, receipt preimage
-
-pragma language_version 0.23;
+// Authorization is DApp-scoped and hash-based (not a wallet signature):
+//   publicKey(sk) = persistentHash([pad(32, "line:pk"), sk])
+// Constructor seals issuer pk, merchant pk, and contractDomain.
+//
+// Status:
+//   CLOSED is terminal for setStatus. A new line after CLOSED requires openLine
+//   (fresh C0, epoch 0, fresh salt). DEFAULTED may return to OPEN via setStatus
+//   without rotating C; draws stay blocked until that happens.
+pragma language_version 0.26;
 
 import CompactStandardLibrary;
 
@@ -27,114 +33,260 @@ export struct QuoteMeta {
   used: Boolean;
 }
 
+export struct LinePreimage {
+  identity: Bytes<32>;
+  limit: Uint<64>;
+  outstanding: Uint<64>;
+  epoch: Uint<64>;
+}
+
 export sealed ledger issuer: Bytes<32>;
 export sealed ledger merchant: Bytes<32>;
 export sealed ledger contractDomain: Bytes<32>;
 
 export ledger identityCommit: Bytes<32>;
 export ledger lineCommit: Bytes<32>;
+export ledger lineExpiry: Uint<64>;
 export ledger status: Status;
 export ledger quotes: Map<Bytes<32>, QuoteMeta>;
 export ledger nullifiers: Set<Bytes<32>>;
 export ledger clock: Counter;
 
+witness callerSecret(): Bytes<32>;
 witness agentSecret(): Bytes<32>;
-witness lineLimit(): Uint<64>;
-witness outstanding(): Uint<64>;
-witness epoch(): Uint<64>;
 witness salt(): Bytes<32>;
 witness newSalt(): Bytes<32>;
-witness quoteAmount(): Uint<64>;
+witness invoiceId(): Bytes<32>;
 witness quoteNonce(): Bytes<32>;
-witness repayAmount(): Uint<64>;
 witness receiptNonce(): Bytes<32>;
+witness paymentRef(): Bytes<32>;
 
-circuit agentId(k: Bytes<32>): Bytes<32> {
-  return persistentHash<Vector<2, Bytes<32>>>([
-    pad(32, "line:id"),
-    k
+circuit publicKey(sk: Bytes<32>): Bytes<32> {
+  return persistentHash<Vector<2, Bytes<32>>>([pad(32, "line:pk"), sk]);
+}
+
+circuit agentId(sk: Bytes<32>): Bytes<32> {
+  return persistentHash<Vector<2, Bytes<32>>>([pad(32, "line:id"), sk]);
+}
+
+circuit encodeU64(n: Uint<64>): Bytes<32> {
+  return n as Bytes<32>;
+}
+
+circuit lineStateCommit(p: LinePreimage, s: Bytes<32>): Bytes<32> {
+  return persistentCommit<LinePreimage>(p, s);
+}
+
+circuit quoteCommit(
+  merchantPk: Bytes<32>,
+  inv: Bytes<32>,
+  amount: Uint<64>,
+  expiry: Uint<64>,
+  nonce: Bytes<32>,
+  domain: Bytes<32>
+): Bytes<32> {
+  return persistentHash<Vector<7, Bytes<32>>>([
+    pad(32, "line:quote"),
+    merchantPk,
+    inv,
+    encodeU64(amount),
+    encodeU64(expiry),
+    nonce,
+    domain
   ]);
 }
 
-circuit drawNf(k: Bytes<32>, Q: Bytes<32>): Bytes<32> {
+circuit drawNullifier(sk: Bytes<32>, Q: Bytes<32>, domain: Bytes<32>): Bytes<32> {
   return persistentHash<Vector<4, Bytes<32>>>([
     pad(32, "line:draw"),
-    k,
+    sk,
     Q,
-    contractDomain
+    domain
   ]);
 }
 
-circuit repayNf(n: Bytes<32>, I: Bytes<32>): Bytes<32> {
-  return persistentHash<Vector<4, Bytes<32>>>([
+circuit repayNullifier(
+  nonce: Bytes<32>,
+  I: Bytes<32>,
+  C: Bytes<32>,
+  amount: Uint<64>,
+  payRef: Bytes<32>,
+  domain: Bytes<32>
+): Bytes<32> {
+  return persistentHash<Vector<7, Bytes<32>>>([
     pad(32, "line:repay"),
-    n,
+    nonce,
     I,
-    contractDomain
+    C,
+    encodeU64(amount),
+    payRef,
+    domain
   ]);
 }
 
-// Issuer-authenticated. Creates C0 with B = 0.
-export circuit openLine(expiry: Uint<64>): [] {
+constructor(issuerSk: Bytes<32>, merchantSk: Bytes<32>) {
+  const ipk = publicKey(issuerSk);
+  const mpk = publicKey(merchantSk);
+  issuer = disclose(ipk);
+  merchant = disclose(mpk);
+  contractDomain = disclose(persistentHash<Vector<3, Bytes<32>>>([
+    pad(32, "line:domain"),
+    ipk,
+    mpk
+  ]));
+  status = Status.NONE;
+}
+
+circuit requireIssuer(): [] {
+  assert(issuer == publicKey(callerSecret()), "not issuer");
+}
+
+circuit requireMerchant(): [] {
+  assert(merchant == publicKey(callerSecret()), "not merchant");
+}
+
+export circuit openLine(limit: Uint<64>, expiry: Uint<64>): [] {
+  requireIssuer();
   assert(status == Status.NONE || status == Status.CLOSED, "line already open");
+  assert(limit > 0, "limit");
   assert(expiry > clock, "expiry");
-  const L = lineLimit();
-  assert(L > 0, "limit");
   const k = agentSecret();
   const I = agentId(k);
-  const s = salt();
+  const p = LinePreimage {
+    identity: I,
+    limit: limit,
+    outstanding: 0,
+    epoch: 0
+  };
+  const C0 = lineStateCommit(p, salt());
   identityCommit = disclose(I);
-  lineCommit = disclose(s);
+  lineCommit = disclose(C0);
+  lineExpiry = disclose(expiry);
   status = Status.OPEN;
+  clock.increment(1);
 }
 
-// Merchant-authenticated. Stores opaque Q only.
-export circuit postQuote(quoteCommit: Bytes<32>, expiry: Uint<64>): [] {
+export circuit postQuote(amount: Uint<64>, expiry: Uint<64>): [] {
+  requireMerchant();
+  assert(amount > 0, "zero");
   assert(expiry > clock, "expiry");
-  assert(!quotes.member(quoteCommit), "quote exists");
-  const meta = QuoteMeta { expiry: expiry, used: false };
-  quotes.insert(quoteCommit, meta);
+  const Q = quoteCommit(
+    merchant,
+    invoiceId(),
+    amount,
+    expiry,
+    quoteNonce(),
+    contractDomain
+  );
+  const pubQ = disclose(Q);
+  assert(!quotes.member(pubQ), "quote exists");
+  quotes.insert(pubQ, QuoteMeta { expiry: disclose(expiry), used: false });
+  clock.increment(1);
 }
 
-// Agent-authenticated. Enforces B + A <= L. Rotates C. Consumes Q.
-export circuit draw(quoteCommit: Bytes<32>): [] {
+export circuit draw(
+  quoteCommitPublic: Bytes<32>,
+  limit: Uint<64>,
+  outstanding: Uint<64>,
+  epoch: Uint<64>,
+  amount: Uint<64>
+): [] {
   assert(status == Status.OPEN, "status");
+  assert(lineExpiry > clock, "line expired");
   const k = agentSecret();
   const I = agentId(k);
   assert(I == identityCommit, "agent");
-  const L = lineLimit();
-  const B = outstanding();
-  const A = quoteAmount();
-  assert(A > 0, "zero");
-  assert(B + A >= B, "overflow");
-  assert(B + A <= L, "capacity");
-  const meta = quotes.lookup(quoteCommit);
+  const p = LinePreimage {
+    identity: I,
+    limit: limit,
+    outstanding: outstanding,
+    epoch: epoch
+  };
+  assert(lineStateCommit(p, salt()) == lineCommit, "stale");
+  const Q = disclose(quoteCommitPublic);
+  assert(quotes.member(Q), "quote");
+  const meta = quotes.lookup(Q);
   assert(!meta.used, "used");
   assert(meta.expiry > clock, "expired");
-  const N = drawNf(k, quoteCommit);
-  assert(!nullifiers.member(N), "nullifier");
-  quotes.insert(quoteCommit, QuoteMeta { expiry: meta.expiry, used: true });
-  nullifiers.insert(N);
-  lineCommit = disclose(newSalt());
+  const recon = quoteCommit(
+    merchant,
+    invoiceId(),
+    amount,
+    meta.expiry,
+    quoteNonce(),
+    contractDomain
+  );
+  assert(disclose(recon) == Q, "quote preimage");
+  assert(amount > 0, "zero");
+  const nextB = outstanding + amount;
+  assert(nextB >= outstanding, "overflow");
+  assert(nextB <= limit, "capacity");
+  const N = drawNullifier(k, Q, contractDomain);
+  const pubN = disclose(N);
+  assert(!nullifiers.member(pubN), "nullifier");
+  quotes.insert(Q, QuoteMeta { expiry: meta.expiry, used: true });
+  nullifiers.insert(pubN);
+  const p2 = LinePreimage {
+    identity: I,
+    limit: limit,
+    outstanding: nextB as Uint<64>,
+    epoch: (epoch + 1) as Uint<64>
+  };
+  lineCommit = disclose(lineStateCommit(p2, newSalt()));
+  clock.increment(1);
 }
 
-// Issuer-authenticated. ONLY circuit that decreases B.
-export circuit acknowledgeRepayment(): [] {
+export circuit acknowledgeRepayment(
+  limit: Uint<64>,
+  outstanding: Uint<64>,
+  epoch: Uint<64>,
+  amount: Uint<64>,
+  receiptExpiry: Uint<64>
+): [] {
+  requireIssuer();
   assert(status == Status.OPEN || status == Status.DEFAULTED, "status");
   const I = identityCommit;
-  const B = outstanding();
-  const R = repayAmount();
-  assert(R > 0, "zero");
-  assert(R <= B, "range");
-  const N = repayNf(receiptNonce(), I);
-  assert(!nullifiers.member(N), "receipt used");
-  nullifiers.insert(N);
-  lineCommit = disclose(newSalt());
+  const C = lineCommit;
+  const p = LinePreimage {
+    identity: I,
+    limit: limit,
+    outstanding: outstanding,
+    epoch: epoch
+  };
+  assert(lineStateCommit(p, salt()) == C, "stale");
+  assert(amount > 0, "zero");
+  assert(amount <= outstanding, "range");
+  assert(receiptExpiry > clock, "expiry");
+  const N = repayNullifier(
+    receiptNonce(),
+    I,
+    C,
+    amount,
+    paymentRef(),
+    contractDomain
+  );
+  const pubN = disclose(N);
+  assert(!nullifiers.member(pubN), "receipt used");
+  nullifiers.insert(pubN);
+  const p2 = LinePreimage {
+    identity: I,
+    limit: limit,
+    outstanding: (outstanding - amount) as Uint<64>,
+    epoch: (epoch + 1) as Uint<64>
+  };
+  lineCommit = disclose(lineStateCommit(p2, newSalt()));
+  clock.increment(1);
 }
 
-// Issuer-authenticated.
 export circuit setStatus(next: Status): [] {
+  requireIssuer();
+  const n = disclose(next);
   assert(status != Status.NONE, "no line");
-  assert(next != Status.NONE, "bad status");
-  status = next;
+  assert(n != Status.NONE, "bad status");
+  assert(status != Status.CLOSED, "closed");
+  if (n == Status.OPEN) {
+    assert(status == Status.OPEN || status == Status.DEFAULTED, "only defaulted reopens");
+  }
+  status = n;
+  clock.increment(1);
 }

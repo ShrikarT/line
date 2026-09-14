@@ -8,41 +8,38 @@ Line is **not** a wallet spend-cap and **not** a private IDO. It is issuer-backe
 
 ## Non-negotiables
 
-1. Agents cannot call repay. Only `acknowledgeRepayment` (issuer) reduces `B`.
-2. Do not claim the merchant was paid in assets. Wave 1 is authorization only (Option A).
-3. Failed circuits write nothing. UI copy: "Clearance could not be proven." Never leak "insufficient balance" to the public view.
-4. Quote preimages stay off the ledger. Public `Q` is opaque.
-5. Nullifiers include the agent secret (draws) or issuer receipt nonce (repays) plus a domain tag.
-6. One issuer, one merchant, one live line per identity in v1.
-7. Keep Compact and the TypeScript engine semantically aligned. If they drift, the engine tests win for the demo; then update Compact.
+1. Compact (`contracts/line.compact`) is the source of truth. TypeScript is a replica of Compact encodings, not a SHA-256 parallel.
+2. Agents cannot call repay. Only `acknowledgeRepayment` (issuer) reduces `B`.
+3. Do not claim the merchant was paid in assets. Wave 1 is authorization only.
+4. Failed circuits write nothing. UI copy: "Clearance could not be proven."
+5. Quote preimages stay off the ledger. Public `Q` is opaque.
+6. Nullifiers are domain-separated (`line:draw` / `line:repay`) and secret-bound.
+7. One issuer, one merchant, one live line per instance in v1.
+8. `CLOSED` cannot `setStatus` back to OPEN. A new line requires `openLine` (fresh `C0`).
 
 ## Where things live
 
 | Path | Owner |
 |---|---|
-| `contracts/line.compact` | Circuit spec for Midnight judges |
-| `src/lib/line/protocol.ts` | Executable reference |
-| `src/lib/line/protocol.test.ts` | Adversarial suite |
-| `src/routes/` | Desks + explorer |
-| `mcp/line-mcp.mjs` | Thin `draw` tool |
-| `docs/` | Plan, progress, pitch |
+| `contracts/line.compact` | Protocol source of truth |
+| `contracts/managed/line` | Compiler output (skip-zk) |
+| `src/lib/line/encoding.ts` | compact-runtime encodings |
+| `src/lib/line/protocol.ts` | Reference engine (UI / MCP) |
+| `src/lib/line/compact.test.ts` | Compact simulator tests |
+| `src/lib/line/protocol.test.ts` | Reference-engine tests |
+| `mcp/line-mcp.mjs` | Local `status` / `draw` / `seed` |
+| `docs/ENCODING.md` | Hash / pad / Uint packing |
 
 ## Demo sequence (do not invent a cooler one)
 
-`L = 150` private.
+`L = 150` private. 11 snapshots (0–10). Replay, over-limit, and post-default failure **execute**, they are not narrated.
 
-1. Issuer `openLine`
-2. Explorer shows `C0` + `open` — no 150
-3. Merchant `postQuote` 40 — explorer shows opaque `Q`
-4. Agent `draw` 40 — `C0 → C1`
-5. Replay draw fails
-6. Quote 120 — draw fails locally
-7. Off-chain payment narrated
-8. Issuer `acknowledgeRepayment(40)` — `C1 → C2`
-9. Draw 120 succeeds; then `setStatus(defaulted)` blocks further draws
+## Compiler
 
-## Next agent after Wave 1
+Toolchain 0.34.0, language 0.26.0, runtime 0.19.0.
 
-Wave 2: shielded escrow redeemable by `N_draw`; note-style unlinkable draws; portable issuer credential; second merchant.
-
-Read `docs/ROADMAP.md` before expanding scope. Wave 1 leftover is the attack lab, dual ledger, step demo, and extra tests — not escrow.
+```bash
+bash scripts/install-compact.sh
+npm run compact:compile
+npm run compact:test
+```

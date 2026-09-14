@@ -10,7 +10,8 @@ import {
   setStatus,
 } from "./protocol.ts";
 import { snapshotAt } from "./demo.ts";
-import { AGENT, ISSUER, MERCHANT } from "./keys.ts";
+import { AGENT_SK, ISSUER_SK, MERCHANT_SK } from "./keys.ts";
+import { randomBytes32, toHex } from "./encoding.ts";
 import type {
   AgentStore,
   Ledger,
@@ -18,9 +19,8 @@ import type {
   MerchantInvoice,
   RepayReceipt,
 } from "./types.ts";
-import { CONTRACT_ID } from "./types.ts";
 
-export { AGENT, ISSUER, MERCHANT } from "./keys.ts";
+export { AGENT_SK as AGENT, ISSUER_SK as ISSUER, MERCHANT_SK as MERCHANT } from "./keys.ts";
 export type { MerchantInvoice } from "./types.ts";
 
 export type Flash = {
@@ -69,12 +69,40 @@ type LineState = {
   attackWrongAgent: () => void;
 };
 
-function nonce() {
-  return Math.random().toString(36).slice(2, 10);
+function freshSalt() {
+  return toHex(randomBytes32());
 }
 
+const DEMO_PUBLIC = [
+  "Empty public ledger.",
+  "C0 + open. No limit.",
+  "Same public C0. Explorer has no books.",
+  "Opaque Q40.",
+  "C0 → C1. Nullifier set.",
+  "No new public transition.",
+  "No new public transition.",
+  "C1 → C2. Issuer ack.",
+  "C2 → C3.",
+  "Status defaulted.",
+  "No new public transition.",
+];
+
+const DEMO_PRIVATE = [
+  "Keys only.",
+  "L=150 B=0.",
+  "L=150 B=0. Explorer still blind.",
+  "Merchant holds 40.",
+  "B=40 available=110.",
+  "Replay rejected privately.",
+  "40+120>150. Generic fail.",
+  "B=0 available=150.",
+  "B=120 available=30.",
+  "Draws frozen.",
+  "Post-default draw rejected.",
+];
+
 const empty = () => ({
-  ledger: createLedger({ issuerPubKey: ISSUER, merchantPubKey: MERCHANT }),
+  ledger: createLedger({ issuerSecret: ISSUER_SK, merchantSecret: MERCHANT_SK }),
   agent: null as AgentStore | null,
   invoices: [] as MerchantInvoice[],
   pendingRepay: 0,
@@ -97,6 +125,7 @@ export const useLine = create<LineState>()(
         const meta = [
           "Genesis",
           "openLine",
+          "Explorer",
           "postQuote 40",
           "draw 40",
           "Replay",
@@ -104,6 +133,7 @@ export const useLine = create<LineState>()(
           "Issuer ack 40",
           "draw 120",
           "Defaulted",
+          "Post-default fail",
         ][snap.step];
         set({
           ledger: snap.ledger,
@@ -120,37 +150,17 @@ export const useLine = create<LineState>()(
           dual: {
             circuit: meta ?? "demo",
             ok: !snap.lastFail,
-            publicView: [
-              "Empty public ledger.",
-              "C0 + open. No limit.",
-              "Opaque Q40.",
-              "C0 → C1. Nullifier set.",
-              "No new public transition.",
-              "No new public transition.",
-              "C1 → C2. Issuer ack.",
-              "C2 → C3.",
-              "Status defaulted.",
-            ][snap.step]!,
-            privateView: [
-              "Keys only.",
-              "L=150 B=0.",
-              "Merchant holds 40.",
-              "B=40 available=110.",
-              "Replay rejected privately.",
-              "40+120>150. Generic fail.",
-              "B=0 available=150.",
-              "B=120 available=30.",
-              "Draws frozen.",
-            ][snap.step]!,
+            publicView: DEMO_PUBLIC[snap.step]!,
+            privateView: DEMO_PRIVATE[snap.step]!,
           },
         });
       },
       doOpen: (limit = 150) => {
         const r = openLine(get().ledger, {
-          caller: ISSUER,
-          agentSecret: AGENT,
+          caller: ISSUER_SK,
+          agentSecret: AGENT_SK,
           limit,
-          salt: `s-${nonce()}`,
+          salt: freshSalt(),
           expiry: get().ledger.clock + 10_000,
         });
         if (!r.ok) {
@@ -179,13 +189,13 @@ export const useLine = create<LineState>()(
         });
       },
       doQuote: (amount, invoiceId) => {
-        const id = invoiceId ?? `inv-${amount}-${nonce()}`;
+        const id = invoiceId ?? `inv-${amount}-${freshSalt().slice(0, 8)}`;
         const r = postQuote(get().ledger, {
-          caller: MERCHANT,
+          caller: MERCHANT_SK,
           amount,
           invoiceId: id,
           expiry: get().ledger.clock + 10_000,
-          nonce: nonce(),
+          nonce: freshSalt(),
         });
         if (!r.ok) {
           set({ flash: { tone: "fail", text: r.message } });
@@ -218,7 +228,7 @@ export const useLine = create<LineState>()(
           agentSecret: agent.secret,
           witness: agent.witness,
           quote: inv.preimage,
-          newSalt: `s-${nonce()}`,
+          newSalt: freshSalt(),
         });
         if (!r.ok) {
           set({
@@ -258,21 +268,21 @@ export const useLine = create<LineState>()(
           return;
         }
         const R = amount ?? get().pendingRepay;
-        const n = nonce();
+        const n = freshSalt();
         const receipt: RepayReceipt = {
           identity: agent.witness.I,
           currentC: C,
           amount: R,
-          paymentRef: `desk-${n}`,
+          paymentRef: `desk-${n.slice(0, 12)}`,
           nonce: n,
           expiry: get().ledger.clock + 10_000,
-          contractId: CONTRACT_ID,
+          contractDomain: get().ledger.contractDomain,
         };
         const r = acknowledgeRepayment(get().ledger, {
-          caller: ISSUER,
+          caller: ISSUER_SK,
           witness: agent.witness,
           receipt,
-          newSalt: `s-${nonce()}`,
+          newSalt: freshSalt(),
         });
         if (!r.ok) {
           set({ flash: { tone: "fail", text: r.message } });
@@ -294,7 +304,7 @@ export const useLine = create<LineState>()(
         });
       },
       doStatus: (status) => {
-        const r = setStatus(get().ledger, { caller: ISSUER, status });
+        const r = setStatus(get().ledger, { caller: ISSUER_SK, status });
         if (!r.ok) {
           set({ flash: { tone: "fail", text: r.message } });
           return;
@@ -310,7 +320,7 @@ export const useLine = create<LineState>()(
           },
         });
       },
-      runDemo: () => get().setDemoStep(8),
+      runDemo: () => get().setDemoStep(10),
       attackReplay: () => {
         const used = get().invoices.find((i) => i.used);
         const agent = get().agent;
@@ -322,7 +332,7 @@ export const useLine = create<LineState>()(
           agentSecret: agent.secret,
           witness: agent.witness,
           quote: used.preimage,
-          newSalt: "atk-replay",
+          newSalt: freshSalt(),
         });
         set({
           flash: { tone: r.ok ? "fail" : "ok", text: r.ok ? "Replay unexpectedly succeeded." : r.message },
@@ -342,18 +352,18 @@ export const useLine = create<LineState>()(
           return;
         }
         const r = acknowledgeRepayment(get().ledger, {
-          caller: AGENT,
+          caller: AGENT_SK,
           witness: agent.witness,
           receipt: {
             identity: agent.witness.I,
             currentC: C,
             amount: Math.max(1, agent.witness.B || 1),
             paymentRef: "fake",
-            nonce: "fake",
+            nonce: freshSalt(),
             expiry: get().ledger.clock + 10_000,
-            contractId: CONTRACT_ID,
+            contractDomain: get().ledger.contractDomain,
           },
-          newSalt: "atk-fake",
+          newSalt: freshSalt(),
         });
         set({
           flash: {
@@ -376,11 +386,11 @@ export const useLine = create<LineState>()(
         }
         const amount = agent.witness.L + 1;
         const q = postQuote(get().ledger, {
-          caller: MERCHANT,
+          caller: MERCHANT_SK,
           amount,
-          invoiceId: `atk-over-${nonce()}`,
+          invoiceId: `atk-over-${freshSalt().slice(0, 8)}`,
           expiry: get().ledger.clock + 10_000,
-          nonce: nonce(),
+          nonce: freshSalt(),
         });
         if (!q.ok) {
           set({ flash: { tone: "fail", text: q.message } });
@@ -390,7 +400,7 @@ export const useLine = create<LineState>()(
           agentSecret: agent.secret,
           witness: agent.witness,
           quote: q.quote,
-          newSalt: "atk-over",
+          newSalt: freshSalt(),
         });
         set({
           ledger: q.ledger,
@@ -430,7 +440,7 @@ export const useLine = create<LineState>()(
           agentSecret: agent.secret,
           witness: stale,
           quote: openInv.preimage,
-          newSalt: "atk-stale",
+          newSalt: freshSalt(),
         });
         set({
           flash: { tone: r.ok ? "fail" : "ok", text: r.ok ? "Stale C accepted — bug." : r.message },
@@ -453,7 +463,7 @@ export const useLine = create<LineState>()(
           agentSecret: "intruder-key",
           witness: agent.witness,
           quote: inv.preimage,
-          newSalt: "atk-agent",
+          newSalt: freshSalt(),
         });
         set({
           flash: { tone: r.ok ? "fail" : "ok", text: r.ok ? "Wrong agent passed — bug." : r.message },
@@ -467,7 +477,7 @@ export const useLine = create<LineState>()(
       },
     }),
     {
-      name: "line.protocol.v2",
+      name: "line.protocol.v3",
       storage: createJSONStorage(() => {
         if (typeof window === "undefined") {
           return {
