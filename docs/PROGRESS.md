@@ -2,21 +2,26 @@
 
 ## M0 — Spec and agent files — done
 
-Pushed: https://github.com/ShrikarT/line
+- [x] PLAN.md, PROGRESS.md, CLAUDE.md, AGENTS.md, HANDOFF.md, PITCH.md, LICENSE
+- [ ] Push to https://github.com/ShrikarT/line (this commit)
 
-## M1 — Protocol — done
+## M1 — Protocol — done locally
 
-- Compact spec in `contracts/line.compact`
-- TypeScript engine + 20 tests
-- Pushed on `main`
+- [x] `contracts/line.compact`
+- [x] TypeScript engine + domain-tagged SHA-256
+- [x] 20 adversarial tests passing
+- [ ] Push
 
-## M2 — Product UI — done
+## M2 — Product UI — in progress
 
-- Issuer / merchant / agent desks + explorer
-- Scripted 9-step demo
-- Pushed on `main`
+- [x] Issuer / merchant / agent desks
+- [x] Public explorer
+- [x] Scripted demo
+- [ ] Browser QA
+- [ ] Push
 
-## M3 — Distribution — done
+## M3 — Distribution
 
-- MCP wrapper
-- README + PITCH
+- [x] MCP wrapper
+- [x] README
+- [ ] Push
