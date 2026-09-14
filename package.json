@@ -1,0 +1,10 @@
+{
+  "name": "line",
+  "private": true,
+  "type": "module",
+  "description": "Private revolving credit authorization for autonomous agents on Midnight.",
+  "license": "Apache-2.0",
+  "scripts": {
+    "test": "node --experimental-strip-types --test src/lib/line/protocol.test.ts"
+  }
+}

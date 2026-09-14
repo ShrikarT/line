@@ -1,0 +1,140 @@
+// Line — private revolving credit authorization
+// Midnight Compact circuit spec (Wave 1)
+//
+// Executable, tested semantics: src/lib/line/protocol.ts
+// Field packing for Uint values in hashes is defined in the TypeScript
+// engine (domain-tagged `type:value` encodings). Keep both files aligned.
+//
+// Wave 1: a successful draw is an issuer-backed, non-replayable
+// authorization — not an on-chain asset transfer.
+//
+// Public: I, C, status, Q, nullifiers, clock
+// Private: k, L, B, e, s, quote preimage, receipt preimage
+
+pragma language_version 0.23;
+
+import CompactStandardLibrary;
+
+export enum Status {
+  NONE,
+  OPEN,
+  DEFAULTED,
+  CLOSED
+}
+
+export struct QuoteMeta {
+  expiry: Uint<64>;
+  used: Boolean;
+}
+
+export sealed ledger issuer: Bytes<32>;
+export sealed ledger merchant: Bytes<32>;
+export sealed ledger contractDomain: Bytes<32>;
+
+export ledger identityCommit: Bytes<32>;
+export ledger lineCommit: Bytes<32>;
+export ledger status: Status;
+export ledger quotes: Map<Bytes<32>, QuoteMeta>;
+export ledger nullifiers: Set<Bytes<32>>;
+export ledger clock: Counter;
+
+witness agentSecret(): Bytes<32>;
+witness lineLimit(): Uint<64>;
+witness outstanding(): Uint<64>;
+witness epoch(): Uint<64>;
+witness salt(): Bytes<32>;
+witness newSalt(): Bytes<32>;
+witness quoteAmount(): Uint<64>;
+witness quoteNonce(): Bytes<32>;
+witness repayAmount(): Uint<64>;
+witness receiptNonce(): Bytes<32>;
+
+circuit agentId(k: Bytes<32>): Bytes<32> {
+  return persistentHash<Vector<2, Bytes<32>>>([
+    pad(32, "line:id"),
+    k
+  ]);
+}
+
+circuit drawNf(k: Bytes<32>, Q: Bytes<32>): Bytes<32> {
+  return persistentHash<Vector<4, Bytes<32>>>([
+    pad(32, "line:draw"),
+    k,
+    Q,
+    contractDomain
+  ]);
+}
+
+circuit repayNf(n: Bytes<32>, I: Bytes<32>): Bytes<32> {
+  return persistentHash<Vector<4, Bytes<32>>>([
+    pad(32, "line:repay"),
+    n,
+    I,
+    contractDomain
+  ]);
+}
+
+// Issuer-authenticated. Creates C0 with B = 0.
+export circuit openLine(expiry: Uint<64>): [] {
+  assert(status == Status.NONE || status == Status.CLOSED, "line already open");
+  assert(expiry > clock, "expiry");
+  const L = lineLimit();
+  assert(L > 0, "limit");
+  const k = agentSecret();
+  const I = agentId(k);
+  const s = salt();
+  identityCommit = disclose(I);
+  lineCommit = disclose(s);
+  status = Status.OPEN;
+}
+
+// Merchant-authenticated. Stores opaque Q only.
+export circuit postQuote(quoteCommit: Bytes<32>, expiry: Uint<64>): [] {
+  assert(expiry > clock, "expiry");
+  assert(!quotes.member(quoteCommit), "quote exists");
+  const meta = QuoteMeta { expiry: expiry, used: false };
+  quotes.insert(quoteCommit, meta);
+}
+
+// Agent-authenticated. Enforces B + A <= L. Rotates C. Consumes Q.
+export circuit draw(quoteCommit: Bytes<32>): [] {
+  assert(status == Status.OPEN, "status");
+  const k = agentSecret();
+  const I = agentId(k);
+  assert(I == identityCommit, "agent");
+  const L = lineLimit();
+  const B = outstanding();
+  const A = quoteAmount();
+  assert(A > 0, "zero");
+  assert(B + A >= B, "overflow");
+  assert(B + A <= L, "capacity");
+  const meta = quotes.lookup(quoteCommit);
+  assert(!meta.used, "used");
+  assert(meta.expiry > clock, "expired");
+  const N = drawNf(k, quoteCommit);
+  assert(!nullifiers.member(N), "nullifier");
+  quotes.insert(quoteCommit, QuoteMeta { expiry: meta.expiry, used: true });
+  nullifiers.insert(N);
+  lineCommit = disclose(newSalt());
+}
+
+// Issuer-authenticated. ONLY circuit that decreases B.
+export circuit acknowledgeRepayment(): [] {
+  assert(status == Status.OPEN || status == Status.DEFAULTED, "status");
+  const I = identityCommit;
+  const B = outstanding();
+  const R = repayAmount();
+  assert(R > 0, "zero");
+  assert(R <= B, "range");
+  const N = repayNf(receiptNonce(), I);
+  assert(!nullifiers.member(N), "receipt used");
+  nullifiers.insert(N);
+  lineCommit = disclose(newSalt());
+}
+
+// Issuer-authenticated.
+export circuit setStatus(next: Status): [] {
+  assert(status != Status.NONE, "no line");
+  assert(next != Status.NONE, "bad status");
+  status = next;
+}
