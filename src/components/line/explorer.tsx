@@ -10,8 +10,9 @@ export function ExplorerPanel() {
   return (
     <Panel kicker="Public ledger" title="What the chain discloses">
       <p className="text-sm text-muted">
-        Amounts, limits, balances, and counterparties are hidden. Public explorer shows verified
-        reserve solvency, commitment progression, anonymous note settlements, and domain nonce.
+        Credit limits ($L$), current debt ($B$), and available capacity are confidential in ZK.
+        The public explorer verifies reserve solvency, commitment progression, anonymous claim notes,
+        and instance domain nonce. Note claim amounts and reserve state deltas are public on-chain.
       </p>
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-6">
         <Stat label="Status" value={ledger.status} />
@@ -23,7 +24,7 @@ export function ExplorerPanel() {
       </div>
 
       <div className="rounded border border-border bg-surface p-3 space-y-2">
-        <p className="text-xs font-semibold uppercase tracking-wider text-muted">Reserve Accounting (Wave 2 Settlement)</p>
+        <p className="text-xs font-semibold uppercase tracking-wider text-muted">On-Chain Settlement Reserve Capacity</p>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <Stat label="Total Reserve" value={ledger.totalReserve ?? 0} />
           <Stat label="Encumbered" value={ledger.encumberedReserve ?? 0} />
@@ -40,14 +41,14 @@ export function ExplorerPanel() {
 
       {ledger.notes.length > 0 && (
         <div className="border-t border-border pt-4 space-y-2">
-          <p className="text-xs font-semibold uppercase tracking-wider text-muted">Settlement Notes ({ledger.notes.length})</p>
+          <p className="text-xs font-semibold uppercase tracking-wider text-muted">Settlement Claims ({ledger.notes.length})</p>
           <ul className="space-y-2">
             {ledger.notes.map((n) => (
               <li key={n.commitment} className="flex flex-wrap items-center justify-between gap-2 text-xs border-b border-border/50 pb-2">
                 <div>
-                  <span className="font-mono font-medium">Note {n.amount}</span>
+                  <span className="font-mono font-medium">Claim {n.amount}</span>
                   <span className="ml-2 text-muted">
-                    {n.redeemed ? "Redeemed (Paid)" : n.cancelled ? "Cancelled/Expired" : "Encumbered (Active)"}
+                    {n.redeemed ? "Redeemed (Claim Settled)" : n.cancelled ? "Cancelled/Expired" : "Encumbered (Active Claim)"}
                   </span>
                 </div>
                 <Mono value={n.commitment} />

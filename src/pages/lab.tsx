@@ -42,7 +42,7 @@ export function LabPage() {
           </div>
 
           <div className="space-y-2 border-t border-border pt-4">
-            <p className="text-xs font-semibold uppercase tracking-wider text-muted">Wave 1 Credit Lifecycle Attacks</p>
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted">Credit Authorization & Invariant Attacks</p>
             <div className="flex flex-wrap gap-2">
               <Button variant="ghost" onClick={attackReplay}>Replay draw</Button>
               <Button variant="ghost" onClick={attackFakeRepay}>Fake repay</Button>
@@ -53,7 +53,7 @@ export function LabPage() {
           </div>
 
           <div className="space-y-2 border-t border-border pt-4">
-            <p className="text-xs font-semibold uppercase tracking-wider text-muted">Wave 2 Settlement & Reserve Attacks</p>
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted">Settlement Claim & Reserve Solvency Attacks</p>
             <div className="flex flex-wrap gap-2">
               <Button variant="ghost" onClick={attackWrongMerchantRedeem}>
                 Wrong Merchant Redeem (B steals A)

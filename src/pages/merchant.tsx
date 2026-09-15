@@ -22,8 +22,8 @@ export function MerchantPage() {
       <div className="grid gap-6 lg:grid-cols-[1fr_1fr]">
         <Panel kicker="Merchant desk" title="Post quotes & Redeem Settlement Notes">
           <p className="text-sm text-muted">
-            You know the price and hold the private opening key. Wave 2 settlements are private,
-            merchant-bound draw notes redeemable directly against the issuer reserve.
+            You know the invoice terms and hold the merchant private key. Line settlements issue private,
+            merchant-bound claim notes redeemable directly against the issuer reserve.
           </p>
           <FlashBar flash={flash} />
 
