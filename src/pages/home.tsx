@@ -20,15 +20,15 @@ export function Home() {
       <div className="space-y-8">
         <section className="max-w-2xl space-y-4">
           <p className="text-xs font-medium uppercase tracking-wide text-subtle">
-            Midnight Buildathon · Wave 2 Settlement Prototype
+            Midnight Zero-Knowledge Protocol · Institutional Infrastructure
           </p>
           <h1 className="font-display text-4xl leading-tight tracking-tight md:text-5xl">
             Private revolving credit and reserve settlement for autonomous agents.
           </h1>
           <p className="text-muted">
-            Revolving credit with reserve accounting and private settlement notes. Issuer funds reserves.
-            Agent draws private note. Merchant redeems against reserve pool without disclosing invoice
-            or counterparty identity. Explorer never shows credit books.
+            Revolving credit with reserve accounting and private settlement notes. Issuer allocates reserves.
+            Agent draws private note. Merchant redeems claim against reserve pool without disclosing credit limit,
+            outstanding debt, or counterparty identity. Explorer never shows credit books.
           </p>
           <div className="flex flex-wrap gap-3">
             <Button onClick={() => setDemoStep(Math.min(DEMO_STEPS.length - 1, demoStep + 1))}>
@@ -69,10 +69,10 @@ export function Home() {
               Commitment rotates; books do not appear.
             </p>
           </Panel>
-          <Panel kicker="Settlement" title="Reserve Escrow & Notes">
+          <Panel kicker="Settlement" title="Reserve Capacity & Claims">
             <p className="text-sm text-muted">
-              Wave 2 implements exact Compact settlement accounting: issuer reserve escrow,
-              merchant-bound draw notes, single-redemption nullifiers, and multi-merchant domain separation.
+              Production Compact settlement accounting: issuer-allocated reserve capacity,
+              merchant-bound draw claims, single-redemption nullifiers, and multi-merchant domain separation.
             </p>
           </Panel>
           <Panel kicker="Agent" title="Private capacity">

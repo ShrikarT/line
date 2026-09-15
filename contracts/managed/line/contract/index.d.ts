@@ -8,7 +8,8 @@ export type QuoteMeta = { merchantPk: Uint8Array;
                           used: boolean
                         };
 
-export type LinePreimage = { identity: Uint8Array;
+export type LinePreimage = { domain: Uint8Array;
+                             identity: Uint8Array;
                              limit: bigint;
                              outstanding: bigint;
                              epoch: bigint

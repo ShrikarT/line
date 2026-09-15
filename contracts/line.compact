@@ -1,12 +1,13 @@
-// Line — private revolving credit and settlement authorization (Wave 2)
+// Line — Private revolving credit and checkout infrastructure for autonomous agents.
 // Compact language 0.26 / toolchain 0.34.0 / compact-runtime 0.19.0
 //
-// Wave 2 North Star:
-//   A successful private draw creates a merchant-bound private settlement note
-//   redeemable once against an issuer-funded reserve.
+// Core Invariant:
+//   An autonomous agent proves that a purchase fits its issuer-backed credit line
+//   without exposing its private credit book. A successful draw creates a
+//   merchant-bound claim note redeemable once against an issuer-funded reserve.
 //
 // Commitments:
-//   C = persistentCommit<LinePreimage>({ identity: I, limit: L, outstanding: B, epoch }, salt)
+//   C = persistentCommit<LinePreimage>({ domain, identity: I, limit: L, outstanding: B, epoch }, salt)
 //   D = persistentCommit<DrawNotePreimage>(notePreimage, noteSalt)
 //
 // Domain separation uses pad(32, "line:…") tags:
@@ -40,6 +41,7 @@ export struct QuoteMeta {
 }
 
 export struct LinePreimage {
+  domain: Bytes<32>;
   identity: Bytes<32>;
   limit: Uint<64>;
   outstanding: Uint<64>;
@@ -236,6 +238,7 @@ export circuit openLine(limit: Uint<64>, expiry: Uint<64>): [] {
   const k = agentSecret();
   const I = agentId(k);
   const p = LinePreimage {
+    domain: contractDomain,
     identity: I,
     limit: limit,
     outstanding: 0,
@@ -292,6 +295,7 @@ export circuit draw(
   const I = agentId(k);
   assert(I == identityCommit, "agent");
   const p = LinePreimage {
+    domain: contractDomain,
     identity: I,
     limit: limit,
     outstanding: outstanding,
@@ -365,6 +369,7 @@ export circuit draw(
   encumberedReserve = ((encumberedReserve + a) as Uint<64>);
 
   const p2 = LinePreimage {
+    domain: contractDomain,
     identity: I,
     limit: limit,
     outstanding: (nextB as Uint<64>),
@@ -457,6 +462,7 @@ export circuit acknowledgeRepayment(
   const I = identityCommit;
   const C = lineCommit;
   const p = LinePreimage {
+    domain: contractDomain,
     identity: I,
     limit: limit,
     outstanding: outstanding,
@@ -478,6 +484,7 @@ export circuit acknowledgeRepayment(
   assert(!nullifiers.member(pubN), "receipt used");
   nullifiers.insert(pubN);
   const p2 = LinePreimage {
+    domain: contractDomain,
     identity: I,
     limit: limit,
     outstanding: ((outstanding - amount) as Uint<64>),

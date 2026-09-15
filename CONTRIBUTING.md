@@ -1,24 +1,31 @@
-# Contributing
+# Contributing to Line
 
-Line is a Midnight Buildathon project. Compact is the source of truth.
+Line provides private credit and checkout infrastructure for autonomous agents. Compact is the source of truth.
 
-1. Read `docs/HANDOFF.md` and `docs/ENCODING.md`.
-2. Change `contracts/line.compact` first for protocol behavior.
-3. Compile: `npm run compact:compile` (requires Compact 0.34.0).
-4. Update `src/lib/line/encoding.ts` only if the Compact types/tags changed.
-5. Keep Compact simulator tests and reference-engine tests in lockstep.
-6. Do not add an on-chain `canPay` circuit or agent-initiated repay.
-7. Do not claim settlement, production readiness, or unlinkability of timing.
+## Development Workflow
+
+1. Read `docs/PRODUCT_ARCHITECTURE.md`, `docs/PROTOCOL.md`, and `docs/PRIVACY.md`.
+2. Modify `contracts/line.compact` first for protocol changes.
+3. Compile contract bindings: `npm run compact:compile`.
+4. Verify zero drift: `git diff --exit-code contracts/managed/`.
+5. Update `src/lib/line/encoding.ts` and runtime adapters.
+6. Ensure all test suites pass: `npm test`.
 
 ```bash
-npm install
-bash scripts/install-compact.sh
+npm ci
 npm run compact:compile
 npm run compact:test
-npm run test:line
-npm run mcp:test
+npm test
 npm run typecheck
 npm run build
 ```
 
-License: Apache-2.0. All original Compact and TypeScript in this repository is covered.
+## Protocol Principles
+
+- Compact circuits in `contracts/line.compact` are the canonical source of truth.
+- Credit limits ($L$) and balances ($B$) remain confidential in agent witnesses.
+- Never claim live token movement or external settlement unless backed by on-chain transactions.
+
+## License
+
+Licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE).

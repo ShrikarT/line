@@ -51,9 +51,9 @@ export function Button({
       onClick={onClick}
       className={cn(
         "inline-flex min-h-11 items-center justify-center rounded-md px-4 text-sm font-medium transition-transform duration-[var(--motion-quick)] enabled:active:scale-[0.98] disabled:opacity-40",
-        variant === "primary" && "bg-accent text-accent-fg",
-        variant === "ghost" && "border border-border bg-transparent text-fg",
-        variant === "danger" && "border border-danger/40 text-danger",
+        variant === "primary" && "bg-accent text-accent-fg hover:opacity-90 transition-opacity",
+        variant === "ghost" && "border border-border bg-transparent text-fg hover:bg-elevated transition-colors",
+        variant === "danger" && "border border-danger/40 text-danger hover:bg-danger/10 transition-colors",
       )}
     >
       {children}
