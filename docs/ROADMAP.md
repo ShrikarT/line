@@ -1,36 +1,40 @@
-# Line Roadmap
+# Line Product Roadmap
 
-Private revolving credit and settlement authorization for autonomous agents.
-
----
-
-## Wave 1 — Credit Authorization (Shipped)
-- **Status:** Complete. Tagged `wave1-final` (`ed45ca4`). Preserved at `contracts/v1/line.compact`.
-- Five circuits: `openLine`, `postQuote`, `draw`, `acknowledgeRepayment`, `setStatus`.
-- Private revolving balance, issuer receipts, opaque quotes, attack lab.
-- Compact simulator tests, TypeScript replica, cross-language vectors.
+Private revolving credit and checkout infrastructure for autonomous agents.
 
 ---
 
-## Wave 2 — Private Credit Settlement Prototype (Shipped)
-- **Status:** Complete on `feat/wave-2-private-settlement`.
-- **Exact Compact Settlement Accounting**:
-  1. **Issuer Reserve Escrow Pool**: `totalReserve`, `encumberedReserve`, `redeemedReserve`, and circuits `fundReserve`, `withdrawUnencumberedReserve`.
-  2. **Multi-Merchant Support**: `registeredMerchants` map with Merchant A & Merchant B, authenticated by domain keys.
-  3. **Merchant-Bound Draw Notes**: Private `DrawNotePreimage` committed to $D$, hiding merchant identity on ledger and proving ownership in ZK.
-  4. **Single-Use Redemption Nullifiers**: $N_{\text{redeem}}$ spent upon redemption, eliminating double-claims.
-  5. **Anti-Rug Protections**: Active draw notes lock reserves; issuer cannot withdraw encumbered funds.
-  6. **Note Expiry & Cancellation**: Circuit `cancelOrExpireNote` returns expired unredeemed note reserves to unencumbered balance.
-  7. **Domain Separation**: Constructor argument `instanceNonce: Bytes<32>` binds all state to `contractDomain`, preventing cross-contract replays.
-  8. **Deterministic State-Machine Model Checker**: 50 pseudo-random transitions testing 10 invariants.
-  9. **19-Step Scripted Demo**: Complete multi-role lifecycle flow with 4 executable attack steps.
-  10. **Wave 2 MCP Server**: 8 JSON-RPC tools for autonomous agents (`mcp/line-mcp.mjs`).
+## Current Release (v0.3.0) — Private Credit Authorization & Settlement Accounting Platform
+- **Status:** Shipped & Verified.
+- **Ten Core Compact Circuits:**
+  `registerMerchant`, `fundReserve`, `withdrawUnencumberedReserve`, `openLine`, `postQuote`, `draw`, `redeemDraw`, `cancelOrExpireNote`, `acknowledgeRepayment`, `setStatus`.
+- **Private Revolving Balance:** $L$, $B$, and remaining capacity committed in zero-knowledge; never visible on-chain.
+- **Settlement Reserve Accounting:** Verifiable on-chain capacity tracking (`totalReserve`, `encumberedReserve`, `redeemedReserve`, `withdrawableReserve`).
+- **Multi-Merchant Architecture:** Registered merchant pseudonyms, domain-bound quotes, private merchant-bound draw notes, and single-use redemption nullifiers ($N_{\text{redeem}}$).
+- **Contract Domain Separation:** Constructor `instanceNonce` binds all commitments and nullifiers to `contractDomain`.
+- **Runtime Architecture:** `MidnightNetworkRuntime`, `LocalDevelopmentRuntime`, and `InMemoryTestRuntime`.
+- **Client Vault:** WebCrypto AES-GCM 256-bit encrypted storage with PBKDF2-HMAC-SHA256.
+- **Agent Integration:** Standard Model Context Protocol (MCP) server supporting 8 tools over JSON-RPC.
+- **Machine-Checked Privacy:** Machine-checked privacy inventory (`docs/PRIVACY.md`) and leakage test suite (`src/lib/line/leakage.test.ts`).
 
 ---
 
-## Wave 3 — Midnight Testnet & Cross-Chain Settlement (Next)
-1. **Midnight Preprod / Testnet Deployment**: Compile full ZK proving and verifier keys (`.bincode`), deploy contract to Midnight network, replace local simulator with on-chain contract address.
-2. **On-Chain Token Settlement**: Direct payout integration with Midnight native tokens (Night / Dust) and Cardano cross-chain settlement bridge.
-3. **Wallet & Key Management**: Lace / Midnight wallet integration for agent and issuer private secret custody.
-4. **Decentralized Underwriting**: Portable zero-knowledge issuer credentials and credit ratings.
-5. **Protocol Fees & Marketplace**: Fee on draws, autonomous issuer liquidity marketplace, and agent policy packs.
+## Release v0.4.0 — Direct On-Chain Shielded Asset Settlement
+- **Midnight Preprod Public Testnet Deployment:** Publish contract to Midnight Preprod with full proving key packages.
+- **Native Shielded Asset Integration:** Direct deposit and transfer of Midnight native assets or supported shielded coins.
+- **Browser Wallet Connect:** Web3 wallet connector supporting Midnight Lace extension.
+- **Automated Settlement Daemons:** Background watcher for merchants to auto-redeem confirmed draw notes upon invoice fulfillment.
+
+---
+
+## Release v0.5.0 — Multi-Issuer Syndication & Delegated Policy Modules
+- **Syndicated Agent Credit Facilities:** Multiple issuers co-underwriting a single credit line with shared risk.
+- **Programmable Policy Packs:** Time-window spend limits, category restrictions, and merchant whitelisting enforced in zero-knowledge.
+- **Dynamic Interest & Fee Accrual:** Zero-knowledge interest calculation circuits for term revolving credit.
+
+---
+
+## Release v1.0.0 — Portable Agent Underwriting & Cross-Chain Settlement
+- **Decentralized Agent Credit Scores:** Zero-knowledge credentials proving historical repayment track records without exposing transaction history.
+- **Cross-Chain Bridge Settlement:** Settlement finality bridged to Cardano and EVM ecosystems.
+- **Institutional MPC Custody:** Institutional multi-party computation integrations for enterprise agent fleets.
