@@ -15,7 +15,10 @@ Line is **not** a wallet spend-cap and **not** a private IDO. It is issuer-backe
 5. Quote preimages stay off the ledger. Public `Q` is opaque.
 6. Nullifiers are domain-separated (`line:draw` / `line:repay`) and secret-bound.
 7. One issuer, one merchant, one live line per instance in v1.
-8. `CLOSED` cannot `setStatus` back to OPEN. A new line requires `openLine` (fresh `C0`).
+8. `CLOSED` cannot `setStatus` back to OPEN. A new line requires `openLine` (fresh `C0`, advances `lineGeneration`).
+9. Quotes are generation-isolated: `postQuote` requires `status == OPEN`. Quotes from generation $G$ cannot be drawn against generation $G+1$ (`meta.lineGeneration == lineGeneration`).
+10. Quote expiry is measured in contract `actionClock: Counter` units (state-transition actions), not wall-clock or block timestamp.
+11. Constructor takes `(issuerPk, merchantPk)` directly so deployers do not hold private secrets. Role public keys use distinct domain tags (`line:issuer:pk` and `line:merchant:pk`).
 
 ## Where things live
 
