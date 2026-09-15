@@ -2,9 +2,19 @@ export type LineStatus = "none" | "open" | "defaulted" | "closed";
 
 export type QuoteRecord = {
   commitment: string;
+  merchantPk: string;
   expiry: number;
   lineGeneration: number;
   used: boolean;
+};
+
+export type NoteRecord = {
+  commitment: string;
+  amount: number;
+  redeemed: boolean;
+  cancelled: boolean;
+  expiry: number;
+  lineGeneration: number;
 };
 
 export type LedgerEvent = {
@@ -14,20 +24,28 @@ export type LedgerEvent = {
   publicNote: string;
   commitment?: string;
   quote?: string;
+  note?: string;
   nullifier?: string;
+  amount?: number;
 };
 
 export type Ledger = {
   /** Compact contractDomain (hex). */
   contractDomain: string;
   issuerPubKey: string;
-  merchantPubKey: string;
+  initialMerchantPubKey: string;
+  instanceNonce: string;
+  registeredMerchants: Record<string, boolean>;
+  totalReserve: number;
+  encumberedReserve: number;
+  redeemedReserve: number;
   identityCommitment: string | null;
   lineCommitment: string | null;
   lineExpiry: number;
   status: LineStatus;
   lineGeneration: number;
   quotes: QuoteRecord[];
+  notes: NoteRecord[];
   nullifiers: string[];
   events: LedgerEvent[];
   actionClock: number;
@@ -61,6 +79,23 @@ export type MerchantInvoice = {
   Q: string;
   used: boolean;
   preimage: QuotePreimage;
+};
+
+export type DrawNotePreimage = {
+  domain: string;
+  lineGeneration: number;
+  identity: string;
+  quoteCommit: string;
+  merchantPk: string;
+  amount: number;
+  noteNonce: string;
+  expiry: number;
+};
+
+export type DrawNote = {
+  D: string;
+  preimage: DrawNotePreimage;
+  salt: string;
 };
 
 export type RepayReceipt = {

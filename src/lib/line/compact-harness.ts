@@ -23,6 +23,10 @@ export type PrivateState = {
   quoteNonce: Uint8Array;
   receiptNonce: Uint8Array;
   paymentRef: Uint8Array;
+  noteNonce: Uint8Array;
+  noteSalt: Uint8Array;
+  noteIdentity: Uint8Array;
+  noteQuoteCommit: Uint8Array;
 };
 
 export const COIN_PK = "0".repeat(64);
@@ -37,6 +41,10 @@ export const WITNESSES = {
   quoteNonce: (ctx: { privateState: PrivateState }) => [ctx.privateState, ctx.privateState.quoteNonce] as const,
   receiptNonce: (ctx: { privateState: PrivateState }) => [ctx.privateState, ctx.privateState.receiptNonce] as const,
   paymentRef: (ctx: { privateState: PrivateState }) => [ctx.privateState, ctx.privateState.paymentRef] as const,
+  noteNonce: (ctx: { privateState: PrivateState }) => [ctx.privateState, ctx.privateState.noteNonce] as const,
+  noteSalt: (ctx: { privateState: PrivateState }) => [ctx.privateState, ctx.privateState.noteSalt] as const,
+  noteIdentity: (ctx: { privateState: PrivateState }) => [ctx.privateState, ctx.privateState.noteIdentity] as const,
+  noteQuoteCommit: (ctx: { privateState: PrivateState }) => [ctx.privateState, ctx.privateState.noteQuoteCommit] as const,
 };
 
 export function blankPrivate(overrides: Partial<PrivateState> = {}): PrivateState {
@@ -50,6 +58,10 @@ export function blankPrivate(overrides: Partial<PrivateState> = {}): PrivateStat
     quoteNonce: z,
     receiptNonce: z,
     paymentRef: z,
+    noteNonce: z,
+    noteSalt: z,
+    noteIdentity: z,
+    noteQuoteCommit: z,
     ...overrides,
   };
 }
@@ -60,13 +72,20 @@ export type Session = {
   privateState: PrivateState;
 };
 
-export async function bootWithPk(issuerPk: Uint8Array, merchantPk: Uint8Array, ps?: PrivateState): Promise<Session> {
+export async function bootWithPk(
+  issuerPk: Uint8Array,
+  merchantPk: Uint8Array,
+  instanceNonce?: Uint8Array,
+  ps?: PrivateState,
+): Promise<Session> {
   const privateState = ps ?? blankPrivate();
   const contract = new Contract(WITNESSES as never);
+  const nonce = instanceNonce ?? pad32("line:demo:instance:1");
   const init = await contract.initialState(
     RT.createConstructorContext(privateState, COIN_PK),
     issuerPk,
     merchantPk,
+    nonce,
   );
   return {
     contract,
@@ -75,11 +94,16 @@ export async function bootWithPk(issuerPk: Uint8Array, merchantPk: Uint8Array, p
   };
 }
 
-export async function boot(issuerSk: Uint8Array, merchantSk: Uint8Array, ps?: PrivateState): Promise<Session> {
+export async function boot(
+  issuerSk: Uint8Array,
+  merchantSk: Uint8Array,
+  instanceNonce?: Uint8Array,
+  ps?: PrivateState,
+): Promise<Session> {
   const privateState = ps ?? blankPrivate({ callerSecret: issuerSk });
   const ipk = issuerPublicKey(issuerSk);
   const mpk = merchantPublicKey(merchantSk);
-  return bootWithPk(ipk, mpk, privateState);
+  return bootWithPk(ipk, mpk, instanceNonce, privateState);
 }
 
 export function readLedger(session: Session): CompactLedger {
@@ -93,9 +117,14 @@ function snapshotState(session: Session) {
 }
 
 export type CircuitCall =
+  | { name: "registerMerchant"; args: [Uint8Array] }
+  | { name: "fundReserve"; args: [bigint] }
+  | { name: "withdrawUnencumberedReserve"; args: [bigint] }
   | { name: "openLine"; args: [bigint, bigint] }
   | { name: "postQuote"; args: [bigint, bigint] }
-  | { name: "draw"; args: [Uint8Array, bigint, bigint, bigint, bigint] }
+  | { name: "draw"; args: [Uint8Array, bigint, bigint, bigint, bigint, bigint] }
+  | { name: "redeemDraw"; args: [Uint8Array, bigint, bigint] }
+  | { name: "cancelOrExpireNote"; args: [Uint8Array] }
   | { name: "acknowledgeRepayment"; args: [bigint, bigint, bigint, bigint, bigint] }
   | { name: "setStatus"; args: [Status] };
 
@@ -109,12 +138,19 @@ export async function call(session: Session, ps: PrivateState, op: CircuitCall):
   try {
     const circuits = session.contract.circuits;
     let result;
-    if (op.name === "openLine") result = await circuits.openLine(ctx, ...op.args);
+    if (op.name === "registerMerchant") result = await circuits.registerMerchant(ctx, ...op.args);
+    else if (op.name === "fundReserve") result = await circuits.fundReserve(ctx, ...op.args);
+    else if (op.name === "withdrawUnencumberedReserve") {
+      result = await circuits.withdrawUnencumberedReserve(ctx, ...op.args);
+    } else if (op.name === "openLine") result = await circuits.openLine(ctx, ...op.args);
     else if (op.name === "postQuote") result = await circuits.postQuote(ctx, ...op.args);
     else if (op.name === "draw") result = await circuits.draw(ctx, ...op.args);
+    else if (op.name === "redeemDraw") result = await circuits.redeemDraw(ctx, ...op.args);
+    else if (op.name === "cancelOrExpireNote") result = await circuits.cancelOrExpireNote(ctx, ...op.args);
     else if (op.name === "acknowledgeRepayment") {
       result = await circuits.acknowledgeRepayment(ctx, ...op.args);
     } else result = await circuits.setStatus(ctx, ...op.args);
+
     const next: Session = {
       contract: session.contract,
       state: result.context.callContext.currentQueryContext.state,
@@ -142,9 +178,21 @@ export function firstQuote(ledger: CompactLedger): { Q: Uint8Array; expiry: bigi
 export function quotesOf(ledger: CompactLedger) {
   return [...ledger.quotes].map(([Q, meta]) => ({
     Q,
+    merchantPk: meta.merchantPk,
     expiry: meta.expiry,
     lineGeneration: meta.lineGeneration,
     used: meta.used,
+  }));
+}
+
+export function notesOf(ledger: CompactLedger) {
+  return [...ledger.notes].map(([D, meta]) => ({
+    D,
+    amount: meta.amount,
+    redeemed: meta.redeemed,
+    cancelled: meta.cancelled,
+    expiry: meta.expiry,
+    lineGeneration: meta.lineGeneration,
   }));
 }
 
@@ -154,6 +202,9 @@ export function nullifiersOf(ledger: CompactLedger) {
 
 export const DEMO = {
   issuer: pad32("line:demo:issuer"),
-  merchant: pad32("line:demo:merchant"),
+  merchantA: pad32("line:demo:merchant:a"),
+  merchantB: pad32("line:demo:merchant:b"),
+  merchant: pad32("line:demo:merchant:a"),
   agent: pad32("line:demo:agent"),
+  instanceNonce: pad32("line:demo:instance:1"),
 };

@@ -20,18 +20,18 @@ export function Home() {
       <div className="space-y-8">
         <section className="max-w-2xl space-y-4">
           <p className="text-xs font-medium uppercase tracking-wide text-subtle">
-            Midnight Buildathon · Wave 1
+            Midnight Buildathon · Wave 2 Settlement Prototype
           </p>
           <h1 className="font-display text-4xl leading-tight tracking-tight md:text-5xl">
-            Prove the purchase is affordable. Never publish the books.
+            Private revolving credit and reserve settlement for autonomous agents.
           </h1>
           <p className="text-muted">
-            Revolving credit, not a spend cap. Issuer underwrites. Agent draws.
-            Merchant gets a one-time authorization. Failed proofs write nothing.
-            Wave 1 does not move tokens.
+            Revolving credit with reserve accounting and private settlement notes. Issuer funds reserves.
+            Agent draws private note. Merchant redeems against reserve pool without disclosing invoice
+            or counterparty identity. Explorer never shows credit books.
           </p>
           <div className="flex flex-wrap gap-3">
-            <Button onClick={() => setDemoStep(Math.min(10, demoStep + 1))}>
+            <Button onClick={() => setDemoStep(Math.min(DEMO_STEPS.length - 1, demoStep + 1))}>
               Next demo step
             </Button>
             <Button variant="ghost" onClick={runDemo}>
@@ -65,14 +65,14 @@ export function Home() {
         <div className="grid gap-4 md:grid-cols-3">
           <Panel kicker="Public" title="Explorer">
             <p className="text-sm text-muted">
-              Status {ledger.status}. Action clock {ledger.actionClock}. Commitment rotates;
-              books do not appear.
+              Status {ledger.status}. Action clock {ledger.actionClock}. Total Reserve {ledger.totalReserve ?? 0}.
+              Commitment rotates; books do not appear.
             </p>
           </Panel>
-          <Panel kicker="Settlement" title="Authorization only">
+          <Panel kicker="Settlement" title="Reserve Escrow & Notes">
             <p className="text-sm text-muted">
-              Wave 1 does not move tokens. A successful draw is clearance, not a
-              payout. Escrow redeemable by the draw nullifier is Wave 2.
+              Wave 2 implements exact Compact settlement accounting: issuer reserve escrow,
+              merchant-bound draw notes, single-redemption nullifiers, and multi-merchant domain separation.
             </p>
           </Panel>
           <Panel kicker="Agent" title="Private capacity">
