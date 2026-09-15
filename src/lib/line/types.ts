@@ -52,6 +52,7 @@ export type Ledger = {
 };
 
 export type LineWitness = {
+  domain: string;
   I: string;
   L: number;
   B: number;
