@@ -37,13 +37,13 @@ export function IssuerPage() {
             <Stat label="Withdrawable" value={withdrawable} />
             <Stat label="Encumbered" value={ledger.encumberedReserve ?? 0} />
             <Stat label="Redeemed" value={ledger.redeemedReserve ?? 0} />
-            <Stat label="Pending Cash" value={pending} />
+            <Stat label="Pending Repayment" value={pending} />
           </div>
 
           <div className="border-t border-border pt-3 space-y-2">
-            <p className="text-xs font-semibold uppercase tracking-wider text-muted">Settlement Reserve</p>
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted">Settlement Reserve Capacity</p>
             <div className="flex flex-wrap gap-2">
-              <Button onClick={() => doFundReserve(500)}>Fund Reserve · 500</Button>
+              <Button onClick={() => doFundReserve(500)}>Allocate Reserve · 500</Button>
               <Button variant="ghost" onClick={() => doWithdrawReserve(withdrawable)} disabled={withdrawable <= 0}>
                 Withdraw Unencumbered ({withdrawable})
               </Button>
