@@ -25,7 +25,7 @@ export const DEMO_STEPS = [
   {
     id: 2,
     title: "Explorer check",
-    publicView: "Public fields are I, C, status, clock. The digit 150 is not a ledger field.",
+    publicView: "Public fields are I, C, status, actionClock, lineGeneration. The digit 150 is not a ledger field.",
     privateView: "Same private books. Explorer cannot read L or B.",
   },
   {
@@ -38,45 +38,45 @@ export const DEMO_STEPS = [
     id: 4,
     title: "draw 40",
     publicView: "C0 → C1. Nullifier inserted. Amount not disclosed.",
-    privateView: "B = 40, available = 110. Issuer sees a pending off-chain 40.",
+    privateView: "Agent store: B = 40, available = 110.",
   },
   {
     id: 5,
-    title: "Replay draw",
-    publicView: "No new transition. Failed proofs write nothing.",
-    privateView: "Clearance could not be proven. Quote already consumed.",
+    title: "Replay failure",
+    publicView: "Execution rejected. Nullifier spent. Ledger unchanged.",
+    privateView: "Agent store unchanged.",
   },
   {
     id: 6,
-    title: "draw 120 blocked",
-    publicView: "Still C1. Explorer does not learn why.",
-    privateView: "40 + 120 > 150. Generic failure only.",
+    title: "Over-limit failure (120)",
+    publicView: "Execution rejected. Capacity exceeded. Ledger unchanged.",
+    privateView: "40 + 120 > 150. Clearance cannot be proven.",
   },
   {
     id: 7,
-    title: "acknowledgeRepayment 40",
-    publicView: "C1 → C2. Issuer-authenticated. Amount hidden.",
-    privateView: "B = 0, available = 150. Receipt bound to C1.",
+    title: "repayAck 40",
+    publicView: "C1 → C2. Repayment nullifier inserted. B decreases.",
+    privateView: "Issuer confirmed settlement off-chain. Capacity restored.",
   },
   {
     id: 8,
-    title: "draw 120",
-    publicView: "C2 → C3. Second authorization for a new Q.",
-    privateView: "B = 120, available = 30.",
+    title: "Fresh draw 120",
+    publicView: "C2 → C3. Authorization issued for 120.",
+    privateView: "Agent store: B = 120, available = 30.",
   },
   {
     id: 9,
-    title: "setStatus defaulted",
-    publicView: "Status defaulted. Further draws rejected.",
-    privateView: "Books still private. Capacity is frozen, not published.",
+    title: "Default line",
+    publicView: "Status defaulted. Commitments not published.",
+    privateView: "Private state frozen.",
   },
   {
     id: 10,
-    title: "draw after default",
-    publicView: "No new transition. Status remains defaulted.",
-    privateView: "Clearance could not be proven.",
+    title: "Post-default draw fails",
+    publicView: "Execution rejected. Status defaulted. Ledger unchanged.",
+    privateView: "Draw circuit asserts status == open.",
   },
-] as const;
+];
 
 export type DemoSnapshot = {
   ledger: Ledger;
@@ -93,7 +93,7 @@ export type DemoSnapshot = {
 };
 
 function expiry(ledger: Ledger) {
-  return ledger.clock + 10_000;
+  return ledger.actionClock + 10_000;
 }
 
 export function snapshotAt(step: number): DemoSnapshot {
@@ -239,12 +239,8 @@ export function snapshotAt(step: number): DemoSnapshot {
     const last = invoices.length - 1;
     invoices[last] = { ...invoices[last], used: true };
   }
-  if (n >= 9) {
-    const frozen = setStatus(ledger, { caller: ISSUER_SK, status: "defaulted" });
-    if (!frozen.ok) throw new Error("demo status");
-    ledger = frozen.ledger;
-  }
-  if (n >= 10 && agent) {
+  let qDefault: { quote: QuotePreimage; Q: string } | null = null;
+  if (n >= 9 && agent) {
     const q = postQuote(ledger, {
       caller: MERCHANT_SK,
       amount: 10,
@@ -254,6 +250,7 @@ export function snapshotAt(step: number): DemoSnapshot {
     });
     if (!q.ok) throw new Error("demo q-default");
     ledger = q.ledger;
+    qDefault = { quote: q.quote, Q: q.Q };
     invoices.push({
       invoiceId: "demo-after-default",
       amount: 10,
@@ -261,11 +258,16 @@ export function snapshotAt(step: number): DemoSnapshot {
       used: false,
       preimage: q.quote,
     });
+    const frozen = setStatus(ledger, { caller: ISSUER_SK, status: "defaulted" });
+    if (!frozen.ok) throw new Error("demo status");
+    ledger = frozen.ledger;
+  }
+  if (n >= 10 && agent && qDefault) {
     postDefaultRan = true;
     const blocked = draw(ledger, {
       agentSecret: AGENT_SK,
       witness: agent.witness!,
-      quote: q.quote,
+      quote: qDefault.quote,
       newSalt: "demo-salt-default",
     });
     if (blocked.ok) throw new Error("demo post-default unexpectedly succeeded");

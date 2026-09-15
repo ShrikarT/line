@@ -329,8 +329,18 @@
       }
     },
     {
-      "name": "quotes",
+      "name": "lineGeneration",
       "index": 7,
+      "exported": true,
+      "storage": "Cell",
+      "type": {
+        "type-name": "Uint",
+        "maxval": 18446744073709551615
+      }
+    },
+    {
+      "name": "quotes",
+      "index": 8,
       "exported": true,
       "storage": "Map",
       "key": {
@@ -349,6 +359,13 @@
             }
           },
           {
+            "name": "lineGeneration",
+            "type": {
+              "type-name": "Uint",
+              "maxval": 18446744073709551615
+            }
+          },
+          {
             "name": "used",
             "type": {
               "type-name": "Boolean"
@@ -359,7 +376,7 @@
     },
     {
       "name": "nullifiers",
-      "index": 8,
+      "index": 9,
       "exported": true,
       "storage": "Set",
       "type": {
@@ -368,8 +385,8 @@
       }
     },
     {
-      "name": "clock",
-      "index": 9,
+      "name": "actionClock",
+      "index": 10,
       "exported": true,
       "storage": "Counter"
     }

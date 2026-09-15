@@ -6,6 +6,7 @@ import {
   Status,
   blankPrivate,
   boot,
+  bootWithPk,
   call,
   firstQuote,
   nullifiersOf,
@@ -16,7 +17,9 @@ import {
 } from "./compact-harness.ts";
 import {
   agentId,
+  issuerPublicKey,
   lineStateCommit,
+  merchantPublicKey,
   pad32,
   quoteCommit,
   toHex,
@@ -72,10 +75,22 @@ describe("compact simulator: constructor", () => {
     const s = await genesis();
     const L = readLedger(s);
     assert.equal(L.status, Status.NONE);
-    assert.equal(L.clock, 0n);
+    assert.equal(L.actionClock, 0n);
+    assert.equal(L.lineGeneration, 0n);
     assert.equal(toHex(L.issuer).length, 64);
     assert.notEqual(toHex(L.issuer), toHex(L.merchant));
     assert.equal(toHex(L.contractDomain).length, 64);
+  });
+
+  it("constructor accepts public keys directly without private secrets", async () => {
+    const ipk = issuerPublicKey(DEMO.issuer);
+    const mpk = merchantPublicKey(DEMO.merchant);
+    const s = await bootWithPk(ipk, mpk);
+    const L = readLedger(s);
+    assert.equal(toHex(L.issuer), toHex(ipk));
+    assert.equal(toHex(L.merchant), toHex(mpk));
+    assert.equal(L.status, Status.NONE);
+    assert.equal(L.lineGeneration, 0n);
   });
 });
 
@@ -83,6 +98,7 @@ describe("compact simulator: openLine", () => {
   it("valid issuer opens a line; C commits to I,L,0,epoch,salt", async () => {
     const r = await opened();
     assert.equal(r.ledger.status, Status.OPEN);
+    assert.equal(r.ledger.lineGeneration, 1n);
     const I = agentId(DEMO.agent);
     assert.equal(toHex(r.ledger.identityCommit), toHex(I));
     const expected = lineStateCommit(
@@ -141,9 +157,11 @@ describe("compact simulator: postQuote", () => {
       amount: 40n,
       expiry: EXPIRY,
       nonce: pad32("n40"),
+      generation: 1n,
       domain: r.ledger.contractDomain,
     });
     assert.equal(toHex(q!.Q), toHex(expected));
+    assert.equal(q!.lineGeneration, 1n);
     assert.equal(q!.used, false);
   });
 
@@ -172,9 +190,68 @@ describe("compact simulator: postQuote", () => {
     const o = await opened();
     const r = await call(o.session, ps({ callerSecret: DEMO.merchant }), {
       name: "postQuote",
-      args: [40n, o.ledger.clock],
+      args: [40n, o.ledger.actionClock],
     });
     assert.equal(r.ok, false);
+  });
+
+  it("quote cannot be posted before a line exists", async () => {
+    const s = await genesis();
+    const r = await call(s, ps({ callerSecret: DEMO.merchant }), {
+      name: "postQuote",
+      args: [40n, EXPIRY],
+    });
+    assert.equal(r.ok, false);
+    assert.match(r.error, /status/);
+  });
+
+  it("quote cannot be posted when line is defaulted", async () => {
+    const o = await opened();
+    const d = await call(o.session, ps({ callerSecret: DEMO.issuer }), {
+      name: "setStatus",
+      args: [Status.DEFAULTED],
+    });
+    assert.equal(d.ok, true);
+    const r = await call(d.session, ps({ callerSecret: DEMO.merchant }), {
+      name: "postQuote",
+      args: [40n, EXPIRY],
+    });
+    assert.equal(r.ok, false);
+    assert.match(r.error, /status/);
+  });
+
+  it("quote cannot be posted when line is closed", async () => {
+    const o = await opened();
+    const c = await call(o.session, ps({ callerSecret: DEMO.issuer }), {
+      name: "setStatus",
+      args: [Status.CLOSED],
+    });
+    assert.equal(c.ok, true);
+    const r = await call(c.session, ps({ callerSecret: DEMO.merchant }), {
+      name: "postQuote",
+      args: [40n, EXPIRY],
+    });
+    assert.equal(r.ok, false);
+    assert.match(r.error, /status/);
+  });
+
+  it("role domain separation: issuer cannot call postQuote and merchant cannot call issuer circuits", async () => {
+    const o = await opened();
+    // Issuer cannot postQuote (merchant-only)
+    const badQuote = await call(o.session, ps({ callerSecret: DEMO.issuer }), {
+      name: "postQuote",
+      args: [40n, EXPIRY],
+    });
+    assert.equal(badQuote.ok, false);
+    assert.match(badQuote.error, /not merchant/);
+
+    // Merchant cannot setStatus (issuer-only)
+    const badStatus = await call(o.session, ps({ callerSecret: DEMO.merchant }), {
+      name: "setStatus",
+      args: [Status.DEFAULTED],
+    });
+    assert.equal(badStatus.ok, false);
+    assert.match(badStatus.error, /not issuer/);
   });
 });
 
@@ -322,6 +399,7 @@ describe("compact simulator: draw", () => {
       amount: 100n,
       expiry: EXPIRY,
       nonce: pad32("na"),
+      generation: 1n,
       domain: q2.ledger.contractDomain,
     });
     const Qb = quoteCommit({
@@ -330,6 +408,7 @@ describe("compact simulator: draw", () => {
       amount: 100n,
       expiry: EXPIRY,
       nonce: pad32("nb"),
+      generation: 1n,
       domain: q2.ledger.contractDomain,
     });
     const proofA = await call(
@@ -358,7 +437,7 @@ describe("compact simulator: draw", () => {
     const posted = await call(
       o.session,
       ps({ callerSecret: DEMO.merchant }),
-      { name: "postQuote", args: [10n, o.ledger.clock + 1n] },
+      { name: "postQuote", args: [10n, o.ledger.actionClock + 1n] },
     );
     assert.equal(posted.ok, true);
     if (!posted.ok) throw new Error("post");
@@ -449,7 +528,15 @@ describe("compact simulator: acknowledgeRepayment", () => {
     assert.equal(ack1.ok, true);
     if (!ack1.ok) throw new Error("ack1");
     const q2 = await quoted(40n, "inv-40b", "n40b", ack1.session);
-    const Q2 = quotesOf(q2.ledger).at(-1)!.Q;
+    const Q2 = quoteCommit({
+      merchantPk: q2.ledger.merchant,
+      invoiceId: pad32("inv-40b"),
+      amount: 40n,
+      expiry: EXPIRY,
+      nonce: pad32("n40b"),
+      generation: 1n,
+      domain: q2.ledger.contractDomain,
+    });
     const d2 = await call(
       q2.session,
       ps({
@@ -509,41 +596,131 @@ describe("compact simulator: acknowledgeRepayment", () => {
 describe("compact simulator: setStatus", () => {
   it("defaulted line rejects draw", async () => {
     const o = await opened();
-    const s = await call(o.session, ps({ callerSecret: DEMO.issuer }), {
+    const q = await quoted(40n, "x", "nx", o.session);
+    const Q = quoteCommit({
+      merchantPk: q.ledger.merchant,
+      invoiceId: pad32("x"),
+      amount: 40n,
+      expiry: EXPIRY,
+      nonce: pad32("nx"),
+      generation: 1n,
+      domain: q.ledger.contractDomain,
+    });
+    const s = await call(q.session, ps({ callerSecret: DEMO.issuer }), {
       name: "setStatus",
       args: [Status.DEFAULTED],
     });
     assert.equal(s.ok, true);
     if (!s.ok) throw new Error("status");
-    const q = await quoted(40n, "x", "nx", s.session);
-    const Q = quotesOf(q.ledger).at(-1)!.Q;
-    const d = await call(q.session, ps({ invoiceId: pad32("x"), quoteNonce: pad32("nx") }), {
+    const d = await call(s.session, ps({ invoiceId: pad32("x"), quoteNonce: pad32("nx") }), {
       name: "draw",
       args: [Q, LIMIT, 0n, 0n, 40n],
     });
     assert.equal(d.ok, false);
+    assert.match(d.error, /status/);
   });
 
   it("closed line rejects draw; new openLine is allowed after CLOSED", async () => {
     const o = await opened();
-    const c = await call(o.session, ps({ callerSecret: DEMO.issuer }), {
+    const q = await quoted(10n, "z", "nz", o.session);
+    const Q = quoteCommit({
+      merchantPk: q.ledger.merchant,
+      invoiceId: pad32("z"),
+      amount: 10n,
+      expiry: EXPIRY,
+      nonce: pad32("nz"),
+      generation: 1n,
+      domain: q.ledger.contractDomain,
+    });
+    const c = await call(q.session, ps({ callerSecret: DEMO.issuer }), {
       name: "setStatus",
       args: [Status.CLOSED],
     });
     assert.equal(c.ok, true);
     if (!c.ok) throw new Error("closed");
-    const q = await quoted(10n, "z", "nz", c.session);
-    const Q = quotesOf(q.ledger).at(-1)!.Q;
-    const d = await call(q.session, ps({ invoiceId: pad32("z"), quoteNonce: pad32("nz") }), {
+    const d = await call(c.session, ps({ invoiceId: pad32("z"), quoteNonce: pad32("nz") }), {
       name: "draw",
       args: [Q, LIMIT, 0n, 0n, 10n],
     });
     assert.equal(d.ok, false);
+    assert.match(d.error, /status/);
+
     const reopen = await call(c.session, ps({ salt: pad32("new-epoch") }), {
       name: "openLine",
       args: [80n, EXPIRY],
     });
     assert.equal(reopen.ok, true, reopen.ok ? "" : reopen.error);
+    assert.equal(reopen.ledger.lineGeneration, 2n);
+  });
+
+  it("quote from generation 1 cannot be drawn after closing and opening generation 2", async () => {
+    // Generation 1: open line, post quote Q1
+    const o1 = await opened();
+    const q1 = await quoted(40n, "inv-gen1", "nonce-gen1", o1.session);
+    const Q1 = quoteCommit({
+      merchantPk: q1.ledger.merchant,
+      invoiceId: pad32("inv-gen1"),
+      amount: 40n,
+      expiry: EXPIRY,
+      nonce: pad32("nonce-gen1"),
+      generation: 1n,
+      domain: q1.ledger.contractDomain,
+    });
+    assert.equal(q1.ledger.lineGeneration, 1n);
+
+    // Close line 1
+    const closed = await call(q1.session, ps({ callerSecret: DEMO.issuer }), {
+      name: "setStatus",
+      args: [Status.CLOSED],
+    });
+    assert.equal(closed.ok, true);
+
+    // Open line generation 2
+    const o2 = await call(closed.session, ps({ salt: pad32("salt-gen2") }), {
+      name: "openLine",
+      args: [200n, EXPIRY],
+    });
+    assert.equal(o2.ok, true);
+    assert.equal(o2.ledger.lineGeneration, 2n);
+
+    // Attempt to draw Q1 against generation 2: fails because meta.lineGeneration (1n) != lineGeneration (2n)
+    const drawOldQuote = await call(
+      o2.session,
+      ps({
+        salt: pad32("salt-gen2"),
+        newSalt: pad32("salt-gen2-draw"),
+        invoiceId: pad32("inv-gen1"),
+        quoteNonce: pad32("nonce-gen1"),
+      }),
+      { name: "draw", args: [Q1, 200n, 0n, 0n, 40n] },
+    );
+    assert.equal(drawOldQuote.ok, false);
+    assert.match(drawOldQuote.error, /line generation mismatch/);
+
+    // Fresh quote posted in generation 2 succeeds
+    const q2 = await quoted(50n, "inv-gen2", "nonce-gen2", o2.session);
+    const Q2 = quoteCommit({
+      merchantPk: q2.ledger.merchant,
+      invoiceId: pad32("inv-gen2"),
+      amount: 50n,
+      expiry: EXPIRY,
+      nonce: pad32("nonce-gen2"),
+      generation: 2n,
+      domain: q2.ledger.contractDomain,
+    });
+    assert.equal(q2.ledger.lineGeneration, 2n);
+
+    const drawNewQuote = await call(
+      q2.session,
+      ps({
+        salt: pad32("salt-gen2"),
+        newSalt: pad32("salt-gen2-draw"),
+        invoiceId: pad32("inv-gen2"),
+        quoteNonce: pad32("nonce-gen2"),
+      }),
+      { name: "draw", args: [Q2, 200n, 0n, 0n, 50n] },
+    );
+    assert.equal(drawNewQuote.ok, true);
   });
 
   it("unauthorized caller cannot change status", async () => {
@@ -599,10 +776,10 @@ describe("compact simulator: domain-separated nullifiers", () => {
 });
 
 describe("compact simulator: failed operations leave state unchanged", () => {
-  it("clock, C, quotes, and nullifiers stay put on a failed draw", async () => {
+  it("actionClock, C, quotes, and nullifiers stay put on a failed draw", async () => {
     const q = await quoted();
     const before = {
-      clock: q.ledger.clock,
+      actionClock: q.ledger.actionClock,
       C: toHex(q.ledger.lineCommit),
       quotes: q.ledger.quotes.size(),
       nullifiers: q.ledger.nullifiers.size(),
@@ -612,7 +789,7 @@ describe("compact simulator: failed operations leave state unchanged", () => {
       args: [firstQuote(q.ledger)!.Q, LIMIT, 0n, 0n, 1n],
     });
     assert.equal(r.ok, false);
-    assert.equal(r.ledger.clock, before.clock);
+    assert.equal(r.ledger.actionClock, before.actionClock);
     assert.equal(toHex(r.ledger.lineCommit), before.C);
     assert.equal(r.ledger.quotes.size(), before.quotes);
     assert.equal(r.ledger.nullifiers.size(), before.nullifiers);

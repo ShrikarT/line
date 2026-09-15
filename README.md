@@ -35,8 +35,8 @@ This is **not production-ready**. It is **not** deployed to Midnight Preprod. Ru
 **Public**
 
 - Identity commitment `I`, line commitment `C`, status, quote commitments `Q`
-- Quote used/expiry metadata, nullifiers, clock / state-transition timing
-- Sealed issuer public key, merchant public key, contract domain
+- Quote used/expiry metadata, nullifiers, `actionClock` state-transition counter, `lineGeneration`
+- Sealed issuer public key (`line:issuer:pk`), merchant public key (`line:merchant:pk`), contract domain
 
 Line does **not** hide that a public state transition happened, or when.
 
@@ -45,14 +45,15 @@ Failed draws always surface: **Clearance could not be proven.** They do not leak
 ## Trust assumptions
 
 - The Compact compiler and `compact-runtime` implement `persistentHash` / `persistentCommit` as documented.
-- Issuer and merchant authorization is **DApp-scoped hash-based** (`publicKey(sk) = persistentHash([pad(32,"line:pk"), sk])`), not a wallet signature scheme.
+- Issuer and merchant authorization is **DApp-scoped hash-based** with domain separation (`issuerPk = persistentHash([pad(32,"line:issuer:pk"), sk])`, `merchantPk = persistentHash([pad(32,"line:merchant:pk"), sk])`), preventing cross-role key reuse.
+- The constructor accepts public keys `(issuerPk, merchantPk)` directly so deployers do not need private signing secrets.
 - Wave 1 has one issuer, one merchant, one live line per contract instance.
 - Demo secrets are deterministic and **not** production keys.
 - Timing and existence of public transitions leak. This is not full unlinkability.
 
 ## Threat model (Wave 1)
 
-In scope: forged issuer/merchant, agent self-repay, stale `C`, quote replay, over-limit, wrong agent, tampered quote preimage, receipt reuse, closed/defaulted draws, overflow/zero amounts.
+In scope: forged issuer/merchant, cross-role key substitution, agent self-repay, stale `C`, cross-generation quote replay, quote expiry, over-limit, wrong agent, tampered quote preimage, receipt reuse, closed/defaulted draws, overflow/zero amounts.
 
 Out of scope: metadata analysis of `C → C′` timing, trusted setup / proving-key compromise, economic slashing, cross-contract composition, network-level deanonymization.
 
@@ -66,16 +67,20 @@ This is Compact's documented commitment primitive. The salt is the opening. Equi
 
 Every balance-changing circuit proves knowledge of a preimage that opens the current public `C`, then writes `C′` with a fresh salt and `epoch + 1`. Only `acknowledgeRepayment` (issuer) may decrease `B`.
 
-## Quote commitment
+## Quote commitment and generation isolation
 
 ```
 Q = persistentHash([
   pad(32, "line:quote"),
-  merchantPk, invoiceId, encodeU64(A), encodeU64(expiry), nonce, contractDomain
+  merchantPk, invoiceId, encodeU64(A), encodeU64(expiry), nonce, encodeU64(generation), contractDomain
 ])
 ```
 
-`encodeU64` is Compact's `n as Bytes<32>` (little-endian, 32-byte buffer).
+- `encodeU64` is Compact's `n as Bytes<32>` (little-endian, 32-byte buffer).
+- `quoteCommit` is an 8-element vector binding `generation`.
+- `postQuote` requires `status == Status.OPEN`.
+- `draw` verifies `meta.lineGeneration == lineGeneration`, preventing quotes from an earlier line generation from being drawn against a reopened line.
+- Expiry is measured against `actionClock: Counter`, which counts contract state transitions. It does not measure wall-clock or block timestamp.
 
 ## Nullifiers
 
@@ -84,16 +89,16 @@ N_draw  = persistentHash([pad(32,"line:draw"), agentSecret, Q, contractDomain])
 N_repay = persistentHash([pad(32,"line:repay"), receiptNonce, I, currentC, encodeU64(R), paymentRef, contractDomain])
 ```
 
-## Status transitions
+## Status transitions and generations
 
 | From | `setStatus` to OPEN | DEFAULTED | CLOSED | `openLine` |
 |---|---|---|---|---|
-| NONE | no | no | no | yes |
+| NONE | no | no | no | yes (generation 1, epoch 0) |
 | OPEN | yes (idempotent) | yes | yes | no |
 | DEFAULTED | yes | yes | yes | no |
-| CLOSED | no | no | no | yes (new `C0`, epoch 0) |
+| CLOSED | no | no | no | yes (generation `gen + 1`, epoch 0) |
 
-`CLOSED` is terminal for `setStatus`. Reopening is a **new line** via `openLine`, not a resurrection of the old commitment. DEFAULTED may return to OPEN without rotating `C`; draws stay blocked until then.
+`CLOSED` is terminal for `setStatus`. Reopening is a **new line generation** via `openLine` (fresh `C0`, epoch 0, `lineGeneration + 1`), not a resurrection of the old commitment. Quotes from previous generations cannot be drawn against the reopened line. DEFAULTED may return to OPEN without rotating `C` or advancing generation; draws stay blocked until returned to OPEN.
 
 ## Circuits
 
