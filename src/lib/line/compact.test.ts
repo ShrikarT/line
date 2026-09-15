@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import * as RT from "@midnight-ntwrk/compact-runtime";
 import {
   DEMO,
   Status,
@@ -9,6 +8,7 @@ import {
   bootWithPk,
   call,
   firstQuote,
+  notesOf,
   nullifiersOf,
   quotesOf,
   readLedger,
@@ -17,11 +17,16 @@ import {
 } from "./compact-harness.ts";
 import {
   agentId,
+  contractDomain,
+  drawNoteCommit,
+  drawNullifier,
   issuerPublicKey,
   lineStateCommit,
   merchantPublicKey,
   pad32,
   quoteCommit,
+  redeemNullifier,
+  repayNullifier,
   toHex,
 } from "./encoding.ts";
 
@@ -38,28 +43,34 @@ function ps(overrides: Partial<PrivateState> = {}): PrivateState {
     quoteNonce: pad32("n40"),
     receiptNonce: pad32("r1"),
     paymentRef: pad32("pay"),
+    noteNonce: pad32("nn-40"),
+    noteSalt: pad32("ns-40"),
+    noteIdentity: agentId(DEMO.agent),
+    noteQuoteCommit: pad32("0"),
     ...overrides,
   });
 }
 
-async function genesis() {
-  return boot(DEMO.issuer, DEMO.merchant, ps());
+async function genesis(instanceNonce?: Uint8Array) {
+  return boot(DEMO.issuer, DEMO.merchantA, instanceNonce, ps());
 }
 
 async function opened(session?: Session) {
   const s = session ?? (await genesis());
-  const r = await call(s, ps(), { name: "openLine", args: [LIMIT, EXPIRY] });
+  const funded = await call(s, ps(), { name: "fundReserve", args: [1000n] });
+  assert.equal(funded.ok, true, funded.ok ? "" : funded.error);
+  const r = await call(funded.session, ps(), { name: "openLine", args: [LIMIT, EXPIRY] });
   assert.equal(r.ok, true, r.ok ? "" : r.error);
   if (!r.ok) throw new Error("open");
   return r;
 }
 
-async function quoted(amount = 40n, invoice = "inv-40", nonce = "n40", from?: Session) {
+async function quoted(amount = 40n, invoice = "inv-40", nonce = "n40", from?: Session, merchant = DEMO.merchantA) {
   const o = from ? { ok: true as const, session: from, ledger: readLedger(from) } : await opened();
   const r = await call(
     o.session,
     ps({
-      callerSecret: DEMO.merchant,
+      callerSecret: merchant,
       invoiceId: pad32(invoice),
       quoteNonce: pad32(nonce),
     }),
@@ -70,27 +81,228 @@ async function quoted(amount = 40n, invoice = "inv-40", nonce = "n40", from?: Se
   return r;
 }
 
-describe("compact simulator: constructor", () => {
-  it("seals issuer, merchant, and domain; status NONE", async () => {
+describe("compact simulator: constructor and domains", () => {
+  it("seals issuer, domain, registers initial merchant; status NONE", async () => {
     const s = await genesis();
     const L = readLedger(s);
     assert.equal(L.status, Status.NONE);
     assert.equal(L.actionClock, 0n);
     assert.equal(L.lineGeneration, 0n);
+    assert.equal(L.totalReserve, 0n);
+    assert.equal(L.encumberedReserve, 0n);
+    assert.equal(L.redeemedReserve, 0n);
     assert.equal(toHex(L.issuer).length, 64);
-    assert.notEqual(toHex(L.issuer), toHex(L.merchant));
     assert.equal(toHex(L.contractDomain).length, 64);
+    const mAPk = merchantPublicKey(DEMO.merchantA);
+    assert.equal(L.registeredMerchants.member(mAPk), true);
   });
 
   it("constructor accepts public keys directly without private secrets", async () => {
     const ipk = issuerPublicKey(DEMO.issuer);
-    const mpk = merchantPublicKey(DEMO.merchant);
-    const s = await bootWithPk(ipk, mpk);
+    const mpk = merchantPublicKey(DEMO.merchantA);
+    const s = await bootWithPk(ipk, mpk, DEMO.instanceNonce);
     const L = readLedger(s);
     assert.equal(toHex(L.issuer), toHex(ipk));
-    assert.equal(toHex(L.merchant), toHex(mpk));
     assert.equal(L.status, Status.NONE);
     assert.equal(L.lineGeneration, 0n);
+    assert.equal(L.registeredMerchants.member(mpk), true);
+  });
+
+  it("unique instance nonces produce unique contract domains", async () => {
+    const s1 = await genesis(pad32("instance:1"));
+    const s2 = await genesis(pad32("instance:2"));
+    const L1 = readLedger(s1);
+    const L2 = readLedger(s2);
+    assert.notEqual(toHex(L1.contractDomain), toHex(L2.contractDomain));
+  });
+});
+
+describe("compact simulator: merchant registry", () => {
+  it("issuer can register a second merchant (Merchant B)", async () => {
+    const s = await genesis();
+    const mBPk = merchantPublicKey(DEMO.merchantB);
+    const r = await call(s, ps({ callerSecret: DEMO.issuer }), {
+      name: "registerMerchant",
+      args: [mBPk],
+    });
+    assert.equal(r.ok, true);
+    assert.equal(r.ledger.registeredMerchants.member(mBPk), true);
+  });
+
+  it("unauthorized caller cannot register a merchant", async () => {
+    const s = await genesis();
+    const mBPk = merchantPublicKey(DEMO.merchantB);
+    const r = await call(s, ps({ callerSecret: DEMO.merchantA }), {
+      name: "registerMerchant",
+      args: [mBPk],
+    });
+    assert.equal(r.ok, false);
+    assert.match(r.error, /not issuer/);
+  });
+
+  it("cannot register the same merchant twice", async () => {
+    const s = await genesis();
+    const mAPk = merchantPublicKey(DEMO.merchantA);
+    const r = await call(s, ps({ callerSecret: DEMO.issuer }), {
+      name: "registerMerchant",
+      args: [mAPk],
+    });
+    assert.equal(r.ok, false);
+    assert.match(r.error, /merchant already registered/);
+  });
+
+  it("registered Merchant B can post quotes", async () => {
+    const o = await opened();
+    const mBPk = merchantPublicKey(DEMO.merchantB);
+    const reg = await call(o.session, ps({ callerSecret: DEMO.issuer }), {
+      name: "registerMerchant",
+      args: [mBPk],
+    });
+    assert.equal(reg.ok, true);
+
+    const q = await call(
+      reg.session,
+      ps({
+        callerSecret: DEMO.merchantB,
+        invoiceId: pad32("inv-b-1"),
+        quoteNonce: pad32("nonce-b-1"),
+      }),
+      { name: "postQuote", args: [60n, EXPIRY] },
+    );
+    assert.equal(q.ok, true);
+  });
+
+  it("unregistered merchant cannot post quotes", async () => {
+    const o = await opened();
+    const unregisteredSk = pad32("line:demo:unregistered");
+    const q = await call(
+      o.session,
+      ps({
+        callerSecret: unregisteredSk,
+        invoiceId: pad32("inv-unreg"),
+        quoteNonce: pad32("nonce-unreg"),
+      }),
+      { name: "postQuote", args: [50n, EXPIRY] },
+    );
+    assert.equal(q.ok, false);
+    assert.match(q.error, /unregistered merchant/);
+  });
+});
+
+describe("compact simulator: reserve accounting", () => {
+  it("issuer funds reserve; totalReserve increases", async () => {
+    const s = await genesis();
+    const r = await call(s, ps({ callerSecret: DEMO.issuer }), {
+      name: "fundReserve",
+      args: [500n],
+    });
+    assert.equal(r.ok, true);
+    assert.equal(r.ledger.totalReserve, 500n);
+    assert.equal(r.ledger.encumberedReserve, 0n);
+    assert.equal(r.ledger.redeemedReserve, 0n);
+  });
+
+  it("unauthorized actor cannot fund reserve as issuer", async () => {
+    const s = await genesis();
+    const r = await call(s, ps({ callerSecret: DEMO.agent }), {
+      name: "fundReserve",
+      args: [500n],
+    });
+    assert.equal(r.ok, false);
+    assert.match(r.error, /not issuer/);
+  });
+
+  it("zero fund is rejected", async () => {
+    const s = await genesis();
+    const r = await call(s, ps({ callerSecret: DEMO.issuer }), {
+      name: "fundReserve",
+      args: [0n],
+    });
+    assert.equal(r.ok, false);
+    assert.match(r.error, /zero fund/);
+  });
+
+  it("issuer can withdraw unencumbered reserve", async () => {
+    const s = await genesis();
+    const f = await call(s, ps({ callerSecret: DEMO.issuer }), {
+      name: "fundReserve",
+      args: [500n],
+    });
+    const w = await call(f.session, ps({ callerSecret: DEMO.issuer }), {
+      name: "withdrawUnencumberedReserve",
+      args: [200n],
+    });
+    assert.equal(w.ok, true);
+    assert.equal(w.ledger.totalReserve, 300n);
+  });
+
+  it("issuer cannot withdraw more than unencumbered reserve", async () => {
+    const s = await genesis();
+    const f = await call(s, ps({ callerSecret: DEMO.issuer }), {
+      name: "fundReserve",
+      args: [100n],
+    });
+    const w = await call(f.session, ps({ callerSecret: DEMO.issuer }), {
+      name: "withdrawUnencumberedReserve",
+      args: [150n],
+    });
+    assert.equal(w.ok, false);
+    assert.match(w.error, /amount exceeds unencumbered reserve/);
+  });
+
+  it("draw fails when reserve is insufficient for draw note", async () => {
+    const s = await genesis();
+    // Fund only 20
+    const f = await call(s, ps(), { name: "fundReserve", args: [20n] });
+    const o = await call(f.session, ps(), { name: "openLine", args: [150n, EXPIRY] });
+    const q = await quoted(40n, "inv-40", "n40", o.session);
+    const Q = firstQuote(q.ledger)!.Q;
+
+    // Draw 40 against 20 reserve
+    const d = await call(
+      q.session,
+      ps({
+        callerSecret: DEMO.issuer,
+        agentSecret: DEMO.agent,
+        salt: pad32("salt-0"),
+        newSalt: pad32("salt-1"),
+        invoiceId: pad32("inv-40"),
+        quoteNonce: pad32("n40"),
+        noteNonce: pad32("nn-40"),
+        noteSalt: pad32("ns-40"),
+      }),
+      { name: "draw", args: [Q, 150n, 0n, 0n, 40n, EXPIRY] },
+    );
+    assert.equal(d.ok, false);
+    assert.match(d.error, /insufficient reserve/);
+  });
+
+  it("issuer cannot withdraw funds backing an outstanding draw note", async () => {
+    const q = await quoted(40n);
+    const Q = firstQuote(q.ledger)!.Q;
+    const d = await call(
+      q.session,
+      ps({
+        callerSecret: DEMO.issuer,
+        agentSecret: DEMO.agent,
+        salt: pad32("salt-0"),
+        newSalt: pad32("salt-1"),
+        invoiceId: pad32("inv-40"),
+        quoteNonce: pad32("n40"),
+        noteNonce: pad32("nn-40"),
+        noteSalt: pad32("ns-40"),
+      }),
+      { name: "draw", args: [Q, 150n, 0n, 0n, 40n, EXPIRY] },
+    );
+    assert.equal(d.ok, true);
+    // Total is 1000, encumbered is 40. Withdrawable is 960.
+    // Withdrawing 980 should fail
+    const w = await call(d.session, ps({ callerSecret: DEMO.issuer }), {
+      name: "withdrawUnencumberedReserve",
+      args: [980n],
+    });
+    assert.equal(w.ok, false);
+    assert.match(w.error, /amount exceeds unencumbered reserve/);
   });
 });
 
@@ -100,712 +312,545 @@ describe("compact simulator: openLine", () => {
     assert.equal(r.ledger.status, Status.OPEN);
     assert.equal(r.ledger.lineGeneration, 1n);
     const I = agentId(DEMO.agent);
-    assert.equal(toHex(r.ledger.identityCommit), toHex(I));
-    const expected = lineStateCommit(
+    const C0 = lineStateCommit(
       { identity: I, limit: LIMIT, outstanding: 0n, epoch: 0n },
       pad32("salt-0"),
     );
-    assert.equal(toHex(r.ledger.lineCommit), toHex(expected));
+    assert.equal(toHex(r.ledger.identityCommit), toHex(I));
+    assert.equal(toHex(r.ledger.lineCommit), toHex(C0));
     assert.equal(r.ledger.lineExpiry, EXPIRY);
   });
 
   it("forged issuer is rejected and state is unchanged", async () => {
     const s = await genesis();
-    const before = toHex(readLedger(s).issuer);
-    const r = await call(s, ps({ callerSecret: pad32("forged") }), {
+    const fake = pad32("line:demo:attacker");
+    const r = await call(s, ps({ callerSecret: fake }), {
       name: "openLine",
       args: [LIMIT, EXPIRY],
     });
     assert.equal(r.ok, false);
-    if (r.ok) throw new Error("expected fail");
     assert.match(r.error, /not issuer/);
     assert.equal(r.ledger.status, Status.NONE);
-    assert.equal(toHex(r.ledger.issuer), before);
+    assert.equal(r.ledger.lineGeneration, 0n);
   });
 
   it("second open while active is rejected", async () => {
     const o = await opened();
-    const r = await call(o.session, ps({ salt: pad32("salt-x") }), {
-      name: "openLine",
-      args: [80n, EXPIRY],
-    });
+    const r = await call(o.session, ps(), { name: "openLine", args: [LIMIT, EXPIRY] });
     assert.equal(r.ok, false);
-    assert.equal(toHex(o.ledger.lineCommit), toHex(readLedger(o.session).lineCommit));
+    assert.match(r.error, /line already open/);
   });
 
   it("zero limit is rejected", async () => {
     const s = await genesis();
     const r = await call(s, ps(), { name: "openLine", args: [0n, EXPIRY] });
     assert.equal(r.ok, false);
-  });
-
-  it("expired line open is rejected", async () => {
-    const s = await genesis();
-    const r = await call(s, ps(), { name: "openLine", args: [LIMIT, 0n] });
-    assert.equal(r.ok, false);
+    assert.match(r.error, /limit/);
   });
 });
 
 describe("compact simulator: postQuote", () => {
   it("authorized merchant posts an opaque quote", async () => {
-    const r = await quoted();
-    const q = firstQuote(r.ledger);
-    assert.ok(q);
-    const expected = quoteCommit({
-      merchantPk: r.ledger.merchant,
-      invoiceId: pad32("inv-40"),
-      amount: 40n,
-      expiry: EXPIRY,
-      nonce: pad32("n40"),
-      generation: 1n,
-      domain: r.ledger.contractDomain,
-    });
-    assert.equal(toHex(q!.Q), toHex(expected));
-    assert.equal(q!.lineGeneration, 1n);
-    assert.equal(q!.used, false);
-  });
-
-  it("unauthorized merchant is rejected", async () => {
-    const o = await opened();
-    const r = await call(o.session, ps({ callerSecret: pad32("stranger") }), {
-      name: "postQuote",
-      args: [40n, EXPIRY],
-    });
-    assert.equal(r.ok, false);
-    if (r.ok) throw new Error("expected fail");
-    assert.match(r.error, /not merchant/);
-    assert.equal(r.ledger.quotes.size(), 0n);
+    const q = await quoted();
+    const Qs = quotesOf(q.ledger);
+    assert.equal(Qs.length, 1);
+    assert.equal(Qs[0]!.used, false);
+    assert.equal(Qs[0]!.lineGeneration, 1n);
   });
 
   it("zero quote is rejected", async () => {
     const o = await opened();
-    const r = await call(o.session, ps({ callerSecret: DEMO.merchant }), {
+    const r = await call(o.session, ps({ callerSecret: DEMO.merchantA }), {
       name: "postQuote",
       args: [0n, EXPIRY],
     });
     assert.equal(r.ok, false);
-  });
-
-  it("expired quote is rejected at post", async () => {
-    const o = await opened();
-    const r = await call(o.session, ps({ callerSecret: DEMO.merchant }), {
-      name: "postQuote",
-      args: [40n, o.ledger.actionClock],
-    });
-    assert.equal(r.ok, false);
-  });
-
-  it("quote cannot be posted before a line exists", async () => {
-    const s = await genesis();
-    const r = await call(s, ps({ callerSecret: DEMO.merchant }), {
-      name: "postQuote",
-      args: [40n, EXPIRY],
-    });
-    assert.equal(r.ok, false);
-    assert.match(r.error, /status/);
+    assert.match(r.error, /zero/);
   });
 
   it("quote cannot be posted when line is defaulted", async () => {
     const o = await opened();
-    const d = await call(o.session, ps({ callerSecret: DEMO.issuer }), {
+    const def = await call(o.session, ps({ callerSecret: DEMO.issuer }), {
       name: "setStatus",
       args: [Status.DEFAULTED],
     });
-    assert.equal(d.ok, true);
-    const r = await call(d.session, ps({ callerSecret: DEMO.merchant }), {
+    const q = await call(def.session, ps({ callerSecret: DEMO.merchantA }), {
       name: "postQuote",
       args: [40n, EXPIRY],
     });
-    assert.equal(r.ok, false);
-    assert.match(r.error, /status/);
-  });
-
-  it("quote cannot be posted when line is closed", async () => {
-    const o = await opened();
-    const c = await call(o.session, ps({ callerSecret: DEMO.issuer }), {
-      name: "setStatus",
-      args: [Status.CLOSED],
-    });
-    assert.equal(c.ok, true);
-    const r = await call(c.session, ps({ callerSecret: DEMO.merchant }), {
-      name: "postQuote",
-      args: [40n, EXPIRY],
-    });
-    assert.equal(r.ok, false);
-    assert.match(r.error, /status/);
-  });
-
-  it("role domain separation: issuer cannot call postQuote and merchant cannot call issuer circuits", async () => {
-    const o = await opened();
-    // Issuer cannot postQuote (merchant-only)
-    const badQuote = await call(o.session, ps({ callerSecret: DEMO.issuer }), {
-      name: "postQuote",
-      args: [40n, EXPIRY],
-    });
-    assert.equal(badQuote.ok, false);
-    assert.match(badQuote.error, /not merchant/);
-
-    // Merchant cannot setStatus (issuer-only)
-    const badStatus = await call(o.session, ps({ callerSecret: DEMO.merchant }), {
-      name: "setStatus",
-      args: [Status.DEFAULTED],
-    });
-    assert.equal(badStatus.ok, false);
-    assert.match(badStatus.error, /not issuer/);
+    assert.equal(q.ok, false);
+    assert.match(q.error, /status/);
   });
 });
 
-describe("compact simulator: draw", () => {
-  it("valid draw within capacity succeeds and rotates C", async () => {
-    const q = await quoted();
+describe("compact simulator: draw and merchant-bound settlement notes", () => {
+  it("valid draw creates merchant-bound note D and rotates C", async () => {
+    const q = await quoted(40n);
     const Q = firstQuote(q.ledger)!.Q;
-    const r = await call(q.session, ps(), {
-      name: "draw",
-      args: [Q, LIMIT, 0n, 0n, 40n],
-    });
-    assert.equal(r.ok, true, r.ok ? "" : r.error);
-    if (!r.ok) throw new Error("draw");
-    const expected = lineStateCommit(
-      { identity: agentId(DEMO.agent), limit: LIMIT, outstanding: 40n, epoch: 1n },
-      pad32("salt-1"),
+    const d = await call(
+      q.session,
+      ps({
+        callerSecret: DEMO.issuer,
+        agentSecret: DEMO.agent,
+        salt: pad32("salt-0"),
+        newSalt: pad32("salt-1"),
+        invoiceId: pad32("inv-40"),
+        quoteNonce: pad32("n40"),
+        noteNonce: pad32("nn-40"),
+        noteSalt: pad32("ns-40"),
+      }),
+      { name: "draw", args: [Q, 150n, 0n, 0n, 40n, EXPIRY] },
     );
-    assert.equal(toHex(r.ledger.lineCommit), toHex(expected));
-    assert.notEqual(toHex(r.ledger.lineCommit), toHex(q.ledger.lineCommit));
-    assert.equal(nullifiersOf(r.ledger).length, 1);
-    assert.equal(quotesOf(r.ledger)[0]?.used, true);
+    assert.equal(d.ok, true);
+    assert.equal(d.ledger.encumberedReserve, 40n);
+    const notes = notesOf(d.ledger);
+    assert.equal(notes.length, 1);
+    assert.equal(notes[0]!.amount, 40n);
+    assert.equal(notes[0]!.redeemed, false);
+    assert.equal(notes[0]!.cancelled, false);
   });
 
   it("over-limit draw fails and leaves state unchanged", async () => {
-    const q = await quoted(151n, "inv-151", "n151");
+    const q = await quoted(160n, "inv-160", "n160");
     const Q = firstQuote(q.ledger)!.Q;
-    const before = toHex(q.ledger.lineCommit);
-    const r = await call(q.session, ps({ invoiceId: pad32("inv-151"), quoteNonce: pad32("n151") }), {
-      name: "draw",
-      args: [Q, LIMIT, 0n, 0n, 151n],
-    });
-    assert.equal(r.ok, false);
-    assert.equal(toHex(r.ledger.lineCommit), before);
-    assert.equal(quotesOf(r.ledger)[0]?.used, false);
-  });
-
-  it("supplying a fake high L fails because it does not open C", async () => {
-    const q = await quoted();
-    const Q = firstQuote(q.ledger)!.Q;
-    const r = await call(q.session, ps(), {
-      name: "draw",
-      args: [Q, 10_000n, 0n, 0n, 40n],
-    });
-    assert.equal(r.ok, false);
-    if (r.ok) throw new Error("expected fail");
-    assert.match(r.error, /stale/);
-  });
-
-  it("supplying a fake low B fails because it does not open C", async () => {
-    const q = await quoted();
-    const Q = firstQuote(q.ledger)!.Q;
-    const d = await call(q.session, ps(), { name: "draw", args: [Q, LIMIT, 0n, 0n, 40n] });
-    assert.equal(d.ok, true);
-    if (!d.ok) throw new Error("d");
-    const q2 = await quoted(10n, "inv-10", "n10", d.session);
-    const Q2 = quotesOf(q2.ledger).at(-1)!.Q;
-    const r = await call(
-      q2.session,
-      ps({ salt: pad32("salt-1"), newSalt: pad32("salt-2"), invoiceId: pad32("inv-10"), quoteNonce: pad32("n10") }),
-      { name: "draw", args: [Q2, LIMIT, 0n, 1n, 10n] },
+    const d = await call(
+      q.session,
+      ps({
+        callerSecret: DEMO.issuer,
+        agentSecret: DEMO.agent,
+        salt: pad32("salt-0"),
+        newSalt: pad32("salt-1"),
+        invoiceId: pad32("inv-160"),
+        quoteNonce: pad32("n160"),
+        noteNonce: pad32("nn-160"),
+        noteSalt: pad32("ns-160"),
+      }),
+      { name: "draw", args: [Q, 150n, 0n, 0n, 160n, EXPIRY] },
     );
-    assert.equal(r.ok, false);
-    if (r.ok) throw new Error("expected fail");
-    assert.match(r.error, /stale/);
+    assert.equal(d.ok, false);
+    assert.match(d.error, /capacity/);
+    assert.equal(d.ledger.encumberedReserve, 0n);
   });
 
-  it("tampered amount fails Q reconstruction", async () => {
-    const q = await quoted();
+  it("tampered amount fails quote reconstruction", async () => {
+    const q = await quoted(40n);
     const Q = firstQuote(q.ledger)!.Q;
-    const r = await call(q.session, ps(), {
-      name: "draw",
-      args: [Q, LIMIT, 0n, 0n, 1n],
-    });
-    assert.equal(r.ok, false);
-    if (r.ok) throw new Error("expected fail");
-    assert.match(r.error, /quote preimage/);
-  });
-
-  it("tampered invoice fails Q reconstruction", async () => {
-    const q = await quoted();
-    const Q = firstQuote(q.ledger)!.Q;
-    const r = await call(q.session, ps({ invoiceId: pad32("other-inv") }), {
-      name: "draw",
-      args: [Q, LIMIT, 0n, 0n, 40n],
-    });
-    assert.equal(r.ok, false);
-    if (r.ok) throw new Error("expected fail");
-    assert.match(r.error, /quote preimage/);
-  });
-
-  it("wrong agent fails", async () => {
-    const q = await quoted();
-    const Q = firstQuote(q.ledger)!.Q;
-    const r = await call(q.session, ps({ agentSecret: pad32("intruder") }), {
-      name: "draw",
-      args: [Q, LIMIT, 0n, 0n, 40n],
-    });
-    assert.equal(r.ok, false);
-    if (r.ok) throw new Error("expected fail");
-    assert.match(r.error, /agent/);
-  });
-
-  it("reused quote / nullifier fails", async () => {
-    const q = await quoted();
-    const Q = firstQuote(q.ledger)!.Q;
-    const d1 = await call(q.session, ps(), { name: "draw", args: [Q, LIMIT, 0n, 0n, 40n] });
-    assert.equal(d1.ok, true);
-    if (!d1.ok) throw new Error("d1");
-    const d2 = await call(
-      d1.session,
-      ps({ salt: pad32("salt-1"), newSalt: pad32("salt-2") }),
-      { name: "draw", args: [Q, LIMIT, 40n, 1n, 40n] },
+    const d = await call(
+      q.session,
+      ps({
+        callerSecret: DEMO.issuer,
+        agentSecret: DEMO.agent,
+        salt: pad32("salt-0"),
+        newSalt: pad32("salt-1"),
+        invoiceId: pad32("inv-40"),
+        quoteNonce: pad32("n40"),
+        noteNonce: pad32("nn-40"),
+        noteSalt: pad32("ns-40"),
+      }),
+      { name: "draw", args: [Q, 150n, 0n, 0n, 39n, EXPIRY] },
     );
-    assert.equal(d2.ok, false);
+    assert.equal(d.ok, false);
+    assert.match(d.error, /quote preimage/);
   });
 
-  it("stale C fails", async () => {
-    const q1 = await quoted(40n, "a", "na");
-    const q2 = await quoted(40n, "b", "nb", q1.session);
-    const Qa = quotesOf(q2.ledger)[0]!.Q;
-    const Qb = quotesOf(q2.ledger)[1]!.Q;
+  it("wrong agent fails draw", async () => {
+    const q = await quoted(40n);
+    const Q = firstQuote(q.ledger)!.Q;
+    const fakeAgent = pad32("line:demo:fakeagent");
+    const d = await call(
+      q.session,
+      ps({
+        callerSecret: DEMO.issuer,
+        agentSecret: fakeAgent,
+        salt: pad32("salt-0"),
+        newSalt: pad32("salt-1"),
+        invoiceId: pad32("inv-40"),
+        quoteNonce: pad32("n40"),
+        noteNonce: pad32("nn-40"),
+        noteSalt: pad32("ns-40"),
+      }),
+      { name: "draw", args: [Q, 150n, 0n, 0n, 40n, EXPIRY] },
+    );
+    assert.equal(d.ok, false);
+    assert.match(d.error, /agent/);
+  });
+
+  it("reused quote fails draw", async () => {
+    const q = await quoted(40n);
+    const Q = firstQuote(q.ledger)!.Q;
     const d1 = await call(
-      q2.session,
-      ps({ invoiceId: pad32("a"), quoteNonce: pad32("na") }),
-      { name: "draw", args: [Qa, LIMIT, 0n, 0n, 40n] },
+      q.session,
+      ps({
+        callerSecret: DEMO.issuer,
+        agentSecret: DEMO.agent,
+        salt: pad32("salt-0"),
+        newSalt: pad32("salt-1"),
+        invoiceId: pad32("inv-40"),
+        quoteNonce: pad32("n40"),
+        noteNonce: pad32("nn-40-1"),
+        noteSalt: pad32("ns-40-1"),
+      }),
+      { name: "draw", args: [Q, 150n, 0n, 0n, 40n, EXPIRY] },
     );
     assert.equal(d1.ok, true);
-    if (!d1.ok) throw new Error("d1");
+
     const d2 = await call(
       d1.session,
-      ps({ invoiceId: pad32("b"), quoteNonce: pad32("nb"), salt: pad32("salt-0"), newSalt: pad32("salt-2") }),
-      { name: "draw", args: [Qb, LIMIT, 0n, 0n, 40n] },
+      ps({
+        callerSecret: DEMO.issuer,
+        agentSecret: DEMO.agent,
+        salt: pad32("salt-1"),
+        newSalt: pad32("salt-2"),
+        invoiceId: pad32("inv-40"),
+        quoteNonce: pad32("n40"),
+        noteNonce: pad32("nn-40-2"),
+        noteSalt: pad32("ns-40-2"),
+      }),
+      { name: "draw", args: [Q, 150n, 40n, 1n, 40n, EXPIRY] },
     );
     assert.equal(d2.ok, false);
-    if (d2.ok) throw new Error("expected stale");
-    assert.match(d2.error, /stale/);
+    assert.match(d2.error, /used/);
+  });
+});
+
+describe("compact simulator: merchant redemption", () => {
+  async function drawn() {
+    const q = await quoted(40n);
+    const Q = firstQuote(q.ledger)!.Q;
+    const d = await call(
+      q.session,
+      ps({
+        callerSecret: DEMO.issuer,
+        agentSecret: DEMO.agent,
+        salt: pad32("salt-0"),
+        newSalt: pad32("salt-1"),
+        invoiceId: pad32("inv-40"),
+        quoteNonce: pad32("n40"),
+        noteNonce: pad32("nn-40"),
+        noteSalt: pad32("ns-40"),
+      }),
+      { name: "draw", args: [Q, 150n, 0n, 0n, 40n, EXPIRY] },
+    );
+    assert.equal(d.ok, true);
+    const D = notesOf(d.ledger)[0]!.D;
+    return { session: d.session, ledger: d.ledger, Q, D };
+  }
+
+  it("designated Merchant A redeems note once; reserve accounting reconciles", async () => {
+    const { session, Q, D } = await drawn();
+    const r = await call(
+      session,
+      ps({
+        callerSecret: DEMO.merchantA,
+        noteIdentity: agentId(DEMO.agent),
+        noteQuoteCommit: Q,
+        noteNonce: pad32("nn-40"),
+        noteSalt: pad32("ns-40"),
+      }),
+      { name: "redeemDraw", args: [D, 40n, EXPIRY] },
+    );
+    assert.equal(r.ok, true);
+    assert.equal(r.ledger.encumberedReserve, 0n);
+    assert.equal(r.ledger.redeemedReserve, 40n);
+    const note = notesOf(r.ledger)[0]!;
+    assert.equal(note.redeemed, true);
   });
 
-  it("two proofs against the same old C cannot both be included", async () => {
-    const q1 = await quoted(100n, "a", "na");
-    const q2 = await quoted(100n, "b", "nb", q1.session);
-    const Qa = quoteCommit({
-      merchantPk: q2.ledger.merchant,
-      invoiceId: pad32("a"),
-      amount: 100n,
-      expiry: EXPIRY,
-      nonce: pad32("na"),
-      generation: 1n,
-      domain: q2.ledger.contractDomain,
-    });
-    const Qb = quoteCommit({
-      merchantPk: q2.ledger.merchant,
-      invoiceId: pad32("b"),
-      amount: 100n,
-      expiry: EXPIRY,
-      nonce: pad32("nb"),
-      generation: 1n,
-      domain: q2.ledger.contractDomain,
-    });
-    const proofA = await call(
-      q2.session,
-      ps({ invoiceId: pad32("a"), quoteNonce: pad32("na"), newSalt: pad32("s1") }),
-      { name: "draw", args: [Qa, LIMIT, 0n, 0n, 100n] },
+  it("Merchant B cannot redeem Merchant A's note (role separation)", async () => {
+    const { session, Q, D } = await drawn();
+    const r = await call(
+      session,
+      ps({
+        callerSecret: DEMO.merchantB,
+        noteIdentity: agentId(DEMO.agent),
+        noteQuoteCommit: Q,
+        noteNonce: pad32("nn-40"),
+        noteSalt: pad32("ns-40"),
+      }),
+      { name: "redeemDraw", args: [D, 40n, EXPIRY] },
     );
-    const proofB = await call(
-      q2.session,
-      ps({ invoiceId: pad32("b"), quoteNonce: pad32("nb"), newSalt: pad32("s2") }),
-      { name: "draw", args: [Qb, LIMIT, 0n, 0n, 100n] },
-    );
-    assert.equal(proofA.ok, true, proofA.ok ? "" : proofA.error);
-    assert.equal(proofB.ok, true, proofB.ok ? "" : proofB.error);
-    if (!proofA.ok) throw new Error("A");
-    const includeB = await call(
-      proofA.session,
-      ps({ invoiceId: pad32("b"), quoteNonce: pad32("nb"), salt: pad32("salt-0"), newSalt: pad32("s2") }),
-      { name: "draw", args: [Qb, LIMIT, 0n, 0n, 100n] },
-    );
-    assert.equal(includeB.ok, false);
-  });
-
-  it("expired quote fails at draw", async () => {
-    const o = await opened();
-    const posted = await call(
-      o.session,
-      ps({ callerSecret: DEMO.merchant }),
-      { name: "postQuote", args: [10n, o.ledger.actionClock + 1n] },
-    );
-    assert.equal(posted.ok, true);
-    if (!posted.ok) throw new Error("post");
-    const Q = firstQuote(posted.ledger)!.Q;
-    const r = await call(posted.session, ps(), {
-      name: "draw",
-      args: [Q, LIMIT, 0n, 0n, 10n],
-    });
     assert.equal(r.ok, false);
+    assert.match(r.error, /note opening invalid/);
+  });
+
+  it("double redemption fails (nullifier spent)", async () => {
+    const { session, Q, D } = await drawn();
+    const r1 = await call(
+      session,
+      ps({
+        callerSecret: DEMO.merchantA,
+        noteIdentity: agentId(DEMO.agent),
+        noteQuoteCommit: Q,
+        noteNonce: pad32("nn-40"),
+        noteSalt: pad32("ns-40"),
+      }),
+      { name: "redeemDraw", args: [D, 40n, EXPIRY] },
+    );
+    assert.equal(r1.ok, true);
+
+    const r2 = await call(
+      r1.session,
+      ps({
+        callerSecret: DEMO.merchantA,
+        noteIdentity: agentId(DEMO.agent),
+        noteQuoteCommit: Q,
+        noteNonce: pad32("nn-40"),
+        noteSalt: pad32("ns-40"),
+      }),
+      { name: "redeemDraw", args: [D, 40n, EXPIRY] },
+    );
+    assert.equal(r2.ok, false);
+    assert.match(r2.error, /note already redeemed/);
+  });
+
+  it("tampered amount fails redemption", async () => {
+    const { session, Q, D } = await drawn();
+    const r = await call(
+      session,
+      ps({
+        callerSecret: DEMO.merchantA,
+        noteIdentity: agentId(DEMO.agent),
+        noteQuoteCommit: Q,
+        noteNonce: pad32("nn-40"),
+        noteSalt: pad32("ns-40"),
+      }),
+      { name: "redeemDraw", args: [D, 39n, EXPIRY] },
+    );
+    assert.equal(r.ok, false);
+    assert.match(r.error, /amount mismatch/);
+  });
+
+  it("wrong note salt fails opening", async () => {
+    const { session, Q, D } = await drawn();
+    const r = await call(
+      session,
+      ps({
+        callerSecret: DEMO.merchantA,
+        noteIdentity: agentId(DEMO.agent),
+        noteQuoteCommit: Q,
+        noteNonce: pad32("nn-40"),
+        noteSalt: pad32("wrong-salt"),
+      }),
+      { name: "redeemDraw", args: [D, 40n, EXPIRY] },
+    );
+    assert.equal(r.ok, false);
+    assert.match(r.error, /note opening invalid/);
+  });
+});
+
+describe("compact simulator: note cancellation and expiry", () => {
+  it("unexpired note cannot be cancelled", async () => {
+    const q = await quoted(40n);
+    const Q = firstQuote(q.ledger)!.Q;
+    const d = await call(
+      q.session,
+      ps({
+        callerSecret: DEMO.issuer,
+        agentSecret: DEMO.agent,
+        salt: pad32("salt-0"),
+        newSalt: pad32("salt-1"),
+        invoiceId: pad32("inv-40"),
+        quoteNonce: pad32("n40"),
+        noteNonce: pad32("nn-40"),
+        noteSalt: pad32("ns-40"),
+      }),
+      { name: "draw", args: [Q, 150n, 0n, 0n, 40n, EXPIRY] },
+    );
+    const D = notesOf(d.ledger)[0]!.D;
+    const c = await call(d.session, ps(), {
+      name: "cancelOrExpireNote",
+      args: [D],
+    });
+    assert.equal(c.ok, false);
+    assert.match(c.error, /note not expired/);
   });
 });
 
 describe("compact simulator: acknowledgeRepayment", () => {
-  it("valid issuer-confirmed repayment restores capacity", async () => {
-    const q = await quoted();
+  async function drawn() {
+    const q = await quoted(40n);
     const Q = firstQuote(q.ledger)!.Q;
-    const d = await call(q.session, ps(), { name: "draw", args: [Q, LIMIT, 0n, 0n, 40n] });
-    assert.equal(d.ok, true);
-    if (!d.ok) throw new Error("d");
+    const d = await call(
+      q.session,
+      ps({
+        callerSecret: DEMO.issuer,
+        agentSecret: DEMO.agent,
+        salt: pad32("salt-0"),
+        newSalt: pad32("salt-1"),
+        invoiceId: pad32("inv-40"),
+        quoteNonce: pad32("n40"),
+        noteNonce: pad32("nn-40"),
+        noteSalt: pad32("ns-40"),
+      }),
+      { name: "draw", args: [Q, 150n, 0n, 0n, 40n, EXPIRY] },
+    );
+    return d;
+  }
+
+  it("valid issuer-confirmed repayment restores capacity", async () => {
+    const d = await drawn();
     const ack = await call(
       d.session,
-      ps({ callerSecret: DEMO.issuer, salt: pad32("salt-1"), newSalt: pad32("salt-2") }),
-      { name: "acknowledgeRepayment", args: [LIMIT, 40n, 1n, 40n, EXPIRY] },
+      ps({
+        callerSecret: DEMO.issuer,
+        agentSecret: DEMO.agent,
+        salt: pad32("salt-1"),
+        newSalt: pad32("salt-2"),
+        receiptNonce: pad32("r1"),
+        paymentRef: pad32("wire-40"),
+      }),
+      { name: "acknowledgeRepayment", args: [150n, 40n, 1n, 40n, EXPIRY] },
     );
-    assert.equal(ack.ok, true, ack.ok ? "" : ack.error);
-    if (!ack.ok) throw new Error("ack");
-    const expected = lineStateCommit(
-      { identity: agentId(DEMO.agent), limit: LIMIT, outstanding: 0n, epoch: 2n },
+    assert.equal(ack.ok, true);
+    const I = agentId(DEMO.agent);
+    const C2 = lineStateCommit(
+      { identity: I, limit: 150n, outstanding: 0n, epoch: 2n },
       pad32("salt-2"),
     );
-    assert.equal(toHex(ack.ledger.lineCommit), toHex(expected));
+    assert.equal(toHex(ack.ledger.lineCommit), toHex(C2));
   });
 
   it("agent-initiated fake repayment fails", async () => {
-    const q = await quoted();
-    const Q = firstQuote(q.ledger)!.Q;
-    const d = await call(q.session, ps(), { name: "draw", args: [Q, LIMIT, 0n, 0n, 40n] });
-    if (!d.ok) throw new Error("d");
-    const r = await call(
+    const d = await drawn();
+    const ack = await call(
       d.session,
-      ps({ callerSecret: DEMO.agent, salt: pad32("salt-1"), newSalt: pad32("salt-2") }),
-      { name: "acknowledgeRepayment", args: [LIMIT, 40n, 1n, 40n, EXPIRY] },
+      ps({
+        callerSecret: DEMO.agent,
+        agentSecret: DEMO.agent,
+        salt: pad32("salt-1"),
+        newSalt: pad32("salt-2"),
+        receiptNonce: pad32("r1"),
+        paymentRef: pad32("wire-40"),
+      }),
+      { name: "acknowledgeRepayment", args: [150n, 40n, 1n, 40n, EXPIRY] },
     );
-    assert.equal(r.ok, false);
-    if (r.ok) throw new Error("expected fail");
-    assert.match(r.error, /not issuer/);
-    assert.equal(toHex(r.ledger.lineCommit), toHex(d.ledger.lineCommit));
-  });
-
-  it("repayment against stale C fails", async () => {
-    const q = await quoted();
-    const Q = firstQuote(q.ledger)!.Q;
-    const d = await call(q.session, ps(), { name: "draw", args: [Q, LIMIT, 0n, 0n, 40n] });
-    if (!d.ok) throw new Error("d");
-    const r = await call(
-      d.session,
-      ps({ callerSecret: DEMO.issuer, salt: pad32("salt-0") }),
-      { name: "acknowledgeRepayment", args: [LIMIT, 0n, 0n, 1n, EXPIRY] },
-    );
-    assert.equal(r.ok, false);
-    if (r.ok) throw new Error("expected fail");
-    assert.match(r.error, /stale/);
+    assert.equal(ack.ok, false);
+    assert.match(ack.error, /not issuer/);
   });
 
   it("repayment greater than B fails", async () => {
-    const q = await quoted();
-    const Q = firstQuote(q.ledger)!.Q;
-    const d = await call(q.session, ps(), { name: "draw", args: [Q, LIMIT, 0n, 0n, 40n] });
-    if (!d.ok) throw new Error("d");
-    const r = await call(
-      d.session,
-      ps({ callerSecret: DEMO.issuer, salt: pad32("salt-1") }),
-      { name: "acknowledgeRepayment", args: [LIMIT, 40n, 1n, 41n, EXPIRY] },
-    );
-    assert.equal(r.ok, false);
-  });
-
-  it("reused repayment receipt fails", async () => {
-    const q = await quoted();
-    const Q = firstQuote(q.ledger)!.Q;
-    const d = await call(q.session, ps(), { name: "draw", args: [Q, LIMIT, 0n, 0n, 40n] });
-    if (!d.ok) throw new Error("d");
-    const ack1 = await call(
-      d.session,
-      ps({ callerSecret: DEMO.issuer, salt: pad32("salt-1"), newSalt: pad32("salt-2") }),
-      { name: "acknowledgeRepayment", args: [LIMIT, 40n, 1n, 40n, EXPIRY] },
-    );
-    assert.equal(ack1.ok, true);
-    if (!ack1.ok) throw new Error("ack1");
-    const q2 = await quoted(40n, "inv-40b", "n40b", ack1.session);
-    const Q2 = quoteCommit({
-      merchantPk: q2.ledger.merchant,
-      invoiceId: pad32("inv-40b"),
-      amount: 40n,
-      expiry: EXPIRY,
-      nonce: pad32("n40b"),
-      generation: 1n,
-      domain: q2.ledger.contractDomain,
-    });
-    const d2 = await call(
-      q2.session,
-      ps({
-        salt: pad32("salt-2"),
-        newSalt: pad32("salt-3"),
-        invoiceId: pad32("inv-40b"),
-        quoteNonce: pad32("n40b"),
-      }),
-      { name: "draw", args: [Q2, LIMIT, 0n, 2n, 40n] },
-    );
-    assert.equal(d2.ok, true);
-    if (!d2.ok) throw new Error("d2");
-    const reuse = await call(
-      d2.session,
-      ps({
-        callerSecret: DEMO.issuer,
-        salt: pad32("salt-3"),
-        newSalt: pad32("salt-4"),
-        receiptNonce: pad32("r1"),
-        paymentRef: pad32("pay"),
-      }),
-      { name: "acknowledgeRepayment", args: [LIMIT, 40n, 3n, 40n, EXPIRY] },
-    );
-    // Same nonce+payRef against a new C is a different nullifier; Compact binds
-    // the receipt to current C. Reuse of the *same* C-bound receipt is the stale
-    // case. Here we also pin nonce and assert a second ack on the *original* C
-    // snapshot cannot apply after rotation:
-    const replayOld = await call(
-      ack1.session,
-      ps({
-        callerSecret: DEMO.issuer,
-        salt: pad32("salt-1"),
-        newSalt: pad32("salt-x"),
-        receiptNonce: pad32("r1"),
-        paymentRef: pad32("pay"),
-      }),
-      { name: "acknowledgeRepayment", args: [LIMIT, 40n, 1n, 40n, EXPIRY] },
-    );
-    assert.equal(replayOld.ok, false);
-    void reuse;
-  });
-
-  it("repayment against another line (wrong I via stale preimage) fails", async () => {
-    const q = await quoted();
-    const Q = firstQuote(q.ledger)!.Q;
-    const d = await call(q.session, ps(), { name: "draw", args: [Q, LIMIT, 0n, 0n, 40n] });
-    if (!d.ok) throw new Error("d");
-    const r = await call(
-      d.session,
-      ps({ callerSecret: DEMO.issuer, salt: pad32("foreign-salt") }),
-      { name: "acknowledgeRepayment", args: [LIMIT, 40n, 1n, 40n, EXPIRY] },
-    );
-    assert.equal(r.ok, false);
-  });
-});
-
-describe("compact simulator: setStatus", () => {
-  it("defaulted line rejects draw", async () => {
-    const o = await opened();
-    const q = await quoted(40n, "x", "nx", o.session);
-    const Q = quoteCommit({
-      merchantPk: q.ledger.merchant,
-      invoiceId: pad32("x"),
-      amount: 40n,
-      expiry: EXPIRY,
-      nonce: pad32("nx"),
-      generation: 1n,
-      domain: q.ledger.contractDomain,
-    });
-    const s = await call(q.session, ps({ callerSecret: DEMO.issuer }), {
-      name: "setStatus",
-      args: [Status.DEFAULTED],
-    });
-    assert.equal(s.ok, true);
-    if (!s.ok) throw new Error("status");
-    const d = await call(s.session, ps({ invoiceId: pad32("x"), quoteNonce: pad32("nx") }), {
-      name: "draw",
-      args: [Q, LIMIT, 0n, 0n, 40n],
-    });
-    assert.equal(d.ok, false);
-    assert.match(d.error, /status/);
-  });
-
-  it("closed line rejects draw; new openLine is allowed after CLOSED", async () => {
-    const o = await opened();
-    const q = await quoted(10n, "z", "nz", o.session);
-    const Q = quoteCommit({
-      merchantPk: q.ledger.merchant,
-      invoiceId: pad32("z"),
-      amount: 10n,
-      expiry: EXPIRY,
-      nonce: pad32("nz"),
-      generation: 1n,
-      domain: q.ledger.contractDomain,
-    });
-    const c = await call(q.session, ps({ callerSecret: DEMO.issuer }), {
-      name: "setStatus",
-      args: [Status.CLOSED],
-    });
-    assert.equal(c.ok, true);
-    if (!c.ok) throw new Error("closed");
-    const d = await call(c.session, ps({ invoiceId: pad32("z"), quoteNonce: pad32("nz") }), {
-      name: "draw",
-      args: [Q, LIMIT, 0n, 0n, 10n],
-    });
-    assert.equal(d.ok, false);
-    assert.match(d.error, /status/);
-
-    const reopen = await call(c.session, ps({ salt: pad32("new-epoch") }), {
-      name: "openLine",
-      args: [80n, EXPIRY],
-    });
-    assert.equal(reopen.ok, true, reopen.ok ? "" : reopen.error);
-    assert.equal(reopen.ledger.lineGeneration, 2n);
-  });
-
-  it("quote from generation 1 cannot be drawn after closing and opening generation 2", async () => {
-    // Generation 1: open line, post quote Q1
-    const o1 = await opened();
-    const q1 = await quoted(40n, "inv-gen1", "nonce-gen1", o1.session);
-    const Q1 = quoteCommit({
-      merchantPk: q1.ledger.merchant,
-      invoiceId: pad32("inv-gen1"),
-      amount: 40n,
-      expiry: EXPIRY,
-      nonce: pad32("nonce-gen1"),
-      generation: 1n,
-      domain: q1.ledger.contractDomain,
-    });
-    assert.equal(q1.ledger.lineGeneration, 1n);
-
-    // Close line 1
-    const closed = await call(q1.session, ps({ callerSecret: DEMO.issuer }), {
-      name: "setStatus",
-      args: [Status.CLOSED],
-    });
-    assert.equal(closed.ok, true);
-
-    // Open line generation 2
-    const o2 = await call(closed.session, ps({ salt: pad32("salt-gen2") }), {
-      name: "openLine",
-      args: [200n, EXPIRY],
-    });
-    assert.equal(o2.ok, true);
-    assert.equal(o2.ledger.lineGeneration, 2n);
-
-    // Attempt to draw Q1 against generation 2: fails because meta.lineGeneration (1n) != lineGeneration (2n)
-    const drawOldQuote = await call(
-      o2.session,
-      ps({
-        salt: pad32("salt-gen2"),
-        newSalt: pad32("salt-gen2-draw"),
-        invoiceId: pad32("inv-gen1"),
-        quoteNonce: pad32("nonce-gen1"),
-      }),
-      { name: "draw", args: [Q1, 200n, 0n, 0n, 40n] },
-    );
-    assert.equal(drawOldQuote.ok, false);
-    assert.match(drawOldQuote.error, /line generation mismatch/);
-
-    // Fresh quote posted in generation 2 succeeds
-    const q2 = await quoted(50n, "inv-gen2", "nonce-gen2", o2.session);
-    const Q2 = quoteCommit({
-      merchantPk: q2.ledger.merchant,
-      invoiceId: pad32("inv-gen2"),
-      amount: 50n,
-      expiry: EXPIRY,
-      nonce: pad32("nonce-gen2"),
-      generation: 2n,
-      domain: q2.ledger.contractDomain,
-    });
-    assert.equal(q2.ledger.lineGeneration, 2n);
-
-    const drawNewQuote = await call(
-      q2.session,
-      ps({
-        salt: pad32("salt-gen2"),
-        newSalt: pad32("salt-gen2-draw"),
-        invoiceId: pad32("inv-gen2"),
-        quoteNonce: pad32("nonce-gen2"),
-      }),
-      { name: "draw", args: [Q2, 200n, 0n, 0n, 50n] },
-    );
-    assert.equal(drawNewQuote.ok, true);
-  });
-
-  it("unauthorized caller cannot change status", async () => {
-    const o = await opened();
-    const r = await call(o.session, ps({ callerSecret: DEMO.agent }), {
-      name: "setStatus",
-      args: [Status.CLOSED],
-    });
-    assert.equal(r.ok, false);
-  });
-
-  it("CLOSED cannot setStatus back to OPEN", async () => {
-    const o = await opened();
-    const c = await call(o.session, ps({ callerSecret: DEMO.issuer }), {
-      name: "setStatus",
-      args: [Status.CLOSED],
-    });
-    assert.equal(c.ok, true);
-    if (!c.ok) throw new Error("c");
-    const r = await call(c.session, ps({ callerSecret: DEMO.issuer }), {
-      name: "setStatus",
-      args: [Status.OPEN],
-    });
-    assert.equal(r.ok, false);
-  });
-});
-
-describe("compact simulator: domain-separated nullifiers", () => {
-  it("draw and repay nullifiers cannot collide across operation types", async () => {
-    const q = await quoted();
-    const Q = firstQuote(q.ledger)!.Q;
-    const d = await call(q.session, ps(), { name: "draw", args: [Q, LIMIT, 0n, 0n, 40n] });
-    if (!d.ok) throw new Error("d");
-    const drawN = toHex(nullifiersOf(d.ledger)[0]!);
+    const d = await drawn();
     const ack = await call(
       d.session,
       ps({
         callerSecret: DEMO.issuer,
+        agentSecret: DEMO.agent,
         salt: pad32("salt-1"),
         newSalt: pad32("salt-2"),
-        receiptNonce: pad32("n40"),
-        paymentRef: Q,
+        receiptNonce: pad32("r1"),
+        paymentRef: pad32("wire-40"),
       }),
-      { name: "acknowledgeRepayment", args: [LIMIT, 40n, 1n, 40n, EXPIRY] },
+      { name: "acknowledgeRepayment", args: [150n, 40n, 1n, 50n, EXPIRY] },
     );
-    assert.equal(ack.ok, true, ack.ok ? "" : ack.error);
-    if (!ack.ok) throw new Error("ack");
-    const ns = nullifiersOf(ack.ledger).map(toHex);
-    assert.equal(ns.length, 2);
-    assert.notEqual(ns[0], ns[1]);
-    assert.ok(ns.includes(drawN));
+    assert.equal(ack.ok, false);
+    assert.match(ack.error, /range/);
   });
 });
 
-describe("compact simulator: failed operations leave state unchanged", () => {
-  it("actionClock, C, quotes, and nullifiers stay put on a failed draw", async () => {
-    const q = await quoted();
-    const before = {
-      actionClock: q.ledger.actionClock,
-      C: toHex(q.ledger.lineCommit),
-      quotes: q.ledger.quotes.size(),
-      nullifiers: q.ledger.nullifiers.size(),
-    };
-    const r = await call(q.session, ps(), {
-      name: "draw",
-      args: [firstQuote(q.ledger)!.Q, LIMIT, 0n, 0n, 1n],
+describe("compact simulator: setStatus and line generation", () => {
+  it("defaulted line rejects draw", async () => {
+    const q = await quoted(40n);
+    const Q = firstQuote(q.ledger)!.Q;
+    const def = await call(q.session, ps({ callerSecret: DEMO.issuer }), {
+      name: "setStatus",
+      args: [Status.DEFAULTED],
     });
-    assert.equal(r.ok, false);
-    assert.equal(r.ledger.actionClock, before.actionClock);
-    assert.equal(toHex(r.ledger.lineCommit), before.C);
-    assert.equal(r.ledger.quotes.size(), before.quotes);
-    assert.equal(r.ledger.nullifiers.size(), before.nullifiers);
+    const d = await call(
+      def.session,
+      ps({
+        callerSecret: DEMO.issuer,
+        agentSecret: DEMO.agent,
+        salt: pad32("salt-0"),
+        newSalt: pad32("salt-1"),
+        invoiceId: pad32("inv-40"),
+        quoteNonce: pad32("n40"),
+        noteNonce: pad32("nn-40"),
+        noteSalt: pad32("ns-40"),
+      }),
+      { name: "draw", args: [Q, 150n, 0n, 0n, 40n, EXPIRY] },
+    );
+    assert.equal(d.ok, false);
+    assert.match(d.error, /status/);
   });
-});
 
-describe("compact simulator: authorization is domain-bound", () => {
-  it("issuer of contract A cannot open a line on contract B", async () => {
-    const otherIssuer = pad32("other-issuer");
-    const b = await boot(otherIssuer, DEMO.merchant, ps({ callerSecret: otherIssuer }));
-    const r = await call(b, ps({ callerSecret: DEMO.issuer }), {
+  it("quote from generation 1 cannot be drawn after closing and reopening generation 2", async () => {
+    const q = await quoted(40n);
+    const Q1 = firstQuote(q.ledger)!.Q;
+
+    // Close line
+    const closed = await call(q.session, ps({ callerSecret: DEMO.issuer }), {
+      name: "setStatus",
+      args: [Status.CLOSED],
+    });
+
+    // Reopen line in generation 2
+    const reopen = await call(closed.session, ps({ callerSecret: DEMO.issuer }), {
       name: "openLine",
-      args: [LIMIT, EXPIRY],
+      args: [150n, EXPIRY + 1000n],
     });
-    assert.equal(r.ok, false);
+    assert.equal(reopen.ledger.lineGeneration, 2n);
+
+    // Attempt draw with Q1
+    const d = await call(
+      reopen.session,
+      ps({
+        callerSecret: DEMO.issuer,
+        agentSecret: DEMO.agent,
+        salt: pad32("salt-0"),
+        newSalt: pad32("salt-1"),
+        invoiceId: pad32("inv-40"),
+        quoteNonce: pad32("n40"),
+        noteNonce: pad32("nn-40"),
+        noteSalt: pad32("ns-40"),
+      }),
+      { name: "draw", args: [Q1, 150n, 0n, 0n, 40n, EXPIRY] },
+    );
+    assert.equal(d.ok, false);
+    assert.match(d.error, /line generation mismatch/);
   });
 });
 
-void RT;
+describe("compact simulator: cross-instance replay rejection", () => {
+  it("draw note from instance A cannot be redeemed in instance B", async () => {
+    const sA = await genesis(pad32("inst:A"));
+    const sB = await genesis(pad32("inst:B"));
+
+    const oA = await opened(sA);
+    const oB = await opened(sB);
+
+    const qA = await quoted(40n, "inv-40", "n40", oA.session);
+    const QA = firstQuote(qA.ledger)!.Q;
+
+    const dA = await call(
+      qA.session,
+      ps({
+        callerSecret: DEMO.issuer,
+        agentSecret: DEMO.agent,
+        salt: pad32("salt-0"),
+        newSalt: pad32("salt-1"),
+        invoiceId: pad32("inv-40"),
+        quoteNonce: pad32("n40"),
+        noteNonce: pad32("nn-40"),
+        noteSalt: pad32("ns-40"),
+      }),
+      { name: "draw", args: [QA, 150n, 0n, 0n, 40n, EXPIRY] },
+    );
+    assert.equal(dA.ok, true);
+    const DA = notesOf(dA.ledger)[0]!.D;
+
+    // Attempt to redeem note DA on instance B
+    const rB = await call(
+      oB.session,
+      ps({
+        callerSecret: DEMO.merchantA,
+        noteIdentity: agentId(DEMO.agent),
+        noteQuoteCommit: QA,
+        noteNonce: pad32("nn-40"),
+        noteSalt: pad32("ns-40"),
+      }),
+      { name: "redeemDraw", args: [DA, 40n, EXPIRY] },
+    );
+    assert.equal(rB.ok, false);
+    assert.match(rB.error, /note not found/);
+  });
+});

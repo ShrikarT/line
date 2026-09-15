@@ -2,7 +2,7 @@ name: ci
 
 on:
   push:
-    branches: [main, "fix/**"]
+    branches: [main, "fix/**", "feat/**"]
   pull_request:
 
 jobs:
@@ -44,6 +44,9 @@ jobs:
 
       - name: Compile Compact contract
         run: npm run compact:compile
+
+      - name: Check for generated artifact drift
+        run: git diff --exit-code contracts/managed/
 
       - name: Compact simulator tests
         run: npm run compact:test

@@ -1,50 +1,36 @@
-# Line roadmap
+# Line Roadmap
 
-Private revolving credit authorization for autonomous agents.
-
-Wave 1 is the **credit state machine**. Wave 2 is **settlement + credentials**. Wave 3 is **network + distribution**.
+Private revolving credit and settlement authorization for autonomous agents.
 
 ---
 
-## Wave 1 — credit authorization (this repo)
-
-Judges should be able to attack the machine, not just watch a happy path.
-
-### Shipped
-
-- Five circuits compiled with Compact 0.34.0
-- `C = persistentCommit({I, L, B, epoch}, salt)` with stale-C protection
-- Issuer-only repayment (no fake self-repay)
-- Opaque quotes, domain-separated nullifiers
-- Dual-ledger desks + public explorer
-- Scripted demo: 40 clears, replay dies, 120 dies, issuer ack, 120 lives, default, post-default dies
-- Compact simulator tests + TypeScript replica tests + cross-language vectors
-- Attack lab, circuit inspector
-- MCP local tools (`status`, `draw`, `seed`)
-
-### Explicitly not Wave 1
-
-On-chain token movement, multi-issuer, interest, slashing court, production MCP discovery, Cardano, Midnight Preprod deployment.
-
-**Promise in Wave 1:** merchant gets a non-replayable, issuer-backed authorization. Not a USDC transfer.
+## Wave 1 — Credit Authorization (Shipped)
+- **Status:** Complete. Tagged `wave1-final` (`ed45ca4`). Preserved at `contracts/v1/line.compact`.
+- Five circuits: `openLine`, `postQuote`, `draw`, `acknowledgeRepayment`, `setStatus`.
+- Private revolving balance, issuer receipts, opaque quotes, attack lab.
+- Compact simulator tests, TypeScript replica, cross-language vectors.
 
 ---
 
-## Wave 2 — settlement and unlinkability
-
-1. **Issuer escrow pool** — merchant redeems with `N_draw`. Option A → Option B without changing `draw`.
-2. **Per-invoice notes** instead of one pooled `B`.
-3. **Unlinkable draws** (note/UTXO) so `C → C'` is not a public activity tape.
-4. **Portable issuer credential**.
-5. **Second merchant + second issuer**.
-6. **Deploy Compact to Midnight testnet** — replace the TypeScript replica as *runtime*.
-7. **Lace / Midnight wallet** for the agent secret.
-8. **Dispute window** (no slash math).
+## Wave 2 — Private Credit Settlement Prototype (Shipped)
+- **Status:** Complete on `feat/wave-2-private-settlement`.
+- **Exact Compact Settlement Accounting**:
+  1. **Issuer Reserve Escrow Pool**: `totalReserve`, `encumberedReserve`, `redeemedReserve`, and circuits `fundReserve`, `withdrawUnencumberedReserve`.
+  2. **Multi-Merchant Support**: `registeredMerchants` map with Merchant A & Merchant B, authenticated by domain keys.
+  3. **Merchant-Bound Draw Notes**: Private `DrawNotePreimage` committed to $D$, hiding merchant identity on ledger and proving ownership in ZK.
+  4. **Single-Use Redemption Nullifiers**: $N_{\text{redeem}}$ spent upon redemption, eliminating double-claims.
+  5. **Anti-Rug Protections**: Active draw notes lock reserves; issuer cannot withdraw encumbered funds.
+  6. **Note Expiry & Cancellation**: Circuit `cancelOrExpireNote` returns expired unredeemed note reserves to unencumbered balance.
+  7. **Domain Separation**: Constructor argument `instanceNonce: Bytes<32>` binds all state to `contractDomain`, preventing cross-contract replays.
+  8. **Deterministic State-Machine Model Checker**: 50 pseudo-random transitions testing 10 invariants.
+  9. **19-Step Scripted Demo**: Complete multi-role lifecycle flow with 4 executable attack steps.
+  10. **Wave 2 MCP Server**: 8 JSON-RPC tools for autonomous agents (`mcp/line-mcp.mjs`).
 
 ---
 
-## Wave 3 — network
-
-1. Protocol fee on draws.
-2. Human BNPL skin on the same line.
-3. Auditor unwrap, issuer marketplace, Cardano settlement.
+## Wave 3 — Midnight Testnet & Cross-Chain Settlement (Next)
+1. **Midnight Preprod / Testnet Deployment**: Compile full ZK proving and verifier keys (`.bincode`), deploy contract to Midnight network, replace local simulator with on-chain contract address.
+2. **On-Chain Token Settlement**: Direct payout integration with Midnight native tokens (Night / Dust) and Cardano cross-chain settlement bridge.
+3. **Wallet & Key Management**: Lace / Midnight wallet integration for agent and issuer private secret custody.
+4. **Decentralized Underwriting**: Portable zero-knowledge issuer credentials and credit ratings.
+5. **Protocol Fees & Marketplace**: Fee on draws, autonomous issuer liquidity marketplace, and agent policy packs.

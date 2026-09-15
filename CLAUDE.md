@@ -4,9 +4,9 @@ Instructions for Claude Code / Codex / Cursor working in this repository.
 
 ## What this is
 
-Midnight Buildathon Wave 1: **private revolving credit for autonomous agents**.
+Midnight Buildathon Wave 2: **private revolving credit and settlement prototype for autonomous agents**.
 
-Compact contract (source of truth) + TypeScript encoding replica + three desks + public explorer.
+Compact contract (source of truth) + TypeScript encoding replica + four desks (Issuer, Merchant A/B, Agent, Explorer) + Attack Lab + MCP server.
 
 ## Commands
 
@@ -15,8 +15,11 @@ npm install
 bash scripts/install-compact.sh
 npm run compact:compile
 npm run compact:test
+npm test
 npm run test:line
+npm run mcp:test
 npm run typecheck
+npm run build
 npm run dev
 ```
 
@@ -32,18 +35,22 @@ npm run mcp
 - Do not add an on-chain `canPay` circuit.
 - Do not let the agent reduce outstanding balance without an issuer receipt.
 - Do not publish amounts, limits, or merchant identities on the public ledger view.
-- Do not implement slashing economics in Wave 1.
-- Failed proofs must leave ledger state unchanged.
+- Support multi-merchant (Merchant A and Merchant B) with role-separated domain keys.
+- Enforce reserve solvency: $\text{encumberedReserve} + \text{redeemedReserve} \le \text{totalReserve}$.
+- Failed proofs must leave ledger state unchanged. Copy: `"Clearance could not be proven."`
 - Do not invent Compact APIs. Pin toolchain 0.34.0 / language 0.26 / runtime 0.19.0.
+- Honest claims: Compact settlement accounting prototype; not live token payouts or Preprod deployment.
 
-## Judging
+## Architecture
 
 Engineering is the commitment state machine:
 
 ```
 C = persistentCommit<LinePreimage>({I, L, B, epoch}, salt)
-draw proves B + A ≤ L and writes C'
+D = persistentCommit<DrawNotePreimage>({domain, lineGen, I, Q, merchantPk, A, nonce, expiry}, noteSalt)
+draw proves B + A ≤ L and reserve solvency, emits D, encumbers reserve
+redeemDraw proves merchant ownership of D, spends N_redeem, shifts encumbered -> redeemed reserve
 acknowledgeRepayment is the only way B decreases
 ```
 
-Read `docs/HANDOFF.md`, `docs/ENCODING.md`, and `docs/PLAN.md` before changing circuits.
+Read `docs/HANDOFF.md`, `docs/WAVE2_PLAN.md`, `docs/WAVE2_SECURITY_REVIEW.md`, and `docs/ENCODING.md`.

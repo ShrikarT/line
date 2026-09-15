@@ -3,8 +3,20 @@ import { describe, it } from "node:test";
 import { snapshotAt } from "./demo.ts";
 
 describe("scripted demo snapshots", () => {
-  it("step 1 publishes C/status and does not store a limit field", () => {
+  it("step 1 registers Merchant B", () => {
     const s = snapshotAt(1);
+    const mB = Object.keys(s.ledger.registeredMerchants);
+    assert.equal(mB.length, 2);
+  });
+
+  it("step 2 funds reserve to 500", () => {
+    const s = snapshotAt(2);
+    assert.equal(s.ledger.totalReserve, 500);
+    assert.equal(s.ledger.encumberedReserve, 0);
+  });
+
+  it("step 3 opens line 150 privately", () => {
+    const s = snapshotAt(3);
     assert.equal(s.ledger.status, "open");
     assert.ok(s.ledger.lineCommitment);
     assert.equal(s.agent?.witness?.L, 150);
@@ -12,50 +24,74 @@ describe("scripted demo snapshots", () => {
     assert.equal("outstanding" in s.ledger, false);
   });
 
-  it("step 4 has B=40 and rotated C", () => {
-    const a = snapshotAt(1);
-    const s = snapshotAt(4);
-    assert.equal(s.agent?.witness?.B, 40);
-    assert.notEqual(s.ledger.lineCommitment, a.ledger.lineCommitment);
+  it("step 5 draws 40, rotates C, creates D1, encumbers 40 reserve", () => {
+    const s3 = snapshotAt(3);
+    const s5 = snapshotAt(5);
+    assert.equal(s5.agent?.witness?.B, 40);
+    assert.notEqual(s5.ledger.lineCommitment, s3.ledger.lineCommitment);
+    assert.equal(s5.ledger.encumberedReserve, 40);
+    assert.equal(s5.notes.length, 1);
   });
 
-  it("step 5 actually runs a replay and records failure without rotating C", () => {
-    const a = snapshotAt(4);
-    const b = snapshotAt(5);
-    assert.equal(b.replayRan, true);
-    assert.ok(b.lastFail);
-    assert.equal(b.lastFail, "Clearance could not be proven.");
-    assert.equal(b.ledger.lineCommitment, a.ledger.lineCommitment);
-    assert.equal(b.ledger.actionClock, a.ledger.actionClock);
+  it("step 6 executes Merchant B redemption attack on D1 and fails", () => {
+    const s = snapshotAt(6);
+    assert.equal(s.wrongMerchantRan, true);
+    assert.ok(s.lastFail);
+    assert.match(s.lastFailReason ?? "", /designated merchant|opening|NOTE_AUTH/i);
+    assert.equal(s.ledger.encumberedReserve, 40);
   });
 
-  it("step 6 actually runs an over-limit draw that fails", () => {
-    const a = snapshotAt(4);
-    const b = snapshotAt(6);
-    assert.equal(b.overLimitRan, true);
-    assert.ok(b.lastFail);
-    assert.equal(b.ledger.lineCommitment, a.ledger.lineCommitment);
-    assert.match(b.lastFailReason ?? "", /capacity|exceed/i);
+  it("step 7 Merchant A redeems D1; encumbered moves to redeemed", () => {
+    const s = snapshotAt(7);
+    assert.equal(s.ledger.encumberedReserve, 0);
+    assert.equal(s.ledger.redeemedReserve, 40);
   });
 
-  it("step 8 is 120 outstanding after issuer ack", () => {
+  it("step 8 Merchant A double redemption fails", () => {
     const s = snapshotAt(8);
-    assert.equal(s.agent?.witness?.B, 120);
-    assert.equal(s.ledger.status, "open");
+    assert.equal(s.doubleRedeemRan, true);
+    assert.ok(s.lastFail);
+    assert.match(s.lastFailReason ?? "", /NOTE_USED|already redeemed/i);
   });
 
-  it("step 9 is defaulted with B=120 privately", () => {
-    const s = snapshotAt(9);
-    assert.equal(s.ledger.status, "defaulted");
-    assert.equal(s.agent?.witness?.B, 120);
+  it("step 10 over-limit draw (40 + 120 > 150) runs and fails", () => {
+    const s = snapshotAt(10);
+    assert.equal(s.overLimitRan, true);
+    assert.ok(s.lastFail);
+    assert.match(s.lastFailReason ?? "", /capacity|exceed/i);
   });
 
-  it("step 10 actually runs a post-default draw that fails", () => {
-    const a = snapshotAt(9);
-    const b = snapshotAt(10);
-    assert.equal(b.postDefaultRan, true);
-    assert.ok(b.lastFail);
-    assert.equal(b.ledger.status, "defaulted");
-    assert.equal(b.ledger.lineCommitment, a.ledger.lineCommitment);
+  it("step 11 issuer ack 40 restores capacity", () => {
+    const s = snapshotAt(11);
+    assert.equal(s.agent?.witness?.B, 0);
+    assert.equal(s.lastAcked, 40);
+  });
+
+  it("step 13 draws 120, creates D2, encumbers 120 reserve", () => {
+    const s = snapshotAt(13);
+    assert.equal(s.agent?.witness?.B, 120);
+    assert.equal(s.ledger.encumberedReserve, 120);
+    assert.equal(s.notes.length, 2);
+  });
+
+  it("step 14 issuer withdrawal of encumbered funds runs and fails", () => {
+    const s = snapshotAt(14);
+    assert.equal(s.withdrawBlockedRan, true);
+    assert.ok(s.lastFail);
+    assert.match(s.lastFailReason ?? "", /unencumbered/i);
+  });
+
+  it("step 15 Merchant B redeems D2 successfully", () => {
+    const s = snapshotAt(15);
+    assert.equal(s.ledger.encumberedReserve, 0);
+    assert.equal(s.ledger.redeemedReserve, 160);
+  });
+
+  it("step 16 defaults line and step 17 post-default draw fails", () => {
+    const s16 = snapshotAt(16);
+    assert.equal(s16.ledger.status, "defaulted");
+    const s17 = snapshotAt(17);
+    assert.equal(s17.postDefaultRan, true);
+    assert.ok(s17.lastFail);
   });
 });
