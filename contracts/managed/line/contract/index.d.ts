@@ -2,7 +2,8 @@ import type * as __compactRuntime from '@midnight-ntwrk/compact-runtime';
 
 export enum Status { NONE = 0, OPEN = 1, DEFAULTED = 2, CLOSED = 3 }
 
-export type QuoteMeta = { expiry: bigint; used: boolean };
+export type QuoteMeta = { expiry: bigint; lineGeneration: bigint; used: boolean
+                        };
 
 export type LinePreimage = { identity: Uint8Array;
                              limit: bigint;
@@ -98,6 +99,7 @@ export type Ledger = {
   readonly lineCommit: Uint8Array;
   readonly lineExpiry: bigint;
   readonly status: Status;
+  readonly lineGeneration: bigint;
   quotes: {
     isEmpty(): boolean;
     size(): bigint;
@@ -111,7 +113,7 @@ export type Ledger = {
     member(elem_0: Uint8Array): boolean;
     [Symbol.iterator](): Iterator<Uint8Array>
   };
-  readonly clock: bigint;
+  readonly actionClock: bigint;
 }
 
 export type ContractReferenceLocations = any;
@@ -125,8 +127,8 @@ export declare class Contract<PS = any, W extends Witnesses<PS> = Witnesses<PS>>
   provableCircuits: ProvableCircuits<PS>;
   constructor(witnesses: W);
   initialState(context: __compactRuntime.ConstructorContext<PS>,
-               issuerSk_0: Uint8Array,
-               merchantSk_0: Uint8Array): Promise<__compactRuntime.ConstructorResult<PS>>;
+               issuerPk_0: Uint8Array,
+               merchantPk_0: Uint8Array): Promise<__compactRuntime.ConstructorResult<PS>>;
 }
 
 export declare function ledger(state: __compactRuntime.StateValue | __compactRuntime.ChargedState): Ledger;
