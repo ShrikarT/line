@@ -3,9 +3,10 @@ import {
   contractDomain,
   drawNullifier as encodeDrawNullifier,
   fromHex,
+  issuerPublicKey as encodeIssuerPublicKey,
   lineStateCommit,
+  merchantPublicKey as encodeMerchantPublicKey,
   pad32,
-  publicKey,
   quoteCommit as encodeQuoteCommit,
   repayNullifier as encodeRepayNullifier,
   toHex,
@@ -40,6 +41,7 @@ export const FAIL = {
   QUOTE_USED: "quote already consumed",
   QUOTE_EXPIRED: "quote expired",
   QUOTE_AUTH: "quote is not bound to the registered merchant",
+  QUOTE_GEN: "quote is bound to a different line generation",
   NULLIFIER: "nullifier already spent",
   RECEIPT: "repayment receipt is invalid for this line",
   RECEIPT_STALE: "receipt does not reference the current commitment",
@@ -76,11 +78,11 @@ export function identityCommitment(agentSecret: string): string {
 }
 
 export function issuerPublicKey(issuerSecret: string): string {
-  return toHex(publicKey(asBytes32(issuerSecret)));
+  return toHex(encodeIssuerPublicKey(asBytes32(issuerSecret)));
 }
 
 export function merchantPublicKey(merchantSecret: string): string {
-  return toHex(publicKey(asBytes32(merchantSecret)));
+  return toHex(encodeMerchantPublicKey(asBytes32(merchantSecret)));
 }
 
 export function merchantCommitment(merchantSecret: string): string {
@@ -109,6 +111,7 @@ export function quoteCommitment(q: QuotePreimage, domain: string): string {
       amount: u64(q.amount),
       expiry: u64(q.expiry),
       nonce: asBytes32(q.nonce),
+      generation: u64(q.generation),
       domain: asBytes32(domain),
     }),
   );
@@ -139,18 +142,22 @@ export function repayNullifier(
 }
 
 function pushEvent(ledger: Ledger, event: Omit<LedgerEvent, "t">): void {
-  ledger.clock += 1;
-  ledger.events.unshift({ t: ledger.clock, ...event });
+  ledger.actionClock += 1;
+  ledger.events.unshift({ t: ledger.actionClock, ...event });
 }
 
 export function createLedger(params?: {
   issuerSecret?: string;
   merchantSecret?: string;
+  issuerPubKey?: string;
+  merchantPubKey?: string;
 }): Ledger {
-  const issuerSk = params?.issuerSecret ?? ISSUER_SK;
-  const merchantSk = params?.merchantSecret ?? MERCHANT_SK;
-  const issuerPk = publicKey(asBytes32(issuerSk));
-  const merchantPk = publicKey(asBytes32(merchantSk));
+  const issuerPk = params?.issuerPubKey
+    ? asBytes32(params.issuerPubKey)
+    : encodeIssuerPublicKey(asBytes32(params?.issuerSecret ?? ISSUER_SK));
+  const merchantPk = params?.merchantPubKey
+    ? asBytes32(params.merchantPubKey)
+    : encodeMerchantPublicKey(asBytes32(params?.merchantSecret ?? MERCHANT_SK));
   return {
     contractDomain: toHex(contractDomain(issuerPk, merchantPk)),
     issuerPubKey: toHex(issuerPk),
@@ -159,10 +166,11 @@ export function createLedger(params?: {
     lineCommitment: null,
     lineExpiry: 0,
     status: "none",
+    lineGeneration: 0,
     quotes: [],
     nullifiers: [],
     events: [],
-    clock: 0,
+    actionClock: 0,
   };
 }
 
@@ -204,7 +212,7 @@ export function openLine(
   const next = cloneLedger(ledger);
   if (!isIssuer(next, input.caller)) return fail("AUTH_ISSUER", FAIL.AUTH_ISSUER);
   if (!assertSafeUint(input.limit) || input.limit <= 0) return fail("LIMIT", FAIL.LIMIT);
-  if (!assertSafeUint(input.expiry) || input.expiry <= next.clock) return fail("EXPIRY", FAIL.EXPIRY);
+  if (!assertSafeUint(input.expiry) || input.expiry <= next.actionClock) return fail("EXPIRY", FAIL.EXPIRY);
   if (next.status !== "none" && next.status !== "closed") {
     return fail("LINE_EXISTS", FAIL.LINE_EXISTS);
   }
@@ -222,6 +230,7 @@ export function openLine(
   next.lineCommitment = C;
   next.lineExpiry = input.expiry;
   next.status = "open";
+  next.lineGeneration += 1;
   pushEvent(next, {
     circuit: "openLine",
     ok: true,
@@ -247,8 +256,9 @@ export function postQuote(
 ): CircuitResult<{ ledger: Ledger; quote: QuotePreimage; Q: string }> {
   const next = cloneLedger(ledger);
   if (!isMerchant(next, input.caller)) return fail("AUTH_MERCHANT", FAIL.AUTH_MERCHANT);
+  if (next.status !== "open") return fail("STATUS", FAIL.STATUS);
   if (!assertSafeUint(input.amount) || input.amount <= 0) return fail("ZERO", FAIL.ZERO);
-  if (!assertSafeUint(input.expiry) || input.expiry <= next.clock) return fail("EXPIRY", FAIL.EXPIRY);
+  if (!assertSafeUint(input.expiry) || input.expiry <= next.actionClock) return fail("EXPIRY", FAIL.EXPIRY);
 
   const preimage: QuotePreimage = {
     merchantCommitment: next.merchantPubKey,
@@ -256,12 +266,18 @@ export function postQuote(
     invoiceId: toHex(asBytes32(input.invoiceId)),
     expiry: input.expiry,
     nonce: toHex(asBytes32(input.nonce)),
+    generation: next.lineGeneration,
   };
   const Q = quoteCommitment(preimage, next.contractDomain);
   if (next.quotes.some((q) => q.commitment === Q)) {
     return fail("QUOTE_USED", "quote commitment already posted");
   }
-  next.quotes.push({ commitment: Q, expiry: input.expiry, used: false });
+  next.quotes.push({
+    commitment: Q,
+    expiry: input.expiry,
+    lineGeneration: next.lineGeneration,
+    used: false,
+  });
   pushEvent(next, {
     circuit: "postQuote",
     ok: true,
@@ -283,7 +299,7 @@ export function draw(
   const next = cloneLedger(ledger);
   if (next.status !== "open") return fail("STATUS", FAIL.STATUS);
   if (!next.lineCommitment) return fail("NO_LINE", FAIL.NO_LINE);
-  if (next.lineExpiry <= next.clock) return fail("LINE_EXPIRED", FAIL.LINE_EXPIRED);
+  if (next.lineExpiry <= next.actionClock) return fail("LINE_EXPIRED", FAIL.LINE_EXPIRED);
 
   const I = identityCommitment(input.agentSecret);
   if (I !== input.witness.I || I !== next.identityCommitment) {
@@ -297,7 +313,10 @@ export function draw(
   const live = next.quotes.find((q) => q.commitment === Q);
   if (!live) return fail("QUOTE", FAIL.QUOTE);
   if (live.used) return fail("QUOTE_USED", FAIL.QUOTE_USED);
-  if (live.expiry <= next.clock) return fail("QUOTE_EXPIRED", FAIL.QUOTE_EXPIRED);
+  if (live.expiry <= next.actionClock) return fail("QUOTE_EXPIRED", FAIL.QUOTE_EXPIRED);
+  if (live.lineGeneration !== next.lineGeneration || input.quote.generation !== next.lineGeneration) {
+    return fail("QUOTE_GEN", FAIL.QUOTE_GEN);
+  }
 
   if (input.quote.merchantCommitment !== next.merchantPubKey) {
     return fail("QUOTE_AUTH", FAIL.QUOTE_AUTH);
@@ -365,7 +384,7 @@ export function acknowledgeRepayment(
     return fail("RECEIPT", FAIL.RECEIPT);
   }
   if (r.currentC !== next.lineCommitment) return fail("RECEIPT_STALE", FAIL.RECEIPT_STALE);
-  if (!assertSafeUint(r.expiry) || r.expiry <= next.clock) return fail("EXPIRY", FAIL.EXPIRY);
+  if (!assertSafeUint(r.expiry) || r.expiry <= next.actionClock) return fail("EXPIRY", FAIL.EXPIRY);
 
   const R = r.amount;
   const { B, L, I, e } = input.witness;
@@ -441,9 +460,10 @@ export function publicLedgerView(ledger: Ledger): Pick<
   | "identityCommitment"
   | "lineCommitment"
   | "status"
+  | "lineGeneration"
   | "quotes"
   | "nullifiers"
-  | "clock"
+  | "actionClock"
   | "events"
 > {
   return {
@@ -451,13 +471,15 @@ export function publicLedgerView(ledger: Ledger): Pick<
     identityCommitment: ledger.identityCommitment,
     lineCommitment: ledger.lineCommitment,
     status: ledger.status,
+    lineGeneration: ledger.lineGeneration,
     quotes: ledger.quotes.map((q) => ({
       commitment: q.commitment,
       expiry: q.expiry,
+      lineGeneration: q.lineGeneration,
       used: q.used,
     })),
     nullifiers: [...ledger.nullifiers],
-    clock: ledger.clock,
+    actionClock: ledger.actionClock,
     events: ledger.events.map((e) => ({ ...e })),
   };
 }

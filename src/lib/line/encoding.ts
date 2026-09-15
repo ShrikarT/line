@@ -25,6 +25,7 @@ const VEC2 = new CompactTypeVector(2, BYTES32);
 const VEC3 = new CompactTypeVector(3, BYTES32);
 const VEC4 = new CompactTypeVector(4, BYTES32);
 const VEC7 = new CompactTypeVector(7, BYTES32);
+const VEC8 = new CompactTypeVector(8, BYTES32);
 
 export type LinePreimage = {
   identity: Uint8Array;
@@ -104,7 +105,8 @@ export function randomBytes32(): Uint8Array {
 }
 
 export const TAG = {
-  pk: pad32("line:pk"),
+  issuerPk: pad32("line:issuer:pk"),
+  merchantPk: pad32("line:merchant:pk"),
   id: pad32("line:id"),
   domain: pad32("line:domain"),
   quote: pad32("line:quote"),
@@ -112,8 +114,17 @@ export const TAG = {
   repay: pad32("line:repay"),
 } as const;
 
+export function issuerPublicKey(sk: Uint8Array): Uint8Array {
+  return persistentHash(VEC2, [TAG.issuerPk, sk]);
+}
+
+export function merchantPublicKey(sk: Uint8Array): Uint8Array {
+  return persistentHash(VEC2, [TAG.merchantPk, sk]);
+}
+
+/** @deprecated Use issuerPublicKey or merchantPublicKey */
 export function publicKey(sk: Uint8Array): Uint8Array {
-  return persistentHash(VEC2, [TAG.pk, sk]);
+  return persistentHash(VEC2, [pad32("line:pk"), sk]);
 }
 
 export function agentId(sk: Uint8Array): Uint8Array {
@@ -134,15 +145,17 @@ export function quoteCommit(parts: {
   amount: bigint;
   expiry: bigint;
   nonce: Uint8Array;
+  generation: bigint;
   domain: Uint8Array;
 }): Uint8Array {
-  return persistentHash(VEC7, [
+  return persistentHash(VEC8, [
     TAG.quote,
     parts.merchantPk,
     parts.invoiceId,
     encodeU64(parts.amount),
     encodeU64(parts.expiry),
     parts.nonce,
+    encodeU64(parts.generation),
     parts.domain,
   ]);
 }
