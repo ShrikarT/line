@@ -1,4 +1,4 @@
-# Encoding Specification (Wave 2)
+# Encoding Specification
 
 Compact compiler **0.34.0**, language **0.26.0**, runtime **0.19.0**.
 
@@ -22,7 +22,7 @@ Runtime: `convertBigintToBytes(32, n, "line.encodeU64")` — little-endian, 32-b
 ## 2. Commitments & Preimages
 
 ### LinePreimage & Line Commitment ($C$)
-Field order: `identity: Bytes<32>`, `limit: Uint<64>`, `outstanding: Uint<64>`, `epoch: Uint<64>`.
+Field order: `domain: Bytes<32>`, `identity: Bytes<32>`, `limit: Uint<64>`, `outstanding: Uint<64>`, `epoch: Uint<64>`.
 $$C = \text{persistentCommit}\langle\text{LinePreimage}\rangle(\text{preimage}, \text{salt})$$
 where `salt: Bytes<32>`.
 
