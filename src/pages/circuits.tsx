@@ -8,7 +8,7 @@ export function CircuitsPage() {
     <Shell>
       <div className="space-y-4">
         <p className="max-w-2xl text-sm text-muted">
-          Five circuits. Compact (`contracts/line.compact`) is the source of
+          Ten circuits. Compact (`contracts/line.compact`) is the source of
           truth. The TypeScript engine is a replica of Compact encodings via
           `@midnight-ntwrk/compact-runtime`.
         </p>

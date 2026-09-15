@@ -4,6 +4,63 @@
   "runtime-version": "0.19.0",
   "circuits": [
     {
+      "name": "registerMerchant",
+      "pure": false,
+      "proof": true,
+      "arguments": [
+        {
+          "name": "merchantPk",
+          "type": {
+            "type-name": "Bytes",
+            "length": 32
+          }
+        }
+      ],
+      "result-type": {
+        "type-name": "Tuple",
+        "types": [
+        ]
+      }
+    },
+    {
+      "name": "fundReserve",
+      "pure": false,
+      "proof": true,
+      "arguments": [
+        {
+          "name": "amount",
+          "type": {
+            "type-name": "Uint",
+            "maxval": 18446744073709551615
+          }
+        }
+      ],
+      "result-type": {
+        "type-name": "Tuple",
+        "types": [
+        ]
+      }
+    },
+    {
+      "name": "withdrawUnencumberedReserve",
+      "pure": false,
+      "proof": true,
+      "arguments": [
+        {
+          "name": "amount",
+          "type": {
+            "type-name": "Uint",
+            "maxval": 18446744073709551615
+          }
+        }
+      ],
+      "result-type": {
+        "type-name": "Tuple",
+        "types": [
+        ]
+      }
+    },
+    {
       "name": "openLine",
       "pure": false,
       "proof": true,
@@ -93,6 +150,65 @@
           "type": {
             "type-name": "Uint",
             "maxval": 18446744073709551615
+          }
+        },
+        {
+          "name": "noteExpiry",
+          "type": {
+            "type-name": "Uint",
+            "maxval": 18446744073709551615
+          }
+        }
+      ],
+      "result-type": {
+        "type-name": "Tuple",
+        "types": [
+        ]
+      }
+    },
+    {
+      "name": "redeemDraw",
+      "pure": false,
+      "proof": true,
+      "arguments": [
+        {
+          "name": "noteCommitPublic",
+          "type": {
+            "type-name": "Bytes",
+            "length": 32
+          }
+        },
+        {
+          "name": "amount",
+          "type": {
+            "type-name": "Uint",
+            "maxval": 18446744073709551615
+          }
+        },
+        {
+          "name": "noteExpiry",
+          "type": {
+            "type-name": "Uint",
+            "maxval": 18446744073709551615
+          }
+        }
+      ],
+      "result-type": {
+        "type-name": "Tuple",
+        "types": [
+        ]
+      }
+    },
+    {
+      "name": "cancelOrExpireNote",
+      "pure": false,
+      "proof": true,
+      "arguments": [
+        {
+          "name": "noteCommitPublic",
+          "type": {
+            "type-name": "Bytes",
+            "length": 32
           }
         }
       ],
@@ -247,6 +363,42 @@
         "type-name": "Bytes",
         "length": 32
       }
+    },
+    {
+      "name": "noteNonce",
+      "arguments": [
+      ],
+      "result type": {
+        "type-name": "Bytes",
+        "length": 32
+      }
+    },
+    {
+      "name": "noteSalt",
+      "arguments": [
+      ],
+      "result type": {
+        "type-name": "Bytes",
+        "length": 32
+      }
+    },
+    {
+      "name": "noteIdentity",
+      "arguments": [
+      ],
+      "result type": {
+        "type-name": "Bytes",
+        "length": 32
+      }
+    },
+    {
+      "name": "noteQuoteCommit",
+      "arguments": [
+      ],
+      "result type": {
+        "type-name": "Bytes",
+        "length": 32
+      }
     }
   ],
   "contracts": [
@@ -263,7 +415,7 @@
       }
     },
     {
-      "name": "merchant",
+      "name": "contractDomain",
       "index": 1,
       "exported": true,
       "storage": "Cell",
@@ -273,37 +425,40 @@
       }
     },
     {
-      "name": "contractDomain",
+      "name": "registeredMerchants",
       "index": 2,
       "exported": true,
-      "storage": "Cell",
-      "type": {
+      "storage": "Map",
+      "key": {
         "type-name": "Bytes",
         "length": 32
+      },
+      "value": {
+        "type-name": "Boolean"
       }
     },
     {
-      "name": "identityCommit",
+      "name": "totalReserve",
       "index": 3,
       "exported": true,
       "storage": "Cell",
       "type": {
-        "type-name": "Bytes",
-        "length": 32
+        "type-name": "Uint",
+        "maxval": 18446744073709551615
       }
     },
     {
-      "name": "lineCommit",
+      "name": "encumberedReserve",
       "index": 4,
       "exported": true,
       "storage": "Cell",
       "type": {
-        "type-name": "Bytes",
-        "length": 32
+        "type-name": "Uint",
+        "maxval": 18446744073709551615
       }
     },
     {
-      "name": "lineExpiry",
+      "name": "redeemedReserve",
       "index": 5,
       "exported": true,
       "storage": "Cell",
@@ -313,8 +468,38 @@
       }
     },
     {
-      "name": "status",
+      "name": "identityCommit",
       "index": 6,
+      "exported": true,
+      "storage": "Cell",
+      "type": {
+        "type-name": "Bytes",
+        "length": 32
+      }
+    },
+    {
+      "name": "lineCommit",
+      "index": 7,
+      "exported": true,
+      "storage": "Cell",
+      "type": {
+        "type-name": "Bytes",
+        "length": 32
+      }
+    },
+    {
+      "name": "lineExpiry",
+      "index": 8,
+      "exported": true,
+      "storage": "Cell",
+      "type": {
+        "type-name": "Uint",
+        "maxval": 18446744073709551615
+      }
+    },
+    {
+      "name": "status",
+      "index": 9,
       "exported": true,
       "storage": "Cell",
       "type": {
@@ -330,7 +515,7 @@
     },
     {
       "name": "lineGeneration",
-      "index": 7,
+      "index": 10,
       "exported": true,
       "storage": "Cell",
       "type": {
@@ -340,7 +525,7 @@
     },
     {
       "name": "quotes",
-      "index": 8,
+      "index": 11,
       "exported": true,
       "storage": "Map",
       "key": {
@@ -351,6 +536,13 @@
         "type-name": "Struct",
         "name": "QuoteMeta",
         "elements": [
+          {
+            "name": "merchantPk",
+            "type": {
+              "type-name": "Bytes",
+              "length": 32
+            }
+          },
           {
             "name": "expiry",
             "type": {
@@ -375,8 +567,57 @@
       }
     },
     {
+      "name": "notes",
+      "index": 12,
+      "exported": true,
+      "storage": "Map",
+      "key": {
+        "type-name": "Bytes",
+        "length": 32
+      },
+      "value": {
+        "type-name": "Struct",
+        "name": "NoteMeta",
+        "elements": [
+          {
+            "name": "amount",
+            "type": {
+              "type-name": "Uint",
+              "maxval": 18446744073709551615
+            }
+          },
+          {
+            "name": "redeemed",
+            "type": {
+              "type-name": "Boolean"
+            }
+          },
+          {
+            "name": "cancelled",
+            "type": {
+              "type-name": "Boolean"
+            }
+          },
+          {
+            "name": "expiry",
+            "type": {
+              "type-name": "Uint",
+              "maxval": 18446744073709551615
+            }
+          },
+          {
+            "name": "lineGeneration",
+            "type": {
+              "type-name": "Uint",
+              "maxval": 18446744073709551615
+            }
+          }
+        ]
+      }
+    },
+    {
       "name": "nullifiers",
-      "index": 9,
+      "index": 13,
       "exported": true,
       "storage": "Set",
       "type": {
@@ -386,7 +627,7 @@
     },
     {
       "name": "actionClock",
-      "index": 10,
+      "index": 14,
       "exported": true,
       "storage": "Counter"
     }
