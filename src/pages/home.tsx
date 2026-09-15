@@ -65,7 +65,7 @@ export function Home() {
         <div className="grid gap-4 md:grid-cols-3">
           <Panel kicker="Public" title="Explorer">
             <p className="text-sm text-muted">
-              Status {ledger.status}. Clock {ledger.clock}. Commitment rotates;
+              Status {ledger.status}. Action clock {ledger.actionClock}. Commitment rotates;
               books do not appear.
             </p>
           </Panel>

@@ -161,7 +161,7 @@ export const useLine = create<LineState>()(
           agentSecret: AGENT_SK,
           limit,
           salt: freshSalt(),
-          expiry: get().ledger.clock + 10_000,
+          expiry: get().ledger.actionClock + 10_000,
         });
         if (!r.ok) {
           set({
@@ -194,7 +194,7 @@ export const useLine = create<LineState>()(
           caller: MERCHANT_SK,
           amount,
           invoiceId: id,
-          expiry: get().ledger.clock + 10_000,
+          expiry: get().ledger.actionClock + 10_000,
           nonce: freshSalt(),
         });
         if (!r.ok) {
@@ -275,7 +275,7 @@ export const useLine = create<LineState>()(
           amount: R,
           paymentRef: `desk-${n.slice(0, 12)}`,
           nonce: n,
-          expiry: get().ledger.clock + 10_000,
+          expiry: get().ledger.actionClock + 10_000,
           contractDomain: get().ledger.contractDomain,
         };
         const r = acknowledgeRepayment(get().ledger, {
@@ -360,7 +360,7 @@ export const useLine = create<LineState>()(
             amount: Math.max(1, agent.witness.B || 1),
             paymentRef: "fake",
             nonce: freshSalt(),
-            expiry: get().ledger.clock + 10_000,
+            expiry: get().ledger.actionClock + 10_000,
             contractDomain: get().ledger.contractDomain,
           },
           newSalt: freshSalt(),
@@ -389,7 +389,7 @@ export const useLine = create<LineState>()(
           caller: MERCHANT_SK,
           amount,
           invoiceId: `atk-over-${freshSalt().slice(0, 8)}`,
-          expiry: get().ledger.clock + 10_000,
+          expiry: get().ledger.actionClock + 10_000,
           nonce: freshSalt(),
         });
         if (!q.ok) {

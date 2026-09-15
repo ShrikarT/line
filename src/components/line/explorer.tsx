@@ -7,11 +7,12 @@ export function ExplorerPanel() {
     <Panel kicker="Public ledger" title="What the chain discloses">
       <p className="text-sm text-muted">
         Amounts, limits, balances, and counterparties are not here. Activity
-        timing is.
+        timing (action clock) and line generation are disclosed.
       </p>
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-5">
         <Stat label="Status" value={ledger.status} />
-        <Stat label="Clock" value={ledger.clock} />
+        <Stat label="Action Clock" value={ledger.actionClock} />
+        <Stat label="Generation" value={ledger.lineGeneration} />
         <Stat label="Quotes" value={ledger.quotes.length} />
         <Stat label="Nullifiers" value={ledger.nullifiers.length} />
       </div>
