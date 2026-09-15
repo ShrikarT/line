@@ -14,7 +14,7 @@ describe("MCP interface", () => {
     ({ handleMessage } = await import("./line-mcp.mjs"));
   });
 
-  it("lists all 8 Wave 2 tools", async () => {
+  it("lists all 8 Line protocol MCP tools", async () => {
     const res = await handleMessage({ jsonrpc: "2.0", id: 1, method: "tools/list" });
     const names = res.result.tools.map((t) => t.name);
     assert.ok(names.includes("line.status"));
@@ -55,7 +55,7 @@ describe("MCP interface", () => {
   });
 
   it("seed + draw note lifecycle through MCP tools", async () => {
-    // Step 5 in Wave 2 demo is after draw 40: Note D1 is issued
+    // Step 5 in reference flow is after draw 40: Note D1 is issued
     const seedRes = await handleMessage({
       jsonrpc: "2.0",
       id: 4,

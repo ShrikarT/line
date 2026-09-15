@@ -1,188 +1,251 @@
 # Line
 
-**Private revolving credit and settlement authorization for autonomous agents.**
+**Private credit and checkout infrastructure for autonomous agents.**
 
-An issuer opens a confidential credit line and funds a verifiable settlement reserve pool. An agent proves in zero-knowledge that an invoice fits remaining credit capacity and that sufficient unencumbered reserve exists. A merchant receives a private, cryptographically-bound draw note redeemable once against the issuer reserve pool. An issuer-confirmed repayment restores credit capacity privately.
-
-Wave 2 of the [Midnight Buildathon](https://app.akindo.io/wave-hacks/jaMZjqPOBsLXvjdG).
+> An autonomous agent proves that a purchase fits its issuer-backed credit line without exposing its private credit book.
 
 ---
 
-## Honest Wave 2 Boundary & Reality Check
+## Problem
 
-- **Exact Settlement-Accounting Prototype**: Wave 2 implements the exact Compact settlement accounting model: on-chain reserve pools, encumbered reserve tracking, private merchant-bound draw notes ($D$), single-redemption nullifiers ($N_{\text{redeem}}$), and unencumbered reserve withdrawal protections.
-- **Local Simulator Execution**: The Compact contract (`contracts/line.compact`) is written in Compact 0.26, compiled with Compact toolchain 0.34.0, and executed against `@midnight-ntwrk/compact-runtime` 0.19.0.
-- **Not Deployed to Preprod**: There are no live on-chain contract addresses, Night/Dust token payouts, or live testnet transactions. Claiming a live Preprod address would be misleading.
-- **Compilation Mode**: Local and CI verification uses `compact compile --skip-zk` to ensure instant builds and zero drift without distributing hundreds of megabytes of `.bincode` proving keys.
-
----
-
-## What is Real vs Simulated
-
-| Layer | Implementation Reality |
-|---|---|
-| **Compact Contract** (`contracts/line.compact`) | **Real Compact 0.26 source code** containing all 10 circuits, compiling cleanly with toolchain **0.34.0**. |
-| **Generated Bindings** (`contracts/managed/line`) | **Real compiler output** (`--skip-zk`), checked into git and verified against compiler drift. |
-| **Compact Simulator Tests** | **Real Compact execution** via `@midnight-ntwrk/compact-runtime` **0.19.0** running 39 circuit-level unit and attack tests. |
-| **TypeScript Engine** (`protocol.ts`) | Strict replica of Compact encodings (`persistentHash`, `persistentCommit`) matching bytecode outputs byte-for-byte. |
-| **Web Desks** (`/issuer`, `/merchant`, `/agent`, `/explorer`, `/lab`) | Interactive simulator UI for interacting with the 4 protocol roles and testing attack vectors. |
-| **MCP Server** (`mcp/line-mcp.mjs`) | Standard JSON-RPC Model Context Protocol tools for autonomous AI agents. |
-| **On-Chain Token Transfers** | Simulated on-chain reserve accounting. Asset bridge to Cardano/Midnight tokens is Wave 3. |
+Autonomous AI agents are increasingly tasked with procurement, API billing, server provisioning, and automated commerce. However, existing payment and credit primitives force an unacceptable trade-off:
+- **Exposed Corporate Books:** Providing agents with open balance sheets or corporate credit cards leaks private limits, available treasury balances, and cash flows to merchants and public blockchains.
+- **Pre-funded Fragmented Wallets:** Locking discrete balances into hundreds of agent wallets is capital inefficient and creates unmanageable balance fragmentation.
+- **Unverified Invoices:** Merchants lack cryptographic guarantees that an autonomous agent's purchase authorization is backed by a solvent underwriter.
 
 ---
 
-## Privacy Map
+## How Line Works
 
-| Data Item | Public / Disclosed | Private / Confidential |
-|---|---|---|
-| **Credit Line Limits ($L$)** | ❌ Never disclosed | ✅ Kept exclusively in agent private witness |
-| **Outstanding Balance ($B$)** | ❌ Never disclosed | ✅ Kept exclusively in agent private witness |
-| **Invoice Amounts ($A$)** | ❌ Never disclosed | ✅ Encrypted in merchant/agent store; only commitments ($Q$, $D$) are public |
-| **Merchant Identity** | ❌ Opaque in draw note $D$ | ✅ Merchant public key is committed inside private note preimage; proven in ZK |
-| **Identity Commitment ($I$)** | ✅ Disclosed on ledger | ❌ Underlying agent secret is never revealed |
-| **Line Commitment ($C \to C'$)** | ✅ Disclosed on ledger | ❌ Preimage parameters ($L, B$) are never revealed |
-| **Reserve Totals** | ✅ Publicly auditable | ❌ Which agent or invoice encumbered what is private |
-| **Transition Timing** | ✅ Disclosed via `actionClock` | ❌ Reasoning behind failures is hidden |
+Line solves this by separating **confidential credit capacity** from **verifiable on-chain settlement claims**:
 
-Failed draws always surface the generic error:
+```text
+  ┌──────────────┐         1. Establishes Line & Reserve         ┌─────────────────────────┐
+  │    Issuer    │ ────────────────────────────────────────────> │ Line Compact Contract   │
+  └──────────────┘                                               │ (Domain-Isolated State) │
+                                                                 └─────────────────────────┘
+                                                                   ▲                     ▲
+                       2. Posts Opaque Quote (Q)                   │                     │
+      ┌────────────────────────────────────────────────────────────┤                     │
+      │                                                            │                     │
+┌──────────────┐               3. Generates ZK Proof & Draws       │                     │
+│   Merchant   │ <─────────────────────────────────────────────────┘                     │
+└──────────────┘                                                                         │
+      │                        4. Redeems Claim Note (D) via Nullifier (N)               │
+      └──────────────────────────────────────────────────────────────────────────────────┘
+```
+
+1. **Credit Underwriting:** An issuer establishes a credit facility with a confidential limit $L$ and allocates settlement capacity in an on-chain reserve pool.
+2. **Merchant Quoting:** A registered merchant posts an opaque quote commitment $Q$ for an invoice without revealing pricing parameters publicly.
+3. **Autonomous ZK Draw:** The agent client-side evaluates the invoice against its private limit and debt ($B + A \le L$). The agent executes the `draw` circuit, rotating state $C \to C'$, encumbering reserve capacity, and emitting a merchant-bound private claim note $D$.
+4. **Guaranteed Claim Redemption:** The designated merchant proves ownership of note $D$ in zero-knowledge and redeems it once against the issuer's reserve.
+5. **Private Repayment:** Issuer-confirmed repayments restore the agent's revolving capacity without public ledger disclosure.
+
+---
+
+## Architectural Pillars
+
+### 1. Zero-Knowledge Credit Books
+The agent's credit limit $L$, outstanding balance $B$, and remaining capacity $(L - B)$ exist exclusively within the agent's private circuit witness. Observers inspecting the contract ledger see only the state commitment $C = \text{persistentCommit}(\{ \text{domain}, I, L, B, \text{epoch} \}, \text{salt})$. If an agent attempts an over-limit purchase, the transaction rejects with a generic error:
 > **`Clearance could not be proven.`**
 
-No observer can deduce whether a rejection was caused by credit capacity, reserve insolvency, merchant mismatch, default status, or bad signature.
+### 2. Verified Reserve Pool Solvency
+Active draw notes are irrevocably backed by an on-chain reserve pool:
+$$\text{withdrawableReserve} = \text{totalReserve} - (\text{encumberedReserve} + \text{redeemedReserve})$$
+- Active notes encumber reserve capacity on-chain.
+- The issuer is cryptographically barred from withdrawing encumbered funds backing outstanding claims.
+
+### 3. Multi-Merchant Claim Isolation
+Merchants register with unique cryptographic pseudonyms (`merchantPk`). Draw notes commit privately to the designated merchant's identity. Merchant B cannot redeem a claim note issued to Merchant A.
+
+### 4. Instance-Level Domain Separation
+Every contract instance derives an immutable `contractDomain` from an `instanceNonce` supplied at initialization. State commitments, quotes, notes, and nullifiers are strictly bound to this domain, preventing cross-contract replay attacks.
+
+---
+
+## Privacy Model & Information Boundaries
+
+Line maintains an honest, machine-checked privacy boundary verified in `src/lib/line/leakage.test.ts`:
+
+| Data Item | Public on Ledger | Private to Witness | Notes / Mitigations |
+|---|---|---|---|
+| **Credit Limit ($L$)** | ❌ Never disclosed | ✅ Private to Agent | Concealed in commitment $C$. |
+| **Current Debt ($B$)** | ❌ Never disclosed | ✅ Private to Agent | Concealed in commitment $C$. |
+| **Available Capacity** | ❌ Never disclosed | ✅ Private to Agent | Circuit evaluates $B + A \le L$ in zero-knowledge. |
+| **Agent Secret ($k$)** | ❌ Never disclosed | ✅ Private to Agent | Identity is committed as $I = \text{agentId}(k)$. |
+| **Settlement Amount ($A$)** | ⚠️ Public in `NoteMeta` | ❌ | Note metadata publishes $A$ to verify settlement solvency. |
+| **Reserve Deltas ($\Delta$)** | ⚠️ Public state deltas | ❌ | $\Delta \text{encumberedReserve} = A$ upon draw; $\Delta \text{redeemedReserve} = A$ on redemption. |
+| **Merchant Identity** | ⚠️ Linkable at Quote | ✅ Private in Note $D$ | `QuoteMeta` records `merchantPk`. Same-action quote consumption links note to merchant. |
+
+See [docs/PRIVACY.md](docs/PRIVACY.md) for the complete field-by-field privacy inventory and delta-inference analysis.
 
 ---
 
 ## The 10 Compact Circuits
 
-| Circuit | Role / Caller | Purpose & Invariant |
+The contract is formally specified in `contracts/line.compact`:
+
+| Circuit | Role | Purpose |
 |---|---|---|
-| `registerMerchant` | Issuer | Registers merchant public key in `registeredMerchants: Map<Bytes<32>, Boolean>`. |
-| `fundReserve` | Issuer | Deposits liquidity into `totalReserve`. |
-| `withdrawUnencumberedReserve` | Issuer | Withdraws unencumbered liquidity (`totalReserve - (encumbered + redeemed)`). |
-| `openLine` | Issuer | Initializes credit line commitment $C_0$ with $B=0$, status `OPEN`. |
-| `postQuote` | Merchant | Commits to opaque invoice $Q$ bound to `lineGeneration` and `contractDomain`. |
-| `draw` | Agent | Proves $B+A \le L$ and reserve solvency, issues private note $D$, encumbers reserve. |
-| `redeemDraw` | Merchant | Merchant opens $D$ with secret, spends $N_{\text{redeem}}$, moves encumbered to redeemed reserve. |
-| `cancelOrExpireNote` | Issuer / Anyone | Releases encumbered reserve back to unencumbered if note expired unredeemed. |
-| `acknowledgeRepayment` | Issuer | Proves receipt bound to current $C$, restores agent capacity privately, spends $N_{\text{repay}}$. |
-| `setStatus` | Issuer | Toggles `OPEN`, `DEFAULTED`, `CLOSED`. |
+| `registerMerchant` | Issuer | Whitelists verified merchant public key in registry. |
+| `fundReserve` | Issuer | Allocates settlement capacity to the reserve pool. |
+| `withdrawUnencumberedReserve` | Issuer | Withdraws unencumbered reserve; active claims are protected. |
+| `openLine` | Issuer | Initializes private credit facility commitment $C_0$. |
+| `postQuote` | Merchant | Posts opaque quote commitment $Q$ for purchase invoice. |
+| `draw` | Agent | Proves $B + A \le L$, rotates $C \to C'$, encumbers reserve, emits note $D$. |
+| `redeemDraw` | Merchant | Proves note ownership in ZK, redeems note once via nullifier $N_{\text{redeem}}$. |
+| `cancelOrExpireNote` | Authorized | Reclaims encumbered reserve for notes expired unredeemed. |
+| `acknowledgeRepayment` | Issuer | Confirms off-chain payment, restores capacity via nullifier $N_{\text{repay}}$. |
+| `setStatus` | Issuer | Toggles facility status (`OPEN`, `DEFAULTED`, `CLOSED`). |
 
 ---
 
-## Cryptographic Commitments & Domain Separation
+## Runtime Architecture
 
-### Contract Domain
-Every contract instance binds its state to an immutable contract domain generated from the constructor's `instanceNonce`:
-$$\text{contractDomain} = \text{persistentHash}([\text{pad}(32, \text{"line:v2:domain"}), \text{issuerPk}, \text{initialMerchantPk}, \text{instanceNonce}])$$
+```text
+LineRuntime (Interface)
+├── MidnightNetworkRuntime   (Production Midnight network RPC, indexer, and wallet)
+├── LocalDevelopmentRuntime (Local Compact simulator with developer environment indicators)
+└── InMemoryTestRuntime      (Isolated in-memory execution for unit tests)
+```
 
-### Draw Note Commitment ($D$)
-When an agent draws, a merchant-bound private note is issued:
-$$D = \text{persistentCommit}\langle\text{DrawNotePreimage}\rangle(\{ \text{domain}, \text{lineGen}, I, Q, \text{merchantPk}, A, \text{nonce}, \text{expiry} \}, \text{noteSalt})$$
-- The on-chain `notes` map stores only $\{ A, \text{redeemed}, \text{cancelled}, \text{expiry}, \text{lineGen} \}$.
-- The merchant's identity is **never recorded on the public ledger**.
-- To redeem, the merchant must prove knowledge of $sk$ deriving $\text{merchantPk}$ matching the preimage opening.
-
-### Redemption Nullifier ($N_{\text{redeem}}$)
-$$N_{\text{redeem}} = \text{persistentHash}([\text{pad}(32, \text{"line:v2:redeem"}), sk_{\text{merchant}}, D, \text{contractDomain}])$$
-Recorded in `nullifiers: Set<Bytes<32>>` to prevent double-redemption.
+- **Production Path:** `MidnightNetworkRuntime` connects to Midnight network RPC and browser wallet extensions. If credentials or network configuration are missing, it fails clearly with actionable setup instructions.
+- **Developer Path:** `LocalDevelopmentRuntime` runs the compiler-generated contract bindings against a local environment.
+- **Test Path:** `InMemoryTestRuntime` runs isolated test suites with zero external dependencies.
 
 ---
 
-## 19-Step Scripted Demo Walkthrough
+## Installation & Setup
 
-The demo executes a complete, non-trivial multi-merchant credit and settlement lifecycle:
+### Prerequisites
+- Node.js `>= 22.0.0`
+- Compact compiler `0.34.0` (installed natively or via WSL on Windows)
 
-0. **Genesis**: Empty ledger.
-1. **Register Merchant B**: Issuer registers second merchant.
-2. **Fund Reserve (500)**: Issuer deposits 500 liquidity into reserve pool.
-3. **openLine 150**: Confidential line opened for agent ($L=150$).
-4. **Merchant A: postQuote 40**: Merchant A posts opaque invoice $Q_{40}$.
-5. **Agent: draw 40 -> Note D1**: Agent draws; note $D_1$ issued; 40 reserve encumbered.
-6. **Attack: Merchant B tries to redeem D1**: Rejected: note opening invalid.
-7. **Merchant A: redeem D1 (40)**: Merchant A redeems note; 40 moves from encumbered to redeemed.
-8. **Attack: Merchant A tries to redeem D1 again**: Rejected: double-redemption blocked.
-9. **Merchant B: postQuote 120**: Merchant B posts opaque quote $Q_{120}$.
-10. **Over-limit failure**: Agent draw 120 rejected ($40 + 120 > 150$).
-11. **Issuer: acknowledgeRepayment 40**: Issuer ack restores capacity ($B=0$).
-12. **Merchant B: post fresh quote 120**: Fresh quote $Q_{120b}$ posted.
-13. **Agent: draw 120 -> Note D2**: Agent draws 120; note $D_2$ issued; 120 reserve encumbered.
-14. **Attack: Issuer tries to withdraw encumbered reserve**: Rejected: locked funds protected.
-15. **Merchant B: redeem D2 (120)**: Merchant B claims 120 from reserve.
-16. **Issuer: setStatus(DEFAULTED)**: Issuer marks line defaulted.
-17. **Post-default draw fails**: Rejected: draws blocked while defaulted.
-18. **Public Explorer Review**: Auditable proof that no private books were published.
-
----
-
-## Model Checking & Test Coverage
-
-Line maintains a comprehensive, reproducible test suite:
-- **92 automated tests** passing with zero failures.
-- **Cross-language commitment vectors**: Verifies that TypeScript replica produces byte-identical hashes and commitments to Compact.
-- **Compact Simulator tests**: 39 contract-level tests covering all 10 circuits and attack vectors.
-- **Deterministic state machine model checker**: 50 pseudo-random operations validating all 10 invariants across edge cases.
-- **MCP server tests**: Validates all 8 tools and rejection handling over JSON-RPC.
-
----
-
-## Quick Start
-
-### Installation
 ```bash
 git clone https://github.com/ShrikarT/line.git
 cd line
-npm install
+npm ci
 ```
 
-### Verification & Testing
+---
+
+## Development & Testing
+
 ```bash
-# Compile Compact contract (skip-zk for local simulation)
+# 1. Compile Compact contract (generates ZKIR and TypeScript bindings)
 npm run compact:compile
 
-# Run full test suite (92 tests)
+# 2. Verify zero drift in generated contract bindings
+git diff --exit-code contracts/managed/
+
+# 3. Run complete verification suite (99 passing tests across 27 suites)
 npm test
 
-# Run Compact simulator tests only
+# 4. Run Compact simulator and cross-language vector tests only
 npm run compact:test
 
-# Run MCP server tests
-npm run mcp:test
+# 5. Run privacy and state-delta leakage tests
+npm run test:leakage
 
-# Typecheck and build frontend
+# 6. Typecheck and build frontend
 npm run typecheck
 npm run build
 ```
 
-### Running Interactive Web Desks
+---
+
+## Running the Application
+
+Start the local Vite development server:
 ```bash
 npm run dev
 ```
-Open `http://localhost:5173` to explore the interactive desks:
-- `/` — Interactive 19-step narrative
-- `/issuer` — Issuer underwriting and reserve management
-- `/merchant` — Multi-merchant quote posting and note redemption
-- `/agent` — Agent private console
-- `/explorer` — Public explorer
-- `/lab` — Security attack lab
-- `/circuits` — Specification of all 10 Compact circuits
-
-### Running Local MCP Server
-```bash
-npm run mcp
-```
+Navigate to `http://localhost:5173`:
+- `/`: Product Landing Page & Protocol Architecture
+- `/issuer`: Issuer Underwriting & Reserve Management
+- `/merchant`: Merchant Console & Claim Note Redemption (Merchants A & B)
+- `/agent`: Autonomous Agent Private Console
+- `/explorer`: Public Zero-Knowledge Explorer
+- `/lab`: Security Invariant & Attack Lab
+- `/circuits`: Compact Circuit Specification Inspector
+- `/roadmap`: Capability Roadmap
 
 ---
 
-## Documentation Index
+## Agent Integration via Model Context Protocol (MCP)
 
-- [docs/WAVE2_PLAN.md](docs/WAVE2_PLAN.md) — Technical design and architecture specification
-- [docs/WAVE2_SECURITY_REVIEW.md](docs/WAVE2_SECURITY_REVIEW.md) — Itemized threat model, invariants, and test matrix
-- [docs/WAVE2_DEMO.md](docs/WAVE2_DEMO.md) — Detailed narrative of the 19-step lifecycle flow
-- [docs/WAVE2_DEPLOYMENT.md](docs/WAVE2_DEPLOYMENT.md) — Proving key policy and deployment requirements
-- [docs/ENCODING.md](docs/ENCODING.md) — Compact encoding specification
-- [docs/WAVE2_PROGRESS.md](docs/WAVE2_PROGRESS.md) — Execution tracking checklist
+Line provides a standard Model Context Protocol (MCP) server for autonomous agents over JSON-RPC:
+
+```bash
+# Run production MCP server
+npm run mcp
+
+# Run local development MCP server
+npm run mcp:dev
+```
+
+Supported MCP tools:
+- `line.status`: Query public contract status, action clock, and commitments.
+- `line.reserve.status`: Query real-time reserve breakdown.
+- `line.quote`: Post purchase quote commitment.
+- `line.draw`: Execute client-side capacity proof and draw note generation.
+- `line.note.status`: Check claim note redemption and expiry status.
+- `line.redeem`: Merchant zero-knowledge claim redemption.
+- `line.repay`: Issuer repayment confirmation.
+- `line.seed`: Load deterministic lifecycle test snapshots.
+
+See [docs/MCP.md](docs/MCP.md) for tool schemas and integration examples.
+
+---
+
+## Network Deployment
+
+To deploy Line to the Midnight Preprod testnet:
+
+1. Configure network variables:
+```bash
+export MIDNIGHT_NETWORK_ID="midnight-preprod"
+export MIDNIGHT_NODE_URI="https://rpc.preprod.midnight.network"
+export MIDNIGHT_INDEXER_URI="https://indexer.preprod.midnight.network"
+export MIDNIGHT_DEPLOYER_SEED="your funded mnemonic here"
+```
+
+2. Validate and deploy:
+```bash
+# Dry run verification
+npm run contract:deploy
+
+# Run network smoke test
+npm run network:smoke
+```
+
+See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for full deployment instructions.
+
+---
+
+## Documentation Directory
+
+- [docs/PRODUCT_ARCHITECTURE.md](docs/PRODUCT_ARCHITECTURE.md) — Technical architecture and circuit designs
+- [docs/PROTOCOL.md](docs/PROTOCOL.md) — Cryptographic specifications, commitment schemes, and nullifiers
+- [docs/PRIVACY.md](docs/PRIVACY.md) — Machine-checked privacy inventory and state-delta leakage analysis
+- [docs/SECURITY.md](docs/SECURITY.md) — Itemized threat matrix, formal invariants, and attack defenses
+- [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) — Testnet deployment, compilation policy, and toolchain versions
+- [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) — Developer setup and local workflows
+- [docs/MCP.md](docs/MCP.md) — Model Context Protocol tools for autonomous agents
+- [docs/PRODUCT_WALKTHROUGH.md](docs/PRODUCT_WALKTHROUGH.md) — Detailed 19-step multi-role lifecycle walkthrough
+- [docs/ENGINEERING_STATUS.md](docs/ENGINEERING_STATUS.md) — Delivery tracking and component checklist
+- [docs/ROADMAP.md](docs/ROADMAP.md) — Capability-driven product roadmap
+
+---
+
+## Security & Audit Limitations
+
+- **Internal Verification:** Line has undergone automated model checking across 50 pseudo-random transitions and maintains 99 automated tests.
+- **Audit Limitation:** Line has not yet been audited by an independent external cybersecurity firm. Production deployments with institutional funds must follow a formal security audit.
+- **Client Custody:** Browser storage uses WebCrypto AES-GCM 256-bit encryption for local testing. Institutional production deployments must use dedicated hardware security modules (HSM) or institutional MPC signers.
 
 ---
 
 ## License
 
-Apache License 2.0. See [LICENSE](LICENSE).
+Licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE) for details.
