@@ -26,7 +26,7 @@ describe("scripted demo snapshots", () => {
     assert.ok(b.lastFail);
     assert.equal(b.lastFail, "Clearance could not be proven.");
     assert.equal(b.ledger.lineCommitment, a.ledger.lineCommitment);
-    assert.equal(b.ledger.clock, a.ledger.clock);
+    assert.equal(b.ledger.actionClock, a.ledger.actionClock);
   });
 
   it("step 6 actually runs an over-limit draw that fails", () => {

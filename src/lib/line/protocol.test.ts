@@ -148,6 +148,50 @@ describe("reference engine: postQuote", () => {
     });
     assert.equal(r.ok, false);
   });
+
+  it("rejects quote before line exists", () => {
+    const r = postQuote(createLedger(), {
+      caller: MERCHANT_SK,
+      amount: 40,
+      invoiceId: "x",
+      expiry: 10_000,
+      nonce: "n",
+    });
+    assert.equal(r.ok, false);
+    assert.equal(r.code, "STATUS");
+  });
+
+  it("rejects quote when line is defaulted", () => {
+    const o = opened();
+    const d = setStatus(o.ledger, { caller: ISSUER_SK, status: "defaulted" });
+    assert.equal(d.ok, true);
+    if (!d.ok) throw new Error("d");
+    const r = postQuote(d.ledger, {
+      caller: MERCHANT_SK,
+      amount: 40,
+      invoiceId: "x",
+      expiry: 10_000,
+      nonce: "n",
+    });
+    assert.equal(r.ok, false);
+    assert.equal(r.code, "STATUS");
+  });
+
+  it("rejects quote when line is closed", () => {
+    const o = opened();
+    const c = setStatus(o.ledger, { caller: ISSUER_SK, status: "closed" });
+    assert.equal(c.ok, true);
+    if (!c.ok) throw new Error("c");
+    const r = postQuote(c.ledger, {
+      caller: MERCHANT_SK,
+      amount: 40,
+      invoiceId: "x",
+      expiry: 10_000,
+      nonce: "n",
+    });
+    assert.equal(r.ok, false);
+    assert.equal(r.code, "STATUS");
+  });
 });
 
 describe("reference engine: draw", () => {
@@ -499,17 +543,18 @@ describe("reference engine: acknowledgeRepayment", () => {
 describe("reference engine: setStatus", () => {
   it("defaulted lines reject draws", () => {
     const o = opened();
-    const s = setStatus(o.ledger, { caller: ISSUER_SK, status: "defaulted" });
+    const q = quote(o.ledger, 40, "inv-40");
+    const s = setStatus(q.ledger, { caller: ISSUER_SK, status: "defaulted" });
     assert.equal(s.ok, true);
     if (!s.ok) throw new Error("s");
-    const q = quote(s.ledger, 40, "inv-40");
-    const d = draw(q.ledger, {
+    const d = draw(s.ledger, {
       agentSecret: AGENT_SK,
       witness: o.agent.witness!,
       quote: q.quote,
       newSalt: "x",
     });
     assert.equal(d.ok, false);
+    assert.equal(d.code, "STATUS");
   });
 
   it("unauthorized caller cannot change status", () => {
@@ -530,6 +575,7 @@ describe("reference engine: nullifier domains", () => {
         invoiceId: "same",
         expiry: 1,
         nonce: "same",
+        generation: 0,
       },
       ledger.contractDomain,
     );
@@ -546,7 +592,7 @@ describe("reference engine: expiry, closed, overflow, zero", () => {
       caller: MERCHANT_SK,
       amount: 10,
       invoiceId: "old",
-      expiry: o.ledger.clock + 1,
+      expiry: o.ledger.actionClock + 1,
       nonce: "old",
     });
     assert.equal(q.ok, true);
@@ -558,21 +604,23 @@ describe("reference engine: expiry, closed, overflow, zero", () => {
       newSalt: "x",
     });
     assert.equal(r.ok, false);
+    assert.equal(r.code, "QUOTE_EXPIRED");
   });
 
   it("closed lines reject draws; a new line can open after closed", () => {
     const o = opened();
-    const closed = setStatus(o.ledger, { caller: ISSUER_SK, status: "closed" });
+    const q = quote(o.ledger, 10, "z");
+    const closed = setStatus(q.ledger, { caller: ISSUER_SK, status: "closed" });
     assert.equal(closed.ok, true);
     if (!closed.ok) throw new Error("c");
-    const q = quote(closed.ledger, 10, "z");
-    const d = draw(q.ledger, {
+    const d = draw(closed.ledger, {
       agentSecret: AGENT_SK,
       witness: o.agent.witness!,
       quote: q.quote,
       newSalt: "x",
     });
     assert.equal(d.ok, false);
+    assert.equal(d.code, "STATUS");
     const reopen = openLine(closed.ledger, {
       caller: ISSUER_SK,
       agentSecret: AGENT_SK,
@@ -581,6 +629,48 @@ describe("reference engine: expiry, closed, overflow, zero", () => {
       expiry: 10_000,
     });
     assert.equal(reopen.ok, true);
+    assert.equal(reopen.ledger.lineGeneration, 2);
+  });
+
+  it("quote from generation 1 cannot be drawn on generation 2", () => {
+    const o1 = opened();
+    const q1 = quote(o1.ledger, 40, "inv-gen1");
+    assert.equal(o1.ledger.lineGeneration, 1);
+    const closed = setStatus(q1.ledger, { caller: ISSUER_SK, status: "closed" });
+    assert.equal(closed.ok, true);
+    if (!closed.ok) throw new Error("closed");
+
+    const o2 = openLine(closed.ledger, {
+      caller: ISSUER_SK,
+      agentSecret: AGENT_SK,
+      limit: 200,
+      salt: "salt-gen2",
+      expiry: 10_000,
+    });
+    assert.equal(o2.ok, true);
+    if (!o2.ok) throw new Error("open 2");
+    assert.equal(o2.ledger.lineGeneration, 2);
+
+    // Old quote from gen 1 cannot be drawn against gen 2
+    const drawOld = draw(o2.ledger, {
+      agentSecret: AGENT_SK,
+      witness: o2.agent.witness!,
+      quote: q1.quote,
+      newSalt: "s-draw",
+    });
+    assert.equal(drawOld.ok, false);
+    assert.equal(drawOld.code, "QUOTE_GEN");
+
+    // Fresh quote in generation 2 succeeds
+    const q2 = quote(o2.ledger, 50, "inv-gen2");
+    assert.equal(q2.quote.generation, 2);
+    const drawNew = draw(q2.ledger, {
+      agentSecret: AGENT_SK,
+      witness: o2.agent.witness!,
+      quote: q2.quote,
+      newSalt: "s-draw2",
+    });
+    assert.equal(drawNew.ok, true);
   });
 
   it("rejects overflow draws", () => {
