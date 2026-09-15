@@ -3,6 +3,7 @@ export type LineStatus = "none" | "open" | "defaulted" | "closed";
 export type QuoteRecord = {
   commitment: string;
   expiry: number;
+  lineGeneration: number;
   used: boolean;
 };
 
@@ -25,10 +26,11 @@ export type Ledger = {
   lineCommitment: string | null;
   lineExpiry: number;
   status: LineStatus;
+  lineGeneration: number;
   quotes: QuoteRecord[];
   nullifiers: string[];
   events: LedgerEvent[];
-  clock: number;
+  actionClock: number;
 };
 
 export type LineWitness = {
@@ -50,6 +52,7 @@ export type QuotePreimage = {
   invoiceId: string;
   expiry: number;
   nonce: string;
+  generation: number;
 };
 
 export type MerchantInvoice = {
