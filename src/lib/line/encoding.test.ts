@@ -5,9 +5,10 @@ import {
   contractDomain,
   drawNullifier,
   fromHex,
+  issuerPublicKey,
   lineStateCommit,
+  merchantPublicKey,
   pad32,
-  publicKey,
   quoteCommit,
   repayNullifier,
   toHex,
@@ -37,8 +38,8 @@ describe("cross-language commitment vectors", () => {
   it("publicKey, agentId, domain, C, Q, draw N, repay N match Compact", async () => {
     const session = await boot(DEMO.issuer, DEMO.merchant);
     const L0 = readLedger(session);
-    assert.equal(toHex(L0.issuer), toHex(publicKey(DEMO.issuer)));
-    assert.equal(toHex(L0.merchant), toHex(publicKey(DEMO.merchant)));
+    assert.equal(toHex(L0.issuer), toHex(issuerPublicKey(DEMO.issuer)));
+    assert.equal(toHex(L0.merchant), toHex(merchantPublicKey(DEMO.merchant)));
     assert.equal(toHex(L0.contractDomain), toHex(contractDomain(L0.issuer, L0.merchant)));
 
     const opened = await call(
@@ -57,6 +58,7 @@ describe("cross-language commitment vectors", () => {
     );
     assert.equal(opened.ok, true);
     if (!opened.ok) throw new Error("open failed");
+    assert.equal(opened.ledger.lineGeneration, 1n);
     const I = agentId(DEMO.agent);
     const C0 = lineStateCommit(
       { identity: I, limit: 150n, outstanding: 0n, epoch: 0n },
@@ -87,9 +89,11 @@ describe("cross-language commitment vectors", () => {
       amount: 40n,
       expiry: 10_000n,
       nonce: pad32("n40"),
+      generation: 1n,
       domain: quoted.ledger.contractDomain,
     });
     assert.equal(toHex(firstQuote(quoted.ledger)!.Q), toHex(Q));
+    assert.equal(firstQuote(quoted.ledger)!.lineGeneration, 1n);
 
     const drawn = await call(
       quoted.session,
