@@ -27,6 +27,7 @@ const VEC7 = new CompactTypeVector(7, BYTES32);
 const VEC8 = new CompactTypeVector(8, BYTES32);
 
 export type LinePreimage = {
+  domain: Uint8Array;
   identity: Uint8Array;
   limit: bigint;
   outstanding: bigint;
@@ -36,18 +37,23 @@ export type LinePreimage = {
 class LinePreimageType implements CompactType<LinePreimage> {
   alignment() {
     return BYTES32.alignment().concat(
-      UINT64.alignment().concat(UINT64.alignment().concat(UINT64.alignment())),
+      BYTES32.alignment().concat(
+        UINT64.alignment().concat(UINT64.alignment().concat(UINT64.alignment())),
+      ),
     );
   }
   toValue(value: LinePreimage) {
-    return BYTES32.toValue(value.identity).concat(
-      UINT64.toValue(value.limit).concat(
-        UINT64.toValue(value.outstanding).concat(UINT64.toValue(value.epoch)),
+    return BYTES32.toValue(value.domain).concat(
+      BYTES32.toValue(value.identity).concat(
+        UINT64.toValue(value.limit).concat(
+          UINT64.toValue(value.outstanding).concat(UINT64.toValue(value.epoch)),
+        ),
       ),
     );
   }
   fromValue(value: Parameters<CompactType<LinePreimage>["fromValue"]>[0]) {
     return {
+      domain: BYTES32.fromValue(value),
       identity: BYTES32.fromValue(value),
       limit: UINT64.fromValue(value),
       outstanding: UINT64.fromValue(value),

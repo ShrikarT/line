@@ -110,6 +110,7 @@ export function lineCommitment(w: LineWitness): string {
   return toHex(
     lineStateCommit(
       {
+        domain: asBytes32(w.domain),
         identity: asBytes32(w.I),
         limit: u64(w.L),
         outstanding: u64(w.B),
@@ -336,6 +337,7 @@ export function openLine(
 
   const I = identityCommitment(input.agentSecret);
   const witness: LineWitness = {
+    domain: next.contractDomain,
     I,
     L: input.limit,
     B: 0,
@@ -485,6 +487,7 @@ export function draw(
   }
 
   const nextWitness: LineWitness = {
+    domain: next.contractDomain,
     I,
     L,
     B: nextB,
@@ -639,6 +642,7 @@ export function acknowledgeRepayment(
   if (next.nullifiers.includes(N)) return fail("RECEIPT_USED", FAIL.RECEIPT_USED);
 
   const nextWitness: LineWitness = {
+    domain: next.contractDomain,
     I,
     L,
     B: B - R,

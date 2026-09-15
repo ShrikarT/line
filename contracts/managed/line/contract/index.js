@@ -83,10 +83,11 @@ const _descriptor_7 = new _DrawNotePreimage_0();
 
 class _LinePreimage_0 {
   alignment() {
-    return _descriptor_2.alignment().concat(_descriptor_1.alignment().concat(_descriptor_1.alignment().concat(_descriptor_1.alignment())));
+    return _descriptor_2.alignment().concat(_descriptor_2.alignment().concat(_descriptor_1.alignment().concat(_descriptor_1.alignment().concat(_descriptor_1.alignment()))));
   }
   fromValue(value_0) {
     return {
+      domain: _descriptor_2.fromValue(value_0),
       identity: _descriptor_2.fromValue(value_0),
       limit: _descriptor_1.fromValue(value_0),
       outstanding: _descriptor_1.fromValue(value_0),
@@ -94,7 +95,7 @@ class _LinePreimage_0 {
     }
   }
   toValue(value_0) {
-    return _descriptor_2.toValue(value_0.identity).concat(_descriptor_1.toValue(value_0.limit).concat(_descriptor_1.toValue(value_0.outstanding).concat(_descriptor_1.toValue(value_0.epoch))));
+    return _descriptor_2.toValue(value_0.domain).concat(_descriptor_2.toValue(value_0.identity).concat(_descriptor_1.toValue(value_0.limit).concat(_descriptor_1.toValue(value_0.outstanding).concat(_descriptor_1.toValue(value_0.epoch)))));
   }
 }
 
@@ -205,14 +206,14 @@ export class Contract {
         if (!(typeof(contextOrig_0) === 'object' && contextOrig_0.callContext.currentQueryContext != undefined)) {
           __compactRuntime.typeError('registerMerchant',
                                      'argument 1 (as invoked from Typescript)',
-                                     'line.compact line 201 char 1',
+                                     'line.compact line 203 char 1',
                                      'CircuitContext',
                                      contextOrig_0)
         }
         if (!(merchantPk_0.buffer instanceof ArrayBuffer && merchantPk_0.BYTES_PER_ELEMENT === 1 && merchantPk_0.length === 32)) {
           __compactRuntime.typeError('registerMerchant',
                                      'argument 1 (argument 2 as invoked from Typescript)',
-                                     'line.compact line 201 char 1',
+                                     'line.compact line 203 char 1',
                                      'Bytes<32>',
                                      merchantPk_0)
         }
@@ -242,14 +243,14 @@ export class Contract {
         if (!(typeof(contextOrig_0) === 'object' && contextOrig_0.callContext.currentQueryContext != undefined)) {
           __compactRuntime.typeError('fundReserve',
                                      'argument 1 (as invoked from Typescript)',
-                                     'line.compact line 209 char 1',
+                                     'line.compact line 211 char 1',
                                      'CircuitContext',
                                      contextOrig_0)
         }
         if (!(typeof(amount_0) === 'bigint' && amount_0 >= 0n && amount_0 <= 18446744073709551615n)) {
           __compactRuntime.typeError('fundReserve',
                                      'argument 1 (argument 2 as invoked from Typescript)',
-                                     'line.compact line 209 char 1',
+                                     'line.compact line 211 char 1',
                                      'Uint<0..18446744073709551616>',
                                      amount_0)
         }
@@ -279,14 +280,14 @@ export class Contract {
         if (!(typeof(contextOrig_0) === 'object' && contextOrig_0.callContext.currentQueryContext != undefined)) {
           __compactRuntime.typeError('withdrawUnencumberedReserve',
                                      'argument 1 (as invoked from Typescript)',
-                                     'line.compact line 219 char 1',
+                                     'line.compact line 221 char 1',
                                      'CircuitContext',
                                      contextOrig_0)
         }
         if (!(typeof(amount_0) === 'bigint' && amount_0 >= 0n && amount_0 <= 18446744073709551615n)) {
           __compactRuntime.typeError('withdrawUnencumberedReserve',
                                      'argument 1 (argument 2 as invoked from Typescript)',
-                                     'line.compact line 219 char 1',
+                                     'line.compact line 221 char 1',
                                      'Uint<0..18446744073709551616>',
                                      amount_0)
         }
@@ -317,21 +318,21 @@ export class Contract {
         if (!(typeof(contextOrig_0) === 'object' && contextOrig_0.callContext.currentQueryContext != undefined)) {
           __compactRuntime.typeError('openLine',
                                      'argument 1 (as invoked from Typescript)',
-                                     'line.compact line 231 char 1',
+                                     'line.compact line 233 char 1',
                                      'CircuitContext',
                                      contextOrig_0)
         }
         if (!(typeof(limit_0) === 'bigint' && limit_0 >= 0n && limit_0 <= 18446744073709551615n)) {
           __compactRuntime.typeError('openLine',
                                      'argument 1 (argument 2 as invoked from Typescript)',
-                                     'line.compact line 231 char 1',
+                                     'line.compact line 233 char 1',
                                      'Uint<0..18446744073709551616>',
                                      limit_0)
         }
         if (!(typeof(expiry_0) === 'bigint' && expiry_0 >= 0n && expiry_0 <= 18446744073709551615n)) {
           __compactRuntime.typeError('openLine',
                                      'argument 2 (argument 3 as invoked from Typescript)',
-                                     'line.compact line 231 char 1',
+                                     'line.compact line 233 char 1',
                                      'Uint<0..18446744073709551616>',
                                      expiry_0)
         }
@@ -363,21 +364,21 @@ export class Contract {
         if (!(typeof(contextOrig_0) === 'object' && contextOrig_0.callContext.currentQueryContext != undefined)) {
           __compactRuntime.typeError('postQuote',
                                      'argument 1 (as invoked from Typescript)',
-                                     'line.compact line 253 char 1',
+                                     'line.compact line 256 char 1',
                                      'CircuitContext',
                                      contextOrig_0)
         }
         if (!(typeof(amount_0) === 'bigint' && amount_0 >= 0n && amount_0 <= 18446744073709551615n)) {
           __compactRuntime.typeError('postQuote',
                                      'argument 1 (argument 2 as invoked from Typescript)',
-                                     'line.compact line 253 char 1',
+                                     'line.compact line 256 char 1',
                                      'Uint<0..18446744073709551616>',
                                      amount_0)
         }
         if (!(typeof(expiry_0) === 'bigint' && expiry_0 >= 0n && expiry_0 <= 18446744073709551615n)) {
           __compactRuntime.typeError('postQuote',
                                      'argument 2 (argument 3 as invoked from Typescript)',
-                                     'line.compact line 253 char 1',
+                                     'line.compact line 256 char 1',
                                      'Uint<0..18446744073709551616>',
                                      expiry_0)
         }
@@ -413,49 +414,49 @@ export class Contract {
         if (!(typeof(contextOrig_0) === 'object' && contextOrig_0.callContext.currentQueryContext != undefined)) {
           __compactRuntime.typeError('draw',
                                      'argument 1 (as invoked from Typescript)',
-                                     'line.compact line 281 char 1',
+                                     'line.compact line 284 char 1',
                                      'CircuitContext',
                                      contextOrig_0)
         }
         if (!(quoteCommitPublic_0.buffer instanceof ArrayBuffer && quoteCommitPublic_0.BYTES_PER_ELEMENT === 1 && quoteCommitPublic_0.length === 32)) {
           __compactRuntime.typeError('draw',
                                      'argument 1 (argument 2 as invoked from Typescript)',
-                                     'line.compact line 281 char 1',
+                                     'line.compact line 284 char 1',
                                      'Bytes<32>',
                                      quoteCommitPublic_0)
         }
         if (!(typeof(limit_0) === 'bigint' && limit_0 >= 0n && limit_0 <= 18446744073709551615n)) {
           __compactRuntime.typeError('draw',
                                      'argument 2 (argument 3 as invoked from Typescript)',
-                                     'line.compact line 281 char 1',
+                                     'line.compact line 284 char 1',
                                      'Uint<0..18446744073709551616>',
                                      limit_0)
         }
         if (!(typeof(outstanding_0) === 'bigint' && outstanding_0 >= 0n && outstanding_0 <= 18446744073709551615n)) {
           __compactRuntime.typeError('draw',
                                      'argument 3 (argument 4 as invoked from Typescript)',
-                                     'line.compact line 281 char 1',
+                                     'line.compact line 284 char 1',
                                      'Uint<0..18446744073709551616>',
                                      outstanding_0)
         }
         if (!(typeof(epoch_0) === 'bigint' && epoch_0 >= 0n && epoch_0 <= 18446744073709551615n)) {
           __compactRuntime.typeError('draw',
                                      'argument 4 (argument 5 as invoked from Typescript)',
-                                     'line.compact line 281 char 1',
+                                     'line.compact line 284 char 1',
                                      'Uint<0..18446744073709551616>',
                                      epoch_0)
         }
         if (!(typeof(amount_0) === 'bigint' && amount_0 >= 0n && amount_0 <= 18446744073709551615n)) {
           __compactRuntime.typeError('draw',
                                      'argument 5 (argument 6 as invoked from Typescript)',
-                                     'line.compact line 281 char 1',
+                                     'line.compact line 284 char 1',
                                      'Uint<0..18446744073709551616>',
                                      amount_0)
         }
         if (!(typeof(noteExpiry_0) === 'bigint' && noteExpiry_0 >= 0n && noteExpiry_0 <= 18446744073709551615n)) {
           __compactRuntime.typeError('draw',
                                      'argument 6 (argument 7 as invoked from Typescript)',
-                                     'line.compact line 281 char 1',
+                                     'line.compact line 284 char 1',
                                      'Uint<0..18446744073709551616>',
                                      noteExpiry_0)
         }
@@ -492,28 +493,28 @@ export class Contract {
         if (!(typeof(contextOrig_0) === 'object' && contextOrig_0.callContext.currentQueryContext != undefined)) {
           __compactRuntime.typeError('redeemDraw',
                                      'argument 1 (as invoked from Typescript)',
-                                     'line.compact line 377 char 1',
+                                     'line.compact line 382 char 1',
                                      'CircuitContext',
                                      contextOrig_0)
         }
         if (!(noteCommitPublic_0.buffer instanceof ArrayBuffer && noteCommitPublic_0.BYTES_PER_ELEMENT === 1 && noteCommitPublic_0.length === 32)) {
           __compactRuntime.typeError('redeemDraw',
                                      'argument 1 (argument 2 as invoked from Typescript)',
-                                     'line.compact line 377 char 1',
+                                     'line.compact line 382 char 1',
                                      'Bytes<32>',
                                      noteCommitPublic_0)
         }
         if (!(typeof(amount_0) === 'bigint' && amount_0 >= 0n && amount_0 <= 18446744073709551615n)) {
           __compactRuntime.typeError('redeemDraw',
                                      'argument 2 (argument 3 as invoked from Typescript)',
-                                     'line.compact line 377 char 1',
+                                     'line.compact line 382 char 1',
                                      'Uint<0..18446744073709551616>',
                                      amount_0)
         }
         if (!(typeof(noteExpiry_0) === 'bigint' && noteExpiry_0 >= 0n && noteExpiry_0 <= 18446744073709551615n)) {
           __compactRuntime.typeError('redeemDraw',
                                      'argument 3 (argument 4 as invoked from Typescript)',
-                                     'line.compact line 377 char 1',
+                                     'line.compact line 382 char 1',
                                      'Uint<0..18446744073709551616>',
                                      noteExpiry_0)
         }
@@ -545,14 +546,14 @@ export class Contract {
         if (!(typeof(contextOrig_0) === 'object' && contextOrig_0.callContext.currentQueryContext != undefined)) {
           __compactRuntime.typeError('cancelOrExpireNote',
                                      'argument 1 (as invoked from Typescript)',
-                                     'line.compact line 428 char 1',
+                                     'line.compact line 433 char 1',
                                      'CircuitContext',
                                      contextOrig_0)
         }
         if (!(noteCommitPublic_0.buffer instanceof ArrayBuffer && noteCommitPublic_0.BYTES_PER_ELEMENT === 1 && noteCommitPublic_0.length === 32)) {
           __compactRuntime.typeError('cancelOrExpireNote',
                                      'argument 1 (argument 2 as invoked from Typescript)',
-                                     'line.compact line 428 char 1',
+                                     'line.compact line 433 char 1',
                                      'Bytes<32>',
                                      noteCommitPublic_0)
         }
@@ -586,42 +587,42 @@ export class Contract {
         if (!(typeof(contextOrig_0) === 'object' && contextOrig_0.callContext.currentQueryContext != undefined)) {
           __compactRuntime.typeError('acknowledgeRepayment',
                                      'argument 1 (as invoked from Typescript)',
-                                     'line.compact line 448 char 1',
+                                     'line.compact line 453 char 1',
                                      'CircuitContext',
                                      contextOrig_0)
         }
         if (!(typeof(limit_0) === 'bigint' && limit_0 >= 0n && limit_0 <= 18446744073709551615n)) {
           __compactRuntime.typeError('acknowledgeRepayment',
                                      'argument 1 (argument 2 as invoked from Typescript)',
-                                     'line.compact line 448 char 1',
+                                     'line.compact line 453 char 1',
                                      'Uint<0..18446744073709551616>',
                                      limit_0)
         }
         if (!(typeof(outstanding_0) === 'bigint' && outstanding_0 >= 0n && outstanding_0 <= 18446744073709551615n)) {
           __compactRuntime.typeError('acknowledgeRepayment',
                                      'argument 2 (argument 3 as invoked from Typescript)',
-                                     'line.compact line 448 char 1',
+                                     'line.compact line 453 char 1',
                                      'Uint<0..18446744073709551616>',
                                      outstanding_0)
         }
         if (!(typeof(epoch_0) === 'bigint' && epoch_0 >= 0n && epoch_0 <= 18446744073709551615n)) {
           __compactRuntime.typeError('acknowledgeRepayment',
                                      'argument 3 (argument 4 as invoked from Typescript)',
-                                     'line.compact line 448 char 1',
+                                     'line.compact line 453 char 1',
                                      'Uint<0..18446744073709551616>',
                                      epoch_0)
         }
         if (!(typeof(amount_0) === 'bigint' && amount_0 >= 0n && amount_0 <= 18446744073709551615n)) {
           __compactRuntime.typeError('acknowledgeRepayment',
                                      'argument 4 (argument 5 as invoked from Typescript)',
-                                     'line.compact line 448 char 1',
+                                     'line.compact line 453 char 1',
                                      'Uint<0..18446744073709551616>',
                                      amount_0)
         }
         if (!(typeof(receiptExpiry_0) === 'bigint' && receiptExpiry_0 >= 0n && receiptExpiry_0 <= 18446744073709551615n)) {
           __compactRuntime.typeError('acknowledgeRepayment',
                                      'argument 5 (argument 6 as invoked from Typescript)',
-                                     'line.compact line 448 char 1',
+                                     'line.compact line 453 char 1',
                                      'Uint<0..18446744073709551616>',
                                      receiptExpiry_0)
         }
@@ -655,14 +656,14 @@ export class Contract {
         if (!(typeof(contextOrig_0) === 'object' && contextOrig_0.callContext.currentQueryContext != undefined)) {
           __compactRuntime.typeError('setStatus',
                                      'argument 1 (as invoked from Typescript)',
-                                     'line.compact line 490 char 1',
+                                     'line.compact line 497 char 1',
                                      'CircuitContext',
                                      contextOrig_0)
         }
         if (!(typeof(next_0) === 'number' && next_0 >= 0 && next_0 <= 3)) {
           __compactRuntime.typeError('setStatus',
                                      'argument 1 (argument 2 as invoked from Typescript)',
-                                     'line.compact line 490 char 1',
+                                     'line.compact line 497 char 1',
                                      'Enum<Status, NONE, OPEN, DEFAULTED, CLOSED>',
                                      next_0)
         }
@@ -732,21 +733,21 @@ export class Contract {
     if (!(issuerPk_0.buffer instanceof ArrayBuffer && issuerPk_0.BYTES_PER_ELEMENT === 1 && issuerPk_0.length === 32)) {
       __compactRuntime.typeError('Contract state constructor',
                                  'argument 1 (argument 2 as invoked from Typescript)',
-                                 'line.compact line 181 char 1',
+                                 'line.compact line 183 char 1',
                                  'Bytes<32>',
                                  issuerPk_0)
     }
     if (!(initialMerchantPk_0.buffer instanceof ArrayBuffer && initialMerchantPk_0.BYTES_PER_ELEMENT === 1 && initialMerchantPk_0.length === 32)) {
       __compactRuntime.typeError('Contract state constructor',
                                  'argument 2 (argument 3 as invoked from Typescript)',
-                                 'line.compact line 181 char 1',
+                                 'line.compact line 183 char 1',
                                  'Bytes<32>',
                                  initialMerchantPk_0)
     }
     if (!(instanceNonce_0.buffer instanceof ArrayBuffer && instanceNonce_0.BYTES_PER_ELEMENT === 1 && instanceNonce_0.length === 32)) {
       __compactRuntime.typeError('Contract state constructor',
                                  'argument 3 (argument 4 as invoked from Typescript)',
-                                 'line.compact line 181 char 1',
+                                 'line.compact line 183 char 1',
                                  'Bytes<32>',
                                  instanceNonce_0)
     }
@@ -1076,7 +1077,7 @@ export class Contract {
     if (!(result_0.buffer instanceof ArrayBuffer && result_0.BYTES_PER_ELEMENT === 1 && result_0.length === 32)) {
       __compactRuntime.typeError('callerSecret',
                                  'return value',
-                                 'line.compact line 86 char 1',
+                                 'line.compact line 88 char 1',
                                  'Bytes<32>',
                                  result_0)
     }
@@ -1093,7 +1094,7 @@ export class Contract {
     if (!(result_0.buffer instanceof ArrayBuffer && result_0.BYTES_PER_ELEMENT === 1 && result_0.length === 32)) {
       __compactRuntime.typeError('agentSecret',
                                  'return value',
-                                 'line.compact line 87 char 1',
+                                 'line.compact line 89 char 1',
                                  'Bytes<32>',
                                  result_0)
     }
@@ -1110,7 +1111,7 @@ export class Contract {
     if (!(result_0.buffer instanceof ArrayBuffer && result_0.BYTES_PER_ELEMENT === 1 && result_0.length === 32)) {
       __compactRuntime.typeError('salt',
                                  'return value',
-                                 'line.compact line 88 char 1',
+                                 'line.compact line 90 char 1',
                                  'Bytes<32>',
                                  result_0)
     }
@@ -1127,7 +1128,7 @@ export class Contract {
     if (!(result_0.buffer instanceof ArrayBuffer && result_0.BYTES_PER_ELEMENT === 1 && result_0.length === 32)) {
       __compactRuntime.typeError('newSalt',
                                  'return value',
-                                 'line.compact line 89 char 1',
+                                 'line.compact line 91 char 1',
                                  'Bytes<32>',
                                  result_0)
     }
@@ -1144,7 +1145,7 @@ export class Contract {
     if (!(result_0.buffer instanceof ArrayBuffer && result_0.BYTES_PER_ELEMENT === 1 && result_0.length === 32)) {
       __compactRuntime.typeError('invoiceId',
                                  'return value',
-                                 'line.compact line 90 char 1',
+                                 'line.compact line 92 char 1',
                                  'Bytes<32>',
                                  result_0)
     }
@@ -1161,7 +1162,7 @@ export class Contract {
     if (!(result_0.buffer instanceof ArrayBuffer && result_0.BYTES_PER_ELEMENT === 1 && result_0.length === 32)) {
       __compactRuntime.typeError('quoteNonce',
                                  'return value',
-                                 'line.compact line 91 char 1',
+                                 'line.compact line 93 char 1',
                                  'Bytes<32>',
                                  result_0)
     }
@@ -1178,7 +1179,7 @@ export class Contract {
     if (!(result_0.buffer instanceof ArrayBuffer && result_0.BYTES_PER_ELEMENT === 1 && result_0.length === 32)) {
       __compactRuntime.typeError('receiptNonce',
                                  'return value',
-                                 'line.compact line 92 char 1',
+                                 'line.compact line 94 char 1',
                                  'Bytes<32>',
                                  result_0)
     }
@@ -1195,7 +1196,7 @@ export class Contract {
     if (!(result_0.buffer instanceof ArrayBuffer && result_0.BYTES_PER_ELEMENT === 1 && result_0.length === 32)) {
       __compactRuntime.typeError('paymentRef',
                                  'return value',
-                                 'line.compact line 93 char 1',
+                                 'line.compact line 95 char 1',
                                  'Bytes<32>',
                                  result_0)
     }
@@ -1212,7 +1213,7 @@ export class Contract {
     if (!(result_0.buffer instanceof ArrayBuffer && result_0.BYTES_PER_ELEMENT === 1 && result_0.length === 32)) {
       __compactRuntime.typeError('noteNonce',
                                  'return value',
-                                 'line.compact line 94 char 1',
+                                 'line.compact line 96 char 1',
                                  'Bytes<32>',
                                  result_0)
     }
@@ -1229,7 +1230,7 @@ export class Contract {
     if (!(result_0.buffer instanceof ArrayBuffer && result_0.BYTES_PER_ELEMENT === 1 && result_0.length === 32)) {
       __compactRuntime.typeError('noteSalt',
                                  'return value',
-                                 'line.compact line 95 char 1',
+                                 'line.compact line 97 char 1',
                                  'Bytes<32>',
                                  result_0)
     }
@@ -1246,7 +1247,7 @@ export class Contract {
     if (!(result_0.buffer instanceof ArrayBuffer && result_0.BYTES_PER_ELEMENT === 1 && result_0.length === 32)) {
       __compactRuntime.typeError('noteIdentity',
                                  'return value',
-                                 'line.compact line 96 char 1',
+                                 'line.compact line 98 char 1',
                                  'Bytes<32>',
                                  result_0)
     }
@@ -1263,7 +1264,7 @@ export class Contract {
     if (!(result_0.buffer instanceof ArrayBuffer && result_0.BYTES_PER_ELEMENT === 1 && result_0.length === 32)) {
       __compactRuntime.typeError('noteQuoteCommit',
                                  'return value',
-                                 'line.compact line 97 char 1',
+                                 'line.compact line 99 char 1',
                                  'Bytes<32>',
                                  result_0)
     }
@@ -1288,7 +1289,7 @@ export class Contract {
   _encodeU64_0(n_0) {
     return __compactRuntime.convertBigintToBytes(32,
                                                  n_0,
-                                                 'line.compact line 112 char 10');
+                                                 'line.compact line 114 char 10');
   }
   _lineStateCommit_0(p_0, s_0) { return this._persistentCommit_1(p_0, s_0); }
   _drawNoteCommit_0(p_0, s_0) { return this._persistentCommit_0(p_0, s_0); }
@@ -1438,7 +1439,7 @@ export class Contract {
                             'overflow');
     const tmp_0 = ((t1) => {
                     if (t1 > 18446744073709551615n) {
-                      throw new __compactRuntime.CompactError('line.compact line 215 char 19: cast from Field or Uint value to smaller Uint value failed: ' + t1 + ' is greater than 18446744073709551615');
+                      throw new __compactRuntime.CompactError('line.compact line 217 char 19: cast from Field or Uint value to smaller Uint value failed: ' + t1 + ' is greater than 18446744073709551615');
                     }
                     return t1;
                   })(next_0);
@@ -1626,7 +1627,23 @@ export class Contract {
                             'expiry');
     const k_0 = this._agentSecret_0(context, partialProofData);
     const I_0 = this._agentId_0(k_0);
-    const p_0 = { identity: I_0, limit: limit_0, outstanding: 0n, epoch: 0n };
+    const p_0 = { domain:
+                    _descriptor_2.fromValue(__compactRuntime.queryLedgerState(context,
+                                                                              partialProofData,
+                                                                              [
+                                                                               { dup: { n: 0 } },
+                                                                               { idx: { cached: false,
+                                                                                        pushPath: false,
+                                                                                        path: [
+                                                                                               { tag: 'value',
+                                                                                                 value: { value: _descriptor_16.toValue(1n),
+                                                                                                          alignment: _descriptor_16.alignment() } }] } },
+                                                                               { popeq: { cached: false,
+                                                                                          result: undefined } }]).value),
+                  identity: I_0,
+                  limit: limit_0,
+                  outstanding: 0n,
+                  epoch: 0n };
     const C0_0 = this._lineStateCommit_0(p_0,
                                          this._salt_0(context, partialProofData));
     __compactRuntime.queryLedgerState(context,
@@ -1671,7 +1688,7 @@ export class Contract {
                                        { ins: { cached: false, n: 1 } }]);
     const tmp_0 = ((t1) => {
                     if (t1 > 18446744073709551615n) {
-                      throw new __compactRuntime.CompactError('line.compact line 249 char 21: cast from Field or Uint value to smaller Uint value failed: ' + t1 + ' is greater than 18446744073709551615');
+                      throw new __compactRuntime.CompactError('line.compact line 252 char 21: cast from Field or Uint value to smaller Uint value failed: ' + t1 + ' is greater than 18446744073709551615');
                     }
                     return t1;
                   })(_descriptor_1.fromValue(__compactRuntime.queryLedgerState(context,
@@ -1953,7 +1970,20 @@ export class Contract {
                                                                                                      { popeq: { cached: false,
                                                                                                                 result: undefined } }]).value)),
                             'agent');
-    const p_0 = { identity: I_0,
+    const p_0 = { domain:
+                    _descriptor_2.fromValue(__compactRuntime.queryLedgerState(context,
+                                                                              partialProofData,
+                                                                              [
+                                                                               { dup: { n: 0 } },
+                                                                               { idx: { cached: false,
+                                                                                        pushPath: false,
+                                                                                        path: [
+                                                                                               { tag: 'value',
+                                                                                                 value: { value: _descriptor_16.toValue(1n),
+                                                                                                          alignment: _descriptor_16.alignment() } }] } },
+                                                                               { popeq: { cached: false,
+                                                                                          result: undefined } }]).value),
+                  identity: I_0,
                   limit: limit_0,
                   outstanding: outstanding_0,
                   epoch: epoch_0 };
@@ -2298,7 +2328,7 @@ export class Contract {
                                        { ins: { cached: true, n: 1 } }]);
     const tmp_2 = ((t1) => {
                     if (t1 > 18446744073709551615n) {
-                      throw new __compactRuntime.CompactError('line.compact line 365 char 24: cast from Field or Uint value to smaller Uint value failed: ' + t1 + ' is greater than 18446744073709551615');
+                      throw new __compactRuntime.CompactError('line.compact line 369 char 24: cast from Field or Uint value to smaller Uint value failed: ' + t1 + ' is greater than 18446744073709551615');
                     }
                     return t1;
                   })(_descriptor_1.fromValue(__compactRuntime.queryLedgerState(context,
@@ -2325,19 +2355,32 @@ export class Contract {
                                                  value: __compactRuntime.StateValue.newCell({ value: _descriptor_1.toValue(tmp_2),
                                                                                               alignment: _descriptor_1.alignment() }).encode() } },
                                        { ins: { cached: false, n: 1 } }]);
-    const p2_0 = { identity: I_0,
+    const p2_0 = { domain:
+                     _descriptor_2.fromValue(__compactRuntime.queryLedgerState(context,
+                                                                               partialProofData,
+                                                                               [
+                                                                                { dup: { n: 0 } },
+                                                                                { idx: { cached: false,
+                                                                                         pushPath: false,
+                                                                                         path: [
+                                                                                                { tag: 'value',
+                                                                                                  value: { value: _descriptor_16.toValue(1n),
+                                                                                                           alignment: _descriptor_16.alignment() } }] } },
+                                                                                { popeq: { cached: false,
+                                                                                           result: undefined } }]).value),
+                   identity: I_0,
                    limit: limit_0,
                    outstanding:
                      ((t1) => {
                        if (t1 > 18446744073709551615n) {
-                         throw new __compactRuntime.CompactError('line.compact line 370 char 19: cast from Field or Uint value to smaller Uint value failed: ' + t1 + ' is greater than 18446744073709551615');
+                         throw new __compactRuntime.CompactError('line.compact line 375 char 19: cast from Field or Uint value to smaller Uint value failed: ' + t1 + ' is greater than 18446744073709551615');
                        }
                        return t1;
                      })(nextB_0),
                    epoch:
                      ((t1) => {
                        if (t1 > 18446744073709551615n) {
-                         throw new __compactRuntime.CompactError('line.compact line 371 char 13: cast from Field or Uint value to smaller Uint value failed: ' + t1 + ' is greater than 18446744073709551615');
+                         throw new __compactRuntime.CompactError('line.compact line 376 char 13: cast from Field or Uint value to smaller Uint value failed: ' + t1 + ' is greater than 18446744073709551615');
                        }
                        return t1;
                      })(epoch_0 + 1n) };
@@ -2562,7 +2605,7 @@ export class Contract {
                                        { ins: { cached: false, n: 1 } }]);
     const tmp_2 = ((t1) => {
                     if (t1 > 18446744073709551615n) {
-                      throw new __compactRuntime.CompactError('line.compact line 424 char 22: cast from Field or Uint value to smaller Uint value failed: ' + t1 + ' is greater than 18446744073709551615');
+                      throw new __compactRuntime.CompactError('line.compact line 429 char 22: cast from Field or Uint value to smaller Uint value failed: ' + t1 + ' is greater than 18446744073709551615');
                     }
                     return t1;
                   })(_descriptor_1.fromValue(__compactRuntime.queryLedgerState(context,
@@ -2793,7 +2836,20 @@ export class Contract {
                                                                                                       alignment: _descriptor_16.alignment() } }] } },
                                                                            { popeq: { cached: false,
                                                                                       result: undefined } }]).value);
-    const p_0 = { identity: I_0,
+    const p_0 = { domain:
+                    _descriptor_2.fromValue(__compactRuntime.queryLedgerState(context,
+                                                                              partialProofData,
+                                                                              [
+                                                                               { dup: { n: 0 } },
+                                                                               { idx: { cached: false,
+                                                                                        pushPath: false,
+                                                                                        path: [
+                                                                                               { tag: 'value',
+                                                                                                 value: { value: _descriptor_16.toValue(1n),
+                                                                                                          alignment: _descriptor_16.alignment() } }] } },
+                                                                               { popeq: { cached: false,
+                                                                                          result: undefined } }]).value),
+                  identity: I_0,
                   limit: limit_0,
                   outstanding: outstanding_0,
                   epoch: epoch_0 };
@@ -2872,7 +2928,20 @@ export class Contract {
                                                  value: __compactRuntime.StateValue.newNull().encode() } },
                                        { ins: { cached: false, n: 1 } },
                                        { ins: { cached: true, n: 1 } }]);
-    const p2_0 = { identity: I_0,
+    const p2_0 = { domain:
+                     _descriptor_2.fromValue(__compactRuntime.queryLedgerState(context,
+                                                                               partialProofData,
+                                                                               [
+                                                                                { dup: { n: 0 } },
+                                                                                { idx: { cached: false,
+                                                                                         pushPath: false,
+                                                                                         path: [
+                                                                                                { tag: 'value',
+                                                                                                  value: { value: _descriptor_16.toValue(1n),
+                                                                                                           alignment: _descriptor_16.alignment() } }] } },
+                                                                                { popeq: { cached: false,
+                                                                                           result: undefined } }]).value),
+                   identity: I_0,
                    limit: limit_0,
                    outstanding:
                      (__compactRuntime.assert(outstanding_0 >= amount_0,
@@ -2881,7 +2950,7 @@ export class Contract {
                    epoch:
                      ((t1) => {
                        if (t1 > 18446744073709551615n) {
-                         throw new __compactRuntime.CompactError('line.compact line 484 char 13: cast from Field or Uint value to smaller Uint value failed: ' + t1 + ' is greater than 18446744073709551615');
+                         throw new __compactRuntime.CompactError('line.compact line 491 char 13: cast from Field or Uint value to smaller Uint value failed: ' + t1 + ' is greater than 18446744073709551615');
                        }
                        return t1;
                      })(epoch_0 + 1n) };
@@ -3126,7 +3195,7 @@ export function ledger(stateOrChargedState) {
         if (!(key_0.buffer instanceof ArrayBuffer && key_0.BYTES_PER_ELEMENT === 1 && key_0.length === 32)) {
           __compactRuntime.typeError('member',
                                      'argument 1',
-                                     'line.compact line 71 char 1',
+                                     'line.compact line 73 char 1',
                                      'Bytes<32>',
                                      key_0)
         }
@@ -3155,7 +3224,7 @@ export function ledger(stateOrChargedState) {
         if (!(key_0.buffer instanceof ArrayBuffer && key_0.BYTES_PER_ELEMENT === 1 && key_0.length === 32)) {
           __compactRuntime.typeError('lookup',
                                      'argument 1',
-                                     'line.compact line 71 char 1',
+                                     'line.compact line 73 char 1',
                                      'Bytes<32>',
                                      key_0)
         }
@@ -3347,7 +3416,7 @@ export function ledger(stateOrChargedState) {
         if (!(key_0.buffer instanceof ArrayBuffer && key_0.BYTES_PER_ELEMENT === 1 && key_0.length === 32)) {
           __compactRuntime.typeError('member',
                                      'argument 1',
-                                     'line.compact line 81 char 1',
+                                     'line.compact line 83 char 1',
                                      'Bytes<32>',
                                      key_0)
         }
@@ -3376,7 +3445,7 @@ export function ledger(stateOrChargedState) {
         if (!(key_0.buffer instanceof ArrayBuffer && key_0.BYTES_PER_ELEMENT === 1 && key_0.length === 32)) {
           __compactRuntime.typeError('lookup',
                                      'argument 1',
-                                     'line.compact line 81 char 1',
+                                     'line.compact line 83 char 1',
                                      'Bytes<32>',
                                      key_0)
         }
@@ -3456,7 +3525,7 @@ export function ledger(stateOrChargedState) {
         if (!(key_0.buffer instanceof ArrayBuffer && key_0.BYTES_PER_ELEMENT === 1 && key_0.length === 32)) {
           __compactRuntime.typeError('member',
                                      'argument 1',
-                                     'line.compact line 82 char 1',
+                                     'line.compact line 84 char 1',
                                      'Bytes<32>',
                                      key_0)
         }
@@ -3485,7 +3554,7 @@ export function ledger(stateOrChargedState) {
         if (!(key_0.buffer instanceof ArrayBuffer && key_0.BYTES_PER_ELEMENT === 1 && key_0.length === 32)) {
           __compactRuntime.typeError('lookup',
                                      'argument 1',
-                                     'line.compact line 82 char 1',
+                                     'line.compact line 84 char 1',
                                      'Bytes<32>',
                                      key_0)
         }
@@ -3565,7 +3634,7 @@ export function ledger(stateOrChargedState) {
         if (!(elem_0.buffer instanceof ArrayBuffer && elem_0.BYTES_PER_ELEMENT === 1 && elem_0.length === 32)) {
           __compactRuntime.typeError('member',
                                      'argument 1',
-                                     'line.compact line 83 char 1',
+                                     'line.compact line 85 char 1',
                                      'Bytes<32>',
                                      elem_0)
         }
