@@ -20,7 +20,7 @@ const STATE_PATH = process.env.LINE_MCP_STATE ?? join(process.cwd(), ".line-mcp-
 const tools = [
   {
     name: "line.status",
-    description: "Public ledger snapshot: status, commitments, clock. Never returns books.",
+    description: "Public ledger snapshot: status, commitments, action clock, generation. Never returns books.",
     inputSchema: { type: "object", properties: {} },
   },
   {
@@ -56,11 +56,16 @@ function writeState(state) {
 function publicStatus(ledger) {
   return {
     status: ledger.status,
-    clock: ledger.clock,
+    actionClock: ledger.actionClock,
+    lineGeneration: ledger.lineGeneration,
     identityCommitment: ledger.identityCommitment,
     lineCommitment: ledger.lineCommitment,
     contractDomain: ledger.contractDomain,
-    quotes: ledger.quotes.map((q) => ({ commitment: q.commitment, used: q.used })),
+    quotes: ledger.quotes.map((q) => ({
+      commitment: q.commitment,
+      lineGeneration: q.lineGeneration,
+      used: q.used,
+    })),
     nullifiers: ledger.nullifiers,
     note: "Books are not in this view. Wave 1 is authorization, not settlement.",
   };

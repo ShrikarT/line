@@ -10,7 +10,7 @@ import {
   Status,
   type Ledger as CompactLedger,
 } from "../../../contracts/managed/line/contract/index.js";
-import { pad32 } from "./encoding.ts";
+import { issuerPublicKey, merchantPublicKey, pad32 } from "./encoding.ts";
 
 export { Status };
 
@@ -60,19 +60,26 @@ export type Session = {
   privateState: PrivateState;
 };
 
-export async function boot(issuerSk: Uint8Array, merchantSk: Uint8Array, ps?: PrivateState): Promise<Session> {
-  const privateState = ps ?? blankPrivate({ callerSecret: issuerSk });
+export async function bootWithPk(issuerPk: Uint8Array, merchantPk: Uint8Array, ps?: PrivateState): Promise<Session> {
+  const privateState = ps ?? blankPrivate();
   const contract = new Contract(WITNESSES as never);
   const init = await contract.initialState(
     RT.createConstructorContext(privateState, COIN_PK),
-    issuerSk,
-    merchantSk,
+    issuerPk,
+    merchantPk,
   );
   return {
     contract,
     state: init.currentContractState,
     privateState: init.currentPrivateState,
   };
+}
+
+export async function boot(issuerSk: Uint8Array, merchantSk: Uint8Array, ps?: PrivateState): Promise<Session> {
+  const privateState = ps ?? blankPrivate({ callerSecret: issuerSk });
+  const ipk = issuerPublicKey(issuerSk);
+  const mpk = merchantPublicKey(merchantSk);
+  return bootWithPk(ipk, mpk, privateState);
 }
 
 export function readLedger(session: Session): CompactLedger {
@@ -125,15 +132,20 @@ export async function call(session: Session, ps: PrivateState, op: CircuitCall):
   }
 }
 
-export function firstQuote(ledger: CompactLedger): { Q: Uint8Array; expiry: bigint; used: boolean } | null {
+export function firstQuote(ledger: CompactLedger): { Q: Uint8Array; expiry: bigint; lineGeneration: bigint; used: boolean } | null {
   for (const [Q, meta] of ledger.quotes) {
-    return { Q, expiry: meta.expiry, used: meta.used };
+    return { Q, expiry: meta.expiry, lineGeneration: meta.lineGeneration, used: meta.used };
   }
   return null;
 }
 
 export function quotesOf(ledger: CompactLedger) {
-  return [...ledger.quotes].map(([Q, meta]) => ({ Q, expiry: meta.expiry, used: meta.used }));
+  return [...ledger.quotes].map(([Q, meta]) => ({
+    Q,
+    expiry: meta.expiry,
+    lineGeneration: meta.lineGeneration,
+    used: meta.used,
+  }));
 }
 
 export function nullifiersOf(ledger: CompactLedger) {
