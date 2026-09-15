@@ -20,14 +20,23 @@ Field order: `identity: Bytes<32>`, `limit: Uint<64>`, `outstanding: Uint<64>`, 
 
 `C = persistentCommit<LinePreimage>(preimage, salt)` with `salt: Bytes<32>`.
 
+## Quote commitment
+
+`Q = persistentHash([pad(32, "line:quote"), merchantPk, invoiceId, encodeU64(A), encodeU64(expiry), nonce, encodeU64(generation), contractDomain])`
+
+A Vector of 8 `Bytes<32>` elements. Binds invoice ID, amount, expiry action clock, nonce, generation, and contract domain.
+
+`QuoteMeta` on-chain struct: `{ used: Boolean, expiry: Uint<64>, lineGeneration: Uint<64> }`.
+
 ## Domain tags
 
 | Tag | Use |
 |---|---|
-| `line:pk` | `publicKey(sk)` |
-| `line:id` | `agentId(sk)` |
+| `line:issuer:pk` | `issuerPublicKey(sk)` — issuer identity |
+| `line:merchant:pk` | `merchantPublicKey(sk)` — merchant identity |
+| `line:id` | `agentId(sk)` — agent identity |
 | `line:domain` | constructor domain from issuer pk + merchant pk |
-| `line:quote` | quote commitment |
+| `line:quote` | quote commitment prefix (vector of 8 elements) |
 | `line:draw` | draw nullifier |
 | `line:repay` | repay nullifier |
 
