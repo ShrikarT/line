@@ -22,7 +22,6 @@ import {
 export const BYTES32 = new CompactTypeBytes(32);
 export const UINT64 = new CompactTypeUnsignedInteger(18446744073709551615n, 8);
 const VEC2 = new CompactTypeVector(2, BYTES32);
-const VEC3 = new CompactTypeVector(3, BYTES32);
 const VEC4 = new CompactTypeVector(4, BYTES32);
 const VEC7 = new CompactTypeVector(7, BYTES32);
 const VEC8 = new CompactTypeVector(8, BYTES32);
@@ -58,6 +57,66 @@ class LinePreimageType implements CompactType<LinePreimage> {
 }
 
 export const LINE_PREIMAGE_TYPE = new LinePreimageType();
+
+export type DrawNotePreimage = {
+  domain: Uint8Array;
+  lineGeneration: bigint;
+  identity: Uint8Array;
+  quoteCommit: Uint8Array;
+  merchantPk: Uint8Array;
+  amount: bigint;
+  noteNonce: Uint8Array;
+  expiry: bigint;
+};
+
+class DrawNotePreimageType implements CompactType<DrawNotePreimage> {
+  alignment() {
+    return BYTES32.alignment().concat(
+      UINT64.alignment().concat(
+        BYTES32.alignment().concat(
+          BYTES32.alignment().concat(
+            BYTES32.alignment().concat(
+              UINT64.alignment().concat(
+                BYTES32.alignment().concat(UINT64.alignment()),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+  toValue(value: DrawNotePreimage) {
+    return BYTES32.toValue(value.domain).concat(
+      UINT64.toValue(value.lineGeneration).concat(
+        BYTES32.toValue(value.identity).concat(
+          BYTES32.toValue(value.quoteCommit).concat(
+            BYTES32.toValue(value.merchantPk).concat(
+              UINT64.toValue(value.amount).concat(
+                BYTES32.toValue(value.noteNonce).concat(
+                  UINT64.toValue(value.expiry),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+  fromValue(value: Parameters<CompactType<DrawNotePreimage>["fromValue"]>[0]) {
+    return {
+      domain: BYTES32.fromValue(value),
+      lineGeneration: UINT64.fromValue(value),
+      identity: BYTES32.fromValue(value),
+      quoteCommit: BYTES32.fromValue(value),
+      merchantPk: BYTES32.fromValue(value),
+      amount: UINT64.fromValue(value),
+      noteNonce: BYTES32.fromValue(value),
+      expiry: UINT64.fromValue(value),
+    };
+  }
+}
+
+export const DRAW_NOTE_PREIMAGE_TYPE = new DrawNotePreimageType();
 
 export function pad32(label: string): Uint8Array {
   const out = new Uint8Array(32);
@@ -97,10 +156,17 @@ export function encodeU64(n: bigint): Uint8Array {
 
 export function randomBytes32(): Uint8Array {
   const out = new Uint8Array(32);
-  if (typeof globalThis.crypto?.getRandomValues !== "function") {
-    throw new Error("no CSPRNG");
+  if (typeof globalThis.crypto?.getRandomValues === "function") {
+    globalThis.crypto.getRandomValues(out);
+  } else {
+    // Node.js fallback using dynamic import or global crypto
+    try {
+      const nodeCrypto = globalThis.crypto;
+      nodeCrypto.getRandomValues(out);
+    } catch {
+      throw new Error("no CSPRNG");
+    }
   }
-  globalThis.crypto.getRandomValues(out);
   return out;
 }
 
@@ -108,10 +174,11 @@ export const TAG = {
   issuerPk: pad32("line:issuer:pk"),
   merchantPk: pad32("line:merchant:pk"),
   id: pad32("line:id"),
-  domain: pad32("line:domain"),
-  quote: pad32("line:quote"),
-  draw: pad32("line:draw"),
-  repay: pad32("line:repay"),
+  domain: pad32("line:v2:domain"),
+  quote: pad32("line:v2:quote"),
+  draw: pad32("line:v2:draw"),
+  redeem: pad32("line:v2:redeem"),
+  repay: pad32("line:v2:repay"),
 } as const;
 
 export function issuerPublicKey(sk: Uint8Array): Uint8Array {
@@ -122,21 +189,24 @@ export function merchantPublicKey(sk: Uint8Array): Uint8Array {
   return persistentHash(VEC2, [TAG.merchantPk, sk]);
 }
 
-/** @deprecated Use issuerPublicKey or merchantPublicKey */
-export function publicKey(sk: Uint8Array): Uint8Array {
-  return persistentHash(VEC2, [pad32("line:pk"), sk]);
-}
-
 export function agentId(sk: Uint8Array): Uint8Array {
   return persistentHash(VEC2, [TAG.id, sk]);
 }
 
-export function contractDomain(issuerPk: Uint8Array, merchantPk: Uint8Array): Uint8Array {
-  return persistentHash(VEC3, [TAG.domain, issuerPk, merchantPk]);
+export function contractDomain(
+  issuerPk: Uint8Array,
+  initialMerchantPk: Uint8Array,
+  instanceNonce: Uint8Array,
+): Uint8Array {
+  return persistentHash(VEC4, [TAG.domain, issuerPk, initialMerchantPk, instanceNonce]);
 }
 
 export function lineStateCommit(preimage: LinePreimage, salt: Uint8Array): Uint8Array {
   return persistentCommit(LINE_PREIMAGE_TYPE, preimage, salt);
+}
+
+export function drawNoteCommit(preimage: DrawNotePreimage, salt: Uint8Array): Uint8Array {
+  return persistentCommit(DRAW_NOTE_PREIMAGE_TYPE, preimage, salt);
 }
 
 export function quoteCommit(parts: {
@@ -162,6 +232,10 @@ export function quoteCommit(parts: {
 
 export function drawNullifier(sk: Uint8Array, Q: Uint8Array, domain: Uint8Array): Uint8Array {
   return persistentHash(VEC4, [TAG.draw, sk, Q, domain]);
+}
+
+export function redeemNullifier(sk: Uint8Array, D: Uint8Array, domain: Uint8Array): Uint8Array {
+  return persistentHash(VEC4, [TAG.redeem, sk, D, domain]);
 }
 
 export function repayNullifier(parts: {

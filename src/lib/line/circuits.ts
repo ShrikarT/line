@@ -1,5 +1,26 @@
 export const CIRCUITS = [
   {
+    name: "registerMerchant",
+    caller: "Issuer",
+    proves: "Authorized issuer, merchant public key not yet registered.",
+    discloses: "Merchant public key, registered=true",
+    hides: "Issuer secret, merchant secret",
+  },
+  {
+    name: "fundReserve",
+    caller: "Issuer",
+    proves: "Authorized issuer, amount > 0. Deposits liquidity into settlement reserve pool.",
+    discloses: "Deposited amount, new totalReserve",
+    hides: "Issuer secret",
+  },
+  {
+    name: "withdrawUnencumberedReserve",
+    caller: "Issuer",
+    proves: "Authorized issuer, amount <= totalReserve - (encumberedReserve + redeemedReserve).",
+    discloses: "Withdrawn amount, updated totalReserve",
+    hides: "Issuer secret",
+  },
+  {
     name: "openLine",
     caller: "Issuer",
     proves: "Authorized issuer, L > 0, B = 0, no live line. C0 = persistentCommit({I,L,0,epoch}, salt).",
@@ -16,9 +37,23 @@ export const CIRCUITS = [
   {
     name: "draw",
     caller: "Agent",
-    proves: "Owns I, opens current C, reconstructs Q, B+A ≤ L, N unused. Writes C'.",
-    discloses: "C', N, Q used",
-    hides: "A, B, L, utilization",
+    proves: "Owns I, opens current C, reconstructs Q, B+A ≤ L, reserve solvency (withdrawable >= A), N unused. Issues private note D.",
+    discloses: "C', N, Q used, note commitment D, encumbered reserve increase",
+    hides: "A, B, L, utilization, merchantPk in note D",
+  },
+  {
+    name: "redeemDraw",
+    caller: "Merchant",
+    proves: "Owns committed merchantPk in note D preimage, note not yet redeemed/cancelled, N_redeem unused. Shifts encumbered to redeemed reserve.",
+    discloses: "Redeemed note D, N_redeem, encumberedReserve decrease, redeemedReserve increase",
+    hides: "Merchant secret, invoice id, merchant identity (proven in ZK)",
+  },
+  {
+    name: "cancelOrExpireNote",
+    caller: "Issuer / Anyone",
+    proves: "Action clock > note expiry (or issuer cancelled). Releases encumbered reserve back to unencumbered.",
+    discloses: "Cancelled note D, encumberedReserve decrease",
+    hides: "Private note preimages",
   },
   {
     name: "acknowledgeRepayment",

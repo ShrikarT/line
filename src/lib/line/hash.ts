@@ -6,7 +6,6 @@ export {
   fromHex,
   lineStateCommit,
   pad32,
-  publicKey,
   quoteCommit,
   randomBytes32,
   repayNullifier,
