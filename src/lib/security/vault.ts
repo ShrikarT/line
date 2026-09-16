@@ -11,6 +11,8 @@
 export const INSTITUTIONAL_CUSTODY_WARNING =
   "WARNING: Local browser custody is intended solely for evaluation and local agent workflows. Institutional production deployments must use dedicated hardware security modules (HSM) or multi-party computation (MPC) key managers.";
 
+import { VaultPassphraseError, VaultTamperedError } from "../runtime/errors.ts";
+
 const DB_NAME = "line_vault_db";
 const STORE_NAME = "encrypted_keys";
 const PBKDF2_ITERATIONS = 100_000;
@@ -125,15 +127,22 @@ export async function decryptSecret(
   const ciphertext = hexToBuffer(envelope.ciphertextHex);
 
   const key = await deriveKey(passphrase, salt);
-  const decrypted = await crypto.subtle.decrypt(
-    { name: "AES-GCM", iv: iv as BufferSource },
-    key,
-    ciphertext as BufferSource
-  );
-
-  const dec = new TextDecoder();
-  return dec.decode(decrypted);
+  try {
+    const decrypted = await crypto.subtle.decrypt(
+      { name: "AES-GCM", iv: iv as BufferSource },
+      key,
+      ciphertext as BufferSource
+    );
+    const dec = new TextDecoder();
+    return dec.decode(decrypted);
+  } catch (err) {
+    throw new VaultPassphraseError("Ciphertext MAC authentication failed: Incorrect vault passphrase or corrupted ciphertext.");
+  }
 }
+
+// Fallback encrypted envelope store for non-browser environments (e.g., Node.js tests or CLI)
+// All data stored here remains fully encrypted with WebCrypto AES-GCM and PBKDF2.
+const fallbackEncryptedStore = new Map<string, EncryptedEnvelope>();
 
 export async function saveEncryptedSecret(
   id: string,
@@ -141,6 +150,10 @@ export async function saveEncryptedSecret(
   passphrase: string
 ): Promise<void> {
   const envelope = await encryptSecret(id, plaintext, passphrase);
+  if (typeof indexedDB === "undefined") {
+    fallbackEncryptedStore.set(id, envelope);
+    return;
+  }
   const db = await openDb();
   return new Promise((resolve, reject) => {
     const tx = db.transaction(STORE_NAME, "readwrite");
@@ -155,14 +168,19 @@ export async function loadEncryptedSecret(
   id: string,
   passphrase: string
 ): Promise<string | null> {
-  const db = await openDb();
-  const envelope = await new Promise<EncryptedEnvelope | null>((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, "readonly");
-    const store = tx.objectStore(STORE_NAME);
-    const req = store.get(id);
-    req.onsuccess = () => resolve(req.result ?? null);
-    req.onerror = () => reject(req.error);
-  });
+  let envelope: EncryptedEnvelope | null = null;
+  if (typeof indexedDB === "undefined") {
+    envelope = fallbackEncryptedStore.get(id) ?? null;
+  } else {
+    const db = await openDb();
+    envelope = await new Promise<EncryptedEnvelope | null>((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, "readonly");
+      const store = tx.objectStore(STORE_NAME);
+      const req = store.get(id);
+      req.onsuccess = () => resolve(req.result ?? null);
+      req.onerror = () => reject(req.error);
+    });
+  }
 
   if (!envelope) return null;
   return decryptSecret(envelope, passphrase);
@@ -185,18 +203,82 @@ export async function loadEncryptedJson<T>(
   if (!jsonStr) return null;
   try {
     return JSON.parse(jsonStr) as T;
-  } catch {
-    return null;
+  } catch (err) {
+    throw new VaultTamperedError(`Vault JSON payload corrupted or tampered for record '${id}'`);
   }
 }
 
 export async function removeEncryptedSecret(id: string): Promise<void> {
+  if (typeof indexedDB === "undefined") {
+    fallbackEncryptedStore.delete(id);
+    return;
+  }
   const db = await openDb();
   return new Promise((resolve, reject) => {
     const tx = db.transaction(STORE_NAME, "readwrite");
     const store = tx.objectStore(STORE_NAME);
     const req = store.delete(id);
     req.onsuccess = () => resolve();
+    req.onerror = () => reject(req.error);
+  });
+}
+
+export async function removeEncryptedPrefix(prefix: string): Promise<number> {
+  if (typeof indexedDB === "undefined") {
+    let count = 0;
+    for (const key of Array.from(fallbackEncryptedStore.keys())) {
+      if (key.startsWith(prefix)) {
+        fallbackEncryptedStore.delete(key);
+        count++;
+      }
+    }
+    return count;
+  }
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, "readwrite");
+    const store = tx.objectStore(STORE_NAME);
+    let count = 0;
+    const req = store.openCursor();
+    req.onsuccess = (event) => {
+      const cursor = (event.target as IDBRequest<IDBCursorWithValue>).result;
+      if (cursor) {
+        const key = String(cursor.key);
+        if (key.startsWith(prefix)) {
+          cursor.delete();
+          count++;
+        }
+        cursor.continue();
+      } else {
+        resolve(count);
+      }
+    };
+    req.onerror = () => reject(req.error);
+  });
+}
+
+export async function listEncryptedKeys(prefix?: string): Promise<string[]> {
+  if (typeof indexedDB === "undefined") {
+    return Array.from(fallbackEncryptedStore.keys()).filter((k) => !prefix || k.startsWith(prefix));
+  }
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, "readonly");
+    const store = tx.objectStore(STORE_NAME);
+    const keys: string[] = [];
+    const req = store.openKeyCursor();
+    req.onsuccess = (event) => {
+      const cursor = (event.target as IDBRequest<IDBCursor>).result;
+      if (cursor) {
+        const key = String(cursor.key);
+        if (!prefix || key.startsWith(prefix)) {
+          keys.push(key);
+        }
+        cursor.continue();
+      } else {
+        resolve(keys);
+      }
+    };
     req.onerror = () => reject(req.error);
   });
 }

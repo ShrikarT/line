@@ -46,9 +46,14 @@
 - [x] Zero plaintext secret persistence in `localStorage`
 - [x] Automatic legacy plaintext `localStorage` purge (`purgeLegacyPlaintextStorage()`)
 - [x] Structural fixture key elimination: production store (`src/app/store.ts`), lab simulator (`src/dev/simulator-store.ts`), test fixtures (`src/test/fixtures/keys.ts`)
+- [x] Zero hardcoded default amounts: `doFundReserve`, `doOpen`, `doAck` all require explicit parameters; no fabricated inputs
+- [x] Typed vault records: `AgentLineRecord`, `MerchantQuoteRecord`, `DrawNoteRecord`, `RepaymentRecord` with validators
+- [x] Transfer packages: `QuoteTransferPackage` and `DrawNoteTransferPackage` for inter-role state exchange
+- [x] `VaultPrivateStateProvider`: strict error hierarchy — `VaultLockedError`, `VaultPersistenceError`, `ContractNotConfiguredError`
+- [x] `MidnightNetworkRuntime`: `validateWitnessBytes32` enforces 32-byte witnesses; no zero-filled fallbacks
 - [x] Zero fixture keys in production paths verified by `npm run check:keys` (37 modules audited)
 - [x] Negative key audit test suite (`node scripts/check-no-fixture-keys.test.mjs`)
-- [x] Secret pattern scanner (`npm run check:secrets`)
+- [x] Secret pattern scanner (`npm run check:secrets`) with hardcoded session password regression guards
 - [x] Cryptographically secure randomness (`crypto.getRandomValues`) throughout
 - [x] Institutional custody disclaimer documented and tested
 
@@ -75,7 +80,7 @@
 ### 6. Developer & Deployment Operations
 - [x] `npm run compact:compile`: Deterministic fast compilation with `--skip-zk`
 - [x] `npm run compact:compile:release`: Full release compilation with proving key generation
-- [x] `npm run contract:deploy`: Contract deployment script requiring `MIDNIGHT_DEPLOYER_SEED`, deriving non-zero constructor args, and verifying deployed state via indexer
+- [x] `npm run contract:deploy`: Contract deployment script requiring `MIDNIGHT_DEPLOYER_SEED`, using `persistentHash` for Compact-consistent key derivation, and verifying deployed state via indexer
 - [x] `npm run contract:join`: Connect to existing deployed contract via GraphQL indexer
 - [x] `npm run network:smoke`: Live network connectivity and state smoke test
 - [x] `npm run local:smoke`: Local simulator smoke test verifying end-to-end lifecycle

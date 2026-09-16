@@ -23,29 +23,48 @@ import {
   saveEncryptedJson,
   loadEncryptedJson,
   removeEncryptedSecret,
+  removeEncryptedPrefix,
   getVaultSessionPassphrase,
   isVaultSessionUnlocked,
 } from "../security/vault.ts";
+import {
+  ContractNotConfiguredError,
+  VaultLockedError,
+  VaultPassphraseError,
+  VaultTamperedError,
+  VaultPersistenceError,
+  UnsupportedOperationError,
+} from "./errors.ts";
 
 export interface VaultPrivateStateProviderConfig {
   passwordProvider?: () => string | Promise<string>;
   networkId?: string;
+  allowEphemeralFallback?: boolean;
 }
 
-export class VaultPrivateStateProvider<PS = any> implements PrivateStateProvider<PrivateStateId, PS> {
+export class VaultPrivateStateProvider<PS = unknown> implements PrivateStateProvider<PrivateStateId, PS> {
   private currentContractAddress: string | null = null;
   private inMemoryFallback = new Map<string, PS>();
-  private signingKeys = new Map<string, any>();
+  private signingKeys = new Map<string, unknown>();
   private passwordProvider?: () => string | Promise<string>;
   private networkId: string;
+  readonly allowEphemeralFallback: boolean;
 
   constructor(config?: VaultPrivateStateProviderConfig) {
     this.passwordProvider = config?.passwordProvider;
     this.networkId = config?.networkId ?? "midnight-testnet";
+    this.allowEphemeralFallback = config?.allowEphemeralFallback ?? false;
   }
 
   setContractAddress(address: string): void {
     this.currentContractAddress = address;
+  }
+
+  private ensureContractConfigured(): string {
+    if (!this.currentContractAddress) {
+      throw new ContractNotConfiguredError("setContractAddress must be called before accessing private state.");
+    }
+    return this.currentContractAddress;
   }
 
   private async getPassphrase(): Promise<string> {
@@ -55,108 +74,140 @@ export class VaultPrivateStateProvider<PS = any> implements PrivateStateProvider
     }
     const sessionPassphrase = getVaultSessionPassphrase();
     if (sessionPassphrase) return sessionPassphrase;
-    throw new Error("Private state storage locked: Passphrase or active vault session required.");
+    throw new VaultLockedError("Private state storage locked: Passphrase or active vault session required.");
   }
 
   private storageKey(privateStateId: string): string {
-    if (!this.currentContractAddress) {
-      throw new Error("setContractAddress must be called before accessing private state.");
-    }
-    return `midnight:ps:${this.networkId}:${this.currentContractAddress}:${privateStateId}`;
+    const contract = this.ensureContractConfigured();
+    return `midnight:ps:${this.networkId}:${contract}:${privateStateId}`;
   }
 
   async get(privateStateId: PrivateStateId): Promise<PS | null> {
-    if (!this.currentContractAddress) {
-      throw new Error("setContractAddress must be called before accessing private state.");
-    }
+    const contract = this.ensureContractConfigured();
+    const key = this.storageKey(privateStateId);
 
     try {
       const passphrase = await this.getPassphrase();
-      const key = this.storageKey(privateStateId);
       const data = await loadEncryptedJson<PS>(key, passphrase);
       if (data !== null && data !== undefined) {
         return data;
       }
-    } catch {
-      // Fallback to ephemeral in-memory if storage is restricted
+    } catch (err) {
+      if (!this.allowEphemeralFallback) {
+        throw err;
+      }
     }
 
-    const key = `${this.currentContractAddress}:${privateStateId}`;
-    return this.inMemoryFallback.get(key) ?? null;
+    const memKey = `${contract}:${privateStateId}`;
+    return this.inMemoryFallback.get(memKey) ?? null;
   }
 
   async set(privateStateId: PrivateStateId, state: PS): Promise<void> {
-    if (!this.currentContractAddress) {
-      throw new Error("setContractAddress must be called before accessing private state.");
-    }
-
-    const memKey = `${this.currentContractAddress}:${privateStateId}`;
+    const contract = this.ensureContractConfigured();
+    const memKey = `${contract}:${privateStateId}`;
     this.inMemoryFallback.set(memKey, state);
 
     try {
       const passphrase = await this.getPassphrase();
       const key = this.storageKey(privateStateId);
       await saveEncryptedJson(key, state, passphrase);
-    } catch {
-      // Ephemeral fallback holds state
+    } catch (err) {
+      if (!this.allowEphemeralFallback) {
+        if (err instanceof VaultLockedError) {
+          throw err;
+        }
+        throw new VaultPersistenceError(err instanceof Error ? err.message : String(err), { privateStateId });
+      }
     }
   }
 
   async remove(privateStateId: PrivateStateId): Promise<void> {
-    if (!this.currentContractAddress) {
-      throw new Error("setContractAddress must be called before accessing private state.");
-    }
-    const memKey = `${this.currentContractAddress}:${privateStateId}`;
+    const contract = this.ensureContractConfigured();
+    const memKey = `${contract}:${privateStateId}`;
     this.inMemoryFallback.delete(memKey);
+    const key = this.storageKey(privateStateId);
     try {
-      const key = this.storageKey(privateStateId);
       await removeEncryptedSecret(key);
-    } catch {
-      // Ephemeral fallback or locked storage
+    } catch (err) {
+      if (!this.allowEphemeralFallback) {
+        throw new VaultPersistenceError(err instanceof Error ? err.message : String(err), { privateStateId });
+      }
     }
   }
 
   async clear(): Promise<void> {
     this.inMemoryFallback.clear();
+    if (this.currentContractAddress) {
+      const prefix = `midnight:ps:${this.networkId}:${this.currentContractAddress}:`;
+      await removeEncryptedPrefix(prefix);
+    }
   }
 
-  async setSigningKey(address: string, signingKey: any): Promise<void> {
+  async setSigningKey(address: string, signingKey: string): Promise<void> {
     this.signingKeys.set(address, signingKey);
+    try {
+      const passphrase = await this.getPassphrase();
+      await saveEncryptedJson(`midnight:sk:${this.networkId}:${address}`, signingKey, passphrase);
+    } catch (err) {
+      if (!this.allowEphemeralFallback) {
+        if (err instanceof VaultLockedError) {
+          throw err;
+        }
+        throw new VaultPersistenceError(err instanceof Error ? err.message : String(err), { address });
+      }
+    }
   }
 
-  async getSigningKey(address: string): Promise<any | null> {
-    return this.signingKeys.get(address) ?? null;
+  async getSigningKey(address: string): Promise<string | null> {
+    const cached = this.signingKeys.get(address) as string | undefined;
+    if (cached !== undefined) {
+      return cached;
+    }
+    try {
+      const passphrase = await this.getPassphrase();
+      const loaded = await loadEncryptedJson<string>(`midnight:sk:${this.networkId}:${address}`, passphrase);
+      if (loaded !== null) {
+        this.signingKeys.set(address, loaded);
+        return loaded;
+      }
+    } catch (err) {
+      if (!this.allowEphemeralFallback) {
+        throw err;
+      }
+    }
+    return null;
   }
 
   async removeSigningKey(address: string): Promise<void> {
     this.signingKeys.delete(address);
+    try {
+      await removeEncryptedSecret(`midnight:sk:${this.networkId}:${address}`);
+    } catch (err) {
+      if (!this.allowEphemeralFallback) {
+        throw new VaultPersistenceError(err instanceof Error ? err.message : String(err), { address });
+      }
+    }
   }
 
   async clearSigningKeys(): Promise<void> {
     this.signingKeys.clear();
+    const prefix = `midnight:sk:${this.networkId}:`;
+    await removeEncryptedPrefix(prefix);
   }
 
   async exportPrivateStates(_options?: ExportPrivateStatesOptions): Promise<PrivateStateExport> {
-    return {
-      format: "midnight-private-state-export",
-      encryptedPayload: "",
-      salt: "",
-    };
+    throw new UnsupportedOperationError("exportPrivateStates");
   }
 
   async importPrivateStates(_exportData: PrivateStateExport, _options?: ImportPrivateStatesOptions): Promise<ImportPrivateStatesResult> {
-    return { imported: 0, skipped: 0, overwritten: 0 };
+    throw new UnsupportedOperationError("importPrivateStates");
   }
 
   async exportSigningKeys(_options?: ExportSigningKeysOptions): Promise<SigningKeyExport> {
-    return {
-      format: "midnight-signing-key-export",
-      encryptedPayload: "",
-      salt: "",
-    };
+    throw new UnsupportedOperationError("exportSigningKeys");
   }
 
   async importSigningKeys(_exportData: SigningKeyExport, _options?: ImportSigningKeysOptions): Promise<ImportSigningKeysResult> {
-    return { imported: 0, skipped: 0, overwritten: 0 };
+    throw new UnsupportedOperationError("importSigningKeys");
   }
 }
