@@ -146,4 +146,75 @@ describe("network integration: MidnightNetworkRuntime & wallet connector", () =>
       (globalThis as any).window = origWindow;
     }
   });
+
+  it("VaultPrivateStateProvider encrypts and retrieves state via passwordProvider", async () => {
+    const { VaultPrivateStateProvider } = await import("./vault-provider.ts");
+    const provider = new VaultPrivateStateProvider({
+      passwordProvider: () => "TestVaultSecretPassword456!",
+      networkId: "midnight-testnet",
+    });
+
+    const testContract = "0x" + "11".repeat(32);
+    provider.setContractAddress(testContract);
+
+    const testState = {
+      callerSecret: [1, 2, 3, 4],
+      agentSecret: [5, 6, 7, 8],
+      balance: 150,
+    };
+
+    await provider.set("agent-line-state", testState);
+    const retrieved = await provider.get("agent-line-state");
+    assert.deepEqual(retrieved, testState);
+
+    await provider.remove("agent-line-state");
+    const afterClear = await provider.get("agent-line-state");
+    assert.equal(afterClear, null);
+  });
+
+  it("VaultPrivateStateProvider throws when contract address is not configured", async () => {
+    const { VaultPrivateStateProvider } = await import("./vault-provider.ts");
+    const provider = new VaultPrivateStateProvider({
+      passwordProvider: () => "pwd",
+    });
+
+    await assert.rejects(
+      () => provider.get("id-1"),
+      /setContractAddress must be called before accessing private state/
+    );
+
+    await assert.rejects(
+      () => provider.set("id-1", {}),
+      /setContractAddress must be called before accessing private state/
+    );
+  });
+
+  it("validateTxResult strictly rejects empty, zero, or malformed transaction receipts", () => {
+    const net = new MidnightNetworkRuntime();
+    const validate = (net as any).validateTxResult.bind(net);
+
+    // Missing txHash
+    const r1 = validate({}, "fundReserve");
+    assert.equal(r1.ok, false);
+    assert.equal(r1.code, "TRANSACTION_FINALIZATION_FAILED");
+
+    // Zero txHash "0x0"
+    const r2 = validate({ txHash: "0x0" }, "fundReserve");
+    assert.equal(r2.ok, false);
+
+    // Whitespace txHash
+    const r3 = validate({ txHash: "   " }, "fundReserve");
+    assert.equal(r3.ok, false);
+
+    // Rejected draw must return the exact generic invariant error
+    const rDraw = validate({ txHash: "" }, "draw");
+    assert.equal(rDraw.ok, false);
+    assert.equal(rDraw.error, "Clearance could not be proven.");
+
+    // Valid finalized transaction
+    const rValid = validate({ txHash: "0xabcdef1234567890", blockHeight: 105 }, "fundReserve");
+    assert.equal(rValid.ok, true);
+    assert.equal(rValid.txHash, "0xabcdef1234567890");
+    assert.equal(rValid.blockHeight, 105);
+  });
 });

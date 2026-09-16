@@ -153,6 +153,20 @@ export function fromHex(hex: string): Uint8Array {
   return out;
 }
 
+export function hexToBytes(hex: string): Uint8Array {
+  const clean = hex.startsWith("0x") ? hex.slice(2) : hex;
+  if (clean.length % 2 !== 0 || !/^[0-9a-fA-F]*$/.test(clean)) {
+    throw new Error("Invalid hex string");
+  }
+  const out = new Uint8Array(clean.length / 2);
+  for (let i = 0; i < out.length; i++) {
+    out[i] = Number.parseInt(clean.slice(i * 2, i * 2 + 2), 16);
+  }
+  return out;
+}
+
+export const bytesToHex = toHex;
+
 export function encodeU64(n: bigint): Uint8Array {
   if (n < 0n || n > 18446744073709551615n) {
     throw new Error("Uint<64> out of range");

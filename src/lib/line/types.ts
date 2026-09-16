@@ -63,6 +63,7 @@ export type LineWitness = {
 export type AgentStore = {
   secret: string;
   witness: LineWitness | null;
+  identityCommitment?: string;
 };
 
 export type QuotePreimage = {
@@ -125,3 +126,9 @@ export type CircuitResult<T extends object = object> = CircuitOk<T> | CircuitFai
 export const GENERIC_DRAW_FAIL = "Clearance could not be proven.";
 
 export const STATUS_FROM_COMPACT = ["none", "open", "defaulted", "closed"] as const;
+
+export function availableCredit(w: { L: number; B: number } | null | undefined): number {
+  if (!w) return 0;
+  return Math.max(0, w.L - w.B);
+}
+

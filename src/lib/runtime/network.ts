@@ -1,3 +1,13 @@
+/**
+ * MidnightNetworkRuntime
+ *
+ * Official Midnight DApp Network Runtime for Line.
+ * Connects to Midnight network services (GraphQL Indexer, Proof Server, Node RPC)
+ * and dispatches transactions through Compact-generated bindings and Midnight DApp Connector.
+ *
+ * Implements operation-scoped private witness context, Vault-backed PrivateStateProvider,
+ * browser-safe hex encodings (zero Node Buffer), and strict transaction confirmation validation.
+ */
 import type {
   LineRuntime,
   RuntimeMode,
@@ -15,14 +25,19 @@ import {
   NetworkUnreachableError,
   CircuitExecutionError,
 } from "./errors.ts";
-import { connectWallet, isWalletInjected, type WalletInfo, getAvailableWallets } from "./wallet.ts";
+import {
+  connectWallet,
+  type WalletInfo,
+  getAvailableWallets,
+  getConnectedWallet,
+  disconnectWallet,
+} from "./wallet.ts";
 import type { ConnectedAPI } from "@midnight-ntwrk/dapp-connector-api";
-
-import type { DeployedContract, ContractProviders } from "@midnight-ntwrk/midnight-js-contracts";
+import type { ContractProviders } from "@midnight-ntwrk/midnight-js-contracts";
 import { indexerPublicDataProvider } from "@midnight-ntwrk/midnight-js-indexer-public-data-provider";
 import type { PublicDataProvider, ZKConfigProvider } from "@midnight-ntwrk/midnight-js-types";
-
-// Official managed contract bindings
+import { VaultPrivateStateProvider } from "./vault-provider.ts";
+import { hexToBytes, toHex } from "../line/encoding.ts";
 import { Contract, ledger, Status } from "../../../contracts/managed/line/contract/index.js";
 
 export interface MidnightNetworkConfig {
@@ -33,8 +48,46 @@ export interface MidnightNetworkConfig {
   proofServerUri?: string;
   zkConfigBaseUrl?: string;
   contractAddress?: string;
-  privateStoragePassword?: string;
-  accountId?: string;
+  privateStoragePasswordProvider?: () => string | Promise<string>;
+}
+
+export interface LinePrivateWitnessContext {
+  callerSecret?: Uint8Array;
+  agentSecret?: Uint8Array;
+  salt?: Uint8Array;
+  newSalt?: Uint8Array;
+  invoiceId?: Uint8Array;
+  quoteNonce?: Uint8Array;
+  receiptNonce?: Uint8Array;
+  paymentRef?: Uint8Array;
+  noteNonce?: Uint8Array;
+  noteSalt?: Uint8Array;
+  noteIdentity?: Uint8Array;
+  noteQuoteCommit?: Uint8Array;
+}
+
+class AsyncMutex {
+  private queue: Array<(release: () => void) => void> = [];
+  private locked = false;
+
+  async acquire(): Promise<() => void> {
+    if (!this.locked) {
+      this.locked = true;
+      return () => this.release();
+    }
+    return new Promise<() => void>((resolve) => {
+      this.queue.push(resolve);
+    });
+  }
+
+  private release(): void {
+    const next = this.queue.shift();
+    if (next) {
+      next(() => this.release());
+    } else {
+      this.locked = false;
+    }
+  }
 }
 
 export class MidnightNetworkRuntime implements LineRuntime {
@@ -50,8 +103,9 @@ export class MidnightNetworkRuntime implements LineRuntime {
   private connectedWallet: ConnectedAPI | null = null;
   private cachedProviders: ContractProviders<any> | null = null;
   private boundContract: any = null;
-  private privateStoragePassword: string = "LineVault123!SecureStoragePassword";
-  private accountId: string = "line-default-account";
+  private passwordProvider?: () => string | Promise<string>;
+  private activeWitnessContext: LinePrivateWitnessContext | null = null;
+  private readonly mutex = new AsyncMutex();
 
   constructor(config?: Partial<MidnightNetworkConfig>) {
     const env = (typeof process !== "undefined" ? process.env : {}) as Record<string, string | undefined>;
@@ -98,12 +152,8 @@ export class MidnightNetworkRuntime implements LineRuntime {
       env.MIDNIGHT_CONTRACT_ADDRESS ??
       null;
 
-    if (config?.privateStoragePassword) {
-      this.privateStoragePassword = config.privateStoragePassword;
-    }
-    if (config?.accountId) {
-      this.accountId = config.accountId;
-    }
+    this.passwordProvider = config?.privateStoragePasswordProvider;
+    this.connectedWallet = getConnectedWallet();
   }
 
   isConnected(): boolean {
@@ -124,13 +174,23 @@ export class MidnightNetworkRuntime implements LineRuntime {
   setContractAddress(address: string | null): void {
     this.contractAddress = address;
     this.boundContract = null;
+    if (this.cachedProviders?.privateStateProvider && address) {
+      this.cachedProviders.privateStateProvider.setContractAddress(address);
+    }
   }
 
   async attachWallet(preferredRdns?: string): Promise<ConnectedAPI> {
-    this.connectedWallet = await connectWallet(preferredRdns);
+    this.connectedWallet = await connectWallet(preferredRdns, this.networkId);
     this.cachedProviders = null;
     this.boundContract = null;
     return this.connectedWallet;
+  }
+
+  async detachWallet(): Promise<void> {
+    await disconnectWallet();
+    this.connectedWallet = null;
+    this.cachedProviders = null;
+    this.boundContract = null;
   }
 
   getDiscoveredWallets(): WalletInfo[] {
@@ -167,16 +227,17 @@ export class MidnightNetworkRuntime implements LineRuntime {
     if (typeof window === "undefined") {
       const { levelPrivateStateProvider } = await import("@midnight-ntwrk/midnight-js-level-private-state-provider");
       privateStateProvider = levelPrivateStateProvider({
-        privateStoragePasswordProvider: () => this.privateStoragePassword,
-        accountId: this.accountId,
+        privateStoragePasswordProvider: this.passwordProvider ?? (() => "ephemeral-node-session-pwd"),
+        accountId: "line-role-session",
       });
     } else {
-      privateStateProvider = {
-        get: async () => null,
-        set: async () => {},
-        remove: async () => {},
-        clear: async () => {},
-      };
+      privateStateProvider = new VaultPrivateStateProvider({
+        passwordProvider: this.passwordProvider,
+        networkId: this.networkId,
+      });
+      if (this.contractAddress) {
+        privateStateProvider.setContractAddress(this.contractAddress);
+      }
     }
 
     let walletProvider: any;
@@ -186,7 +247,6 @@ export class MidnightNetworkRuntime implements LineRuntime {
       walletProvider = (this.connectedWallet as any).walletProvider ?? this.connectedWallet;
       midnightProvider = (this.connectedWallet as any).midnightProvider ?? this.connectedWallet;
     } else {
-      // Stub provider for read-only queries or Node scripts with custom keys
       walletProvider = {
         balanceTx: async () => { throw new WalletNotConnectedError(); },
         getCoinPublicKey: () => "0x00",
@@ -241,7 +301,7 @@ export class MidnightNetworkRuntime implements LineRuntime {
       const l = ledger(state.data);
       const toHex32 = (u: Uint8Array | null | undefined): string | null => {
         if (!u || u.length === 0) return null;
-        return Array.from(u, (b) => b.toString(16).padStart(2, "0")).join("");
+        return toHex(u);
       };
 
       const statusFromCompact = (st: Status): LineStatus => {
@@ -275,7 +335,7 @@ export class MidnightNetworkRuntime implements LineRuntime {
         withdrawableReserve: withdrawable,
         quoteCount: Number(l.quotes?.size?.() ?? 0),
         noteCount: Number(l.notes?.size?.() ?? 0),
-        nullifierCount: 0,
+        nullifierCount: Number(l.nullifiers?.size?.() ?? 0),
         runtime: "network",
       };
     } catch (err) {
@@ -313,7 +373,6 @@ export class MidnightNetworkRuntime implements LineRuntime {
     }
 
     try {
-      // Validate that ledger decodes cleanly as a Line contract
       const l = ledger(state.data);
       if (!l.contractDomain || l.contractDomain.length !== 32) {
         throw new Error("Missing 32-byte contractDomain in decoded ledger.");
@@ -322,8 +381,7 @@ export class MidnightNetworkRuntime implements LineRuntime {
       throw new ContractIncompatibleError(address, err instanceof Error ? err.message : String(err));
     }
 
-    this.contractAddress = address;
-    this.boundContract = null;
+    this.setContractAddress(address);
     return this.getStatus();
   }
 
@@ -337,20 +395,71 @@ export class MidnightNetworkRuntime implements LineRuntime {
     }
 
     const providers = await this.getProviders();
+
+    // Typed witnesses read from active operation context or private state provider
     const witnesses = {
-      callerSecret: () => [undefined, new Uint8Array(32)],
-      agentSecret: () => [undefined, new Uint8Array(32)],
-      salt: () => [undefined, new Uint8Array(32)],
-      newSalt: () => [undefined, new Uint8Array(32)],
-      invoiceId: () => [undefined, new Uint8Array(32)],
-      quoteNonce: () => [undefined, new Uint8Array(32)],
-      receiptNonce: () => [undefined, new Uint8Array(32)],
-      paymentRef: () => [undefined, new Uint8Array(32)],
-      noteNonce: () => [undefined, new Uint8Array(32)],
-      noteSalt: () => [undefined, new Uint8Array(32)],
-      noteIdentity: () => [undefined, new Uint8Array(32)],
-      noteQuoteCommit: () => [undefined, new Uint8Array(32)],
+      callerSecret: (ctx: any) => {
+        const val = this.activeWitnessContext?.callerSecret ?? ctx.privateState?.callerSecret;
+        if (!val) throw new Error("Witness error: missing callerSecret in active witness context");
+        return [ctx.privateState, val];
+      },
+      agentSecret: (ctx: any) => {
+        const val = this.activeWitnessContext?.agentSecret ?? ctx.privateState?.agentSecret;
+        if (!val) throw new Error("Witness error: missing agentSecret in active witness context");
+        return [ctx.privateState, val];
+      },
+      salt: (ctx: any) => {
+        const val = this.activeWitnessContext?.salt ?? ctx.privateState?.salt;
+        if (!val) throw new Error("Witness error: missing salt in active witness context");
+        return [ctx.privateState, val];
+      },
+      newSalt: (ctx: any) => {
+        const val = this.activeWitnessContext?.newSalt ?? ctx.privateState?.newSalt;
+        if (!val) throw new Error("Witness error: missing newSalt in active witness context");
+        return [ctx.privateState, val];
+      },
+      invoiceId: (ctx: any) => {
+        const val = this.activeWitnessContext?.invoiceId ?? ctx.privateState?.invoiceId;
+        if (!val) throw new Error("Witness error: missing invoiceId in active witness context");
+        return [ctx.privateState, val];
+      },
+      quoteNonce: (ctx: any) => {
+        const val = this.activeWitnessContext?.quoteNonce ?? ctx.privateState?.quoteNonce;
+        if (!val) throw new Error("Witness error: missing quoteNonce in active witness context");
+        return [ctx.privateState, val];
+      },
+      receiptNonce: (ctx: any) => {
+        const val = this.activeWitnessContext?.receiptNonce ?? ctx.privateState?.receiptNonce;
+        if (!val) throw new Error("Witness error: missing receiptNonce in active witness context");
+        return [ctx.privateState, val];
+      },
+      paymentRef: (ctx: any) => {
+        const val = this.activeWitnessContext?.paymentRef ?? ctx.privateState?.paymentRef;
+        if (!val) throw new Error("Witness error: missing paymentRef in active witness context");
+        return [ctx.privateState, val];
+      },
+      noteNonce: (ctx: any) => {
+        const val = this.activeWitnessContext?.noteNonce ?? ctx.privateState?.noteNonce;
+        if (!val) throw new Error("Witness error: missing noteNonce in active witness context");
+        return [ctx.privateState, val];
+      },
+      noteSalt: (ctx: any) => {
+        const val = this.activeWitnessContext?.noteSalt ?? ctx.privateState?.noteSalt;
+        if (!val) throw new Error("Witness error: missing noteSalt in active witness context");
+        return [ctx.privateState, val];
+      },
+      noteIdentity: (ctx: any) => {
+        const val = this.activeWitnessContext?.noteIdentity ?? ctx.privateState?.noteIdentity;
+        if (!val) throw new Error("Witness error: missing noteIdentity in active witness context");
+        return [ctx.privateState, val];
+      },
+      noteQuoteCommit: (ctx: any) => {
+        const val = this.activeWitnessContext?.noteQuoteCommit ?? ctx.privateState?.noteQuoteCommit;
+        if (!val) throw new Error("Witness error: missing noteQuoteCommit in active witness context");
+        return [ctx.privateState, val];
+      },
     };
+
     const contract = new Contract(witnesses as any);
 
     try {
@@ -358,6 +467,7 @@ export class MidnightNetworkRuntime implements LineRuntime {
       this.boundContract = (await (findDeployedContract as any)(providers, {
         contract,
         contractAddress: this.contractAddress,
+        privateStateId: `line-state:${this.contractAddress}`,
       })) as any;
       return this.boundContract;
     } catch (err) {
@@ -365,51 +475,83 @@ export class MidnightNetworkRuntime implements LineRuntime {
     }
   }
 
-  async fundReserve(amount: number, _callerSk: string): Promise<RuntimeTransactionResult> {
-    if (!this.connectedWallet) throw new WalletNotConnectedError();
-    if (!this.contractAddress) throw new ContractNotConfiguredError();
+  private validateTxResult(
+    tx: any,
+    operationName: string
+  ): { ok: true; txHash: string; blockHeight: number } | { ok: false; error: string; code: string } {
+    const txHash = tx?.public?.txHash ?? tx?.public?.txId ?? tx?.txHash ?? tx?.txId;
+    if (!txHash || typeof txHash !== "string" || txHash === "0x0" || txHash.trim().length === 0) {
+      return {
+        ok: false,
+        error: operationName === "draw" ? "Clearance could not be proven." : `${operationName} failed: Transaction receipt missing finalization evidence.`,
+        code: "TRANSACTION_FINALIZATION_FAILED",
+      };
+    }
+    const blockHeight = Number(tx?.public?.blockHeight ?? tx?.blockHeight ?? 0);
+    return { ok: true, txHash, blockHeight };
+  }
 
+  private async withOperationLock<T>(
+    witnessContext: LinePrivateWitnessContext,
+    action: () => Promise<T>
+  ): Promise<T> {
+    const release = await this.mutex.acquire();
+    this.activeWitnessContext = witnessContext;
     try {
-      const bound = await this.getBoundContract();
-      const tx = await bound.callTx.fundReserve(BigInt(amount));
-      const txHash = tx?.public?.txHash ?? tx?.public?.txId ?? "0x0";
-      const blockHeight = tx?.public?.blockHeight ?? 0;
-      return { ok: true, txHash, blockHeight };
-    } catch (err) {
-      return { ok: false, error: err instanceof Error ? err.message : String(err), code: "FUND_RESERVE_FAILED" };
+      return await action();
+    } finally {
+      this.activeWitnessContext = null;
+      release();
     }
   }
 
-  async withdrawReserve(amount: number, _callerSk: string): Promise<RuntimeTransactionResult> {
+  async fundReserve(amount: number, callerSk: string): Promise<RuntimeTransactionResult> {
     if (!this.connectedWallet) throw new WalletNotConnectedError();
     if (!this.contractAddress) throw new ContractNotConfiguredError();
 
-    try {
-      const bound = await this.getBoundContract();
-      const tx = await bound.callTx.withdrawUnencumberedReserve(BigInt(amount));
-      const txHash = tx?.public?.txHash ?? tx?.public?.txId ?? "0x0";
-      const blockHeight = tx?.public?.blockHeight ?? 0;
-      return { ok: true, txHash, blockHeight };
-    } catch (err) {
-      return { ok: false, error: err instanceof Error ? err.message : String(err), code: "WITHDRAW_RESERVE_FAILED" };
-    }
+    const callerBytes = callerSk ? hexToBytes(callerSk) : new Uint8Array(32);
+    return this.withOperationLock({ callerSecret: callerBytes }, async () => {
+      try {
+        const bound = await this.getBoundContract();
+        const tx = await bound.callTx.fundReserve(BigInt(amount));
+        return this.validateTxResult(tx, "fundReserve");
+      } catch (err) {
+        return { ok: false, error: err instanceof Error ? err.message : String(err), code: "FUND_RESERVE_FAILED" };
+      }
+    });
   }
 
-  async registerMerchant(merchantPk: string, _callerSk: string): Promise<RuntimeTransactionResult> {
+  async withdrawReserve(amount: number, callerSk: string): Promise<RuntimeTransactionResult> {
     if (!this.connectedWallet) throw new WalletNotConnectedError();
     if (!this.contractAddress) throw new ContractNotConfiguredError();
 
-    try {
-      const bound = await this.getBoundContract();
-      const cleanPk = merchantPk.startsWith("0x") ? merchantPk.slice(2) : merchantPk;
-      const bytes = new Uint8Array(Buffer.from(cleanPk, "hex"));
-      const tx = await bound.callTx.registerMerchant(bytes);
-      const txHash = tx?.public?.txHash ?? tx?.public?.txId ?? "0x0";
-      const blockHeight = tx?.public?.blockHeight ?? 0;
-      return { ok: true, txHash, blockHeight };
-    } catch (err) {
-      return { ok: false, error: err instanceof Error ? err.message : String(err), code: "REGISTER_MERCHANT_FAILED" };
-    }
+    const callerBytes = callerSk ? hexToBytes(callerSk) : new Uint8Array(32);
+    return this.withOperationLock({ callerSecret: callerBytes }, async () => {
+      try {
+        const bound = await this.getBoundContract();
+        const tx = await bound.callTx.withdrawUnencumberedReserve(BigInt(amount));
+        return this.validateTxResult(tx, "withdrawReserve");
+      } catch (err) {
+        return { ok: false, error: err instanceof Error ? err.message : String(err), code: "WITHDRAW_RESERVE_FAILED" };
+      }
+    });
+  }
+
+  async registerMerchant(merchantPk: string, callerSk: string): Promise<RuntimeTransactionResult> {
+    if (!this.connectedWallet) throw new WalletNotConnectedError();
+    if (!this.contractAddress) throw new ContractNotConfiguredError();
+
+    const callerBytes = callerSk ? hexToBytes(callerSk) : new Uint8Array(32);
+    return this.withOperationLock({ callerSecret: callerBytes }, async () => {
+      try {
+        const bound = await this.getBoundContract();
+        const bytes = hexToBytes(merchantPk);
+        const tx = await bound.callTx.registerMerchant(bytes);
+        return this.validateTxResult(tx, "registerMerchant");
+      } catch (err) {
+        return { ok: false, error: err instanceof Error ? err.message : String(err), code: "REGISTER_MERCHANT_FAILED" };
+      }
+    });
   }
 
   async openLine(params: {
@@ -422,15 +564,21 @@ export class MidnightNetworkRuntime implements LineRuntime {
     if (!this.connectedWallet) throw new WalletNotConnectedError();
     if (!this.contractAddress) throw new ContractNotConfiguredError();
 
-    try {
-      const bound = await this.getBoundContract();
-      const tx = await bound.callTx.openLine(BigInt(params.limit), BigInt(params.expiry));
-      const txHash = tx?.public?.txHash ?? tx?.public?.txId ?? "0x0";
-      const blockHeight = tx?.public?.blockHeight ?? 0;
-      return { ok: true, txHash, blockHeight };
-    } catch (err) {
-      return { ok: false, error: err instanceof Error ? err.message : String(err), code: "OPEN_LINE_FAILED" };
-    }
+    const witnessContext: LinePrivateWitnessContext = {
+      callerSecret: params.callerSk ? hexToBytes(params.callerSk) : new Uint8Array(32),
+      agentSecret: params.agentSecret ? hexToBytes(params.agentSecret) : new Uint8Array(32),
+      salt: params.salt ? hexToBytes(params.salt) : new Uint8Array(32),
+    };
+
+    return this.withOperationLock(witnessContext, async () => {
+      try {
+        const bound = await this.getBoundContract();
+        const tx = await bound.callTx.openLine(BigInt(params.limit), BigInt(params.expiry));
+        return this.validateTxResult(tx, "openLine");
+      } catch (err) {
+        return { ok: false, error: err instanceof Error ? err.message : String(err), code: "OPEN_LINE_FAILED" };
+      }
+    });
   }
 
   async postQuote(params: {
@@ -443,15 +591,21 @@ export class MidnightNetworkRuntime implements LineRuntime {
     if (!this.connectedWallet) throw new WalletNotConnectedError();
     if (!this.contractAddress) throw new ContractNotConfiguredError();
 
-    try {
-      const bound = await this.getBoundContract();
-      const tx = await bound.callTx.postQuote(BigInt(params.amount), BigInt(params.expiry));
-      const txHash = tx?.public?.txHash ?? tx?.public?.txId ?? "0x0";
-      const blockHeight = tx?.public?.blockHeight ?? 0;
-      return { ok: true, txHash, blockHeight };
-    } catch (err) {
-      return { ok: false, error: err instanceof Error ? err.message : String(err), code: "POST_QUOTE_FAILED" };
-    }
+    const witnessContext: LinePrivateWitnessContext = {
+      callerSecret: params.merchantSk ? hexToBytes(params.merchantSk) : new Uint8Array(32),
+      invoiceId: params.invoiceId ? hexToBytes(params.invoiceId.length === 64 ? params.invoiceId : params.nonce) : new Uint8Array(32),
+      quoteNonce: params.nonce ? hexToBytes(params.nonce) : new Uint8Array(32),
+    };
+
+    return this.withOperationLock(witnessContext, async () => {
+      try {
+        const bound = await this.getBoundContract();
+        const tx = await bound.callTx.postQuote(BigInt(params.amount), BigInt(params.expiry));
+        return this.validateTxResult(tx, "postQuote");
+      } catch (err) {
+        return { ok: false, error: err instanceof Error ? err.message : String(err), code: "POST_QUOTE_FAILED" };
+      }
+    });
   }
 
   async draw(params: {
@@ -473,24 +627,34 @@ export class MidnightNetworkRuntime implements LineRuntime {
     if (!this.connectedWallet) throw new WalletNotConnectedError();
     if (!this.contractAddress) throw new ContractNotConfiguredError();
 
-    try {
-      const bound = await this.getBoundContract();
-      const cleanQ = params.quoteCommit.startsWith("0x") ? params.quoteCommit.slice(2) : params.quoteCommit;
-      const qBytes = new Uint8Array(Buffer.from(cleanQ, "hex"));
-      const tx = await bound.callTx.draw(
-        qBytes,
-        BigInt(params.limit),
-        BigInt(params.outstanding),
-        BigInt(params.epoch),
-        BigInt(params.amount),
-        BigInt(params.expiry)
-      );
-      const txHash = tx?.public?.txHash ?? tx?.public?.txId ?? "0x0";
-      const blockHeight = tx?.public?.blockHeight ?? 0;
-      return { ok: true, txHash, blockHeight };
-    } catch (err) {
-      return { ok: false, error: "Clearance could not be proven.", code: "DRAW_FAILED" };
-    }
+    const witnessContext: LinePrivateWitnessContext = {
+      callerSecret: params.callerSk ? hexToBytes(params.callerSk) : new Uint8Array(32),
+      agentSecret: params.agentSecret ? hexToBytes(params.agentSecret) : new Uint8Array(32),
+      salt: params.salt ? hexToBytes(params.salt) : new Uint8Array(32),
+      newSalt: params.newSalt ? hexToBytes(params.newSalt) : new Uint8Array(32),
+      invoiceId: params.invoiceId ? hexToBytes(params.invoiceId.length === 64 ? params.invoiceId : params.quoteNonce) : new Uint8Array(32),
+      quoteNonce: params.quoteNonce ? hexToBytes(params.quoteNonce) : new Uint8Array(32),
+      noteNonce: params.noteNonce ? hexToBytes(params.noteNonce) : new Uint8Array(32),
+      noteSalt: params.noteSalt ? hexToBytes(params.noteSalt) : new Uint8Array(32),
+    };
+
+    return this.withOperationLock(witnessContext, async () => {
+      try {
+        const bound = await this.getBoundContract();
+        const qBytes = hexToBytes(params.quoteCommit);
+        const tx = await bound.callTx.draw(
+          qBytes,
+          BigInt(params.limit),
+          BigInt(params.outstanding),
+          BigInt(params.epoch),
+          BigInt(params.amount),
+          BigInt(params.expiry)
+        );
+        return this.validateTxResult(tx, "draw");
+      } catch {
+        return { ok: false, error: "Clearance could not be proven.", code: "DRAW_FAILED" };
+      }
+    });
   }
 
   async redeemDraw(params: {
@@ -506,34 +670,41 @@ export class MidnightNetworkRuntime implements LineRuntime {
     if (!this.connectedWallet) throw new WalletNotConnectedError();
     if (!this.contractAddress) throw new ContractNotConfiguredError();
 
-    try {
-      const bound = await this.getBoundContract();
-      const cleanD = params.noteCommit.startsWith("0x") ? params.noteCommit.slice(2) : params.noteCommit;
-      const dBytes = new Uint8Array(Buffer.from(cleanD, "hex"));
-      const tx = await bound.callTx.redeemDraw(dBytes, BigInt(params.amount), BigInt(params.expiry));
-      const txHash = tx?.public?.txHash ?? tx?.public?.txId ?? "0x0";
-      const blockHeight = tx?.public?.blockHeight ?? 0;
-      return { ok: true, txHash, blockHeight };
-    } catch (err) {
-      return { ok: false, error: err instanceof Error ? err.message : String(err), code: "REDEEM_DRAW_FAILED" };
-    }
+    const witnessContext: LinePrivateWitnessContext = {
+      callerSecret: params.merchantSk ? hexToBytes(params.merchantSk) : new Uint8Array(32),
+      noteIdentity: params.noteIdentity ? hexToBytes(params.noteIdentity) : new Uint8Array(32),
+      noteQuoteCommit: params.noteQuoteCommit ? hexToBytes(params.noteQuoteCommit) : new Uint8Array(32),
+      noteNonce: params.noteNonce ? hexToBytes(params.noteNonce) : new Uint8Array(32),
+      noteSalt: params.noteSalt ? hexToBytes(params.noteSalt) : new Uint8Array(32),
+    };
+
+    return this.withOperationLock(witnessContext, async () => {
+      try {
+        const bound = await this.getBoundContract();
+        const dBytes = hexToBytes(params.noteCommit);
+        const tx = await bound.callTx.redeemDraw(dBytes, BigInt(params.amount), BigInt(params.expiry));
+        return this.validateTxResult(tx, "redeemDraw");
+      } catch (err) {
+        return { ok: false, error: err instanceof Error ? err.message : String(err), code: "REDEEM_DRAW_FAILED" };
+      }
+    });
   }
 
-  async cancelOrExpireNote(noteCommit: string, _callerSk: string): Promise<RuntimeTransactionResult> {
+  async cancelOrExpireNote(noteCommit: string, callerSk: string): Promise<RuntimeTransactionResult> {
     if (!this.connectedWallet) throw new WalletNotConnectedError();
     if (!this.contractAddress) throw new ContractNotConfiguredError();
 
-    try {
-      const bound = await this.getBoundContract();
-      const cleanD = noteCommit.startsWith("0x") ? noteCommit.slice(2) : noteCommit;
-      const dBytes = new Uint8Array(Buffer.from(cleanD, "hex"));
-      const tx = await bound.callTx.cancelOrExpireNote(dBytes);
-      const txHash = tx?.public?.txHash ?? tx?.public?.txId ?? "0x0";
-      const blockHeight = tx?.public?.blockHeight ?? 0;
-      return { ok: true, txHash, blockHeight };
-    } catch (err) {
-      return { ok: false, error: err instanceof Error ? err.message : String(err), code: "CANCEL_NOTE_FAILED" };
-    }
+    const callerBytes = callerSk ? hexToBytes(callerSk) : new Uint8Array(32);
+    return this.withOperationLock({ callerSecret: callerBytes }, async () => {
+      try {
+        const bound = await this.getBoundContract();
+        const dBytes = hexToBytes(noteCommit);
+        const tx = await bound.callTx.cancelOrExpireNote(dBytes);
+        return this.validateTxResult(tx, "cancelOrExpireNote");
+      } catch (err) {
+        return { ok: false, error: err instanceof Error ? err.message : String(err), code: "CANCEL_NOTE_FAILED" };
+      }
+    });
   }
 
   async acknowledgeRepayment(params: {
@@ -552,36 +723,46 @@ export class MidnightNetworkRuntime implements LineRuntime {
     if (!this.connectedWallet) throw new WalletNotConnectedError();
     if (!this.contractAddress) throw new ContractNotConfiguredError();
 
-    try {
-      const bound = await this.getBoundContract();
-      const tx = await bound.callTx.acknowledgeRepayment(
-        BigInt(params.limit),
-        BigInt(params.outstanding),
-        BigInt(params.epoch),
-        BigInt(params.amount),
-        BigInt(params.receiptExpiry)
-      );
-      const txHash = tx?.public?.txHash ?? tx?.public?.txId ?? "0x0";
-      const blockHeight = tx?.public?.blockHeight ?? 0;
-      return { ok: true, txHash, blockHeight };
-    } catch (err) {
-      return { ok: false, error: err instanceof Error ? err.message : String(err), code: "ACK_REPAYMENT_FAILED" };
-    }
+    const witnessContext: LinePrivateWitnessContext = {
+      callerSecret: params.callerSk ? hexToBytes(params.callerSk) : new Uint8Array(32),
+      agentSecret: params.agentSecret ? hexToBytes(params.agentSecret) : new Uint8Array(32),
+      salt: params.salt ? hexToBytes(params.salt) : new Uint8Array(32),
+      newSalt: params.newSalt ? hexToBytes(params.newSalt) : new Uint8Array(32),
+      receiptNonce: params.receiptNonce ? hexToBytes(params.receiptNonce) : new Uint8Array(32),
+      paymentRef: params.paymentRef ? hexToBytes(params.paymentRef) : new Uint8Array(32),
+    };
+
+    return this.withOperationLock(witnessContext, async () => {
+      try {
+        const bound = await this.getBoundContract();
+        const tx = await bound.callTx.acknowledgeRepayment(
+          BigInt(params.limit),
+          BigInt(params.outstanding),
+          BigInt(params.epoch),
+          BigInt(params.amount),
+          BigInt(params.receiptExpiry)
+        );
+        return this.validateTxResult(tx, "acknowledgeRepayment");
+      } catch (err) {
+        return { ok: false, error: err instanceof Error ? err.message : String(err), code: "ACK_REPAYMENT_FAILED" };
+      }
+    });
   }
 
-  async setStatus(status: Exclude<LineStatus, "none">, _callerSk: string): Promise<RuntimeTransactionResult> {
+  async setStatus(status: Exclude<LineStatus, "none">, callerSk: string): Promise<RuntimeTransactionResult> {
     if (!this.connectedWallet) throw new WalletNotConnectedError();
     if (!this.contractAddress) throw new ContractNotConfiguredError();
 
-    try {
-      const bound = await this.getBoundContract();
-      const compactStatus = status === "open" ? Status.OPEN : status === "defaulted" ? Status.DEFAULTED : Status.CLOSED;
-      const tx = await bound.callTx.setStatus(compactStatus);
-      const txHash = tx?.public?.txHash ?? tx?.public?.txId ?? "0x0";
-      const blockHeight = tx?.public?.blockHeight ?? 0;
-      return { ok: true, txHash, blockHeight };
-    } catch (err) {
-      return { ok: false, error: err instanceof Error ? err.message : String(err), code: "SET_STATUS_FAILED" };
-    }
+    const callerBytes = callerSk ? hexToBytes(callerSk) : new Uint8Array(32);
+    return this.withOperationLock({ callerSecret: callerBytes }, async () => {
+      try {
+        const bound = await this.getBoundContract();
+        const compactStatus = status === "open" ? Status.OPEN : status === "defaulted" ? Status.DEFAULTED : Status.CLOSED;
+        const tx = await bound.callTx.setStatus(compactStatus);
+        return this.validateTxResult(tx, "setStatus");
+      } catch (err) {
+        return { ok: false, error: err instanceof Error ? err.message : String(err), code: "SET_STATUS_FAILED" };
+      }
+    });
   }
 }

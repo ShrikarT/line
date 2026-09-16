@@ -190,6 +190,17 @@ export async function loadEncryptedJson<T>(
   }
 }
 
+export async function removeEncryptedSecret(id: string): Promise<void> {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, "readwrite");
+    const store = tx.objectStore(STORE_NAME);
+    const req = store.delete(id);
+    req.onsuccess = () => resolve();
+    req.onerror = () => reject(req.error);
+  });
+}
+
 // In-memory ephemeral session state (never stored to disk or localStorage)
 let sessionPassphrase: string | null = null;
 let sessionExpiresAt: number = 0;

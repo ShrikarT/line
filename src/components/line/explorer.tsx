@@ -1,34 +1,41 @@
-import { useLine } from "@/lib/line/store.ts";
+import { useAppStore } from "@/app/store.ts";
 import { Mono, Panel, Stat } from "./ui";
 
 export function ExplorerPanel() {
-  const ledger = useLine((s) => s.ledger);
-  const locked = (ledger.encumberedReserve ?? 0) + (ledger.redeemedReserve ?? 0);
-  const withdrawable = Math.max(0, (ledger.totalReserve ?? 0) - locked);
-  const merchantCount = Object.keys(ledger.registeredMerchants ?? {}).length;
+  const ledger = useAppStore((s) => s.ledger);
+  const total = ledger.totalReserve ?? 0;
+  const encumbered = ledger.encumberedReserve ?? 0;
+  const redeemed = ledger.redeemedReserve ?? 0;
+  const withdrawable = ledger.withdrawableReserve ?? Math.max(0, total - (encumbered + redeemed));
+
+  const quotesCount = "quoteCount" in ledger ? (ledger as any).quoteCount : (ledger as any).quotes?.length ?? 0;
+  const nullifiersCount = "nullifierCount" in ledger ? (ledger as any).nullifierCount : (ledger as any).nullifiers?.length ?? 0;
+  const notesCount = "noteCount" in ledger ? (ledger as any).noteCount : (ledger as any).notes?.length ?? 0;
+  const notesList = "notes" in ledger && Array.isArray((ledger as any).notes) ? (ledger as any).notes : [];
 
   return (
     <Panel kicker="Public ledger" title="What the chain discloses">
       <p className="text-sm text-muted">
-        Credit limits ($L$), current debt ($B$), and available capacity are confidential in ZK.
-        The public explorer verifies reserve solvency, commitment progression, anonymous claim notes,
-        and instance domain nonce. Note claim amounts and reserve state deltas are public on-chain.
+        The agent&apos;s credit limit, outstanding debt and remaining capacity remain private.
+        Settlement amount and merchant pseudonym are public in this protocol version.
+        The public explorer verifies reserve solvency, commitment progression, claim notes,
+        and instance domain nonce.
       </p>
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-6">
         <Stat label="Status" value={ledger.status} />
         <Stat label="Action Clock" value={ledger.actionClock} />
         <Stat label="Generation" value={ledger.lineGeneration} />
-        <Stat label="Merchants" value={merchantCount} />
-        <Stat label="Quotes" value={ledger.quotes.length} />
-        <Stat label="Nullifiers" value={ledger.nullifiers.length} />
+        <Stat label="Runtime" value={ledger.runtime ?? "network"} />
+        <Stat label="Quotes" value={quotesCount} />
+        <Stat label="Nullifiers" value={nullifiersCount} />
       </div>
 
       <div className="rounded border border-border bg-surface p-3 space-y-2">
         <p className="text-xs font-semibold uppercase tracking-wider text-muted">On-Chain Settlement Reserve Capacity</p>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <Stat label="Total Reserve" value={ledger.totalReserve ?? 0} />
-          <Stat label="Encumbered" value={ledger.encumberedReserve ?? 0} />
-          <Stat label="Redeemed" value={ledger.redeemedReserve ?? 0} />
+          <Stat label="Total Reserve" value={total} />
+          <Stat label="Encumbered" value={encumbered} />
+          <Stat label="Redeemed" value={redeemed} />
           <Stat label="Withdrawable" value={withdrawable} />
         </div>
       </div>
@@ -37,13 +44,14 @@ export function ExplorerPanel() {
         <Stat label="Identity commitment" value={<Mono value={ledger.identityCommitment} />} />
         <Stat label="Line commitment C" value={<Mono value={ledger.lineCommitment} />} />
         <Stat label="Contract Domain" value={<Mono value={ledger.contractDomain} />} />
+        <Stat label="Active Contract" value={<Mono value={ledger.contractAddress} />} />
       </div>
 
-      {ledger.notes.length > 0 && (
+      {notesList.length > 0 && (
         <div className="border-t border-border pt-4 space-y-2">
-          <p className="text-xs font-semibold uppercase tracking-wider text-muted">Settlement Claims ({ledger.notes.length})</p>
+          <p className="text-xs font-semibold uppercase tracking-wider text-muted">Settlement Claims ({notesList.length})</p>
           <ul className="space-y-2">
-            {ledger.notes.map((n) => (
+            {notesList.map((n: any) => (
               <li key={n.commitment} className="flex flex-wrap items-center justify-between gap-2 text-xs border-b border-border/50 pb-2">
                 <div>
                   <span className="font-mono font-medium">Claim {n.amount}</span>
@@ -57,27 +65,6 @@ export function ExplorerPanel() {
           </ul>
         </div>
       )}
-
-      <ul className="space-y-3 border-t border-border pt-4">
-        {ledger.events.length === 0 ? (
-          <li className="text-sm text-subtle">No transitions yet.</li>
-        ) : (
-          ledger.events.map((e) => (
-            <li key={`${e.t}-${e.circuit}`} className="text-sm">
-              <div className="flex items-baseline justify-between gap-3">
-                <span className="font-medium">{e.circuit}</span>
-                <span className="font-mono text-xs text-subtle">t={e.t}</span>
-              </div>
-              <p className="text-muted">{e.publicNote}</p>
-              {e.commitment ? (
-                <p className="mt-1">
-                  C <Mono value={e.commitment} />
-                </p>
-              ) : null}
-            </li>
-          ))
-        )}
-      </ul>
     </Panel>
   );
 }

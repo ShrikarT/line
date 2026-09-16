@@ -1,21 +1,24 @@
-﻿#!/usr/bin/env node
+#!/usr/bin/env node
 /**
  * Local Simulator Smoke Test
  * Exercises the complete multi-role Line protocol lifecycle on LocalDevelopmentRuntime.
  */
 import { LocalDevelopmentRuntime } from "../src/lib/runtime/local.ts";
-import { ISSUER_SK, MERCHANT_A_SK, MERCHANT_B_SK, AGENT_SK } from "../src/lib/line/keys.ts";
+import { ISSUER_SK, MERCHANT_A_SK, MERCHANT_B_SK, AGENT_SK, MERCHANT_B_PK } from "../src/test/fixtures/keys.ts";
+import { createLedger } from "../src/lib/line/protocol.ts";
 
 async function main() {
   console.log("=================================================");
   console.log(" Line — Local Development Simulator Smoke Test");
   console.log("=================================================");
 
-  const runtime = new LocalDevelopmentRuntime();
+  const runtime = new LocalDevelopmentRuntime(
+    createLedger({ issuerSecret: ISSUER_SK, merchantSecret: MERCHANT_A_SK })
+  );
   console.log(`Runtime: ${runtime.mode} | Network: ${runtime.networkId}`);
 
   console.log("\n1. Registering Merchant B...");
-  const regRes = await runtime.registerMerchant(MERCHANT_B_SK, ISSUER_SK);
+  const regRes = await runtime.registerMerchant(MERCHANT_B_PK, ISSUER_SK);
   if (!regRes.ok) throw new Error(`Merchant registration failed: ${regRes.error}`);
   console.log(`✓ Merchant B registered. Tx: ${regRes.txHash}`);
 

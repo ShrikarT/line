@@ -16,7 +16,7 @@ import {
   MERCHANT_B_SK,
   AGENT_SK,
   INSTANCE_NONCE,
-} from "./keys.ts";
+} from "../../test/fixtures/keys.ts";
 import { handleMessage } from "../../../mcp/line-mcp.mjs";
 import type { CircuitFail, CircuitOk, CircuitResult } from "./types.ts";
 

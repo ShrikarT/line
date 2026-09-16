@@ -120,7 +120,7 @@ describe("MCP interface", () => {
     const noteD = notesList[0].commitment;
 
     // Wrong merchant redemption rejection
-    const { MERCHANT_B_SK } = await import("../src/lib/line/keys.ts");
+    const { MERCHANT_B_SK } = await import("../src/test/fixtures/keys.ts");
     const wrongRedeem = await handleMessage({
       jsonrpc: "2.0",
       id: 9,

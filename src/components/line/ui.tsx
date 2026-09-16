@@ -1,6 +1,7 @@
 import { cn } from "@/lib/utils";
 import { shortHex } from "@/lib/line/hash.ts";
 import { useLine, type Flash } from "@/lib/line/store.ts";
+import { getRuntime } from "@/lib/runtime";
 
 export function Panel({
   title,
@@ -98,11 +99,12 @@ export function FlashBar({ flash }: { flash: Flash | null }) {
   );
 }
 
-export function ResetRow() {
-  const reset = useLine((s) => s.reset);
-  return (
-    <Button variant="ghost" onClick={reset}>
-      Reset ledger
+export function ResetRow({ onReset }: { onReset?: () => void } = {}) {
+  const runtime = getRuntime();
+  if (runtime.mode === "network") return null;
+  return onReset ? (
+    <Button variant="ghost" onClick={onReset}>
+      Reset simulator
     </Button>
-  );
+  ) : null;
 }
