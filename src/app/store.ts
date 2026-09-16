@@ -149,6 +149,8 @@ export type ProductStoreState = {
   saveAgentRecord: (rec: PrivateAgentRecord) => Promise<void>;
   saveIssuerRecord: (rec: PrivateIssuerRecord) => Promise<void>;
   saveMerchantRecord: (rec: PrivateMerchantRecord) => Promise<void>;
+  generateIdentity: (role: "issuer" | "agent" | "merchant") => Promise<string>;
+  importIdentity: (role: "issuer" | "agent" | "merchant", secretHex: string) => Promise<void>;
 
   // Asynchronous mutations via LineRuntime
   doFundReserve: (amount?: number) => Promise<boolean>;
@@ -335,6 +337,60 @@ export const useAppStore = create<ProductStoreState>((set, get) => ({
     const prefix = `line:vault:${runtime.networkId}:${runtime.getContractAddress() ?? "unconfigured"}`;
     await saveEncryptedJson(`${prefix}:merchant`, rec, passphrase);
     set({ merchantRecord: rec });
+  },
+
+  generateIdentity: async (role: "issuer" | "agent" | "merchant"): Promise<string> => {
+    const passphrase = getVaultSessionPassphrase();
+    if (!passphrase) throw new Error("Vault is locked. Unlock vault to generate identity.");
+    const secret = toHex(randomBytes32());
+    if (role === "issuer") {
+      await get().saveIssuerRecord({ issuerSecret: secret });
+    } else if (role === "merchant") {
+      const pk = toHex(merchantPublicKey(hexToBytes(secret)));
+      await get().saveMerchantRecord({ merchantSecret: secret, merchantPk: pk });
+    } else if (role === "agent") {
+      const idBytes = agentId(hexToBytes(secret));
+      const identityCommitment = toHex(idBytes);
+      await get().saveAgentRecord({
+        agentSecret: secret,
+        identityCommitment,
+        lineCommitment: "",
+        L: 0,
+        B: 0,
+        epoch: 0,
+        salt: "",
+      });
+    }
+    set({ flash: { tone: "ok", text: `Generated and secured ${role} credentials in encrypted vault.` } });
+    return secret;
+  },
+
+  importIdentity: async (role: "issuer" | "agent" | "merchant", secretHex: string): Promise<void> => {
+    const clean = secretHex.trim().replace(/^0x/, "");
+    if (clean.length !== 64 || !/^[0-9a-fA-F]{64}$/.test(clean)) {
+      throw new Error("Expected 32-byte hexadecimal secret key (64 hex characters).");
+    }
+    const passphrase = getVaultSessionPassphrase();
+    if (!passphrase) throw new Error("Vault is locked. Unlock vault to import identity.");
+    if (role === "issuer") {
+      await get().saveIssuerRecord({ issuerSecret: clean });
+    } else if (role === "merchant") {
+      const pk = toHex(merchantPublicKey(hexToBytes(clean)));
+      await get().saveMerchantRecord({ merchantSecret: clean, merchantPk: pk });
+    } else if (role === "agent") {
+      const idBytes = agentId(hexToBytes(clean));
+      const identityCommitment = toHex(idBytes);
+      await get().saveAgentRecord({
+        agentSecret: clean,
+        identityCommitment,
+        lineCommitment: "",
+        L: 0,
+        B: 0,
+        epoch: 0,
+        salt: "",
+      });
+    }
+    set({ flash: { tone: "ok", text: `Imported and secured ${role} credentials in encrypted vault.` } });
   },
 
   doFundReserve: async (amount?: number) => {
@@ -534,7 +590,7 @@ export const useAppStore = create<ProductStoreState>((set, get) => ({
       set({ txLifecycle: "proving" });
       const res = await runtime.openLine({
         limit,
-        expiry: 10_000,
+        expiry: (get().ledger.actionClock || 0) + 10_000,
         callerSk,
         agentSecret,
         salt,
@@ -704,25 +760,33 @@ export const useAppStore = create<ProductStoreState>((set, get) => ({
       if (!quote) {
         const inv = get().invoices.find((i) => i.Q === quoteCommitOrPackage);
         if (inv) {
+          if (!inv.preimage) {
+            set({ flash: { tone: "fail", text: "Draw refused: Quote preimage missing. Import full quote package." } });
+            return false;
+          }
           quote = {
             version: 1,
             networkId: get().ledger.networkId,
             contractAddress: get().ledger.contractAddress ?? "",
-            merchantPublicKey: get().merchantRecord?.merchantPk ?? "",
+            merchantPublicKey: inv.preimage.merchantCommitment,
             invoiceIdBytes: toHex(canonicalInvoiceIdBytes(inv.invoiceId)),
             displayInvoiceId: inv.invoiceId,
             amount: inv.amount,
-            expiry: (get().ledger.actionClock || 0) + 10_000,
-            quoteNonce: toHex(randomBytes32()),
+            expiry: inv.preimage.expiry,
+            quoteNonce: inv.preimage.nonce,
             quoteCommitment: inv.Q,
-            lineGeneration: get().ledger.lineGeneration,
-            status: "open",
+            lineGeneration: inv.preimage.generation,
+            status: inv.used ? "consumed" : "open",
             updatedAt: Date.now(),
           };
         }
       }
     } else {
-      const pkg = validateQuoteTransferPackage(quoteCommitOrPackage, get().ledger.contractAddress ?? undefined);
+      const pkg = validateQuoteTransferPackage(
+        quoteCommitOrPackage,
+        get().ledger.networkId,
+        get().ledger.contractAddress ?? undefined
+      );
       quote = {
         version: 1,
         networkId: pkg.networkId,
@@ -923,6 +987,10 @@ export const useAppStore = create<ProductStoreState>((set, get) => ({
       if (!note) {
         const uiN = get().notes.find((n) => n.D === noteCommitOrPackage);
         if (uiN) {
+          if (!uiN.salt) {
+            set({ flash: { tone: "fail", text: "Redemption refused: Note opening salt missing. Import full draw note package." } });
+            return false;
+          }
           note = {
             version: 1,
             networkId: get().ledger.networkId,
@@ -935,7 +1003,7 @@ export const useAppStore = create<ProductStoreState>((set, get) => ({
             merchantPublicKey: uiN.preimage.merchantPk,
             amount: uiN.preimage.amount,
             noteNonce: uiN.preimage.noteNonce,
-            noteSalt: toHex(randomBytes32()),
+            noteSalt: uiN.salt,
             expiry: uiN.preimage.expiry,
             status: "active",
             updatedAt: Date.now(),
@@ -943,7 +1011,11 @@ export const useAppStore = create<ProductStoreState>((set, get) => ({
         }
       }
     } else {
-      const pkg = validateDrawNoteTransferPackage(noteCommitOrPackage, get().ledger.contractAddress ?? undefined);
+      const pkg = validateDrawNoteTransferPackage(
+        noteCommitOrPackage,
+        get().ledger.networkId,
+        get().ledger.contractAddress ?? undefined
+      );
       note = {
         version: 1,
         networkId: pkg.networkId,
@@ -1296,7 +1368,11 @@ export const useAppStore = create<ProductStoreState>((set, get) => ({
 
   importQuotePackage: (pkg: unknown): boolean => {
     try {
-      const valid = validateQuoteTransferPackage(pkg, get().ledger.contractAddress ?? undefined);
+      const valid = validateQuoteTransferPackage(
+        pkg,
+        get().ledger.networkId,
+        get().ledger.contractAddress ?? undefined
+      );
       const existing = get().merchantQuotes.find((q) => q.quoteCommitment === valid.quoteCommitment);
       if (existing) return true;
       const quoteRec: MerchantQuoteRecord = {
@@ -1315,6 +1391,12 @@ export const useAppStore = create<ProductStoreState>((set, get) => ({
         updatedAt: valid.issuedAt,
       };
       const updated = [...get().merchantQuotes, quoteRec];
+      const passphrase = getVaultSessionPassphrase();
+      if (passphrase) {
+        const runtime = getRuntime();
+        const prefix = `line:vault:${runtime.networkId}:${runtime.getContractAddress() ?? "unconfigured"}`;
+        saveEncryptedJson(`${prefix}:quotes`, updated, passphrase).catch(() => {});
+      }
       set({
         merchantQuotes: updated,
         invoices: updated.map(quoteRecordToInvoice),
@@ -1350,7 +1432,11 @@ export const useAppStore = create<ProductStoreState>((set, get) => ({
 
   importDrawNotePackage: (pkg: unknown): boolean => {
     try {
-      const valid = validateDrawNoteTransferPackage(pkg, get().ledger.contractAddress ?? undefined);
+      const valid = validateDrawNoteTransferPackage(
+        pkg,
+        get().ledger.networkId,
+        get().ledger.contractAddress ?? undefined
+      );
       const existing = get().drawNotes.find((n) => n.noteCommitment === valid.noteCommitment);
       if (existing) return true;
       const noteRec: DrawNoteRecord = {
@@ -1371,6 +1457,12 @@ export const useAppStore = create<ProductStoreState>((set, get) => ({
         updatedAt: valid.issuedAt,
       };
       const updated = [...get().drawNotes, noteRec];
+      const passphrase = getVaultSessionPassphrase();
+      if (passphrase) {
+        const runtime = getRuntime();
+        const prefix = `line:vault:${runtime.networkId}:${runtime.getContractAddress() ?? "unconfigured"}`;
+        saveEncryptedJson(`${prefix}:notes`, updated, passphrase).catch(() => {});
+      }
       set({
         drawNotes: updated,
         notes: updated.map(drawNoteRecordToNote),

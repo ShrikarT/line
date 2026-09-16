@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Shell } from "@/components/line/shell";
 import { ExplorerPanel } from "@/components/line/explorer";
 import { Button, FlashBar, Mono, Panel, Stat } from "@/components/line/ui";
@@ -12,6 +13,12 @@ export function MerchantPage() {
   const notes = useAppStore((s) => s.notes);
   const flash = useAppStore((s) => s.flash);
   const txLifecycle = useAppStore((s) => s.txLifecycle);
+  const exportQuotePackage = useAppStore((s) => s.exportQuotePackage);
+  const importDrawNotePackage = useAppStore((s) => s.importDrawNotePackage);
+
+  const [drawNotePkgInput, setDrawNotePkgInput] = useState("");
+  const [showImportNote, setShowImportNote] = useState(false);
+  const [copiedQuote, setCopiedQuote] = useState<string | null>(null);
 
   const isBusy = txLifecycle === "wallet-approval" || txLifecycle === "proving";
 
@@ -52,9 +59,48 @@ export function MerchantPage() {
           </div>
 
           <div className="border-t border-border pt-4 space-y-3">
-            <p className="text-xs font-semibold uppercase tracking-wider text-muted">
-              Settlement Notes Inbox ({notes.length})
-            </p>
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted">
+                Settlement Notes Inbox ({notes.length})
+              </p>
+              <button
+                onClick={() => setShowImportNote(!showImportNote)}
+                className="text-xs text-accent underline"
+              >
+                {showImportNote ? "Cancel" : "+ Import Draw Note Package"}
+              </button>
+            </div>
+
+            {showImportNote && (
+              <div className="rounded border border-border bg-elevated/40 p-3 space-y-2">
+                <p className="text-xs text-subtle">Paste JSON DrawNoteTransferPackage from agent:</p>
+                <textarea
+                  rows={3}
+                  value={drawNotePkgInput}
+                  onChange={(e) => setDrawNotePkgInput(e.target.value)}
+                  placeholder='{"format":"line:note-package:v1", ...}'
+                  className="w-full rounded border border-border bg-elevated p-2 text-xs font-mono text-fg focus:outline-none focus:ring-1 focus:ring-accent"
+                />
+                <Button
+                  onClick={() => {
+                    try {
+                      const parsed = JSON.parse(drawNotePkgInput);
+                      const ok = importDrawNotePackage(parsed);
+                      if (ok) {
+                        setDrawNotePkgInput("");
+                        setShowImportNote(false);
+                      }
+                    } catch (e) {
+                      alert("Invalid JSON format");
+                    }
+                  }}
+                  disabled={!drawNotePkgInput.trim()}
+                >
+                  Import Draw Note
+                </Button>
+              </div>
+            )}
+
             {notes.length === 0 ? (
               <p className="text-sm text-subtle">No notes received yet. Agent draws create notes.</p>
             ) : (
@@ -93,11 +139,29 @@ export function MerchantPage() {
                 <li className="text-sm text-subtle">No invoices in the private merchant store.</li>
               ) : (
                 invoices.map((inv) => (
-                  <li key={inv.Q} className="flex flex-wrap items-baseline justify-between gap-2 text-sm">
-                    <span>
-                      {inv.invoiceId} · {inv.amount} · {inv.used ? "consumed" : "open"}
-                    </span>
-                    <Mono value={inv.Q} />
+                  <li key={inv.Q} className="flex flex-col gap-1 text-sm border-b border-border/40 pb-2">
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold">
+                        {inv.invoiceId} · {inv.amount} units · {inv.used ? "consumed" : "open"}
+                      </span>
+                      <button
+                        onClick={() => {
+                          const pkg = exportQuotePackage(inv.Q);
+                          if (pkg) {
+                            navigator.clipboard.writeText(JSON.stringify(pkg, null, 2));
+                            setCopiedQuote(inv.Q);
+                            setTimeout(() => setCopiedQuote(null), 2000);
+                          }
+                        }}
+                        className="rounded border border-border px-2 py-0.5 text-[11px] text-accent hover:bg-elevated transition-colors"
+                      >
+                        {copiedQuote === inv.Q ? "Copied Package!" : "Copy Package for Agent"}
+                      </button>
+                    </div>
+                    <div className="flex items-center justify-between text-xs text-muted">
+                      <span className="text-subtle">Quote Q:</span>
+                      <Mono value={inv.Q} />
+                    </div>
                   </li>
                 ))
               )}

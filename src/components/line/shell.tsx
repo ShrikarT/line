@@ -2,6 +2,7 @@ import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { getRuntime, setRuntime, LocalDevelopmentRuntime, MidnightNetworkRuntime } from "@/lib/runtime";
 import { NetworkSetupScreen } from "./network-setup";
+import { VaultBar } from "./vault-bar";
 
 const NAV = [
   { to: "/", label: "Overview" },
@@ -86,6 +87,8 @@ export function Shell({ children }: { children: React.ReactNode }) {
           </nav>
         </div>
       </header>
+
+      <VaultBar />
 
       {/* Network Setup screen if toggled or if in unconfigured network mode */}
       {showNetworkSetup && (
