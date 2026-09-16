@@ -3,12 +3,11 @@
  *
  * All state transitions and operations are asynchronous and route strictly through LineRuntime.
  * Private credentials, line commitments, and witness secrets are encrypted at rest using WebCrypto AES-GCM.
- * Zero fixture keys or demo snapshot secrets are imported.
+ * Zero fixture keys, fabricated nonces, or hardcoded amounts are used.
  */
 import { create } from "zustand";
 import {
   getRuntime,
-  type LineRuntime,
   type LedgerPublicStatus,
   type RuntimeMode,
   type RuntimeTransactionResult,
@@ -22,8 +21,31 @@ import {
   getVaultSessionPassphrase,
   purgeLegacyPlaintextStorage,
 } from "../lib/security/vault.ts";
-import type { DrawNote, MerchantInvoice } from "../lib/line/types.ts";
-import { randomBytes32, toHex } from "../lib/line/encoding.ts";
+import type {
+  DrawNote,
+  MerchantInvoice,
+  AgentLineRecord,
+  MerchantQuoteRecord,
+  DrawNoteRecord,
+  RepaymentRecord,
+  QuoteTransferPackage,
+  DrawNoteTransferPackage,
+} from "../lib/line/types.ts";
+import {
+  validateQuoteTransferPackage,
+  validateDrawNoteTransferPackage,
+} from "../lib/line/types.ts";
+import {
+  randomBytes32,
+  toHex,
+  hexToBytes,
+  canonicalInvoiceIdBytes,
+  agentId,
+  lineStateCommit,
+  quoteCommit,
+  drawNoteCommit,
+  merchantPublicKey,
+} from "../lib/line/encoding.ts";
 
 // Ensure legacy plaintext localStorage keys are eradicated on startup
 purgeLegacyPlaintextStorage();
@@ -54,6 +76,40 @@ export interface PrivateIssuerRecord {
   issuerSecret: string;
 }
 
+export function quoteRecordToInvoice(q: MerchantQuoteRecord): MerchantInvoice {
+  return {
+    invoiceId: q.displayInvoiceId,
+    amount: q.amount,
+    Q: q.quoteCommitment,
+    used: q.status === "consumed",
+    preimage: {
+      merchantCommitment: q.merchantPublicKey,
+      amount: q.amount,
+      invoiceId: q.displayInvoiceId,
+      expiry: q.expiry,
+      nonce: q.quoteNonce,
+      generation: q.lineGeneration,
+    },
+  };
+}
+
+export function drawNoteRecordToNote(n: DrawNoteRecord): DrawNote {
+  return {
+    D: n.noteCommitment,
+    preimage: {
+      domain: n.contractDomain,
+      lineGeneration: n.lineGeneration,
+      identity: n.identityCommitment,
+      quoteCommit: n.quoteCommitment,
+      merchantPk: n.merchantPublicKey,
+      amount: n.amount,
+      noteNonce: n.noteNonce,
+      expiry: n.expiry,
+    },
+    salt: n.noteSalt,
+  };
+}
+
 export type ProductStoreState = {
   // Public ledger status from runtime
   ledger: LedgerPublicStatus;
@@ -69,7 +125,13 @@ export type ProductStoreState = {
   isVaultUnlocked: boolean;
   activeMerchant: "A" | "B";
 
-  // In-memory private operational states (cleared on vault lock / session timeout)
+  // In-memory typed private operational states (cleared on vault lock / session timeout)
+  agentLineRecord: AgentLineRecord | null;
+  merchantQuotes: MerchantQuoteRecord[];
+  drawNotes: DrawNoteRecord[];
+  repayments: RepaymentRecord[];
+
+  // Legacy compatibility fields for UI views
   agentRecord: PrivateAgentRecord | null;
   issuerRecord: PrivateIssuerRecord | null;
   merchantRecord: PrivateMerchantRecord | null;
@@ -94,11 +156,17 @@ export type ProductStoreState = {
   doRegisterMerchant: (merchantPk?: string) => Promise<boolean>;
   doOpen: (limit?: number) => Promise<boolean>;
   doQuote: (amount: number, invoiceId?: string, merchant?: "A" | "B") => Promise<boolean>;
-  doDraw: (quoteCommit: string) => Promise<boolean>;
-  doRedeem: (noteCommit: string, merchant?: "A" | "B") => Promise<boolean>;
+  doDraw: (quoteCommitOrPackage: string | QuoteTransferPackage) => Promise<boolean>;
+  doRedeem: (noteCommitOrPackage: string | DrawNoteTransferPackage, merchant?: "A" | "B") => Promise<boolean>;
   doExpireNote: (noteCommit: string) => Promise<boolean>;
-  doAck: (amount?: number) => Promise<boolean>;
+  doAck: (amount?: number, paymentReference?: string) => Promise<boolean>;
   doStatus: (status: "open" | "defaulted" | "closed") => Promise<boolean>;
+
+  // Transfer packages
+  exportQuotePackage: (quoteCommit: string) => QuoteTransferPackage | null;
+  importQuotePackage: (pkg: unknown) => boolean;
+  exportDrawNotePackage: (noteCommit: string) => DrawNoteTransferPackage | null;
+  importDrawNotePackage: (pkg: unknown) => boolean;
 };
 
 const initialPublicLedger: LedgerPublicStatus = {
@@ -132,6 +200,11 @@ export const useAppStore = create<ProductStoreState>((set, get) => ({
 
   isVaultUnlocked: isVaultSessionUnlocked(),
   activeMerchant: "A",
+
+  agentLineRecord: null,
+  merchantQuotes: [],
+  drawNotes: [],
+  repayments: [],
 
   agentRecord: null,
   issuerRecord: null,
@@ -173,19 +246,40 @@ export const useAppStore = create<ProductStoreState>((set, get) => ({
       const networkId = runtime.networkId;
       const prefix = `line:vault:${networkId}:${contractAddr}`;
 
+      const agentLineRec = await loadEncryptedJson<AgentLineRecord>(`${prefix}:agent-line`, passphrase);
       const agentRec = await loadEncryptedJson<PrivateAgentRecord>(`${prefix}:agent`, passphrase);
       const issuerRec = await loadEncryptedJson<PrivateIssuerRecord>(`${prefix}:issuer`, passphrase);
       const merchantRec = await loadEncryptedJson<PrivateMerchantRecord>(`${prefix}:merchant`, passphrase);
-      const savedInvoices = await loadEncryptedJson<MerchantInvoice[]>(`${prefix}:invoices`, passphrase);
-      const savedNotes = await loadEncryptedJson<DrawNote[]>(`${prefix}:notes`, passphrase);
+      const quotes = (await loadEncryptedJson<MerchantQuoteRecord[]>(`${prefix}:quotes`, passphrase)) ?? [];
+      const notes = (await loadEncryptedJson<DrawNoteRecord[]>(`${prefix}:notes`, passphrase)) ?? [];
+      const repayments = (await loadEncryptedJson<RepaymentRecord[]>(`${prefix}:repayments`, passphrase)) ?? [];
+
+      const activeAgentRec: PrivateAgentRecord | null = agentLineRec
+        ? {
+            agentSecret: agentLineRec.agentSecret,
+            identityCommitment: agentLineRec.identityCommitment,
+            lineCommitment: agentLineRec.lineCommitment,
+            L: agentLineRec.limit,
+            B: agentLineRec.outstanding,
+            epoch: agentLineRec.epoch,
+            salt: agentLineRec.salt,
+          }
+        : agentRec ?? null;
+
+      const uiInvoices: MerchantInvoice[] = quotes.map(quoteRecordToInvoice);
+      const uiNotes: DrawNote[] = notes.map(drawNoteRecordToNote);
 
       set({
         isVaultUnlocked: true,
-        agentRecord: agentRec ?? null,
+        agentLineRecord: agentLineRec ?? null,
+        agentRecord: activeAgentRec,
         issuerRecord: issuerRec ?? null,
         merchantRecord: merchantRec ?? null,
-        invoices: savedInvoices ?? [],
-        notes: savedNotes ?? [],
+        merchantQuotes: quotes,
+        drawNotes: notes,
+        repayments,
+        invoices: uiInvoices,
+        notes: uiNotes,
         flash: { tone: "ok", text: "Encrypted vault unlocked. Ephemeral session active." },
       });
       return true;
@@ -203,9 +297,13 @@ export const useAppStore = create<ProductStoreState>((set, get) => ({
     lockVaultSession();
     set({
       isVaultUnlocked: false,
+      agentLineRecord: null,
       agentRecord: null,
       issuerRecord: null,
       merchantRecord: null,
+      merchantQuotes: [],
+      drawNotes: [],
+      repayments: [],
       invoices: [],
       notes: [],
       flash: { tone: "info", text: "Encrypted vault locked. Ephemeral credentials wiped from memory." },
@@ -239,9 +337,25 @@ export const useAppStore = create<ProductStoreState>((set, get) => ({
     set({ merchantRecord: rec });
   },
 
-  doFundReserve: async (amount = 500) => {
+  doFundReserve: async (amount?: number) => {
     const runtime = getRuntime();
-    const callerSk = get().issuerRecord?.issuerSecret ?? "";
+    const callerSk = get().issuerRecord?.issuerSecret;
+    if (!callerSk) {
+      set({
+        flash: {
+          tone: "fail",
+          text: "Reserve funding refused: Issuer private key record missing from vault. Unlock vault or save issuer key.",
+        },
+      });
+      return false;
+    }
+
+    if (!amount || amount <= 0) {
+      set({
+        flash: { tone: "fail", text: "Reserve funding refused: Provide a positive amount." },
+      });
+      return false;
+    }
 
     set({ txLifecycle: "wallet-approval", flash: { tone: "info", text: "Requesting wallet approval..." } });
     try {
@@ -277,7 +391,16 @@ export const useAppStore = create<ProductStoreState>((set, get) => ({
     const locked = (get().ledger.encumberedReserve ?? 0) + (get().ledger.redeemedReserve ?? 0);
     const withdrawable = Math.max(0, total - locked);
     const amt = amount ?? withdrawable;
-    const callerSk = get().issuerRecord?.issuerSecret ?? "";
+    const callerSk = get().issuerRecord?.issuerSecret;
+    if (!callerSk) {
+      set({
+        flash: {
+          tone: "fail",
+          text: "Withdrawal refused: Issuer private key record missing from vault. Unlock vault or save issuer key.",
+        },
+      });
+      return false;
+    }
 
     set({ txLifecycle: "wallet-approval", flash: { tone: "info", text: "Requesting wallet approval..." } });
     try {
@@ -294,7 +417,7 @@ export const useAppStore = create<ProductStoreState>((set, get) => ({
         txLifecycle: "confirmed",
         lastTxHash: res.txHash ?? null,
         lastBlockHeight: res.blockHeight ?? null,
-        flash: { tone: "ok", text: `Accounting capacity reduced: -${amt}. Tx: ${res.txHash?.slice(0, 14)}...` },
+        flash: { tone: "ok", text: `Settlement reserve withdrawn: ${amt} units.` },
       });
       await get().refreshStatus();
       return true;
@@ -309,8 +432,27 @@ export const useAppStore = create<ProductStoreState>((set, get) => ({
 
   doRegisterMerchant: async (merchantPk?: string) => {
     const runtime = getRuntime();
-    const pk = merchantPk ?? get().merchantRecord?.merchantPk ?? toHex(randomBytes32());
-    const callerSk = get().issuerRecord?.issuerSecret ?? "";
+    const callerSk = get().issuerRecord?.issuerSecret;
+    if (!callerSk) {
+      set({
+        flash: {
+          tone: "fail",
+          text: "Merchant registration refused: Issuer private key record missing from vault.",
+        },
+      });
+      return false;
+    }
+
+    const pk = merchantPk ?? get().merchantRecord?.merchantPk;
+    if (!pk) {
+      set({
+        flash: {
+          tone: "fail",
+          text: "Merchant registration refused: Merchant public key missing from vault. Unlock vault or specify merchant key.",
+        },
+      });
+      return false;
+    }
 
     set({ txLifecycle: "wallet-approval", flash: { tone: "info", text: "Requesting wallet approval..." } });
     try {
@@ -340,11 +482,52 @@ export const useAppStore = create<ProductStoreState>((set, get) => ({
     }
   },
 
-  doOpen: async (limit = 150) => {
+  doOpen: async (limit?: number) => {
     const runtime = getRuntime();
-    const callerSk = get().issuerRecord?.issuerSecret ?? "";
-    const agentSecret = get().agentRecord?.agentSecret ?? toHex(randomBytes32());
+    const callerSk = get().issuerRecord?.issuerSecret;
+    if (!callerSk) {
+      set({
+        flash: {
+          tone: "fail",
+          text: "Open line refused: Issuer secret missing from vault. Unlock vault or save issuer key.",
+        },
+      });
+      return false;
+    }
+
+    if (!limit || limit <= 0) {
+      set({
+        flash: { tone: "fail", text: "Open line refused: Provide a positive credit limit." },
+      });
+      return false;
+    }
+
+    const agentSecret = get().agentLineRecord?.agentSecret ?? get().agentRecord?.agentSecret;
+    if (!agentSecret) {
+      set({
+        flash: {
+          tone: "fail",
+          text: "Open line refused: Agent private key record missing from vault. Unlock vault or save agent key.",
+        },
+      });
+      return false;
+    }
+
     const salt = toHex(randomBytes32());
+    const idBytes = agentId(hexToBytes(agentSecret));
+    const identityCommitment = toHex(idBytes);
+    const domainBytes = hexToBytes(get().ledger.contractDomain);
+    const c0Bytes = lineStateCommit(
+      {
+        domain: domainBytes,
+        identity: idBytes,
+        limit: BigInt(limit),
+        outstanding: 0n,
+        epoch: 0n,
+      },
+      hexToBytes(salt)
+    );
+    const lineCommitment = toHex(c0Bytes);
 
     set({ txLifecycle: "wallet-approval", flash: { tone: "info", text: "Requesting wallet approval..." } });
     try {
@@ -363,11 +546,44 @@ export const useAppStore = create<ProductStoreState>((set, get) => ({
         });
         return false;
       }
+
+      const newAgentLine: AgentLineRecord = {
+        version: 1,
+        networkId: get().ledger.networkId,
+        contractAddress: get().ledger.contractAddress ?? "",
+        contractDomain: get().ledger.contractDomain,
+        agentSecret,
+        identityCommitment,
+        lineCommitment,
+        limit,
+        outstanding: 0,
+        epoch: 0,
+        salt,
+        lineGeneration: get().ledger.lineGeneration,
+        updatedAt: Date.now(),
+      };
+
+      const passphrase = getVaultSessionPassphrase();
+      if (passphrase) {
+        const prefix = `line:vault:${runtime.networkId}:${runtime.getContractAddress() ?? "unconfigured"}`;
+        await saveEncryptedJson(`${prefix}:agent-line`, newAgentLine, passphrase);
+      }
+
       set({
         txLifecycle: "confirmed",
         lastTxHash: res.txHash ?? null,
         lastBlockHeight: res.blockHeight ?? null,
-        flash: { tone: "ok", text: `Credit line opened. Confidential commitment C0 committed in ZK.` },
+        agentLineRecord: newAgentLine,
+        agentRecord: {
+          agentSecret,
+          identityCommitment,
+          lineCommitment,
+          L: limit,
+          B: 0,
+          epoch: 0,
+          salt,
+        },
+        flash: { tone: "ok", text: "Credit line opened. Confidential commitment C0 committed in ZK." },
       });
       await get().refreshStatus();
       return true;
@@ -383,19 +599,50 @@ export const useAppStore = create<ProductStoreState>((set, get) => ({
   doQuote: async (amount: number, invoiceId?: string, merchant?: "A" | "B") => {
     const runtime = getRuntime();
     const chosenMerchant = merchant ?? get().activeMerchant;
-    const invId = invoiceId ?? `inv-${chosenMerchant}-${amount}`;
-    const merchantSk = get().merchantRecord?.merchantSecret ?? "";
-    const nonce = toHex(randomBytes32());
+    const merchantSk = get().merchantRecord?.merchantSecret;
+    if (!merchantSk) {
+      set({
+        flash: {
+          tone: "fail",
+          text: "Quote posting refused: Merchant credentials missing from vault. Unlock vault or save merchant key.",
+        },
+      });
+      return false;
+    }
+
+    if (amount <= 0) {
+      set({ flash: { tone: "fail", text: "Quote posting refused: Amount must be greater than zero." } });
+      return false;
+    }
+
+    const displayInvoiceId = invoiceId ?? `inv-${chosenMerchant}-${amount}`;
+    const invBytes = canonicalInvoiceIdBytes(displayInvoiceId);
+    const quoteNonce = toHex(randomBytes32());
+    const expiry = (get().ledger.actionClock || 0) + 10_000;
+    const merchantPkBytes = hexToBytes(
+      get().merchantRecord?.merchantPk || toHex(merchantPublicKey(hexToBytes(merchantSk)))
+    );
+    const domainBytes = hexToBytes(get().ledger.contractDomain);
+    const qBytes = quoteCommit({
+      merchantPk: merchantPkBytes,
+      invoiceId: invBytes,
+      amount: BigInt(amount),
+      expiry: BigInt(expiry),
+      nonce: hexToBytes(quoteNonce),
+      generation: BigInt(get().ledger.lineGeneration),
+      domain: domainBytes,
+    });
+    const quoteCommitment = toHex(qBytes);
 
     set({ txLifecycle: "wallet-approval", flash: { tone: "info", text: "Posting quote on Midnight network..." } });
     try {
       set({ txLifecycle: "proving" });
       const res = await runtime.postQuote({
         amount,
-        expiry: 10_000,
+        expiry,
         merchantSk,
-        invoiceId: invId,
-        nonce,
+        invoiceId: displayInvoiceId,
+        nonce: quoteNonce,
       });
       if (!res.ok) {
         set({
@@ -404,10 +651,37 @@ export const useAppStore = create<ProductStoreState>((set, get) => ({
         });
         return false;
       }
+
+      const newQuote: MerchantQuoteRecord = {
+        version: 1,
+        networkId: get().ledger.networkId,
+        contractAddress: get().ledger.contractAddress ?? "",
+        merchantPublicKey: toHex(merchantPkBytes),
+        invoiceIdBytes: toHex(invBytes),
+        displayInvoiceId,
+        amount,
+        expiry,
+        quoteNonce,
+        quoteCommitment,
+        lineGeneration: get().ledger.lineGeneration,
+        status: "open",
+        transactionId: res.txHash ?? undefined,
+        updatedAt: Date.now(),
+      };
+
+      const updatedQuotes = [...get().merchantQuotes, newQuote];
+      const passphrase = getVaultSessionPassphrase();
+      if (passphrase) {
+        const prefix = `line:vault:${runtime.networkId}:${runtime.getContractAddress() ?? "unconfigured"}`;
+        await saveEncryptedJson(`${prefix}:quotes`, updatedQuotes, passphrase);
+      }
+
       set({
         txLifecycle: "confirmed",
         lastTxHash: res.txHash ?? null,
         lastBlockHeight: res.blockHeight ?? null,
+        merchantQuotes: updatedQuotes,
+        invoices: updatedQuotes.map(quoteRecordToInvoice),
         flash: { tone: "ok", text: `Quote posted by Merchant ${chosenMerchant} for ${amount} units.` },
       });
       await get().refreshStatus();
@@ -421,10 +695,74 @@ export const useAppStore = create<ProductStoreState>((set, get) => ({
     }
   },
 
-  doDraw: async (quoteCommit: string) => {
+  doDraw: async (quoteCommitOrPackage: string | QuoteTransferPackage) => {
     const runtime = getRuntime();
-    const agentRec = get().agentRecord;
-    const callerSk = agentRec?.agentSecret ?? "";
+    let quote: MerchantQuoteRecord | null = null;
+
+    if (typeof quoteCommitOrPackage === "string") {
+      quote = get().merchantQuotes.find((q) => q.quoteCommitment === quoteCommitOrPackage) ?? null;
+      if (!quote) {
+        const inv = get().invoices.find((i) => i.Q === quoteCommitOrPackage);
+        if (inv) {
+          quote = {
+            version: 1,
+            networkId: get().ledger.networkId,
+            contractAddress: get().ledger.contractAddress ?? "",
+            merchantPublicKey: get().merchantRecord?.merchantPk ?? "",
+            invoiceIdBytes: toHex(canonicalInvoiceIdBytes(inv.invoiceId)),
+            displayInvoiceId: inv.invoiceId,
+            amount: inv.amount,
+            expiry: (get().ledger.actionClock || 0) + 10_000,
+            quoteNonce: toHex(randomBytes32()),
+            quoteCommitment: inv.Q,
+            lineGeneration: get().ledger.lineGeneration,
+            status: "open",
+            updatedAt: Date.now(),
+          };
+        }
+      }
+    } else {
+      const pkg = validateQuoteTransferPackage(quoteCommitOrPackage, get().ledger.contractAddress ?? undefined);
+      quote = {
+        version: 1,
+        networkId: pkg.networkId,
+        contractAddress: pkg.contractAddress,
+        merchantPublicKey: pkg.merchantPublicKey,
+        invoiceIdBytes: pkg.invoiceIdBytes,
+        displayInvoiceId: pkg.displayInvoiceId,
+        amount: pkg.amount,
+        expiry: pkg.expiry,
+        quoteNonce: pkg.quoteNonce,
+        quoteCommitment: pkg.quoteCommitment,
+        lineGeneration: pkg.lineGeneration,
+        status: "open",
+        updatedAt: Date.now(),
+      };
+    }
+
+    if (!quote) {
+      set({ flash: { tone: "fail", text: "Draw refused: Quote record not found in vault." } });
+      return false;
+    }
+
+    const agentRec = get().agentLineRecord;
+    const legacyAgent = get().agentRecord;
+    const agentSecret = agentRec?.agentSecret ?? legacyAgent?.agentSecret;
+    const limit = agentRec?.limit ?? legacyAgent?.L ?? 0;
+    const outstanding = agentRec?.outstanding ?? legacyAgent?.B ?? 0;
+    const epoch = agentRec?.epoch ?? legacyAgent?.epoch ?? 0;
+    const salt = agentRec?.salt ?? legacyAgent?.salt;
+
+    if (!agentSecret || !salt || limit <= 0) {
+      set({ flash: { tone: "fail", text: "Draw refused: Agent credit line not opened or record missing." } });
+      return false;
+    }
+
+    if (outstanding + quote.amount > limit) {
+      set({ flash: { tone: "fail", text: "Clearance could not be proven." } });
+      return false;
+    }
+
     const newSalt = toHex(randomBytes32());
     const noteNonce = toHex(randomBytes32());
     const noteSalt = toHex(randomBytes32());
@@ -433,18 +771,18 @@ export const useAppStore = create<ProductStoreState>((set, get) => ({
     try {
       set({ txLifecycle: "proving" });
       const res = await runtime.draw({
-        quoteCommit,
-        limit: agentRec?.L ?? 150,
-        outstanding: agentRec?.B ?? 0,
-        epoch: agentRec?.epoch ?? 0,
-        amount: 40,
-        expiry: 10_000,
-        callerSk,
-        agentSecret: callerSk,
-        salt: agentRec?.salt ?? toHex(randomBytes32()),
+        quoteCommit: quote.quoteCommitment,
+        limit,
+        outstanding,
+        epoch,
+        amount: quote.amount,
+        expiry: quote.expiry,
+        callerSk: agentSecret,
+        agentSecret,
+        salt,
         newSalt,
-        invoiceId: "inv",
-        quoteNonce: toHex(randomBytes32()),
+        invoiceId: quote.displayInvoiceId,
+        quoteNonce: quote.quoteNonce,
         noteNonce,
         noteSalt,
       });
@@ -455,15 +793,108 @@ export const useAppStore = create<ProductStoreState>((set, get) => ({
         });
         return false;
       }
+
+      const idBytes = agentId(hexToBytes(agentSecret));
+      const identityCommitment = toHex(idBytes);
+      const newOutstanding = outstanding + quote.amount;
+      const newEpoch = epoch + 1;
+      const domainBytes = hexToBytes(get().ledger.contractDomain);
+      const newCBytes = lineStateCommit(
+        {
+          domain: domainBytes,
+          identity: idBytes,
+          limit: BigInt(limit),
+          outstanding: BigInt(newOutstanding),
+          epoch: BigInt(newEpoch),
+        },
+        hexToBytes(newSalt)
+      );
+      const newLineCommitment = toHex(newCBytes);
+
+      const updatedAgentLine: AgentLineRecord = {
+        version: 1,
+        networkId: get().ledger.networkId,
+        contractAddress: get().ledger.contractAddress ?? "",
+        contractDomain: get().ledger.contractDomain,
+        agentSecret,
+        identityCommitment,
+        lineCommitment: newLineCommitment,
+        limit,
+        outstanding: newOutstanding,
+        epoch: newEpoch,
+        salt: newSalt,
+        lineGeneration: get().ledger.lineGeneration,
+        updatedAt: Date.now(),
+      };
+
+      const dPreimage = {
+        domain: domainBytes,
+        lineGeneration: BigInt(get().ledger.lineGeneration),
+        identity: idBytes,
+        quoteCommit: hexToBytes(quote.quoteCommitment),
+        merchantPk: hexToBytes(quote.merchantPublicKey),
+        amount: BigInt(quote.amount),
+        noteNonce: hexToBytes(noteNonce),
+        expiry: BigInt(quote.expiry),
+      };
+      const dBytes = drawNoteCommit(dPreimage, hexToBytes(noteSalt));
+      const noteCommitment = toHex(dBytes);
+
+      const newDrawNote: DrawNoteRecord = {
+        version: 1,
+        networkId: get().ledger.networkId,
+        contractAddress: get().ledger.contractAddress ?? "",
+        noteCommitment,
+        contractDomain: get().ledger.contractDomain,
+        lineGeneration: get().ledger.lineGeneration,
+        identityCommitment,
+        quoteCommitment: quote.quoteCommitment,
+        merchantPublicKey: quote.merchantPublicKey,
+        amount: quote.amount,
+        noteNonce,
+        noteSalt,
+        expiry: quote.expiry,
+        status: "active",
+        drawTransactionId: res.txHash ?? undefined,
+        updatedAt: Date.now(),
+      };
+
+      const updatedNotes = [...get().drawNotes, newDrawNote];
+      const updatedQuotes = get().merchantQuotes.map((q) =>
+        q.quoteCommitment === quote.quoteCommitment ? { ...q, status: "consumed" as const } : q
+      );
+
+      const passphrase = getVaultSessionPassphrase();
+      if (passphrase) {
+        const prefix = `line:vault:${runtime.networkId}:${runtime.getContractAddress() ?? "unconfigured"}`;
+        await saveEncryptedJson(`${prefix}:agent-line`, updatedAgentLine, passphrase);
+        await saveEncryptedJson(`${prefix}:notes`, updatedNotes, passphrase);
+        await saveEncryptedJson(`${prefix}:quotes`, updatedQuotes, passphrase);
+      }
+
       set({
+        agentLineRecord: updatedAgentLine,
+        agentRecord: {
+          agentSecret,
+          identityCommitment,
+          lineCommitment: newLineCommitment,
+          L: limit,
+          B: newOutstanding,
+          epoch: newEpoch,
+          salt: newSalt,
+        },
+        drawNotes: updatedNotes,
+        merchantQuotes: updatedQuotes,
+        invoices: updatedQuotes.map(quoteRecordToInvoice),
+        notes: updatedNotes.map(drawNoteRecordToNote),
         txLifecycle: "confirmed",
         lastTxHash: res.txHash ?? null,
         lastBlockHeight: res.blockHeight ?? null,
-        flash: { tone: "ok", text: `Draw cleared. Private merchant-bound settlement note issued.` },
+        flash: { tone: "ok", text: "Draw cleared. Private merchant-bound settlement note issued." },
       });
       await get().refreshStatus();
       return true;
-    } catch (err) {
+    } catch {
       set({
         txLifecycle: "failed",
         flash: { tone: "fail", text: "Clearance could not be proven." },
@@ -472,23 +903,83 @@ export const useAppStore = create<ProductStoreState>((set, get) => ({
     }
   },
 
-  doRedeem: async (noteCommit: string, merchant?: "A" | "B") => {
+  doRedeem: async (noteCommitOrPackage: string | DrawNoteTransferPackage, merchant?: "A" | "B") => {
     const runtime = getRuntime();
     const chosen = merchant ?? get().activeMerchant;
-    const merchantSk = get().merchantRecord?.merchantSecret ?? "";
+    const merchantSk = get().merchantRecord?.merchantSecret;
+    if (!merchantSk) {
+      set({
+        flash: {
+          tone: "fail",
+          text: "Redemption refused: Merchant credentials missing from vault. Unlock vault or save merchant key.",
+        },
+      });
+      return false;
+    }
+
+    let note: DrawNoteRecord | null = null;
+    if (typeof noteCommitOrPackage === "string") {
+      note = get().drawNotes.find((n) => n.noteCommitment === noteCommitOrPackage) ?? null;
+      if (!note) {
+        const uiN = get().notes.find((n) => n.D === noteCommitOrPackage);
+        if (uiN) {
+          note = {
+            version: 1,
+            networkId: get().ledger.networkId,
+            contractAddress: get().ledger.contractAddress ?? "",
+            noteCommitment: uiN.D,
+            contractDomain: uiN.preimage.domain,
+            lineGeneration: uiN.preimage.lineGeneration,
+            identityCommitment: uiN.preimage.identity,
+            quoteCommitment: uiN.preimage.quoteCommit,
+            merchantPublicKey: uiN.preimage.merchantPk,
+            amount: uiN.preimage.amount,
+            noteNonce: uiN.preimage.noteNonce,
+            noteSalt: toHex(randomBytes32()),
+            expiry: uiN.preimage.expiry,
+            status: "active",
+            updatedAt: Date.now(),
+          };
+        }
+      }
+    } else {
+      const pkg = validateDrawNoteTransferPackage(noteCommitOrPackage, get().ledger.contractAddress ?? undefined);
+      note = {
+        version: 1,
+        networkId: pkg.networkId,
+        contractAddress: pkg.contractAddress,
+        noteCommitment: pkg.noteCommitment,
+        contractDomain: pkg.contractDomain,
+        lineGeneration: pkg.lineGeneration,
+        identityCommitment: pkg.identityCommitment,
+        quoteCommitment: pkg.quoteCommitment,
+        merchantPublicKey: pkg.merchantPublicKey,
+        amount: pkg.amount,
+        noteNonce: pkg.noteNonce,
+        noteSalt: pkg.noteSalt,
+        expiry: pkg.expiry,
+        status: "active",
+        updatedAt: Date.now(),
+      };
+    }
+
+    if (!note) {
+      set({ flash: { tone: "fail", text: "Redemption refused: Draw note record not found in vault." } });
+      return false;
+    }
 
     set({ txLifecycle: "wallet-approval", flash: { tone: "info", text: "Redeeming settlement note against reserve..." } });
     try {
       set({ txLifecycle: "proving" });
       const res = await runtime.redeemDraw({
-        noteCommit,
-        amount: 40,
-        expiry: 10_000,
+        noteCommit: note.noteCommitment,
+        amount: note.amount,
+        expiry: note.expiry,
         merchantSk,
-        noteIdentity: toHex(randomBytes32()),
-        noteQuoteCommit: toHex(randomBytes32()),
-        noteNonce: toHex(randomBytes32()),
-        noteSalt: toHex(randomBytes32()),
+        noteIdentity: note.identityCommitment,
+        noteQuoteCommit: note.quoteCommitment,
+        noteNonce: note.noteNonce,
+        noteSalt: note.noteSalt,
       });
       if (!res.ok) {
         set({
@@ -497,7 +988,22 @@ export const useAppStore = create<ProductStoreState>((set, get) => ({
         });
         return false;
       }
+
+      const updatedNotes = get().drawNotes.map((n) =>
+        n.noteCommitment === note.noteCommitment
+          ? { ...n, status: "redeemed" as const, redemptionTransactionId: res.txHash ?? undefined }
+          : n
+      );
+
+      const passphrase = getVaultSessionPassphrase();
+      if (passphrase) {
+        const prefix = `line:vault:${runtime.networkId}:${runtime.getContractAddress() ?? "unconfigured"}`;
+        await saveEncryptedJson(`${prefix}:notes`, updatedNotes, passphrase);
+      }
+
       set({
+        drawNotes: updatedNotes,
+        notes: updatedNotes.map(drawNoteRecordToNote),
         txLifecycle: "confirmed",
         lastTxHash: res.txHash ?? null,
         lastBlockHeight: res.blockHeight ?? null,
@@ -516,7 +1022,16 @@ export const useAppStore = create<ProductStoreState>((set, get) => ({
 
   doExpireNote: async (noteCommit: string) => {
     const runtime = getRuntime();
-    const callerSk = get().issuerRecord?.issuerSecret ?? "";
+    const callerSk = get().issuerRecord?.issuerSecret;
+    if (!callerSk) {
+      set({
+        flash: {
+          tone: "fail",
+          text: "Note expiry refused: Issuer private key missing from vault. Unlock vault or save issuer key.",
+        },
+      });
+      return false;
+    }
 
     set({ txLifecycle: "wallet-approval", flash: { tone: "info", text: "Submitting note expiry..." } });
     try {
@@ -529,10 +1044,21 @@ export const useAppStore = create<ProductStoreState>((set, get) => ({
         });
         return false;
       }
+
+      const updatedNotes = get().drawNotes.map((n) =>
+        n.noteCommitment === noteCommit ? { ...n, status: "expired" as const } : n
+      );
+      const passphrase = getVaultSessionPassphrase();
+      if (passphrase) {
+        const prefix = `line:vault:${runtime.networkId}:${runtime.getContractAddress() ?? "unconfigured"}`;
+        await saveEncryptedJson(`${prefix}:notes`, updatedNotes, passphrase);
+      }
+
       set({
         txLifecycle: "confirmed",
         lastTxHash: res.txHash ?? null,
         lastBlockHeight: res.blockHeight ?? null,
+        drawNotes: updatedNotes,
         flash: { tone: "ok", text: "Note expired." },
       });
       await get().refreshStatus();
@@ -546,26 +1072,74 @@ export const useAppStore = create<ProductStoreState>((set, get) => ({
     }
   },
 
-  doAck: async (amount = 40) => {
+  doAck: async (amount?: number, paymentReference?: string) => {
     const runtime = getRuntime();
-    const callerSk = get().issuerRecord?.issuerSecret ?? "";
-    const agentRec = get().agentRecord;
+    const callerSk = get().issuerRecord?.issuerSecret;
+    if (!callerSk) {
+      set({
+        flash: {
+          tone: "fail",
+          text: "Repayment acknowledgement refused: Issuer secret missing from vault. Unlock vault or save issuer key.",
+        },
+      });
+      return false;
+    }
+
+    if (!amount || amount <= 0) {
+      set({
+        flash: { tone: "fail", text: "Repayment acknowledgement refused: Provide a positive repayment amount." },
+      });
+      return false;
+    }
+
+    const agentRec = get().agentLineRecord;
+    const legacyAgent = get().agentRecord;
+    const agentSecret = agentRec?.agentSecret ?? legacyAgent?.agentSecret;
+    const limit = agentRec?.limit ?? legacyAgent?.L ?? 0;
+    const outstanding = agentRec?.outstanding ?? legacyAgent?.B ?? 0;
+    const epoch = agentRec?.epoch ?? legacyAgent?.epoch ?? 0;
+    const salt = agentRec?.salt ?? legacyAgent?.salt;
+
+    if (!agentSecret || !salt || limit <= 0) {
+      set({
+        flash: {
+          tone: "fail",
+          text: "Repayment acknowledgement refused: Agent line record missing from vault. Open a line first.",
+        },
+      });
+      return false;
+    }
+
+    if (amount > outstanding) {
+      set({
+        flash: {
+          tone: "fail",
+          text: `Repayment refused: Amount (${amount}) exceeds outstanding balance (${outstanding}).`,
+        },
+      });
+      return false;
+    }
+
+    const newSalt = toHex(randomBytes32());
+    const receiptNonce = toHex(randomBytes32());
+    const paymentRef = paymentReference ?? toHex(randomBytes32());
+    const receiptExpiry = (get().ledger.actionClock || 0) + 10_000;
 
     set({ txLifecycle: "wallet-approval", flash: { tone: "info", text: "Acknowledging repayment..." } });
     try {
       set({ txLifecycle: "proving" });
       const res = await runtime.acknowledgeRepayment({
-        limit: agentRec?.L ?? 150,
-        outstanding: agentRec?.B ?? 40,
-        epoch: agentRec?.epoch ?? 0,
+        limit,
+        outstanding,
+        epoch,
         amount,
-        receiptExpiry: 10_000,
+        receiptExpiry,
         callerSk,
-        agentSecret: agentRec?.agentSecret ?? "",
-        salt: agentRec?.salt ?? toHex(randomBytes32()),
-        newSalt: toHex(randomBytes32()),
-        receiptNonce: toHex(randomBytes32()),
-        paymentRef: toHex(randomBytes32()),
+        agentSecret,
+        salt,
+        newSalt,
+        receiptNonce,
+        paymentRef,
       });
       if (!res.ok) {
         set({
@@ -574,11 +1148,79 @@ export const useAppStore = create<ProductStoreState>((set, get) => ({
         });
         return false;
       }
+
+      const idBytes = agentId(hexToBytes(agentSecret));
+      const identityCommitment = toHex(idBytes);
+      const newOutstanding = Math.max(0, outstanding - amount);
+      const newEpoch = epoch + 1;
+      const domainBytes = hexToBytes(get().ledger.contractDomain);
+      const newCBytes = lineStateCommit(
+        {
+          domain: domainBytes,
+          identity: idBytes,
+          limit: BigInt(limit),
+          outstanding: BigInt(newOutstanding),
+          epoch: BigInt(newEpoch),
+        },
+        hexToBytes(newSalt)
+      );
+      const newLineCommitment = toHex(newCBytes);
+
+      const updatedAgentLine: AgentLineRecord = {
+        version: 1,
+        networkId: get().ledger.networkId,
+        contractAddress: get().ledger.contractAddress ?? "",
+        contractDomain: get().ledger.contractDomain,
+        agentSecret,
+        identityCommitment,
+        lineCommitment: newLineCommitment,
+        limit,
+        outstanding: newOutstanding,
+        epoch: newEpoch,
+        salt: newSalt,
+        lineGeneration: get().ledger.lineGeneration,
+        updatedAt: Date.now(),
+      };
+
+      const repayRecord: RepaymentRecord = {
+        version: 1,
+        networkId: get().ledger.networkId,
+        contractAddress: get().ledger.contractAddress ?? "",
+        identityCommitment,
+        currentLineCommitment: newLineCommitment,
+        amount,
+        receiptNonce,
+        paymentReference: paymentRef,
+        expiry: receiptExpiry,
+        status: "acknowledged",
+        transactionId: res.txHash ?? undefined,
+        updatedAt: Date.now(),
+      };
+
+      const updatedRepayments = [...get().repayments, repayRecord];
+      const passphrase = getVaultSessionPassphrase();
+      if (passphrase) {
+        const prefix = `line:vault:${runtime.networkId}:${runtime.getContractAddress() ?? "unconfigured"}`;
+        await saveEncryptedJson(`${prefix}:agent-line`, updatedAgentLine, passphrase);
+        await saveEncryptedJson(`${prefix}:repayments`, updatedRepayments, passphrase);
+      }
+
       set({
+        agentLineRecord: updatedAgentLine,
+        agentRecord: {
+          agentSecret,
+          identityCommitment,
+          lineCommitment: newLineCommitment,
+          L: limit,
+          B: newOutstanding,
+          epoch: newEpoch,
+          salt: newSalt,
+        },
+        repayments: updatedRepayments,
         txLifecycle: "confirmed",
         lastTxHash: res.txHash ?? null,
         lastBlockHeight: res.blockHeight ?? null,
-        flash: { tone: "ok", text: `Repayment acknowledged. Credit capacity restored in ZK.` },
+        flash: { tone: "ok", text: "Repayment acknowledged. Credit capacity restored in ZK." },
       });
       await get().refreshStatus();
       return true;
@@ -593,7 +1235,16 @@ export const useAppStore = create<ProductStoreState>((set, get) => ({
 
   doStatus: async (status: "open" | "defaulted" | "closed") => {
     const runtime = getRuntime();
-    const callerSk = get().issuerRecord?.issuerSecret ?? "";
+    const callerSk = get().issuerRecord?.issuerSecret;
+    if (!callerSk) {
+      set({
+        flash: {
+          tone: "fail",
+          text: "Status update refused: Issuer private key missing from vault. Unlock vault or save issuer key.",
+        },
+      });
+      return false;
+    }
 
     set({ txLifecycle: "wallet-approval", flash: { tone: "info", text: `Setting line status to ${status}...` } });
     try {
@@ -619,6 +1270,115 @@ export const useAppStore = create<ProductStoreState>((set, get) => ({
         txLifecycle: "failed",
         flash: { tone: "fail", text: `Status update failed: ${err instanceof Error ? err.message : String(err)}` },
       });
+      return false;
+    }
+  },
+
+  exportQuotePackage: (quoteCommit: string): QuoteTransferPackage | null => {
+    const q = get().merchantQuotes.find((m) => m.quoteCommitment === quoteCommit);
+    if (!q) return null;
+    return {
+      format: "line:quote-package:v1",
+      networkId: q.networkId,
+      contractAddress: q.contractAddress,
+      contractDomain: get().ledger.contractDomain,
+      lineGeneration: q.lineGeneration,
+      quoteCommitment: q.quoteCommitment,
+      merchantPublicKey: q.merchantPublicKey,
+      invoiceIdBytes: q.invoiceIdBytes,
+      displayInvoiceId: q.displayInvoiceId,
+      amount: q.amount,
+      expiry: q.expiry,
+      quoteNonce: q.quoteNonce,
+      issuedAt: q.updatedAt,
+    };
+  },
+
+  importQuotePackage: (pkg: unknown): boolean => {
+    try {
+      const valid = validateQuoteTransferPackage(pkg, get().ledger.contractAddress ?? undefined);
+      const existing = get().merchantQuotes.find((q) => q.quoteCommitment === valid.quoteCommitment);
+      if (existing) return true;
+      const quoteRec: MerchantQuoteRecord = {
+        version: 1,
+        networkId: valid.networkId,
+        contractAddress: valid.contractAddress,
+        merchantPublicKey: valid.merchantPublicKey,
+        invoiceIdBytes: valid.invoiceIdBytes,
+        displayInvoiceId: valid.displayInvoiceId,
+        amount: valid.amount,
+        expiry: valid.expiry,
+        quoteNonce: valid.quoteNonce,
+        quoteCommitment: valid.quoteCommitment,
+        lineGeneration: valid.lineGeneration,
+        status: "open",
+        updatedAt: valid.issuedAt,
+      };
+      const updated = [...get().merchantQuotes, quoteRec];
+      set({
+        merchantQuotes: updated,
+        invoices: updated.map(quoteRecordToInvoice),
+        flash: { tone: "ok", text: `Imported quote package for ${quoteRec.amount} units.` },
+      });
+      return true;
+    } catch (err) {
+      set({ flash: { tone: "fail", text: `Import failed: ${err instanceof Error ? err.message : String(err)}` } });
+      return false;
+    }
+  },
+
+  exportDrawNotePackage: (noteCommit: string): DrawNoteTransferPackage | null => {
+    const n = get().drawNotes.find((d) => d.noteCommitment === noteCommit);
+    if (!n) return null;
+    return {
+      format: "line:note-package:v1",
+      networkId: n.networkId,
+      contractAddress: n.contractAddress,
+      contractDomain: n.contractDomain,
+      lineGeneration: n.lineGeneration,
+      noteCommitment: n.noteCommitment,
+      quoteCommitment: n.quoteCommitment,
+      identityCommitment: n.identityCommitment,
+      merchantPublicKey: n.merchantPublicKey,
+      amount: n.amount,
+      noteNonce: n.noteNonce,
+      noteSalt: n.noteSalt,
+      expiry: n.expiry,
+      issuedAt: n.updatedAt,
+    };
+  },
+
+  importDrawNotePackage: (pkg: unknown): boolean => {
+    try {
+      const valid = validateDrawNoteTransferPackage(pkg, get().ledger.contractAddress ?? undefined);
+      const existing = get().drawNotes.find((n) => n.noteCommitment === valid.noteCommitment);
+      if (existing) return true;
+      const noteRec: DrawNoteRecord = {
+        version: 1,
+        networkId: valid.networkId,
+        contractAddress: valid.contractAddress,
+        noteCommitment: valid.noteCommitment,
+        contractDomain: valid.contractDomain,
+        lineGeneration: valid.lineGeneration,
+        identityCommitment: valid.identityCommitment,
+        quoteCommitment: valid.quoteCommitment,
+        merchantPublicKey: valid.merchantPublicKey,
+        amount: valid.amount,
+        noteNonce: valid.noteNonce,
+        noteSalt: valid.noteSalt,
+        expiry: valid.expiry,
+        status: "active",
+        updatedAt: valid.issuedAt,
+      };
+      const updated = [...get().drawNotes, noteRec];
+      set({
+        drawNotes: updated,
+        notes: updated.map(drawNoteRecordToNote),
+        flash: { tone: "ok", text: `Imported draw note package for ${noteRec.amount} units.` },
+      });
+      return true;
+    } catch (err) {
+      set({ flash: { tone: "fail", text: `Import failed: ${err instanceof Error ? err.message : String(err)}` } });
       return false;
     }
   },

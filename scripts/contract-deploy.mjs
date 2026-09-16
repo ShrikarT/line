@@ -12,6 +12,9 @@ import { indexerPublicDataProvider } from "@midnight-ntwrk/midnight-js-indexer-p
 import { httpClientProofProvider } from "@midnight-ntwrk/midnight-js-http-client-proof-provider";
 import { NodeZkConfigProvider } from "@midnight-ntwrk/midnight-js-node-zk-config-provider";
 import { levelPrivateStateProvider } from "@midnight-ntwrk/midnight-js-level-private-state-provider";
+import { persistentHash, CompactTypeBytes } from "@midnight-ntwrk/compact-runtime";
+
+const BYTES32 = new CompactTypeBytes(32);
 
 function hexToBytes(hex) {
   const clean = hex.startsWith("0x") ? hex.slice(2) : hex;
@@ -78,12 +81,17 @@ async function main() {
     accountId: "deployer",
   });
 
-  // Construct wallet provider bound to deployer credentials
+  // Wallet provider stub — coin and encryption public keys are placeholder derivations.
+  // Real deployment requires the Midnight wallet daemon (lace-midnight) or DApp connector
+  // to provide these keys from the funded deployer account. The balanceTx call below
+  // will fail until a real wallet daemon is connected.
   const walletProvider = {
     getCoinPublicKey: () => {
+      // Placeholder: derive from deployer seed. Real keys come from wallet daemon.
       return createHash("sha256").update(deployerSeed + ":coin").digest("hex");
     },
     getEncryptionPublicKey: () => {
+      // Placeholder: derive from deployer seed. Real keys come from wallet daemon.
       return createHash("sha256").update(deployerSeed + ":enc").digest("hex");
     },
     balanceTx: async (tx) => {
@@ -117,11 +125,21 @@ async function main() {
 
   const issuerPk = process.env.MIDNIGHT_ISSUER_PK
     ? hexToBytes(process.env.MIDNIGHT_ISSUER_PK)
-    : Uint8Array.from(createHash("sha256").update(deployerSeed + ":line:issuer").digest());
+    : (() => {
+        // Derive issuer public key using persistentHash (Compact-consistent).
+        // In production, always provide MIDNIGHT_ISSUER_PK explicitly.
+        const seed = hexToBytes(createHash("sha256").update(deployerSeed + ":line:issuer").digest("hex"));
+        return Uint8Array.from(persistentHash(BYTES32, seed));
+      })();
 
   const initialMerchantPk = process.env.MIDNIGHT_INITIAL_MERCHANT_PK
     ? hexToBytes(process.env.MIDNIGHT_INITIAL_MERCHANT_PK)
-    : Uint8Array.from(createHash("sha256").update(deployerSeed + ":line:initial_merchant").digest());
+    : (() => {
+        // Derive initial merchant public key using persistentHash (Compact-consistent).
+        // In production, always provide MIDNIGHT_INITIAL_MERCHANT_PK explicitly.
+        const seed = hexToBytes(createHash("sha256").update(deployerSeed + ":line:initial_merchant").digest("hex"));
+        return Uint8Array.from(persistentHash(BYTES32, seed));
+      })();
 
   console.log("Submitting deployment to Midnight network via deployContract()...");
   const deployed = await deployContract(

@@ -13,6 +13,8 @@ const BANNED_PATTERNS = [
   { pattern: /LineDeployer/i, label: "Hardcoded deployer password (LineDeployer)" },
   { pattern: /line-default-account/i, label: "Hardcoded default account name (line-default-account)" },
   { pattern: /privateStoragePassword:\s*["'][^"']+["']/i, label: "Hardcoded privateStoragePassword literal" },
+  { pattern: /ephemeral-node-session-pwd/i, label: "Hardcoded ephemeral session password" },
+  { pattern: /["']line-role-session["']/i, label: "Hardcoded role session identifier" },
 ];
 
 const SCAN_DIRS = [

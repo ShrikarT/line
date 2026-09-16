@@ -24,6 +24,9 @@ import {
   ContractIncompatibleError,
   NetworkUnreachableError,
   CircuitExecutionError,
+  MissingPrivateWitnessError,
+  InvalidWitnessError,
+  VaultLockedError,
 } from "./errors.ts";
 import {
   connectWallet,
@@ -37,7 +40,7 @@ import type { ContractProviders } from "@midnight-ntwrk/midnight-js-contracts";
 import { indexerPublicDataProvider } from "@midnight-ntwrk/midnight-js-indexer-public-data-provider";
 import type { PublicDataProvider, ZKConfigProvider } from "@midnight-ntwrk/midnight-js-types";
 import { VaultPrivateStateProvider } from "./vault-provider.ts";
-import { hexToBytes, toHex } from "../line/encoding.ts";
+import { hexToBytes, toHex, canonicalInvoiceIdBytes } from "../line/encoding.ts";
 import { Contract, ledger, Status } from "../../../contracts/managed/line/contract/index.js";
 
 export interface MidnightNetworkConfig {
@@ -88,6 +91,39 @@ class AsyncMutex {
       this.locked = false;
     }
   }
+}
+
+export function validateWitnessBytes32(
+  val: string | Uint8Array | undefined | null,
+  witnessName: string
+): Uint8Array {
+  if (!val) {
+    throw new MissingPrivateWitnessError(witnessName);
+  }
+  if (typeof val === "string") {
+    const trimmed = val.trim();
+    if (trimmed.length === 0) {
+      throw new MissingPrivateWitnessError(witnessName);
+    }
+    const cleanHex = trimmed.startsWith("0x") ? trimmed.slice(2) : trimmed;
+    if (cleanHex.length !== 64 || !/^[0-9a-fA-F]{64}$/.test(cleanHex)) {
+      throw new InvalidWitnessError(
+        witnessName,
+        `Expected 32-byte hex string (64 characters), received '${trimmed}'`
+      );
+    }
+    return hexToBytes(cleanHex);
+  }
+  if (val instanceof Uint8Array) {
+    if (val.length !== 32) {
+      throw new InvalidWitnessError(
+        witnessName,
+        `Expected 32 bytes, received ${val.length} bytes`
+      );
+    }
+    return val;
+  }
+  throw new InvalidWitnessError(witnessName, "Expected 32-byte hex string or Uint8Array");
 }
 
 export class MidnightNetworkRuntime implements LineRuntime {
@@ -225,10 +261,13 @@ export class MidnightNetworkRuntime implements LineRuntime {
 
     let privateStateProvider: any;
     if (typeof window === "undefined") {
+      if (!this.passwordProvider) {
+        throw new VaultLockedError("Private storage passwordProvider must be configured for Node environment private state.");
+      }
       const { levelPrivateStateProvider } = await import("@midnight-ntwrk/midnight-js-level-private-state-provider");
       privateStateProvider = levelPrivateStateProvider({
-        privateStoragePasswordProvider: this.passwordProvider ?? (() => "ephemeral-node-session-pwd"),
-        accountId: "line-role-session",
+        privateStoragePasswordProvider: this.passwordProvider,
+        accountId: this.contractAddress ? `line-${this.contractAddress.slice(0, 10)}` : "line-session",
       });
     } else {
       privateStateProvider = new VaultPrivateStateProvider({
@@ -488,6 +527,13 @@ export class MidnightNetworkRuntime implements LineRuntime {
       };
     }
     const blockHeight = Number(tx?.public?.blockHeight ?? tx?.blockHeight ?? 0);
+    if (!Number.isFinite(blockHeight) || blockHeight <= 0) {
+      return {
+        ok: false,
+        error: operationName === "draw" ? "Clearance could not be proven." : `${operationName} failed: Transaction receipt unconfirmed or invalid block height (${blockHeight}).`,
+        code: "TRANSACTION_NOT_CONFIRMED",
+      };
+    }
     return { ok: true, txHash, blockHeight };
   }
 
@@ -509,7 +555,7 @@ export class MidnightNetworkRuntime implements LineRuntime {
     if (!this.connectedWallet) throw new WalletNotConnectedError();
     if (!this.contractAddress) throw new ContractNotConfiguredError();
 
-    const callerBytes = callerSk ? hexToBytes(callerSk) : new Uint8Array(32);
+    const callerBytes = validateWitnessBytes32(callerSk, "callerSecret");
     return this.withOperationLock({ callerSecret: callerBytes }, async () => {
       try {
         const bound = await this.getBoundContract();
@@ -525,7 +571,7 @@ export class MidnightNetworkRuntime implements LineRuntime {
     if (!this.connectedWallet) throw new WalletNotConnectedError();
     if (!this.contractAddress) throw new ContractNotConfiguredError();
 
-    const callerBytes = callerSk ? hexToBytes(callerSk) : new Uint8Array(32);
+    const callerBytes = validateWitnessBytes32(callerSk, "callerSecret");
     return this.withOperationLock({ callerSecret: callerBytes }, async () => {
       try {
         const bound = await this.getBoundContract();
@@ -541,12 +587,12 @@ export class MidnightNetworkRuntime implements LineRuntime {
     if (!this.connectedWallet) throw new WalletNotConnectedError();
     if (!this.contractAddress) throw new ContractNotConfiguredError();
 
-    const callerBytes = callerSk ? hexToBytes(callerSk) : new Uint8Array(32);
+    const callerBytes = validateWitnessBytes32(callerSk, "callerSecret");
+    const merchantBytes = validateWitnessBytes32(merchantPk, "merchantPublicKey");
     return this.withOperationLock({ callerSecret: callerBytes }, async () => {
       try {
         const bound = await this.getBoundContract();
-        const bytes = hexToBytes(merchantPk);
-        const tx = await bound.callTx.registerMerchant(bytes);
+        const tx = await bound.callTx.registerMerchant(merchantBytes);
         return this.validateTxResult(tx, "registerMerchant");
       } catch (err) {
         return { ok: false, error: err instanceof Error ? err.message : String(err), code: "REGISTER_MERCHANT_FAILED" };
@@ -565,9 +611,9 @@ export class MidnightNetworkRuntime implements LineRuntime {
     if (!this.contractAddress) throw new ContractNotConfiguredError();
 
     const witnessContext: LinePrivateWitnessContext = {
-      callerSecret: params.callerSk ? hexToBytes(params.callerSk) : new Uint8Array(32),
-      agentSecret: params.agentSecret ? hexToBytes(params.agentSecret) : new Uint8Array(32),
-      salt: params.salt ? hexToBytes(params.salt) : new Uint8Array(32),
+      callerSecret: validateWitnessBytes32(params.callerSk, "callerSecret"),
+      agentSecret: validateWitnessBytes32(params.agentSecret, "agentSecret"),
+      salt: validateWitnessBytes32(params.salt, "salt"),
     };
 
     return this.withOperationLock(witnessContext, async () => {
@@ -591,10 +637,14 @@ export class MidnightNetworkRuntime implements LineRuntime {
     if (!this.connectedWallet) throw new WalletNotConnectedError();
     if (!this.contractAddress) throw new ContractNotConfiguredError();
 
+    if (!params.invoiceId || params.invoiceId.trim().length === 0) {
+      throw new MissingPrivateWitnessError("invoiceId");
+    }
+
     const witnessContext: LinePrivateWitnessContext = {
-      callerSecret: params.merchantSk ? hexToBytes(params.merchantSk) : new Uint8Array(32),
-      invoiceId: params.invoiceId ? hexToBytes(params.invoiceId.length === 64 ? params.invoiceId : params.nonce) : new Uint8Array(32),
-      quoteNonce: params.nonce ? hexToBytes(params.nonce) : new Uint8Array(32),
+      callerSecret: validateWitnessBytes32(params.merchantSk, "merchantSecret"),
+      invoiceId: canonicalInvoiceIdBytes(params.invoiceId),
+      quoteNonce: validateWitnessBytes32(params.nonce, "quoteNonce"),
     };
 
     return this.withOperationLock(witnessContext, async () => {
@@ -627,21 +677,26 @@ export class MidnightNetworkRuntime implements LineRuntime {
     if (!this.connectedWallet) throw new WalletNotConnectedError();
     if (!this.contractAddress) throw new ContractNotConfiguredError();
 
+    if (!params.invoiceId || params.invoiceId.trim().length === 0) {
+      throw new MissingPrivateWitnessError("invoiceId");
+    }
+
     const witnessContext: LinePrivateWitnessContext = {
-      callerSecret: params.callerSk ? hexToBytes(params.callerSk) : new Uint8Array(32),
-      agentSecret: params.agentSecret ? hexToBytes(params.agentSecret) : new Uint8Array(32),
-      salt: params.salt ? hexToBytes(params.salt) : new Uint8Array(32),
-      newSalt: params.newSalt ? hexToBytes(params.newSalt) : new Uint8Array(32),
-      invoiceId: params.invoiceId ? hexToBytes(params.invoiceId.length === 64 ? params.invoiceId : params.quoteNonce) : new Uint8Array(32),
-      quoteNonce: params.quoteNonce ? hexToBytes(params.quoteNonce) : new Uint8Array(32),
-      noteNonce: params.noteNonce ? hexToBytes(params.noteNonce) : new Uint8Array(32),
-      noteSalt: params.noteSalt ? hexToBytes(params.noteSalt) : new Uint8Array(32),
+      callerSecret: validateWitnessBytes32(params.callerSk, "callerSecret"),
+      agentSecret: validateWitnessBytes32(params.agentSecret, "agentSecret"),
+      salt: validateWitnessBytes32(params.salt, "salt"),
+      newSalt: validateWitnessBytes32(params.newSalt, "newSalt"),
+      invoiceId: canonicalInvoiceIdBytes(params.invoiceId),
+      quoteNonce: validateWitnessBytes32(params.quoteNonce, "quoteNonce"),
+      noteNonce: validateWitnessBytes32(params.noteNonce, "noteNonce"),
+      noteSalt: validateWitnessBytes32(params.noteSalt, "noteSalt"),
     };
+
+    const qBytes = validateWitnessBytes32(params.quoteCommit, "quoteCommit");
 
     return this.withOperationLock(witnessContext, async () => {
       try {
         const bound = await this.getBoundContract();
-        const qBytes = hexToBytes(params.quoteCommit);
         const tx = await bound.callTx.draw(
           qBytes,
           BigInt(params.limit),
@@ -671,17 +726,18 @@ export class MidnightNetworkRuntime implements LineRuntime {
     if (!this.contractAddress) throw new ContractNotConfiguredError();
 
     const witnessContext: LinePrivateWitnessContext = {
-      callerSecret: params.merchantSk ? hexToBytes(params.merchantSk) : new Uint8Array(32),
-      noteIdentity: params.noteIdentity ? hexToBytes(params.noteIdentity) : new Uint8Array(32),
-      noteQuoteCommit: params.noteQuoteCommit ? hexToBytes(params.noteQuoteCommit) : new Uint8Array(32),
-      noteNonce: params.noteNonce ? hexToBytes(params.noteNonce) : new Uint8Array(32),
-      noteSalt: params.noteSalt ? hexToBytes(params.noteSalt) : new Uint8Array(32),
+      callerSecret: validateWitnessBytes32(params.merchantSk, "merchantSecret"),
+      noteIdentity: validateWitnessBytes32(params.noteIdentity, "noteIdentity"),
+      noteQuoteCommit: validateWitnessBytes32(params.noteQuoteCommit, "noteQuoteCommit"),
+      noteNonce: validateWitnessBytes32(params.noteNonce, "noteNonce"),
+      noteSalt: validateWitnessBytes32(params.noteSalt, "noteSalt"),
     };
+
+    const dBytes = validateWitnessBytes32(params.noteCommit, "noteCommit");
 
     return this.withOperationLock(witnessContext, async () => {
       try {
         const bound = await this.getBoundContract();
-        const dBytes = hexToBytes(params.noteCommit);
         const tx = await bound.callTx.redeemDraw(dBytes, BigInt(params.amount), BigInt(params.expiry));
         return this.validateTxResult(tx, "redeemDraw");
       } catch (err) {
@@ -694,11 +750,12 @@ export class MidnightNetworkRuntime implements LineRuntime {
     if (!this.connectedWallet) throw new WalletNotConnectedError();
     if (!this.contractAddress) throw new ContractNotConfiguredError();
 
-    const callerBytes = callerSk ? hexToBytes(callerSk) : new Uint8Array(32);
+    const callerBytes = validateWitnessBytes32(callerSk, "callerSecret");
+    const dBytes = validateWitnessBytes32(noteCommit, "noteCommit");
+
     return this.withOperationLock({ callerSecret: callerBytes }, async () => {
       try {
         const bound = await this.getBoundContract();
-        const dBytes = hexToBytes(noteCommit);
         const tx = await bound.callTx.cancelOrExpireNote(dBytes);
         return this.validateTxResult(tx, "cancelOrExpireNote");
       } catch (err) {
@@ -724,12 +781,12 @@ export class MidnightNetworkRuntime implements LineRuntime {
     if (!this.contractAddress) throw new ContractNotConfiguredError();
 
     const witnessContext: LinePrivateWitnessContext = {
-      callerSecret: params.callerSk ? hexToBytes(params.callerSk) : new Uint8Array(32),
-      agentSecret: params.agentSecret ? hexToBytes(params.agentSecret) : new Uint8Array(32),
-      salt: params.salt ? hexToBytes(params.salt) : new Uint8Array(32),
-      newSalt: params.newSalt ? hexToBytes(params.newSalt) : new Uint8Array(32),
-      receiptNonce: params.receiptNonce ? hexToBytes(params.receiptNonce) : new Uint8Array(32),
-      paymentRef: params.paymentRef ? hexToBytes(params.paymentRef) : new Uint8Array(32),
+      callerSecret: validateWitnessBytes32(params.callerSk, "callerSecret"),
+      agentSecret: validateWitnessBytes32(params.agentSecret, "agentSecret"),
+      salt: validateWitnessBytes32(params.salt, "salt"),
+      newSalt: validateWitnessBytes32(params.newSalt, "newSalt"),
+      receiptNonce: validateWitnessBytes32(params.receiptNonce, "receiptNonce"),
+      paymentRef: validateWitnessBytes32(params.paymentRef, "paymentRef"),
     };
 
     return this.withOperationLock(witnessContext, async () => {
@@ -753,7 +810,7 @@ export class MidnightNetworkRuntime implements LineRuntime {
     if (!this.connectedWallet) throw new WalletNotConnectedError();
     if (!this.contractAddress) throw new ContractNotConfiguredError();
 
-    const callerBytes = callerSk ? hexToBytes(callerSk) : new Uint8Array(32);
+    const callerBytes = validateWitnessBytes32(callerSk, "callerSecret");
     return this.withOperationLock({ callerSecret: callerBytes }, async () => {
       try {
         const bound = await this.getBoundContract();

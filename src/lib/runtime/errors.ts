@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Structured errors for Line runtime operations.
  */
 
@@ -70,3 +70,46 @@ export class CircuitExecutionError extends LineRuntimeError {
     super(`Failed executing circuit '${circuit}': ${reason}`, "CIRCUIT_EXECUTION_ERROR", { circuit, reason, ...details });
   }
 }
+
+export class MissingPrivateWitnessError extends LineRuntimeError {
+  constructor(witnessName: string, reason = "required 32-byte witness is missing or malformed") {
+    super(`Missing private witness '${witnessName}': ${reason}`, "MISSING_PRIVATE_WITNESS", { witnessName, reason });
+  }
+}
+
+export class InvalidWitnessError extends LineRuntimeError {
+  constructor(witnessName: string, reason: string) {
+    super(`Invalid private witness '${witnessName}': ${reason}`, "INVALID_WITNESS", { witnessName, reason });
+  }
+}
+
+export class VaultLockedError extends LineRuntimeError {
+  constructor(message = "Private state storage locked: Passphrase or active vault session required.") {
+    super(message, "VAULT_LOCKED");
+  }
+}
+
+export class VaultPassphraseError extends LineRuntimeError {
+  constructor(message = "Decryption failed: Incorrect vault passphrase.") {
+    super(message, "VAULT_PASSPHRASE_ERROR");
+  }
+}
+
+export class VaultTamperedError extends LineRuntimeError {
+  constructor(message = "Ciphertext authentication failed: Vault record has been corrupted or tampered.") {
+    super(message, "VAULT_TAMPERED_ERROR");
+  }
+}
+
+export class VaultPersistenceError extends LineRuntimeError {
+  constructor(message: string, details?: Record<string, unknown>) {
+    super(`Critical: Local vault persistence failed after on-chain transaction: ${message}`, "VAULT_PERSISTENCE_ERROR", details);
+  }
+}
+
+export class UnsupportedOperationError extends LineRuntimeError {
+  constructor(operation: string) {
+    super(`Operation '${operation}' is not supported in this runtime environment.`, "UNSUPPORTED_OPERATION", { operation });
+  }
+}
+
