@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
-  DEMO,
   Status,
   blankPrivate,
   boot,
@@ -15,6 +14,7 @@ import {
   type PrivateState,
   type Session,
 } from "./compact-harness.ts";
+import { DEMO } from "../../test/fixtures/keys.ts";
 import {
   agentId,
   contractDomain,

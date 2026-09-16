@@ -18,6 +18,7 @@ import {
   cancelOrExpireNote,
   acknowledgeRepayment,
   setStatus,
+  issuerPublicKey,
 } from "../line/protocol.ts";
 
 export class LocalDevelopmentRuntime implements LineRuntime {
@@ -25,9 +26,23 @@ export class LocalDevelopmentRuntime implements LineRuntime {
   readonly networkId: string = "local-simulator";
   private ledger: Ledger;
   private txCounter: number = 0;
+  private unboundGenesis: boolean = false;
 
   constructor(initialLedger?: Ledger) {
-    this.ledger = initialLedger ?? createLedger();
+    if (initialLedger) {
+      this.ledger = initialLedger;
+      this.unboundGenesis = false;
+    } else {
+      this.ledger = createLedger();
+      this.unboundGenesis = true;
+    }
+  }
+
+  private bindGenesisIssuer(callerSk?: string): void {
+    if (this.unboundGenesis && callerSk) {
+      this.ledger.issuerPubKey = issuerPublicKey(callerSk);
+      this.unboundGenesis = false;
+    }
   }
 
   isConnected(): boolean {
@@ -85,6 +100,7 @@ export class LocalDevelopmentRuntime implements LineRuntime {
   }
 
   async fundReserve(amount: number, callerSk: string): Promise<RuntimeTransactionResult> {
+    this.bindGenesisIssuer(callerSk);
     const res = fundReserve(this.ledger, { caller: callerSk, amount });
     if (!res.ok) return { ok: false, error: res.message, code: res.code };
     this.ledger = res.ledger;
@@ -92,6 +108,7 @@ export class LocalDevelopmentRuntime implements LineRuntime {
   }
 
   async withdrawReserve(amount: number, callerSk: string): Promise<RuntimeTransactionResult> {
+    this.bindGenesisIssuer(callerSk);
     const res = withdrawUnencumberedReserve(this.ledger, { caller: callerSk, amount });
     if (!res.ok) return { ok: false, error: res.message, code: res.code };
     this.ledger = res.ledger;
@@ -99,6 +116,7 @@ export class LocalDevelopmentRuntime implements LineRuntime {
   }
 
   async registerMerchant(merchantPk: string, callerSk: string): Promise<RuntimeTransactionResult> {
+    this.bindGenesisIssuer(callerSk);
     const res = registerMerchant(this.ledger, { caller: callerSk, merchantPk });
     if (!res.ok) return { ok: false, error: res.message, code: res.code };
     this.ledger = res.ledger;
@@ -112,6 +130,7 @@ export class LocalDevelopmentRuntime implements LineRuntime {
     agentSecret: string;
     salt: string;
   }): Promise<RuntimeTransactionResult> {
+    this.bindGenesisIssuer(params.callerSk);
     const res = openLine(this.ledger, {
       caller: params.callerSk,
       agentSecret: params.agentSecret,

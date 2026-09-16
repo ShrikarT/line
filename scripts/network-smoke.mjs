@@ -20,7 +20,13 @@ async function main() {
   console.log(`Node RPC URI:     ${nodeUri}`);
   console.log(`Indexer URI:      ${indexerUri}`);
   console.log(`Proof Server URI: ${proofServerUri}`);
-  console.log(`Contract Address: ${contractAddress ?? "Not set (skipping on-chain query)"}`);
+  console.log(`Contract Address: ${contractAddress ?? "NOT SET"}`);
+
+  if (!contractAddress || contractAddress.trim().length === 0) {
+    console.error("\n✗ MIDNIGHT_CONTRACT_ADDRESS or VITE_MIDNIGHT_CONTRACT_ADDRESS is not configured.");
+    console.error("Network smoke test strictly requires a target deployed contract address on Midnight network.");
+    process.exit(1);
+  }
 
   const runtime = new MidnightNetworkRuntime({
     networkId,

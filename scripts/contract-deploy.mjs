@@ -5,12 +5,23 @@
  */
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { randomBytes, randomUUID, createHash } from "node:crypto";
 import { deployContract } from "@midnight-ntwrk/midnight-js-contracts";
 import { Contract } from "../contracts/managed/line/contract/index.js";
 import { indexerPublicDataProvider } from "@midnight-ntwrk/midnight-js-indexer-public-data-provider";
 import { httpClientProofProvider } from "@midnight-ntwrk/midnight-js-http-client-proof-provider";
 import { NodeZkConfigProvider } from "@midnight-ntwrk/midnight-js-node-zk-config-provider";
 import { levelPrivateStateProvider } from "@midnight-ntwrk/midnight-js-level-private-state-provider";
+
+function hexToBytes(hex) {
+  const clean = hex.startsWith("0x") ? hex.slice(2) : hex;
+  const len = clean.length;
+  const bytes = new Uint8Array(len / 2);
+  for (let i = 0; i < len; i += 2) {
+    bytes[i / 2] = parseInt(clean.substring(i, i + 2), 16);
+  }
+  return bytes;
+}
 
 async function main() {
   console.log("=================================================");
@@ -39,31 +50,48 @@ async function main() {
   console.log(`Indexer URI:      ${indexerUri}`);
   console.log(`Proof Server:     ${proofServerUri}`);
 
-  if (!deployerSeed) {
-    console.log("\n[DEPLOYMENT BLOCKED — MISSING WALLET CREDENTIALS]");
-    console.log("----------------------------------------------------------------------");
-    console.log("Deploying the Line contract to an active Midnight network requires a funded");
-    console.log("deployer account with sufficient tDUST to balance the deploy transaction.");
-    console.log("\nTo execute an on-chain deployment, provide the following environment variables:");
-    console.log("  MIDNIGHT_DEPLOYER_SEED      Funded deployer seed phrase or secret key");
-    console.log("  MIDNIGHT_NETWORK_ID         Target network ID (default: midnight-testnet)");
-    console.log("  MIDNIGHT_NODE_URI           Midnight Substrate RPC endpoint");
-    console.log("  MIDNIGHT_INDEXER_URI        Midnight GraphQL indexer endpoint");
-    console.log("  MIDNIGHT_PROOF_SERVER_URI   Local or remote Midnight proof server");
-    console.log("\nOnce configured, rerun:");
-    console.log("  node scripts/contract-deploy.mjs");
-    console.log("----------------------------------------------------------------------\n");
-    return;
+  if (!deployerSeed || deployerSeed.trim().length === 0) {
+    console.error("\n[DEPLOYMENT BLOCKED — MISSING WALLET CREDENTIALS]");
+    console.error("----------------------------------------------------------------------");
+    console.error("Deploying the Line contract to an active Midnight network requires a funded");
+    console.error("deployer account with sufficient tDUST to balance the deploy transaction.");
+    console.error("\nTo execute an on-chain deployment, provide the following environment variables:");
+    console.error("  MIDNIGHT_DEPLOYER_SEED      Funded deployer seed phrase or secret key");
+    console.error("  MIDNIGHT_STORAGE_PASSWORD   (Optional) Encryption password for private state");
+    console.error("  MIDNIGHT_NETWORK_ID         Target network ID (default: midnight-testnet)");
+    console.error("  MIDNIGHT_NODE_URI           Midnight Substrate RPC endpoint");
+    console.error("  MIDNIGHT_INDEXER_URI        Midnight GraphQL indexer endpoint");
+    console.error("  MIDNIGHT_PROOF_SERVER_URI   Local or remote Midnight proof server");
+    console.error("\nOnce configured, rerun:");
+    console.error("  node scripts/contract-deploy.mjs");
+    console.error("----------------------------------------------------------------------\n");
+    process.exit(1);
   }
 
   console.log("\nInitializing providers for deployment...");
   const zkConfigProvider = new NodeZkConfigProvider(join(process.cwd(), "contracts/managed/line"));
   const publicDataProvider = indexerPublicDataProvider(indexerUri, indexerWsUri);
   const proofProvider = httpClientProofProvider(proofServerUri);
+  const privateStatePassword = process.env.MIDNIGHT_STORAGE_PASSWORD || randomUUID();
   const privateStateProvider = levelPrivateStateProvider({
-    privateStoragePassword: "LineDeployerStoragePassword",
+    privateStoragePassword: privateStatePassword,
     accountId: "deployer",
   });
+
+  // Construct wallet provider bound to deployer credentials
+  const walletProvider = {
+    getCoinPublicKey: () => {
+      return createHash("sha256").update(deployerSeed + ":coin").digest("hex");
+    },
+    getEncryptionPublicKey: () => {
+      return createHash("sha256").update(deployerSeed + ":enc").digest("hex");
+    },
+    balanceTx: async (tx) => {
+      throw new Error(
+        "Transaction balancing requires an active Midnight wallet daemon or DApp connector connected to the network node.",
+      );
+    },
+  };
 
   console.log("Preparing deployment transaction...");
   const dummyWitnesses = {
@@ -82,7 +110,19 @@ async function main() {
   };
   const lineContract = new Contract(dummyWitnesses);
 
-  // Deploy requires wallet provider integration
+  // Derive non-zero constructor parameters
+  const instanceNonce = process.env.MIDNIGHT_INSTANCE_NONCE
+    ? hexToBytes(process.env.MIDNIGHT_INSTANCE_NONCE)
+    : Uint8Array.from(randomBytes(32));
+
+  const issuerPk = process.env.MIDNIGHT_ISSUER_PK
+    ? hexToBytes(process.env.MIDNIGHT_ISSUER_PK)
+    : Uint8Array.from(createHash("sha256").update(deployerSeed + ":line:issuer").digest());
+
+  const initialMerchantPk = process.env.MIDNIGHT_INITIAL_MERCHANT_PK
+    ? hexToBytes(process.env.MIDNIGHT_INITIAL_MERCHANT_PK)
+    : Uint8Array.from(createHash("sha256").update(deployerSeed + ":line:initial_merchant").digest());
+
   console.log("Submitting deployment to Midnight network via deployContract()...");
   const deployed = await deployContract(
     {
@@ -90,21 +130,32 @@ async function main() {
       zkConfigProvider,
       proofProvider,
       privateStateProvider,
+      walletProvider,
     },
     {
       compiledContract: lineContract,
-      args: [
-        new Uint8Array(32), // initial issuer PK
-        new Uint8Array(32), // initial merchant PK
-        new Uint8Array(32), // instance nonce
-      ],
-    }
+      args: [issuerPk, initialMerchantPk, instanceNonce],
+    },
   );
 
-  console.log("\n✓ Deployed successfully!");
-  console.log(`Contract Address: ${deployed.deployTxData.public.contractAddress}`);
+  const deployedAddress = deployed?.deployTxData?.public?.contractAddress;
+  if (!deployedAddress) {
+    console.error("\n✗ Deployment failed: No contract address returned in deploy transaction data.");
+    process.exit(1);
+  }
+
+  console.log("\n✓ Contract deployment submitted!");
+  console.log(`Contract Address: ${deployedAddress}`);
   console.log(`Transaction ID:   ${deployed.deployTxData.public.txId}`);
   console.log(`Block Height:     ${deployed.deployTxData.public.blockHeight}`);
+
+  console.log("\nVerifying deployed contract on-chain via indexer...");
+  const queryResult = await publicDataProvider.queryContractState(deployedAddress);
+  if (!queryResult || !queryResult.data) {
+    console.error(`\n✗ Deployed contract verification failed: Contract not found on-chain at ${deployedAddress}`);
+    process.exit(1);
+  }
+  console.log("✓ Deployed contract state verified on-chain via indexer.");
 }
 
 main().catch((err) => {

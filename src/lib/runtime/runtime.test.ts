@@ -6,7 +6,7 @@ import {
   InMemoryTestRuntime,
   getRuntime,
 } from "./index.ts";
-import { ISSUER_SK, MERCHANT_A_SK, AGENT_SK } from "../line/keys.ts";
+import { ISSUER_SK, MERCHANT_A_SK, AGENT_SK } from "../../test/fixtures/keys.ts";
 
 describe("runtime architecture: MidnightNetworkRuntime, LocalDevelopmentRuntime, InMemoryTestRuntime", () => {
   it("MidnightNetworkRuntime defaults to unconfigured in test environment and fails clearly", async () => {

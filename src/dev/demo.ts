@@ -9,8 +9,8 @@ import {
   registerMerchant,
   setStatus,
   withdrawUnencumberedReserve,
-} from "./protocol.ts";
-import type { AgentStore, DrawNote, Ledger, MerchantInvoice, QuotePreimage } from "./types.ts";
+} from "../lib/line/protocol.ts";
+import type { AgentStore, DrawNote, Ledger, MerchantInvoice, QuotePreimage } from "../lib/line/types.ts";
 import {
   AGENT_SK,
   INSTANCE_NONCE,
@@ -19,7 +19,7 @@ import {
   MERCHANT_A_SK,
   MERCHANT_B_PK,
   MERCHANT_B_SK,
-} from "./keys.ts";
+} from "../test/fixtures/keys.ts";
 
 export const DEMO_STEPS = [
   {
@@ -154,6 +154,7 @@ export type DemoSnapshot = {
   wrongMerchantRan: boolean;
   doubleRedeemRan: boolean;
   withdrawBlockedRan: boolean;
+  staleWitness?: any;
 };
 
 function expiry(ledger: Ledger) {
@@ -180,6 +181,7 @@ export function snapshotAt(step: number): DemoSnapshot {
   let wrongMerchantRan = false;
   let doubleRedeemRan = false;
   let withdrawBlockedRan = false;
+  let staleWitness: any = null;
 
   let q40: { quote: QuotePreimage; Q: string } | null = null;
   let note1: DrawNote | null = null;
@@ -188,7 +190,7 @@ export function snapshotAt(step: number): DemoSnapshot {
   // Step 1: Register Merchant B
   if (n >= 1) {
     const reg = registerMerchant(ledger, {
-      caller: ISSUER_SK,
+      callerSk: ISSUER_SK,
       merchantPk: MERCHANT_B_PK,
     });
     if (!reg.ok) throw new Error("demo reg B");
@@ -197,7 +199,7 @@ export function snapshotAt(step: number): DemoSnapshot {
 
   // Step 2: Fund reserve 500
   if (n >= 2) {
-    const fund = fundReserve(ledger, { caller: ISSUER_SK, amount: 500 });
+    const fund = fundReserve(ledger, { callerSk: ISSUER_SK, amount: 500 });
     if (!fund.ok) throw new Error("demo fund");
     ledger = fund.ledger;
   }
@@ -205,7 +207,7 @@ export function snapshotAt(step: number): DemoSnapshot {
   // Step 3: Open line 150
   if (n >= 3) {
     const open = openLine(ledger, {
-      caller: ISSUER_SK,
+      callerSk: ISSUER_SK,
       agentSecret: AGENT_SK,
       limit: 150,
       salt: "demo-salt-0",
@@ -219,7 +221,7 @@ export function snapshotAt(step: number): DemoSnapshot {
   // Step 4: Merchant A posts quote 40
   if (n >= 4 && agent) {
     const q = postQuote(ledger, {
-      caller: MERCHANT_A_SK,
+      callerSk: MERCHANT_A_SK,
       amount: 40,
       invoiceId: "demo-inv-40",
       expiry: expiry(ledger),
@@ -233,10 +235,11 @@ export function snapshotAt(step: number): DemoSnapshot {
 
   // Step 5: Agent draws 40 -> note D1
   if (n >= 5 && agent && q40) {
+    staleWitness = agent.witness;
     const d = draw(ledger, {
-      agentSecret: AGENT_SK,
-      witness: agent.witness!,
-      quote: q40.quote,
+      callerSk: AGENT_SK,
+      agent,
+      invoice: invoices[0],
       newSalt: "demo-salt-1",
       noteNonce: "nn-40",
       noteSalt: "ns-40",
@@ -254,10 +257,8 @@ export function snapshotAt(step: number): DemoSnapshot {
   if (n >= 6 && note1) {
     wrongMerchantRan = true;
     const r = redeemDraw(ledger, {
-      caller: MERCHANT_B_SK,
-      noteCommitment: note1.D,
-      notePreimage: note1.preimage,
-      noteSalt: note1.salt,
+      callerSk: MERCHANT_B_SK,
+      note: note1,
     });
     if (r.ok) throw new Error("Merchant B unexpectedly redeemed Merchant A note");
     lastFail = r.message;
@@ -267,10 +268,8 @@ export function snapshotAt(step: number): DemoSnapshot {
   // Step 7: Merchant A redeems D1 successfully
   if (n >= 7 && note1) {
     const r = redeemDraw(ledger, {
-      caller: MERCHANT_A_SK,
-      noteCommitment: note1.D,
-      notePreimage: note1.preimage,
-      noteSalt: note1.salt,
+      callerSk: MERCHANT_A_SK,
+      note: note1,
     });
     if (!r.ok) throw new Error("demo redeem D1 failed");
     ledger = r.ledger;
@@ -280,10 +279,8 @@ export function snapshotAt(step: number): DemoSnapshot {
   if (n >= 8 && note1) {
     doubleRedeemRan = true;
     const r = redeemDraw(ledger, {
-      caller: MERCHANT_A_SK,
-      noteCommitment: note1.D,
-      notePreimage: note1.preimage,
-      noteSalt: note1.salt,
+      callerSk: MERCHANT_A_SK,
+      note: note1,
     });
     if (r.ok) throw new Error("Double redemption unexpectedly succeeded");
     lastFail = r.message;
@@ -294,7 +291,7 @@ export function snapshotAt(step: number): DemoSnapshot {
   let q120a: { quote: QuotePreimage; Q: string } | null = null;
   if (n >= 9) {
     const q = postQuote(ledger, {
-      caller: MERCHANT_B_SK,
+      callerSk: MERCHANT_B_SK,
       amount: 120,
       invoiceId: "demo-inv-120a",
       expiry: expiry(ledger),
@@ -316,9 +313,9 @@ export function snapshotAt(step: number): DemoSnapshot {
   if (n >= 10 && agent && q120a) {
     overLimitRan = true;
     const blocked = draw(ledger, {
-      agentSecret: AGENT_SK,
-      witness: agent.witness!,
-      quote: q120a.quote,
+      callerSk: AGENT_SK,
+      agent,
+      invoice: invoices[1],
       newSalt: "demo-salt-fail",
     });
     if (blocked.ok) throw new Error("Over-limit draw unexpectedly succeeded");
@@ -329,10 +326,10 @@ export function snapshotAt(step: number): DemoSnapshot {
   // Step 11: Repayment ack 40
   if (n >= 11 && agent) {
     const ack = acknowledgeRepayment(ledger, {
-      caller: ISSUER_SK,
-      witness: agent.witness!,
+      callerSk: ISSUER_SK,
+      agent,
       receipt: {
-        identity: agent.witness!.I,
+        identity: agent.identityCommitment ?? agent.witness?.I ?? "",
         currentC: ledger.lineCommitment!,
         amount: 40,
         paymentRef: "demo-pay-40",
@@ -344,7 +341,7 @@ export function snapshotAt(step: number): DemoSnapshot {
     });
     if (!ack.ok) throw new Error("demo ack 40");
     ledger = ack.ledger;
-    agent = { secret: AGENT_SK, witness: ack.witness };
+    agent = ack.agent ?? null;
     pendingRepay = 0;
     lastAcked = 40;
   }
@@ -353,7 +350,7 @@ export function snapshotAt(step: number): DemoSnapshot {
   let q120b: { quote: QuotePreimage; Q: string } | null = null;
   if (n >= 12) {
     const q = postQuote(ledger, {
-      caller: MERCHANT_B_SK,
+      callerSk: MERCHANT_B_SK,
       amount: 120,
       invoiceId: "demo-inv-120b",
       expiry: expiry(ledger),
@@ -374,9 +371,9 @@ export function snapshotAt(step: number): DemoSnapshot {
   // Step 13: Agent draws 120 -> note D2
   if (n >= 13 && agent && q120b) {
     const d = draw(ledger, {
-      agentSecret: AGENT_SK,
-      witness: agent.witness!,
-      quote: q120b.quote,
+      callerSk: AGENT_SK,
+      agent,
+      invoice: invoices[2],
       newSalt: "demo-salt-3",
       noteNonce: "nn-120",
       noteSalt: "ns-120",
@@ -394,9 +391,7 @@ export function snapshotAt(step: number): DemoSnapshot {
   // Step 14: Issuer tries to withdraw funds backing D2 and fails
   if (n >= 14) {
     withdrawBlockedRan = true;
-    // Total is 500, redeemed is 40, encumbered is 120. Withdrawable is 340.
-    // Attempting to withdraw 400 fails.
-    const w = withdrawUnencumberedReserve(ledger, { caller: ISSUER_SK, amount: 400 });
+    const w = withdrawUnencumberedReserve(ledger, { callerSk: ISSUER_SK, amount: 400 });
     if (w.ok) throw new Error("Withdrawal of encumbered reserve unexpectedly succeeded");
     lastFail = w.message;
     lastFailReason = w.reason;
@@ -405,10 +400,8 @@ export function snapshotAt(step: number): DemoSnapshot {
   // Step 15: Merchant B redeems D2
   if (n >= 15 && note2) {
     const r = redeemDraw(ledger, {
-      caller: MERCHANT_B_SK,
-      noteCommitment: note2.D,
-      notePreimage: note2.preimage,
-      noteSalt: note2.salt,
+      callerSk: MERCHANT_B_SK,
+      note: note2,
     });
     if (!r.ok) throw new Error("demo redeem D2 failed");
     ledger = r.ledger;
@@ -416,7 +409,7 @@ export function snapshotAt(step: number): DemoSnapshot {
 
   // Step 16: Default line
   if (n >= 16) {
-    const def = setStatus(ledger, { caller: ISSUER_SK, status: "defaulted" });
+    const def = setStatus(ledger, { callerSk: ISSUER_SK, status: "defaulted" });
     if (!def.ok) throw new Error("demo default");
     ledger = def.ledger;
   }
@@ -425,15 +418,21 @@ export function snapshotAt(step: number): DemoSnapshot {
   if (n >= 17 && agent) {
     postDefaultRan = true;
     const blocked = draw(ledger, {
-      agentSecret: AGENT_SK,
-      witness: agent.witness!,
-      quote: {
-        merchantCommitment: MERCHANT_A_PK,
-        amount: 10,
+      callerSk: AGENT_SK,
+      agent,
+      invoice: {
         invoiceId: "post-def",
-        expiry: expiry(ledger),
-        nonce: "nd",
-        generation: ledger.lineGeneration,
+        amount: 10,
+        Q: "q-def",
+        used: false,
+        preimage: {
+          merchantCommitment: MERCHANT_A_PK,
+          amount: 10,
+          invoiceId: "post-def",
+          expiry: expiry(ledger),
+          nonce: "nd",
+          generation: ledger.lineGeneration,
+        },
       },
       newSalt: "salt-def-fail",
     });
@@ -458,5 +457,6 @@ export function snapshotAt(step: number): DemoSnapshot {
     wrongMerchantRan,
     doubleRedeemRan,
     withdrawBlockedRan,
+    staleWitness,
   };
 }

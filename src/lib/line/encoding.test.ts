@@ -15,7 +15,8 @@ import {
   repayNullifier,
   toHex,
 } from "./encoding.ts";
-import { DEMO, boot, call, firstQuote, readLedger } from "./compact-harness.ts";
+import { boot, call, firstQuote, readLedger } from "./compact-harness.ts";
+import { DEMO } from "../../test/fixtures/keys.ts";
 import {
   createLedger,
   draw,
@@ -28,7 +29,7 @@ import {
   quoteCommitment,
   redeemDraw,
 } from "./protocol.ts";
-import { AGENT_SK, INSTANCE_NONCE, ISSUER_SK, MERCHANT_A_SK, MERCHANT_B_SK } from "./keys.ts";
+import { AGENT_SK, INSTANCE_NONCE, ISSUER_SK, MERCHANT_A_SK, MERCHANT_B_SK } from "../../test/fixtures/keys.ts";
 
 describe("browser-safe hex", () => {
   it("round-trips 32-byte values without Node Buffer", () => {

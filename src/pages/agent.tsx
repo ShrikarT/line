@@ -1,16 +1,19 @@
 import { Shell } from "@/components/line/shell";
 import { ExplorerPanel } from "@/components/line/explorer";
 import { Button, FlashBar, Mono, Panel, Stat } from "@/components/line/ui";
-import { available } from "@/lib/line/protocol.ts";
-import { useLine } from "@/lib/line/store.ts";
+import { availableCredit } from "@/lib/line/types.ts";
+import { useAppStore } from "@/app/store.ts";
 
 export function AgentPage() {
-  const agent = useLine((s) => s.agent);
-  const invoices = useLine((s) => s.invoices);
-  const doDraw = useLine((s) => s.doDraw);
-  const flash = useLine((s) => s.flash);
-  const notes = useLine((s) => s.notes);
-  const w = agent?.witness;
+  const agentRecord = useAppStore((s) => s.agentRecord);
+  const invoices = useAppStore((s) => s.invoices);
+  const doDraw = useAppStore((s) => s.doDraw);
+  const flash = useAppStore((s) => s.flash);
+  const notes = useAppStore((s) => s.notes);
+  const isVaultUnlocked = useAppStore((s) => s.isVaultUnlocked);
+  const txLifecycle = useAppStore((s) => s.txLifecycle);
+
+  const w = agentRecord ? { L: agentRecord.L, B: agentRecord.B } : null;
 
   return (
     <Shell>
@@ -25,10 +28,14 @@ export function AgentPage() {
             <div className="grid grid-cols-3 gap-4">
               <Stat label="Limit" privateHint value={w.L} />
               <Stat label="Outstanding" privateHint value={w.B} />
-              <Stat label="Available" privateHint value={available(w)} />
+              <Stat label="Available" privateHint value={availableCredit(w)} />
             </div>
           ) : (
-            <p className="text-sm text-subtle">Issuer has not opened a line for this agent.</p>
+            <p className="text-sm text-subtle">
+              {isVaultUnlocked
+                ? "Issuer has not opened a credit line for this agent."
+                : "Unlock encrypted vault to access confidential credit line."}
+            </p>
           )}
 
           <div className="border-t border-border pt-4 space-y-3">
@@ -44,7 +51,12 @@ export function AgentPage() {
                     <span className="text-sm">
                       {inv.invoiceId} · <span className="font-semibold">{inv.amount} units</span>
                     </span>
-                    <Button onClick={() => doDraw(inv.Q)}>Draw & Issue Note</Button>
+                    <Button
+                      onClick={() => doDraw(inv.Q)}
+                      disabled={txLifecycle === "wallet-approval" || txLifecycle === "proving"}
+                    >
+                      {txLifecycle === "proving" ? "Proving ZK..." : "Draw & Issue Note"}
+                    </Button>
                   </li>
                 ))}
               </ul>

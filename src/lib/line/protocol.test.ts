@@ -24,16 +24,13 @@ import {
   withdrawUnencumberedReserve,
 } from "./protocol.ts";
 import type { Ledger, LineWitness, QuotePreimage, RepayReceipt } from "./types.ts";
-import { AGENT_SK, INSTANCE_NONCE, ISSUER_SK, MERCHANT_A_SK, MERCHANT_B_SK } from "./keys.ts";
+import { AGENT_SK, INSTANCE_NONCE, ISSUER_SK, MERCHANT_A_SK, MERCHANT_B_SK } from "../../test/fixtures/keys.ts";
 
 const LIMIT = 150;
+const createTestLedger = () => createLedger({ issuerSecret: ISSUER_SK, merchantSecret: MERCHANT_A_SK, instanceNonce: INSTANCE_NONCE });
 
 function opened() {
-  const ledger = createLedger({
-    issuerSecret: ISSUER_SK,
-    merchantSecret: MERCHANT_A_SK,
-    instanceNonce: INSTANCE_NONCE,
-  });
+  const ledger = createTestLedger();
   const funded = fundReserve(ledger, { caller: ISSUER_SK, amount: 1000 });
   assert.equal(funded.ok, true);
   if (!funded.ok) throw new Error("fund");
@@ -104,7 +101,7 @@ describe("reference engine: merchant registry", () => {
 
 describe("reference engine: reserve accounting", () => {
   it("fund increases totalReserve", () => {
-    const ledger = createLedger();
+    const ledger = createTestLedger();
     const r = fundReserve(ledger, { caller: ISSUER_SK, amount: 500 });
     assert.equal(r.ok, true);
     if (!r.ok) throw new Error("fund");
@@ -112,13 +109,13 @@ describe("reference engine: reserve accounting", () => {
   });
 
   it("non-issuer cannot fund reserve", () => {
-    const ledger = createLedger();
+    const ledger = createTestLedger();
     const r = fundReserve(ledger, { caller: AGENT_SK, amount: 500 });
     assert.equal(r.ok, false);
   });
 
   it("withdraws unencumbered reserve", () => {
-    const ledger = createLedger();
+    const ledger = createTestLedger();
     const f = fundReserve(ledger, { caller: ISSUER_SK, amount: 500 });
     if (!f.ok) throw new Error("fund");
     const w = withdrawUnencumberedReserve(f.ledger, { caller: ISSUER_SK, amount: 200 });
@@ -128,7 +125,7 @@ describe("reference engine: reserve accounting", () => {
   });
 
   it("cannot withdraw more than unencumbered reserve", () => {
-    const ledger = createLedger();
+    const ledger = createTestLedger();
     const f = fundReserve(ledger, { caller: ISSUER_SK, amount: 100 });
     if (!f.ok) throw new Error("fund");
     const w = withdrawUnencumberedReserve(f.ledger, { caller: ISSUER_SK, amount: 150 });
@@ -148,7 +145,7 @@ describe("reference engine: openLine", () => {
   });
 
   it("rejects a forged issuer", () => {
-    const r = openLine(createLedger(), {
+    const r = openLine(createTestLedger(), {
       caller: "attacker",
       agentSecret: AGENT_SK,
       limit: 150,
@@ -171,7 +168,7 @@ describe("reference engine: openLine", () => {
   });
 
   it("rejects zero limit", () => {
-    const r = openLine(createLedger(), {
+    const r = openLine(createTestLedger(), {
       caller: ISSUER_SK,
       agentSecret: AGENT_SK,
       limit: 0,
@@ -215,7 +212,7 @@ describe("reference engine: postQuote", () => {
   });
 
   it("rejects quote before line exists", () => {
-    const r = postQuote(createLedger(), {
+    const r = postQuote(createTestLedger(), {
       caller: MERCHANT_A_SK,
       amount: 40,
       invoiceId: "inv-1",
@@ -291,7 +288,7 @@ describe("reference engine: draw and note creation", () => {
   });
 
   it("rejects draw when reserve is insufficient", () => {
-    const ledger = createLedger();
+    const ledger = createTestLedger();
     const f = fundReserve(ledger, { caller: ISSUER_SK, amount: 30 });
     if (!f.ok) throw new Error("fund");
     const o = openLine(f.ledger, {
