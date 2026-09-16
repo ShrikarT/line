@@ -33,7 +33,8 @@
 
 ### 2. Runtime Architecture (`src/lib/runtime/`)
 - [x] `LineRuntime` interface defining unified operations and status queries
-- [x] `MidnightNetworkRuntime`: Production adapter interfacing with Midnight network RPC, indexer, and wallet via `@midnight-ntwrk/dapp-connector-api@4.0.1` and `indexerPublicDataProvider`
+- [x] `MidnightNetworkRuntime`: Production adapter interfacing with Midnight network RPC, indexer, and wallet via `@midnight-ntwrk/dapp-connector-api@4.0.1`, `@midnight-ntwrk/midnight-js-contracts@4.1.1`, and `indexerPublicDataProvider`
+- [x] `VaultPrivateStateProvider`: Production `PrivateStateProvider` conforming to `@midnight-ntwrk/midnight-js-types` with WebCrypto AES-GCM IndexedDB encryption
 - [x] `LocalDevelopmentRuntime`: Developer adapter running Compact simulator with explicit environment indicators
 - [x] `InMemoryTestRuntime`: Isolated in-memory adapter for automated test suites
 - [x] Runtime selection factory `getRuntime()` with environment variable control (`LINE_RUNTIME`)
@@ -44,7 +45,10 @@
 - [x] IndexedDB encrypted envelope persistence and in-memory session locking
 - [x] Zero plaintext secret persistence in `localStorage`
 - [x] Automatic legacy plaintext `localStorage` purge (`purgeLegacyPlaintextStorage()`)
-- [x] Zero fixture keys in production paths verified by `npm run check:keys`
+- [x] Structural fixture key elimination: production store (`src/app/store.ts`), lab simulator (`src/dev/simulator-store.ts`), test fixtures (`src/test/fixtures/keys.ts`)
+- [x] Zero fixture keys in production paths verified by `npm run check:keys` (37 modules audited)
+- [x] Negative key audit test suite (`node scripts/check-no-fixture-keys.test.mjs`)
+- [x] Secret pattern scanner (`npm run check:secrets`)
 - [x] Cryptographically secure randomness (`crypto.getRandomValues`) throughout
 - [x] Institutional custody disclaimer documented and tested
 
@@ -58,24 +62,25 @@
 ### 5. Automated Verification Suite
 - [x] 46 Compact simulator & cross-language encoding tests (`npm run compact:test`)
 - [x] 31 Reference engine tests (`src/lib/line/protocol.test.ts`)
-- [x] 13 Scripted demo snapshot tests (`src/lib/line/demo.test.ts`)
+- [x] 13 Scripted demo snapshot tests (`src/dev/demo.ts` / `src/lib/line/demo.test.ts`)
 - [x] 1 Deterministic model checker test (`src/lib/line/model.test.ts`) verifying all 10 invariants across 50 operations
 - [x] 4 Privacy & leakage tests (`src/lib/line/leakage.test.ts`)
 - [x] 4 Runtime architecture tests (`src/lib/runtime/runtime.test.ts`)
-- [x] 6 Midnight Network Runtime & wallet integration tests (`src/lib/runtime/network.integration.test.ts`)
+- [x] 9 Midnight Network Runtime, wallet connector, and vault provider integration tests (`src/lib/runtime/network.integration.test.ts`)
 - [x] 6 Security vault tests (`src/lib/security/vault.test.ts`)
 - [x] 4 MCP JSON-RPC server tests (`mcp/line-mcp.test.mjs`)
-- [x] **Total Unit/Integration:** **115 passing tests across 30 suites (`npm test`)**
+- [x] **Total Unit/Integration:** **118 passing tests across 30 suites (`npm test`)**
 - [x] **E2E Browser Testing:** **4 passing Playwright browser tests (`npm run test:e2e`)**
 
 ### 6. Developer & Deployment Operations
 - [x] `npm run compact:compile`: Deterministic fast compilation with `--skip-zk`
 - [x] `npm run compact:compile:release`: Full release compilation with proving key generation
-- [x] `npm run contract:deploy`: Contract deployment script querying network and deployer seed
+- [x] `npm run contract:deploy`: Contract deployment script requiring `MIDNIGHT_DEPLOYER_SEED`, deriving non-zero constructor args, and verifying deployed state via indexer
 - [x] `npm run contract:join`: Connect to existing deployed contract via GraphQL indexer
-- [x] `npm run network:smoke`: Real network connectivity and state smoke test
+- [x] `npm run network:smoke`: Live network connectivity and state smoke test
 - [x] `npm run local:smoke`: Local simulator smoke test verifying end-to-end lifecycle
-- [x] `npm run check:keys`: Static analysis guarding against fixture key imports in production paths
+- [x] `npm run check:keys`: Deep static analysis guarding against fixture key imports in production graph
+- [x] `npm run check:secrets`: Secret scanner auditing for hardcoded keys, passwords, and seeds
 - [x] `npm run test:e2e`: Playwright headless browser test suite
 - [x] `npm run mcp`: Production MCP server
 - [x] `npm run mcp:dev`: Local development MCP adapter
