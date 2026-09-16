@@ -180,11 +180,11 @@ export const TAG = {
   issuerPk: pad32("line:issuer:pk"),
   merchantPk: pad32("line:merchant:pk"),
   id: pad32("line:id"),
-  domain: pad32("line:v2:domain"),
-  quote: pad32("line:v2:quote"),
-  draw: pad32("line:v2:draw"),
-  redeem: pad32("line:v2:redeem"),
-  repay: pad32("line:v2:repay"),
+  domain: pad32("line:protocol:2:domain"),
+  quote: pad32("line:protocol:2:quote"),
+  draw: pad32("line:protocol:2:draw"),
+  redeem: pad32("line:protocol:2:redeem"),
+  repay: pad32("line:protocol:2:repay"),
 } as const;
 
 export function issuerPublicKey(sk: Uint8Array): Uint8Array {

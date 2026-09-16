@@ -33,15 +33,18 @@
 
 ### 2. Runtime Architecture (`src/lib/runtime/`)
 - [x] `LineRuntime` interface defining unified operations and status queries
-- [x] `MidnightNetworkRuntime`: Production adapter interfacing with Midnight network RPC, indexer, and wallet
+- [x] `MidnightNetworkRuntime`: Production adapter interfacing with Midnight network RPC, indexer, and wallet via `@midnight-ntwrk/dapp-connector-api@4.0.1` and `indexerPublicDataProvider`
 - [x] `LocalDevelopmentRuntime`: Developer adapter running Compact simulator with explicit environment indicators
 - [x] `InMemoryTestRuntime`: Isolated in-memory adapter for automated test suites
 - [x] Runtime selection factory `getRuntime()` with environment variable control (`LINE_RUNTIME`)
+- [x] Network setup UI with wallet connector (`window.midnight.mnLace`) and contract join panel
 
 ### 3. Private State Management & Security Vault (`src/lib/security/`)
 - [x] WebCrypto AES-GCM 256-bit encryption with PBKDF2-HMAC-SHA256 (100,000 iterations)
-- [x] IndexedDB encrypted envelope persistence
+- [x] IndexedDB encrypted envelope persistence and in-memory session locking
 - [x] Zero plaintext secret persistence in `localStorage`
+- [x] Automatic legacy plaintext `localStorage` purge (`purgeLegacyPlaintextStorage()`)
+- [x] Zero fixture keys in production paths verified by `npm run check:keys`
 - [x] Cryptographically secure randomness (`crypto.getRandomValues`) throughout
 - [x] Institutional custody disclaimer documented and tested
 
@@ -59,15 +62,20 @@
 - [x] 1 Deterministic model checker test (`src/lib/line/model.test.ts`) verifying all 10 invariants across 50 operations
 - [x] 4 Privacy & leakage tests (`src/lib/line/leakage.test.ts`)
 - [x] 4 Runtime architecture tests (`src/lib/runtime/runtime.test.ts`)
-- [x] 4 Security vault tests (`src/lib/security/vault.test.ts`)
+- [x] 6 Midnight Network Runtime & wallet integration tests (`src/lib/runtime/network.integration.test.ts`)
+- [x] 6 Security vault tests (`src/lib/security/vault.test.ts`)
 - [x] 4 MCP JSON-RPC server tests (`mcp/line-mcp.test.mjs`)
-- **Total:** **99 passing tests across 27 suites**
+- [x] **Total Unit/Integration:** **115 passing tests across 30 suites (`npm test`)**
+- [x] **E2E Browser Testing:** **4 passing Playwright browser tests (`npm run test:e2e`)**
 
 ### 6. Developer & Deployment Operations
 - [x] `npm run compact:compile`: Deterministic fast compilation with `--skip-zk`
 - [x] `npm run compact:compile:release`: Full release compilation with proving key generation
-- [x] `npm run contract:deploy`: Contract deployment with dry-run validation
-- [x] `npm run contract:join`: Connect to existing deployed contract
-- [x] `npm run network:smoke`: Network connectivity and state smoke test
+- [x] `npm run contract:deploy`: Contract deployment script querying network and deployer seed
+- [x] `npm run contract:join`: Connect to existing deployed contract via GraphQL indexer
+- [x] `npm run network:smoke`: Real network connectivity and state smoke test
+- [x] `npm run local:smoke`: Local simulator smoke test verifying end-to-end lifecycle
+- [x] `npm run check:keys`: Static analysis guarding against fixture key imports in production paths
+- [x] `npm run test:e2e`: Playwright headless browser test suite
 - [x] `npm run mcp`: Production MCP server
 - [x] `npm run mcp:dev`: Local development MCP adapter

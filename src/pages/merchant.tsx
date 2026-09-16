@@ -2,19 +2,19 @@ import { Shell } from "@/components/line/shell";
 import { ExplorerPanel } from "@/components/line/explorer";
 import { Button, FlashBar, Mono, Panel, Stat } from "@/components/line/ui";
 import { useLine } from "@/lib/line/store.ts";
-import { MERCHANT_A_PK, MERCHANT_B_PK } from "@/lib/line/keys.ts";
 
 export function MerchantPage() {
   const doQuote = useLine((s) => s.doQuote);
   const doRedeem = useLine((s) => s.doRedeem);
   const activeMerchant = useLine((s) => s.activeMerchant);
   const setActiveMerchant = useLine((s) => s.setActiveMerchant);
+  const getActiveMerchantPk = useLine((s) => s.getActiveMerchantPk);
   const invoices = useLine((s) => s.invoices);
   const notes = useLine((s) => s.notes);
   const ledger = useLine((s) => s.ledger);
   const flash = useLine((s) => s.flash);
 
-  const currentPk = activeMerchant === "A" ? MERCHANT_A_PK : MERCHANT_B_PK;
+  const currentPk = getActiveMerchantPk();
   const merchantNotes = notes.filter((n) => n.preimage.merchantPk === currentPk);
 
   return (

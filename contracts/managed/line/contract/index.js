@@ -950,7 +950,7 @@ export class Contract {
                                                  value: __compactRuntime.StateValue.newCell({ value: _descriptor_2.toValue(issuerPk_0),
                                                                                               alignment: _descriptor_2.alignment() }).encode() } },
                                        { ins: { cached: false, n: 1 } }]);
-    const tmp_0 = this._persistentHash_1([new Uint8Array([108, 105, 110, 101, 58, 118, 50, 58, 100, 111, 109, 97, 105, 110, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+    const tmp_0 = this._persistentHash_1([new Uint8Array([108, 105, 110, 101, 58, 112, 114, 111, 116, 111, 99, 111, 108, 58, 50, 58, 100, 111, 109, 97, 105, 110, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
                                           issuerPk_0,
                                           initialMerchantPk_0,
                                           instanceNonce_0]);
@@ -1301,7 +1301,7 @@ export class Contract {
                  generation_0,
                  domain_0)
   {
-    return this._persistentHash_0([new Uint8Array([108, 105, 110, 101, 58, 118, 50, 58, 113, 117, 111, 116, 101, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+    return this._persistentHash_0([new Uint8Array([108, 105, 110, 101, 58, 112, 114, 111, 116, 111, 99, 111, 108, 58, 50, 58, 113, 117, 111, 116, 101, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
                                    merchantPk_0,
                                    inv_0,
                                    this._encodeU64_0(amount_0),
@@ -1311,19 +1311,19 @@ export class Contract {
                                    domain_0]);
   }
   _drawNullifier_0(sk_0, Q_0, domain_0) {
-    return this._persistentHash_1([new Uint8Array([108, 105, 110, 101, 58, 118, 50, 58, 100, 114, 97, 119, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+    return this._persistentHash_1([new Uint8Array([108, 105, 110, 101, 58, 112, 114, 111, 116, 111, 99, 111, 108, 58, 50, 58, 100, 114, 97, 119, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
                                    sk_0,
                                    Q_0,
                                    domain_0]);
   }
   _redeemNullifier_0(sk_0, D_0, domain_0) {
-    return this._persistentHash_1([new Uint8Array([108, 105, 110, 101, 58, 118, 50, 58, 114, 101, 100, 101, 101, 109, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+    return this._persistentHash_1([new Uint8Array([108, 105, 110, 101, 58, 112, 114, 111, 116, 111, 99, 111, 108, 58, 50, 58, 114, 101, 100, 101, 101, 109, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
                                    sk_0,
                                    D_0,
                                    domain_0]);
   }
   _repayNullifier_0(nonce_0, I_0, C_0, amount_0, payRef_0, domain_0) {
-    return this._persistentHash_2([new Uint8Array([108, 105, 110, 101, 58, 118, 50, 58, 114, 101, 112, 97, 121, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+    return this._persistentHash_2([new Uint8Array([108, 105, 110, 101, 58, 112, 114, 111, 116, 111, 99, 111, 108, 58, 50, 58, 114, 101, 112, 97, 121, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
                                    nonce_0,
                                    I_0,
                                    C_0,
