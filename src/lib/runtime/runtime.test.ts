@@ -23,7 +23,7 @@ describe("runtime architecture: MidnightNetworkRuntime, LocalDevelopmentRuntime,
 
     await assert.rejects(
       () => net.fundReserve(100, ISSUER_SK),
-      /MidnightNetworkRuntime: Cannot fund reserve. MIDNIGHT_CONTRACT_ADDRESS is not set/
+      /WalletNotConnectedError|No Midnight wallet connection detected/
     );
   });
 

@@ -28,7 +28,7 @@ where `salt: Bytes<32>`.
 
 ### Quote Commitment ($Q$)
 $$\begin{aligned}
-Q = \text{persistentHash}([&\text{pad}(32, \text{"line:v2:quote"}), \text{merchantPk}, \text{invoiceId}, \\
+Q = \text{persistentHash}([&\text{pad}(32, \text{"line:protocol:2:quote"}), \text{merchantPk}, \text{invoiceId}, \\
 &\text{encodeU64}(A), \text{encodeU64}(\text{expiry}), \text{nonce}, \text{encodeU64}(\text{generation}), \text{contractDomain}])
 \end{aligned}$$
 Vector of 8 `Bytes<32>` elements. Binds invoice ID, amount, expiry action clock, nonce, generation, and contract domain.
@@ -54,19 +54,19 @@ Note: Merchant identity is hidden from `NoteMeta` and protected inside $D$.
 ## 3. Nullifiers
 
 ### Draw Nullifier
-$$N_{\text{draw}} = \text{persistentHash}([\text{pad}(32, \text{"line:v2:draw"}), \text{agentSecret}, Q, \text{contractDomain}])$$
+$$N_{\text{draw}} = \text{persistentHash}([\text{pad}(32, \text{"line:protocol:2:draw"}), \text{agentSecret}, Q, \text{contractDomain}])$$
 
 ### Redemption Nullifier
-$$N_{\text{redeem}} = \text{persistentHash}([\text{pad}(32, \text{"line:v2:redeem"}), \text{merchantSecret}, D, \text{contractDomain}])$$
+$$N_{\text{redeem}} = \text{persistentHash}([\text{pad}(32, \text{"line:protocol:2:redeem"}), \text{merchantSecret}, D, \text{contractDomain}])$$
 
 ### Repayment Nullifier
-$$N_{\text{repay}} = \text{persistentHash}([\text{pad}(32, \text{"line:v2:repay"}), \text{nonce}, I, C, \text{encodeU64}(R), \text{paymentRef}, \text{contractDomain}])$$
+$$N_{\text{repay}} = \text{persistentHash}([\text{pad}(32, \text{"line:protocol:2:repay"}), \text{nonce}, I, C, \text{encodeU64}(R), \text{paymentRef}, \text{contractDomain}])$$
 
 ---
 
 ## 4. Contract Domain
 
-$$\text{contractDomain} = \text{persistentHash}([\text{pad}(32, \text{"line:v2:domain"}), \text{issuerPk}, \text{initialMerchantPk}, \text{instanceNonce}])$$
+$$\text{contractDomain} = \text{persistentHash}([\text{pad}(32, \text{"line:protocol:2:domain"}), \text{issuerPk}, \text{initialMerchantPk}, \text{instanceNonce}])$$
 
 ---
 
@@ -77,11 +77,11 @@ $$\text{contractDomain} = \text{persistentHash}([\text{pad}(32, \text{"line:v2:d
 | `line:issuer:pk` | `issuerPublicKey(sk)` | Issuer identity derivation |
 | `line:merchant:pk` | `merchantPublicKey(sk)` | Merchant identity derivation |
 | `line:id` | `agentId(sk)` | Agent identity derivation |
-| `line:v2:domain` | `contractDomain` | Instance isolation with `instanceNonce` |
-| `line:v2:quote` | `quoteCommit` | 8-element quote commitment |
-| `line:v2:draw` | `drawNullifier` | 4-element draw nullifier |
-| `line:v2:redeem` | `redeemNullifier` | 4-element redemption nullifier |
-| `line:v2:repay` | `repayNullifier` | 7-element repayment nullifier |
+| `line:protocol:2:domain` | `contractDomain` | Instance isolation with `instanceNonce` |
+| `line:protocol:2:quote` | `quoteCommit` | 8-element quote commitment |
+| `line:protocol:2:draw` | `drawNullifier` | 4-element draw nullifier |
+| `line:protocol:2:redeem` | `redeemNullifier` | 4-element redemption nullifier |
+| `line:protocol:2:repay` | `repayNullifier` | 7-element repayment nullifier |
 
 ---
 

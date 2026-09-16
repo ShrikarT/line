@@ -15,10 +15,10 @@ import {
   postQuote,
   draw,
   redeemDraw,
+  cancelOrExpireNote,
   acknowledgeRepayment,
   setStatus,
 } from "../line/protocol.ts";
-import { ISSUER_SK, MERCHANT_A_SK, INSTANCE_NONCE } from "../line/keys.ts";
 
 export class LocalDevelopmentRuntime implements LineRuntime {
   readonly mode: RuntimeMode = "local";
@@ -27,13 +27,7 @@ export class LocalDevelopmentRuntime implements LineRuntime {
   private txCounter: number = 0;
 
   constructor(initialLedger?: Ledger) {
-    this.ledger =
-      initialLedger ??
-      createLedger({
-        issuerSecret: ISSUER_SK,
-        merchantSecret: MERCHANT_A_SK,
-        instanceNonce: INSTANCE_NONCE,
-      });
+    this.ledger = initialLedger ?? createLedger();
   }
 
   isConnected(): boolean {
@@ -244,6 +238,13 @@ export class LocalDevelopmentRuntime implements LineRuntime {
       notePreimage: preimage,
       noteSalt: params.noteSalt,
     });
+    if (!res.ok) return { ok: false, error: res.message, code: res.code };
+    this.ledger = res.ledger;
+    return { ok: true, txHash: this.nextTxHash(), blockHeight: this.ledger.actionClock };
+  }
+
+  async cancelOrExpireNote(noteCommit: string, _callerSk: string): Promise<RuntimeTransactionResult> {
+    const res = cancelOrExpireNote(this.ledger, { noteCommitment: noteCommit });
     if (!res.ok) return { ok: false, error: res.message, code: res.code };
     this.ledger = res.ledger;
     return { ok: true, txHash: this.nextTxHash(), blockHeight: this.ledger.actionClock };

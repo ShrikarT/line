@@ -49,4 +49,68 @@ describe("security vault: WebCrypto AES-GCM and PBKDF2", () => {
       /operation failed|ciphertext|mac/i
     );
   });
+
+  it("manages ephemeral vault session locking and timeout", async () => {
+    const {
+      unlockVaultSession,
+      lockVaultSession,
+      isVaultSessionUnlocked,
+      getVaultSessionPassphrase,
+    } = await import("./vault.ts");
+
+    lockVaultSession();
+    assert.equal(isVaultSessionUnlocked(), false);
+    assert.equal(getVaultSessionPassphrase(), null);
+
+    unlockVaultSession("session-pass-123", 10);
+    assert.equal(isVaultSessionUnlocked(), true);
+    assert.equal(getVaultSessionPassphrase(), "session-pass-123");
+
+    lockVaultSession();
+    assert.equal(isVaultSessionUnlocked(), false);
+    assert.equal(getVaultSessionPassphrase(), null);
+  });
+
+  it("purgeLegacyPlaintextStorage cleans sensitive legacy keys without removing UI prefs", async () => {
+    const { purgeLegacyPlaintextStorage } = await import("./vault.ts");
+
+    const mockStorage = new Map<string, string>();
+    const fakeLocalStorage = {
+      length: 0,
+      key: (i: number) => Array.from(mockStorage.keys())[i] ?? null,
+      getItem: (k: string) => mockStorage.get(k) ?? null,
+      setItem: (k: string, v: string) => {
+        mockStorage.set(k, v);
+        fakeLocalStorage.length = mockStorage.size;
+      },
+      removeItem: (k: string) => {
+        mockStorage.delete(k);
+        fakeLocalStorage.length = mockStorage.size;
+      },
+    };
+
+    // Simulate global window.localStorage
+    const originalWindow = globalThis.window;
+    (globalThis as any).window = { localStorage: fakeLocalStorage };
+
+    try {
+      fakeLocalStorage.setItem("line.protocol.v3", JSON.stringify({ state: { secret: "sensitive_sk", L: 150 } }));
+      fakeLocalStorage.setItem("line.state.agent", "secret_agent_witness");
+      fakeLocalStorage.setItem("line.ui.theme", "dark");
+      fakeLocalStorage.setItem("line.ui.preferences", JSON.stringify({ activeMerchant: "A" }));
+
+      assert.equal(mockStorage.size, 4);
+
+      purgeLegacyPlaintextStorage();
+
+      // Sensitive keys purged
+      assert.equal(mockStorage.has("line.protocol.v3"), false);
+      assert.equal(mockStorage.has("line.state.agent"), false);
+      // Non-sensitive UI keys preserved
+      assert.equal(mockStorage.get("line.ui.theme"), "dark");
+      assert.equal(mockStorage.has("line.ui.preferences"), true);
+    } finally {
+      (globalThis as any).window = originalWindow;
+    }
+  });
 });

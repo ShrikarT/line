@@ -33,6 +33,14 @@ import type {
   MerchantInvoice,
   RepayReceipt,
 } from "./types.ts";
+import {
+  purgeLegacyPlaintextStorage,
+  saveEncryptedJson,
+  loadEncryptedJson,
+  getVaultSessionPassphrase,
+} from "../security/vault.ts";
+
+purgeLegacyPlaintextStorage();
 
 export { AGENT_SK as AGENT, ISSUER_SK as ISSUER, MERCHANT_SK as MERCHANT } from "./keys.ts";
 export type { MerchantInvoice, DrawNote } from "./types.ts";
@@ -73,6 +81,7 @@ export type LineState = {
   reset: () => void;
   setFlash: (flash: Flash | null) => void;
   setActiveMerchant: (m: "A" | "B") => void;
+  getActiveMerchantPk: (m?: "A" | "B") => string;
   doFundReserve: (amount?: number) => void;
   doWithdrawReserve: (amount?: number) => void;
   doRegisterMerchant: (merchantPkOrSecret?: string) => void;
@@ -122,6 +131,7 @@ export const useLine = create<LineState>()(
       ...empty(),
       setFlash: (flash) => set({ flash }),
       setActiveMerchant: (activeMerchant) => set({ activeMerchant }),
+      getActiveMerchantPk: (m) => ((m ?? get().activeMerchant) === "A" ? MERCHANT_A_PK : MERCHANT_B_PK),
       reset: () => set({ ...empty(), flash: { tone: "info", text: "Ledger reset." } }),
 
       setDemoStep: (step) => {
@@ -166,7 +176,7 @@ export const useLine = create<LineState>()(
             circuit: "fundReserve",
             ok: true,
             publicView: `Total reserve increased by ${amount}. Total reserve = ${r.ledger.totalReserve}.`,
-            privateView: `Issuer liquidity deposited to back agent purchases.`,
+            privateView: `Issuer allocated settlement capacity to back agent purchases.`,
           },
         });
       },
@@ -708,7 +718,7 @@ export const useLine = create<LineState>()(
       },
     }),
     {
-      name: "line.protocol.v3",
+      name: "line.ui.preferences",
       storage: createJSONStorage(() => {
         if (typeof window === "undefined") {
           return {
@@ -718,6 +728,10 @@ export const useLine = create<LineState>()(
           };
         }
         return localStorage;
+      }),
+      partialize: (state) => ({
+        activeMerchant: state.activeMerchant,
+        demoStep: state.demoStep,
       }),
     },
   ),

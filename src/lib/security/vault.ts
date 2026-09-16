@@ -168,7 +168,96 @@ export async function loadEncryptedSecret(
   return decryptSecret(envelope, passphrase);
 }
 
+export async function saveEncryptedJson<T>(
+  id: string,
+  data: T,
+  passphrase: string
+): Promise<void> {
+  const jsonStr = JSON.stringify(data);
+  return saveEncryptedSecret(id, jsonStr, passphrase);
+}
+
+export async function loadEncryptedJson<T>(
+  id: string,
+  passphrase: string
+): Promise<T | null> {
+  const jsonStr = await loadEncryptedSecret(id, passphrase);
+  if (!jsonStr) return null;
+  try {
+    return JSON.parse(jsonStr) as T;
+  } catch {
+    return null;
+  }
+}
+
+// In-memory ephemeral session state (never stored to disk or localStorage)
+let sessionPassphrase: string | null = null;
+let sessionExpiresAt: number = 0;
+let sessionTimer: ReturnType<typeof setTimeout> | null = null;
+
+export function unlockVaultSession(passphrase: string, timeoutMinutes: number = 15): void {
+  sessionPassphrase = passphrase;
+  sessionExpiresAt = Date.now() + timeoutMinutes * 60 * 1000;
+  if (sessionTimer) clearTimeout(sessionTimer);
+  sessionTimer = setTimeout(() => {
+    lockVaultSession();
+  }, timeoutMinutes * 60 * 1000);
+}
+
+export function lockVaultSession(): void {
+  sessionPassphrase = null;
+  sessionExpiresAt = 0;
+  if (sessionTimer) {
+    clearTimeout(sessionTimer);
+    sessionTimer = null;
+  }
+}
+
+export function isVaultSessionUnlocked(): boolean {
+  return Boolean(sessionPassphrase && Date.now() < sessionExpiresAt);
+}
+
+export function getVaultSessionPassphrase(): string | null {
+  if (!isVaultSessionUnlocked()) {
+    lockVaultSession();
+    return null;
+  }
+  return sessionPassphrase;
+}
+
+export function purgeLegacyPlaintextStorage(targetStorage?: {
+  length: number;
+  key(index: number): string | null;
+  removeItem(key: string): void;
+}): void {
+  const storage = targetStorage ?? (typeof window !== "undefined" ? window.localStorage : null);
+  if (!storage) return;
+  try {
+    const toRemove: string[] = [];
+    for (let i = 0; i < storage.length; i++) {
+      const key = storage.key(i);
+      if (
+        key &&
+        (key.startsWith("line.protocol") ||
+          key.includes("line:store") ||
+          key.includes("line.state") ||
+          key.includes("agent-secret") ||
+          key.includes("witness"))
+      ) {
+        toRemove.push(key);
+      }
+    }
+    for (const k of toRemove) {
+      storage.removeItem(k);
+    }
+  } catch {
+    // Ignore restricted storage contexts
+  }
+}
+
 export async function clearVaultState(): Promise<void> {
+  lockVaultSession();
+  purgeLegacyPlaintextStorage();
   if (typeof indexedDB === "undefined") return;
   const db = await openDb();
   return new Promise((resolve, reject) => {
@@ -179,3 +268,4 @@ export async function clearVaultState(): Promise<void> {
     req.onerror = () => reject(req.error);
   });
 }
+

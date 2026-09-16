@@ -88,6 +88,7 @@ export interface LineRuntime {
     noteNonce: string;
     noteSalt: string;
   }): Promise<RuntimeTransactionResult>;
+  cancelOrExpireNote(noteCommit: string, callerSk: string): Promise<RuntimeTransactionResult>;
   acknowledgeRepayment(params: {
     limit: number;
     outstanding: number;

@@ -11,7 +11,7 @@
 //   D = persistentCommit<DrawNotePreimage>(notePreimage, noteSalt)
 //
 // Domain separation uses pad(32, "line:…") tags:
-//   line:issuer:pk, line:merchant:pk, line:id, line:v2:domain, line:v2:quote, line:v2:draw, line:v2:redeem, line:v2:repay
+//   line:issuer:pk, line:merchant:pk, line:id, line:protocol:2:domain, line:protocol:2:quote, line:protocol:2:draw, line:protocol:2:redeem, line:protocol:2:repay
 //
 // Reserve accounting:
 //   totalReserve: cumulative funds deposited by issuer
@@ -132,7 +132,7 @@ circuit quoteCommit(
   domain: Bytes<32>
 ): Bytes<32> {
   return persistentHash<Vector<8, Bytes<32>>>([
-    pad(32, "line:v2:quote"),
+    pad(32, "line:protocol:2:quote"),
     merchantPk,
     inv,
     encodeU64(amount),
@@ -145,7 +145,7 @@ circuit quoteCommit(
 
 circuit drawNullifier(sk: Bytes<32>, Q: Bytes<32>, domain: Bytes<32>): Bytes<32> {
   return persistentHash<Vector<4, Bytes<32>>>([
-    pad(32, "line:v2:draw"),
+    pad(32, "line:protocol:2:draw"),
     sk,
     Q,
     domain
@@ -154,7 +154,7 @@ circuit drawNullifier(sk: Bytes<32>, Q: Bytes<32>, domain: Bytes<32>): Bytes<32>
 
 circuit redeemNullifier(sk: Bytes<32>, D: Bytes<32>, domain: Bytes<32>): Bytes<32> {
   return persistentHash<Vector<4, Bytes<32>>>([
-    pad(32, "line:v2:redeem"),
+    pad(32, "line:protocol:2:redeem"),
     sk,
     D,
     domain
@@ -170,7 +170,7 @@ circuit repayNullifier(
   domain: Bytes<32>
 ): Bytes<32> {
   return persistentHash<Vector<7, Bytes<32>>>([
-    pad(32, "line:v2:repay"),
+    pad(32, "line:protocol:2:repay"),
     nonce,
     I,
     C,
@@ -183,7 +183,7 @@ circuit repayNullifier(
 constructor(issuerPk: Bytes<32>, initialMerchantPk: Bytes<32>, instanceNonce: Bytes<32>) {
   issuer = disclose(issuerPk);
   contractDomain = disclose(persistentHash<Vector<4, Bytes<32>>>([
-    pad(32, "line:v2:domain"),
+    pad(32, "line:protocol:2:domain"),
     issuerPk,
     initialMerchantPk,
     instanceNonce
