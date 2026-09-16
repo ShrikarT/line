@@ -10,7 +10,7 @@ import {
   Status,
   type Ledger as CompactLedger,
 } from "../../../contracts/managed/line/contract/index.js";
-import { issuerPublicKey, merchantPublicKey, pad32 } from "./encoding.ts";
+import { issuerPublicKey, merchantPublicKey, pad32, randomBytes32 } from "./encoding.ts";
 
 export { Status };
 
@@ -80,7 +80,7 @@ export async function bootWithPk(
 ): Promise<Session> {
   const privateState = ps ?? blankPrivate();
   const contract = new Contract(WITNESSES as never);
-  const nonce = instanceNonce ?? pad32("line:demo:instance:1");
+  const nonce = instanceNonce ?? randomBytes32();
   const init = await contract.initialState(
     RT.createConstructorContext(privateState, COIN_PK),
     issuerPk,
@@ -199,12 +199,3 @@ export function notesOf(ledger: CompactLedger) {
 export function nullifiersOf(ledger: CompactLedger) {
   return [...ledger.nullifiers];
 }
-
-export const DEMO = {
-  issuer: pad32("line:demo:issuer"),
-  merchantA: pad32("line:demo:merchant:a"),
-  merchantB: pad32("line:demo:merchant:b"),
-  merchant: pad32("line:demo:merchant:a"),
-  agent: pad32("line:demo:agent"),
-  instanceNonce: pad32("line:demo:instance:1"),
-};

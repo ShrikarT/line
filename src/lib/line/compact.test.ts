@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
-  DEMO,
   Status,
   blankPrivate,
   boot,
@@ -15,6 +14,7 @@ import {
   type PrivateState,
   type Session,
 } from "./compact-harness.ts";
+import { DEMO } from "../../test/fixtures/keys.ts";
 import {
   agentId,
   contractDomain,
@@ -313,7 +313,7 @@ describe("compact simulator: openLine", () => {
     assert.equal(r.ledger.lineGeneration, 1n);
     const I = agentId(DEMO.agent);
     const C0 = lineStateCommit(
-      { identity: I, limit: LIMIT, outstanding: 0n, epoch: 0n },
+      { domain: r.ledger.contractDomain, identity: I, limit: LIMIT, outstanding: 0n, epoch: 0n },
       pad32("salt-0"),
     );
     assert.equal(toHex(r.ledger.identityCommit), toHex(I));
@@ -704,7 +704,7 @@ describe("compact simulator: acknowledgeRepayment", () => {
     assert.equal(ack.ok, true);
     const I = agentId(DEMO.agent);
     const C2 = lineStateCommit(
-      { identity: I, limit: 150n, outstanding: 0n, epoch: 2n },
+      { domain: ack.ledger.contractDomain, identity: I, limit: 150n, outstanding: 0n, epoch: 2n },
       pad32("salt-2"),
     );
     assert.equal(toHex(ack.ledger.lineCommit), toHex(C2));
@@ -853,4 +853,52 @@ describe("compact simulator: cross-instance replay rejection", () => {
     assert.equal(rB.ok, false);
     assert.match(rB.error, /note not found/);
   });
+
+  it("identical line parameters under different contract domains produce different C", async () => {
+    const sA = await genesis(pad32("inst:A"));
+    const sB = await genesis(pad32("inst:B"));
+    const LA = readLedger(sA);
+    const LB = readLedger(sB);
+    const I = agentId(DEMO.agent);
+    const CA = lineStateCommit(
+      { domain: LA.contractDomain, identity: I, limit: LIMIT, outstanding: 0n, epoch: 0n },
+      pad32("salt-0"),
+    );
+    const CB = lineStateCommit(
+      { domain: LB.contractDomain, identity: I, limit: LIMIT, outstanding: 0n, epoch: 0n },
+      pad32("salt-0"),
+    );
+    assert.notEqual(toHex(CA), toHex(CB));
+  });
+
+  it("line-state opening from instance A fails in instance B even with identical keys", async () => {
+    const sA = await genesis(pad32("inst:A"));
+    const sB = await genesis(pad32("inst:B"));
+
+    const oA = await opened(sA);
+    const oB = await opened(sB);
+
+    // Merchant posts quote on instance B
+    const qB = await quoted(40n, "inv-40", "n40", oB.session);
+    const QB = firstQuote(qB.ledger)!.Q;
+
+    // Agent attempts to use quote QB from instance B on instance A: fails because quote does not exist on instance A
+    const dA_with_QB = await call(
+      oA.session,
+      ps({
+        callerSecret: DEMO.issuer,
+        agentSecret: DEMO.agent,
+        salt: pad32("salt-0"),
+        newSalt: pad32("salt-1"),
+        invoiceId: pad32("inv-40"),
+        quoteNonce: pad32("n40"),
+        noteNonce: pad32("nn-40"),
+        noteSalt: pad32("ns-40"),
+      }),
+      { name: "draw", args: [QB, 150n, 0n, 0n, 40n, EXPIRY] },
+    );
+    assert.equal(dA_with_QB.ok, false);
+    assert.match(dA_with_QB.error, /quote/);
+  });
 });
+

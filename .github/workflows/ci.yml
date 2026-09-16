@@ -57,5 +57,14 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      - name: Audit fixture keys in production paths
+        run: npm run check:keys
+
+      - name: Negative audit test for fixture keys
+        run: node scripts/check-no-fixture-keys.test.mjs
+
+      - name: Audit hardcoded credentials and secret patterns
+        run: npm run check:secrets
+
       - name: Frontend build
         run: npm run build
