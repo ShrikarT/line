@@ -295,6 +295,9 @@ export function unlockVaultSession(passphrase: string, timeoutMinutes: number = 
   sessionTimer = setTimeout(() => {
     lockVaultSession();
   }, timeoutMinutes * 60 * 1000);
+  if (sessionTimer && typeof (sessionTimer as any).unref === "function") {
+    (sessionTimer as any).unref();
+  }
 }
 
 export function lockVaultSession(): void {

@@ -19,6 +19,7 @@ import {
   acknowledgeRepayment,
   setStatus,
   issuerPublicKey,
+  merchantPublicKey,
 } from "../line/protocol.ts";
 
 export class LocalDevelopmentRuntime implements LineRuntime {
@@ -245,7 +246,7 @@ export class LocalDevelopmentRuntime implements LineRuntime {
       lineGeneration: noteRec.lineGeneration,
       identity: params.noteIdentity,
       quoteCommit: params.noteQuoteCommit,
-      merchantPk: "",
+      merchantPk: merchantPublicKey(params.merchantSk),
       amount: params.amount,
       noteNonce: params.noteNonce,
       expiry: params.expiry,

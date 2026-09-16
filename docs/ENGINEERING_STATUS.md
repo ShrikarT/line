@@ -73,8 +73,9 @@
 - [x] 4 Runtime architecture tests (`src/lib/runtime/runtime.test.ts`)
 - [x] 9 Midnight Network Runtime, wallet connector, and vault provider integration tests (`src/lib/runtime/network.integration.test.ts`)
 - [x] 6 Security vault tests (`src/lib/security/vault.test.ts`)
+- [x] 5 Production store full lifecycle, vault custody & witness tests (`src/app/store.test.ts`)
 - [x] 4 MCP JSON-RPC server tests (`mcp/line-mcp.test.mjs`)
-- [x] **Total Unit/Integration:** **118 passing tests across 30 suites (`npm test`)**
+- [x] **Total Unit/Integration:** **123 passing tests across 31 suites (`npm test`)**
 - [x] **E2E Browser Testing:** **4 passing Playwright browser tests (`npm run test:e2e`)**
 
 ### 6. Developer & Deployment Operations
