@@ -8,20 +8,20 @@ Autonomous AI agents need instantaneous purchasing power for compute, APIs, and 
 
 ## Slide 2 — Product
 
-Line delivers **private revolving credit and settlement authorization for autonomous agents**.
+Line delivers **private spending guardrails for autonomous agent fleets** — corporate cards for AI agents, Midnight-private.
 
-- **Issuer**: Underwrites confidential credit and deposits liquidity into an auditable reserve pool.
-- **Agent**: Proves `outstanding + invoice ≤ limit` and reserve solvency without publishing limits, balances, or prices.
-- **Merchant**: Receives a private, non-replayable draw note redeemable once against the issuer reserve pool.
-- **Public Explorer**: Sees verified reserve solvency, commitment progression, and nullifiers—never private books or counterparties.
+- **Finance Admin (Issuer)**: Issues capped agent budgets and deposits liquidity into an auditable reserve pool. No underwriting — budgets are policy, not credit risk.
+- **Agent**: Proves `outstanding + invoice ≤ limit` and reserve solvency in-circuit, without exposing its strategy: which invoices it chose, quote contents, or identity secrets.
+- **Merchant**: Receives a cryptographically-bound draw note redeemable once against the reserve pool.
+- **Public Explorer**: Sees verified reserve solvency, settled amounts, commitment progression, and nullifiers — never secrets, salts, or identity preimages.
 
-Revolving credit with reserve accounting, not a spend cap.
+Private budget guardrails with reserve accounting, not a credit line.
 
 ## Slide 3 — Demo (19 Real Steps)
 
 Private limit $L = 150$, Reserve pool 500.
 
-1. Line opens — explorer shows $C_0$, not 150.
+1. Line opens — budget $L = 150$ issued as a public circuit parameter; explorer shows the $C_0$ commitment.
 2. Merchant A posts opaque quote $Q_{40}$.
 3. Agent draws 40: note $D_1$ issued, 40 reserve encumbered.
 4. **Attack 1**: Merchant B tries to steal and redeem $D_1$ -> **Rejected in ZK**.

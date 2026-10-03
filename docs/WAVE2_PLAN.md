@@ -9,7 +9,7 @@
 
 ## 1. Product Goal
 
-In Wave 1, **Line** proved that an autonomous agent can draw against a confidential, revolving credit line without revealing its limit $L$, balance $B$, available capacity $L - B$, quote amount $A$, or counterparty on-chain. Wave 1 was **authorization only**; no settlement took place.
+In Wave 1, **Line** authorized autonomous-agent draws against an issuer-backed line — limits $L$, balances $B$, and quote amounts $A$ were already public circuit parameters, and settlement was off-chain. Wave 1 was **authorization only**; no settlement took place.
 
 **Wave 2 turns authorization into private, non-replayable settlement:**
 When an agent draws against its private line, the contract encumbers funds from an **issuer-funded reserve** and issues a **merchant-bound private draw note** ($D$). The intended merchant can privately prove ownership of this note and **redeem it exactly once** against the issuer's reserve. An issuer may only withdraw funds that are **unencumbered**. An agent's repayment restores credit line capacity and reconciles accounting.
@@ -139,13 +139,13 @@ D = persistentCommit<DrawNotePreimage>(notePreimage, noteSalt)
   ```compact
   struct NoteMeta {
     amount: Uint<64>,
-    merchantPk: Bytes<32>,
     redeemed: Boolean,
     cancelled: Boolean,
     expiry: Uint<64>,
     lineGeneration: Uint<64>,
   }
   ```
+  (No `merchantPk` field — merchant binding lives in the note *preimage* (`DrawNotePreimage.merchantPk`) and is enforced at redemption via the $N_{\text{redeem}}$ nullifier opening, which proves $sk \to \text{merchantPk}$ in-circuit. The quotes ledger records `QuoteMeta.merchantPk` publicly, so a settled note is linkable to its merchant on-ledger.)
 
 ### Merchant Redemption Nullifier ($N_{\text{redeem}}$)
 ```compact

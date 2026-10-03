@@ -4,8 +4,8 @@ Read this before touching Line.
 
 ## Product Context
 
-Line is **private revolving credit and settlement authorization for autonomous agents**.
-It is not a wallet spend-cap and not an unbacked IOU. An issuer underwrites confidential credit and deposits liquidity into a reserve pool. An agent proves in zero-knowledge that an invoice fits remaining capacity and that reserve backing exists. A merchant receives an issuer-backed, non-replayable private draw note redeemable once against the reserve pool. An issuer-confirmed repayment restores capacity privately.
+Line is **private spending guardrails for autonomous agent fleets** — corporate cards for AI agents, Midnight-private.
+It is not a wallet spend-cap and not an unbacked IOU. An enterprise finance admin issues a capped agent budget and deposits liquidity into a reserve pool. An agent proves in the ZK circuit (simulated locally via compact-runtime) that an invoice fits remaining budget capacity and that reserve backing exists. A merchant receives a cryptographically-bound, non-replayable draw note redeemable once against the reserve pool. A finance-admin-confirmed repayment restores budget capacity privately.
 
 ## Non-Negotiables
 
@@ -17,7 +17,7 @@ It is not a wallet spend-cap and not an unbacked IOU. An issuer underwrites conf
 6. **One-time redemption**: Draw notes can be redeemed at most once using $N_{\text{redeem}} = \text{persistentHash}([\text{pad}(32, \text{"line:v2:redeem"}), sk_{\text{merchant}}, D, \text{domain}])$. Double redemption must fail.
 7. **Instance domain separation**: The constructor takes `(issuerPk, initialMerchantPk, instanceNonce: Bytes<32>)` creating unique `contractDomain`.
 8. **Private failure string**: Failed circuits write nothing to public storage. Any failed draw surfaces: `"Clearance could not be proven."`
-9. **Private books**: Limits $L$, balances $B$, invoice amounts $A$, and merchant identities remain hidden. Only commitments ($I, C, Q, D$), reserve totals, and nullifiers are public.
+9. **Privacy story (corrected Oct 2026):** settled note amounts $A$, credit limit $L$, outstanding $B$, and the merchant↔quote↔note linkage are PUBLIC on-ledger escrow accounting. What stays private: secrets, salts, nonces, the agent identity preimage, quote contents, and the strategy behind every draw. Never claim amounts/identities are hidden.
 10. **10 Circuits only**: `registerMerchant`, `fundReserve`, `withdrawUnencumberedReserve`, `openLine`, `postQuote`, `draw`, `redeemDraw`, `cancelOrExpireNote`, `acknowledgeRepayment`, `setStatus`.
 
 ## File Map

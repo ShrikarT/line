@@ -1,6 +1,6 @@
 # Line Roadmap
 
-Private revolving credit and settlement authorization for autonomous agents.
+Private spending guardrails for autonomous agent fleets — corporate cards for AI agents, Midnight-private.
 
 ---
 
@@ -32,5 +32,5 @@ Private revolving credit and settlement authorization for autonomous agents.
 1. **Midnight Preprod / Testnet Deployment**: Compile full ZK proving and verifier keys (`.bincode`), deploy contract to Midnight network, replace local simulator with on-chain contract address.
 2. **On-Chain Token Settlement**: Direct payout integration with Midnight native tokens (Night / Dust) and Cardano cross-chain settlement bridge.
 3. **Wallet & Key Management**: Lace / Midnight wallet integration for agent and issuer private secret custody.
-4. **Decentralized Underwriting**: Portable zero-knowledge issuer credentials and credit ratings.
+4. **Decentralized Budget Credentials**: Portable zero-knowledge issuer credentials and fleet budget ratings.
 5. **Protocol Fees & Marketplace**: Fee on draws, autonomous issuer liquidity marketplace, and agent policy packs.

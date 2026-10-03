@@ -1,14 +1,14 @@
 # Line — Architecture & Plan
 
-Private revolving credit and settlement authorization for autonomous agents.
+Private spending guardrails for autonomous agent fleets — corporate cards for AI agents, Midnight-private.
 
-**One-liner:** An agent proves a purchase fits an issuer-backed credit line and reserve pool. The chain never sees credit limit, outstanding balance, invoice amount, or merchant identity.
+**One-liner:** An enterprise finance admin issues a capped budget to an agent, backed by a funded reserve pool. The chain never sees secrets, salts, nonces, or the agent identity preimage — settled amounts, limits, and merchant↔quote linkage are public escrow accounting.
 
 **Wave 1 Foundation:** Issuer-backed revolving credit authorization, opaque quote commitments, single-use nullifiers, and deterministic state transitions.
 
 **Wave 2 Delivery (Current):** Exact Compact settlement accounting prototype. Verified reserve pool escrow, multi-merchant support (Merchant A & Merchant B), merchant-bound private draw notes, single-redemption nullifiers ($N_{\text{redeem}}$), anti-rug reserve protections, and contract-instance domain separation.
 
-**Privacy promise:** Line hides credit limits, balances, invoice amounts, and merchant counterparties. It discloses reserve pool totals, anonymous note commitments, nullifiers, status, and `actionClock` transition timing.
+**Privacy promise:** Line keeps the secret layer private — secrets, salts, nonces, the agent identity preimage, quote contents, and the strategy behind every draw. It discloses as public escrow accounting: reserve pool totals, settled note amounts, credit limit $L$ and outstanding $B$ (circuit parameters), note/quote commitments, merchant↔quote linkage, nullifiers, status, and `actionClock` transition timing.
 
 ---
 
