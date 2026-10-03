@@ -159,7 +159,7 @@ describe("cross-language commitment vectors", () => {
         noteIdentity: pad32("0"),
         noteQuoteCommit: pad32("0"),
       },
-      { name: "draw", args: [Q, 150n, 0n, 0n, 40n, 10_000n] },
+      { name: "draw", args: [Q, 150n, 0n, 0n, 40n, 10_000n, 0n] },
     );
     assert.equal(drawn.ok, true);
     if (!drawn.ok) throw new Error("draw failed");

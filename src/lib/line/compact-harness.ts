@@ -122,9 +122,11 @@ export type CircuitCall =
   | { name: "withdrawUnencumberedReserve"; args: [bigint] }
   | { name: "openLine"; args: [bigint, bigint] }
   | { name: "postQuote"; args: [bigint, bigint] }
-  | { name: "draw"; args: [Uint8Array, bigint, bigint, bigint, bigint, bigint] }
+  | { name: "draw"; args: [Uint8Array, bigint, bigint, bigint, bigint, bigint, bigint] }
   | { name: "redeemDraw"; args: [Uint8Array, bigint, bigint] }
   | { name: "cancelOrExpireNote"; args: [Uint8Array] }
+  | { name: "disableMerchant"; args: [Uint8Array] }
+  | { name: "withdrawFees"; args: [] }
   | { name: "acknowledgeRepayment"; args: [bigint, bigint, bigint, bigint, bigint] }
   | { name: "setStatus"; args: [Status] };
 
@@ -147,6 +149,8 @@ export async function call(session: Session, ps: PrivateState, op: CircuitCall):
     else if (op.name === "draw") result = await circuits.draw(ctx, ...op.args);
     else if (op.name === "redeemDraw") result = await circuits.redeemDraw(ctx, ...op.args);
     else if (op.name === "cancelOrExpireNote") result = await circuits.cancelOrExpireNote(ctx, ...op.args);
+    else if (op.name === "disableMerchant") result = await circuits.disableMerchant(ctx, ...op.args);
+    else if (op.name === "withdrawFees") result = await circuits.withdrawFees(ctx, ...op.args);
     else if (op.name === "acknowledgeRepayment") {
       result = await circuits.acknowledgeRepayment(ctx, ...op.args);
     } else result = await circuits.setStatus(ctx, ...op.args);
