@@ -3,7 +3,7 @@
 - **Branch:** `feat/wave-2-private-settlement`
 - **Starting Point:** PR #2 merged at `ed45ca4`, tagged `wave1-final`.
 - **Wave 1 Preserved At:** `contracts/v1/line.compact`
-- **Wave 2 Contract:** `contracts/line.compact` and `contracts/v2/line.compact`
+- **Wave 2 Contract:** `contracts/line.compact` (canonical; the byte-identical `contracts/v2/` duplicate was removed)
 
 ## Wave 2 Checklist
 
