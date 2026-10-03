@@ -17,11 +17,11 @@ Wave 2 of the [Midnight Buildathon](https://app.akindo.io/wave-hacks/jaMZjqPOBsL
 
 ## Why not x402 / prefunded wallets
 
-x402 (Coinbase / Linux Foundation) moves money with no privacy and no credit/budget semantics — every payment is a naked transfer. Prefunded agent wallets trap liquidity and are theft targets: one leaked key drains the whole balance. Line is the private budget-guardrail layer underneath: the enterprise issues capped budgets, the agent spends inside them proving `B + A ≤ L` without exposing strategy, and the merchant settles against an escrowed reserve it can verify on-ledger.
+x402 (Coinbase / Linux Foundation) moves money with no privacy and no credit/budget semantics — every payment is a naked transfer. Prefunded agent wallets trap liquidity and are theft targets: one leaked key drains the whole balance. Line is the private budget-guardrail layer underneath: the enterprise issues capped budgets, the agent spends inside them proving `B + A + F ≤ L` without exposing strategy, and the merchant settles against an escrowed reserve it can verify on-ledger.
 
 ![line architecture](docs/architecture.svg)
 
-**Reading the diagram:** (1) the finance admin (issuer) issues the budget `openLine(L)` and funds the reserve; (2) the agent draws against a merchant's quote, proving capacity in-circuit and issuing note `D`; (3) the merchant redeems `D` once via the `N_redeem` nullifier; (4) the public explorer sees public escrow accounting (amounts, commitments, nullifiers) but never secrets, salts, or identity preimages.
+**Reading the diagram:** (1) the finance admin (issuer) issues the budget `openLine(expiry)` with the limit as a private witness and funds the reserve; (2) the agent draws against a merchant's quote, proving capacity in-circuit and issuing note `D`; (3) the merchant redeems `D` once via the `N_redeem` nullifier; (4) the public explorer sees anonymous escrow flows — amounts are visible as unattributable flows; attribution is what the ZK hides.
 
 ## Honest Wave 2 Boundary & Reality Check
 
@@ -38,7 +38,7 @@ x402 (Coinbase / Linux Foundation) moves money with no privacy and no credit/bud
 |---|---|
 | **Compact Contract** (`contracts/line.compact`) | **Real Compact 0.26 source code** containing all 12 circuits, compiling cleanly with toolchain **0.34.0**. |
 | **Generated Bindings** (`contracts/managed/line`) | **Real compiler output** (`--skip-zk`), checked into git and verified against compiler drift. |
-| **Compact Simulator Tests** | **Real Compact execution** via `@midnight-ntwrk/compact-runtime` **0.19.0** running 39 circuit-level unit and attack tests. |
+| **Compact Simulator Tests** | **Real Compact execution** via `@midnight-ntwrk/compact-runtime` **0.19.0** running 60 circuit-level unit and attack tests. |
 | **TypeScript Engine** (`protocol.ts`) | Strict replica of Compact encodings (`persistentHash`, `persistentCommit`); cross-implementation hash/commitment vectors verified against real compiler output, simulator-executed. |
 | **Web Desks** (`/issuer`, `/merchant`, `/agent`, `/explorer`, `/lab`) | Interactive simulator UI for interacting with the 4 protocol roles and testing attack vectors. |
 | **MCP Server** (`mcp/line-mcp.mjs`) | Standard JSON-RPC Model Context Protocol tools for autonomous AI agents. |
@@ -48,18 +48,21 @@ x402 (Coinbase / Linux Foundation) moves money with no privacy and no credit/bud
 
 ## Privacy Map
 
-Corrected against the actual circuit signatures and ledger structs (Oct 2026 audit): invoice amounts, credit limit $L$, outstanding $B$, and the merchant↔quote↔note linkage are **public on-ledger escrow accounting**. What stays private: all secrets/salts/nonces, the agent identity preimage, and the strategy layer — which invoices an agent chose not to draw, quote contents, and the reasoning behind every draw.
+Rewritten against the actual circuit signatures and ledger structs (Oct 2026 rework): credit limit $L$, outstanding balance $B$, epoch, per-quote invoice amounts, and the merchant↔quote↔note linkage are **hidden in ZK witnesses**. What the ledger discloses by design: reserve totals and their deltas, settled note amounts, commitments, nullifiers, the registered-merchant allowlist, `actionClock`, and fee amounts.
+
+The frame: **amounts are visible as anonymous flows; attribution is what the ZK hides.** A single draw's size is visible as an `encumberedReserve` delta and a `NoteMeta.amount` entry — but nothing on-ledger says whose budget it came from, which merchant it settles with, or how much of the limit remains.
 
 | Data Item | Public / Disclosed | Private / Confidential |
 |---|---|---|
-| **Credit Line Limits ($L$)** | ✅ Public — `openLine(limit)` circuit parameter | ❌ None — the budget is public |
-| **Outstanding Balance ($B$)** | ✅ Public — `draw` / `acknowledgeRepayment` circuit parameters | ❌ None — public escrow accounting |
-| **Invoice & Note Amounts ($A$)** | ✅ Public — `NoteMeta.amount` on ledger, plus `encumberedReserve` deltas | ✅ Quote *contents* (invoice IDs, nonces) stay sealed inside the opaque $Q$ preimage |
-| **Merchant Identity** | ✅ Public — `QuoteMeta.merchantPk` on ledger; note $D$ publicly links to quote $Q$ | ✅ Merchant *secrets* are never revealed; the sk→merchantPk binding is proven in-circuit |
-| **Agent Identity** | ✅ `identityCommit` ($I$) on ledger | ✅ Agent secret preimage never revealed |
-| **Line Commitment ($C \to C'$)** | ✅ Disclosed on ledger | ✅ Commitment salts never revealed |
-| **Reserve Totals** | ✅ Publicly auditable | ✅ Note salts, preimages, and unused-quote contents |
-| **Transition Timing** | ✅ Disclosed via `actionClock` | ✅ Reasoning behind failures is hidden |
+| **Credit limit ($L$), outstanding ($B$), epoch** | ❌ Never in public inputs or ledger state | ✅ ZK witnesses, bound to line commitment $C$ by the stale check |
+| **Per-quote invoice amounts** | ❌ Not in `QuoteMeta`; sealed opaquely inside the $Q$ preimage | ✅ Hidden until settlement |
+| **Settled note amounts** | ✅ `NoteMeta.amount` on ledger + `encumberedReserve`/`redeemedReserve` deltas — anonymous flows | ❌ Unattributable: no link to agent, merchant, or limit |
+| **Merchant↔quote↔note linkage** | ❌ `QuoteMeta` stores no `merchantPk`; quotes map holds opaque commitments only | ✅ Unlinkable — the agent proves registered-merchant membership in ZK |
+| **Registered-merchant allowlist** | ✅ The SET is public (`registeredMerchants`) | ✅ Which member quoted a given quote is not |
+| **Reserve totals & fee** | ✅ `totalReserve`, `encumberedReserve`, `redeemedReserve`, `feeReserve` — publicly auditable | ❌ Which note or draw a delta belongs to |
+| **Agent identity** | ✅ `identityCommit` ($I$) on ledger | ✅ Secret preimage never revealed |
+| **Commitments ($C$, $Q$, $D$) & nullifiers** | ✅ Disclosed on ledger | ✅ Openings, salts, and nonces never revealed |
+| **Transition timing** | ✅ Disclosed via `actionClock` | ✅ Reasoning behind failures is hidden |
 
 Failed draws always surface the generic error:
 > **`Clearance could not be proven.`**
@@ -79,7 +82,7 @@ No observer can deduce whether a rejection was caused by budget capacity, reserv
 | `withdrawFees` | Issuer | Pays out the accrued issuer fee reserve. |
 | `openLine` | Issuer | Initializes credit line commitment $C_0$ with $B=0$, status `OPEN`. |
 | `postQuote` | Merchant | Commits to opaque invoice $Q$ bound to `lineGeneration` and `contractDomain`. |
-| `draw` | Agent | Proves $B+A+F \le L$ and reserve solvency, issues private note $D$, encumbers reserve, accrues the issuer fee. |
+| `draw` | Agent | Proves $B+A+F \le L$ with witness-private books ($L$, $B$, epoch), reserve solvency, issues private note $D$, encumbers reserve, accrues the issuer fee. |
 | `redeemDraw` | Merchant | Merchant opens $D$ with secret, spends $N_{\text{redeem}}$, moves encumbered to redeemed reserve. |
 | `cancelOrExpireNote` | Issuer / Anyone | Releases encumbered reserve back to unencumbered if note expired unredeemed. |
 | `acknowledgeRepayment` | Issuer | Proves receipt bound to current $C$, restores agent capacity privately, spends $N_{\text{repay}}$. |
@@ -96,8 +99,8 @@ $$\text{contractDomain} = \text{persistentHash}([\text{pad}(32, \text{"line:v2:d
 ### Draw Note Commitment ($D$)
 When an agent draws, a merchant-bound private note is issued:
 $$D = \text{persistentCommit}\langle\text{DrawNotePreimage}\rangle(\{ \text{domain}, \text{lineGen}, I, Q, \text{merchantPk}, A, \text{nonce}, \text{expiry} \}, \text{noteSalt})$$
-- The on-chain `notes` map stores `{ A, redeemed, cancelled, expiry, lineGen }` — the settled amount **is** public escrow accounting.
-- **Merchant linkage is public, merchant secrets are not.** The `quotes` ledger map stores `QuoteMeta.merchantPk` in plaintext, and a draw's public `quoteCommitPublic` input links note $D$ to quote $Q$ — so the merchant↔quote↔note chain is publicly linkable. What the circuit proves privately is the *binding*: the redeeming caller opens the note preimage and proves $sk \to \text{merchantPk}$ matches, without revealing the secret.
+- The on-chain `notes` map stores `{ A, redeemed, cancelled, expiry, lineGen }` — the settled amount **is** public escrow accounting, an anonymous flow.
+- **Merchant linkage is private by construction (audit H3), merchant secrets are not.** The `quotes` ledger map stores no `merchantPk` — it holds opaque commitments only. In `draw`, the agent supplies the quote's merchant as a private witness and proves in ZK that (1) the witness preimage recomputes to the public $Q$, and (2) the witness `merchantPk` is on the public `registeredMerchants` allowlist. The allowlist SET is public; which member quoted is not. At redemption, the caller opens the note preimage and proves $sk \to \text{merchantPk}$ matches, without revealing the secret.
 - To redeem, the merchant must prove knowledge of $sk$ deriving $\text{merchantPk}$ matching the preimage opening.
 
 ### Redemption Nullifier ($N_{\text{redeem}}$)
@@ -113,7 +116,7 @@ The demo executes a complete, non-trivial multi-merchant credit and settlement l
 0. **Genesis**: Empty ledger.
 1. **Register Merchant B**: Issuer registers second merchant.
 2. **Fund Reserve (500)**: Issuer deposits 500 liquidity into reserve pool.
-3. **openLine 150**: Budget line opened for agent ($L=150$, public circuit parameter).
+3. **openLine 150**: Budget line opened for agent ($L=150$ as a private witness — the explorer sees only $C_0$, limit absent).
 4. **Merchant A: postQuote 40**: Merchant A posts opaque invoice $Q_{40}$.
 5. **Agent: draw 40 -> Note D1**: Agent draws; note $D_1$ issued; 40 reserve encumbered.
 6. **Attack: Merchant B tries to redeem D1**: Rejected: note opening invalid.
@@ -128,7 +131,7 @@ The demo executes a complete, non-trivial multi-merchant credit and settlement l
 15. **Merchant B: redeem D2 (120)**: Merchant B claims 120 from reserve.
 16. **Issuer: setStatus(DEFAULTED)**: Issuer marks line defaulted.
 17. **Post-default draw fails**: Rejected: draws blocked while defaulted.
-18. **Public Explorer Review**: Auditable proof that settled amounts match public escrow accounting — and that no secrets, salts, or identity preimages were ever published.
+18. **Public Explorer Review**: Auditable proof that settled amounts match public escrow accounting — and that no private books ($L$, $B$, quote amounts), counterparty bindings, salts, or identity preimages were ever published.
 
 ---
 
@@ -137,7 +140,7 @@ The demo executes a complete, non-trivial multi-merchant credit and settlement l
 Line maintains a comprehensive, reproducible test suite:
 - **92 automated tests** passing with zero failures.
 - **Cross-language commitment vectors**: Verifies that the TypeScript replica produces identical hashes and commitments to the Compact contract's real compiler output (simulator-executed, not deployed bytecode).
-- **Compact Simulator tests**: 39 contract-level tests covering all 12 circuits and attack vectors.
+- **Compact Simulator tests**: 60 contract-level tests covering all 12 circuits, attack vectors, and negative privacy tests.
 - **Deterministic state machine model checker**: 50 pseudo-random operations validating all 10 invariants across edge cases.
 - **MCP server tests**: Validates all 8 tools and rejection handling over JSON-RPC.
 
@@ -157,7 +160,7 @@ npm install
 # Compile Compact contract (skip-zk for local simulation)
 npm run compact:compile
 
-# Run full test suite (92 tests)
+# Run full test suite (145 tests)
 npm test
 
 # Run Compact simulator tests only
@@ -182,7 +185,7 @@ Open `http://localhost:5173` to explore the interactive desks:
 - `/agent` — Agent private console
 - `/explorer` — Public explorer
 - `/lab` — Security attack lab
-- `/circuits` — Specification of all 10 Compact circuits
+- `/circuits` — Specification of all 12 Compact circuits
 
 ### Running Local MCP Server
 ```bash
@@ -204,7 +207,7 @@ npm run dev                   # interactive desks on http://localhost:5173
 
 **Expected outputs:**
 - `npm run compact:compile` — compiles cleanly with toolchain 0.34.0; a subsequent `git status` shows no changes under `contracts/managed/` (CI enforces this as a drift gate).
-- `npm test` — **92 tests, 26 suites, 92 pass, 0 fail** (protocol 31, demo 13, encoding 4, compact 39 incl. attack vectors, model 1×50 ops, MCP ~10).
+- `npm test` — **145 tests, 32 suites, 145 pass, 0 fail** (protocol 56, demo 14, encoding 4, compact 60 incl. attack vectors + negative privacy tests, model 1×50 ops, MCP 10).
 - `npm run typecheck` — clean, no errors.
 - `npm run dev` — desks at `/`, `/issuer`, `/merchant`, `/agent`, `/explorer`, `/lab`, `/circuits`.
 

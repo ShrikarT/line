@@ -21,7 +21,7 @@ Private budget guardrails with reserve accounting, not a credit line.
 
 Private limit $L = 150$, Reserve pool 500.
 
-1. Line opens — budget $L = 150$ issued as a public circuit parameter; explorer shows the $C_0$ commitment.
+1. Line opens — budget $L = 150$ supplied as a private witness, never published; explorer shows only the $C_0$ commitment.
 2. Merchant A posts opaque quote $Q_{40}$.
 3. Agent draws 40: note $D_1$ issued, 40 reserve encumbered.
 4. **Attack 1**: Merchant B tries to steal and redeem $D_1$ -> **Rejected in ZK**.

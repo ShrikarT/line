@@ -17,8 +17,8 @@ It is not a wallet spend-cap and not an unbacked IOU. An enterprise finance admi
 6. **One-time redemption**: Draw notes can be redeemed at most once using $N_{\text{redeem}} = \text{persistentHash}([\text{pad}(32, \text{"line:v2:redeem"}), sk_{\text{merchant}}, D, \text{domain}])$. Double redemption must fail.
 7. **Instance domain separation**: The constructor takes `(issuerPk, initialMerchantPk, instanceNonce: Bytes<32>)` creating unique `contractDomain`.
 8. **Private failure string**: Failed circuits write nothing to public storage. Any failed draw surfaces: `"Clearance could not be proven."`
-9. **Privacy story (corrected Oct 2026):** settled note amounts $A$, credit limit $L$, outstanding $B$, and the merchant↔quote↔note linkage are PUBLIC on-ledger escrow accounting. What stays private: secrets, salts, nonces, the agent identity preimage, quote contents, and the strategy behind every draw. Never claim amounts/identities are hidden.
-10. **10 Circuits only**: `registerMerchant`, `fundReserve`, `withdrawUnencumberedReserve`, `openLine`, `postQuote`, `draw`, `redeemDraw`, `cancelOrExpireNote`, `acknowledgeRepayment`, `setStatus`.
+9. **Privacy story (rebuilt Oct 2026, witness-private):** credit limit $L$, outstanding $B$, epoch, per-quote invoice amounts, and merchant↔quote↔note linkage are HIDDEN in ZK witnesses — never in public inputs or ledger state. PUBLIC BY DESIGN: reserve totals and their deltas, settled note amounts (`NoteMeta.amount`), commitments ($Q$, $D$, $C$), nullifiers, the registered-merchant allowlist (SET public; which member quoted is not), `actionClock`, and fee amounts. Frame: amounts are visible as anonymous flows; attribution is what the ZK hides. Never claim private books are public.
+10. **12 Circuits**: `registerMerchant`, `disableMerchant`, `fundReserve`, `withdrawUnencumberedReserve`, `withdrawFees`, `openLine`, `postQuote`, `draw`, `redeemDraw`, `cancelOrExpireNote`, `acknowledgeRepayment`, `setStatus`.
 
 ## File Map
 
