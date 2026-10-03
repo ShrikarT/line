@@ -21,6 +21,7 @@ import {
   registerMerchant,
   repayNullifier,
   setStatus,
+  withdrawFees,
   withdrawUnencumberedReserve,
 } from "./protocol.ts";
 import type { Ledger, LineWitness, QuotePreimage, RepayReceipt } from "./types.ts";
@@ -583,5 +584,125 @@ describe("reference engine: expiry, closed, and generations", () => {
     });
     assert.equal(r.ok, false);
     assert.equal(r.code, "QUOTE_GEN");
+  });
+});
+
+describe("reference engine: issuer fees (FEE_SPEC)", () => {
+  function drawWithFee(fee: number, amount = 40) {
+    const o = opened();
+    const q = quote(o.ledger, amount, `fee-inv-${fee}-${amount}`);
+    return {
+      o,
+      r: draw(q.ledger, {
+        agentSecret: AGENT_SK,
+        witness: o.agent.witness!,
+        quote: q.quote,
+        newSalt: "fee-salt",
+        fee,
+      }),
+    };
+  }
+
+  it("fee charges outstanding by amount+fee; encumbers amount; accrues feeReserve", () => {
+    const { r } = drawWithFee(5);
+    assert.equal(r.ok, true);
+    if (!r.ok) throw new Error("draw");
+    assert.equal(r.agent.witness!.B, 45); // outstanding = amount + fee
+    assert.equal(r.ledger.encumberedReserve, 40); // note encumbers amount only
+    assert.equal(r.ledger.feeReserve, 5); // fee accrues to the issuer
+    assert.equal(r.note.preimage.amount, 40); // settlement note is for amount, not amount+fee
+  });
+
+  it("zero fee behaves exactly like the pre-fee draw", () => {
+    const { r } = drawWithFee(0);
+    assert.equal(r.ok, true);
+    if (!r.ok) throw new Error("draw");
+    assert.equal(r.agent.witness!.B, 40);
+    assert.equal(r.ledger.encumberedReserve, 40);
+    assert.equal(r.ledger.feeReserve, 0);
+  });
+
+  it("fee counts toward the credit limit: B + amount + fee <= L", () => {
+    // B=0, L=150: amount 140 + fee 20 = 160 > 150 must fail CAPACITY
+    const { r } = drawWithFee(20, 140);
+    assert.equal(r.ok, false);
+    assert.equal(r.code, "CAPACITY");
+    // ...but amount 140 + fee 10 = 150 == L passes
+    const { r: r2 } = drawWithFee(10, 140);
+    assert.equal(r2.ok, true);
+  });
+
+  it("fee counts toward reserve solvency: amount + fee <= unencumberedReserve", () => {
+    // Big line (L=2000) but thin reserve (1000): 990 + 20 = 1010 passes
+    // capacity yet exceeds unencumbered reserve -> RESERVE_CAPACITY.
+    let ledger = createLedger({
+      issuerSecret: ISSUER_SK,
+      merchantSecret: MERCHANT_A_SK,
+      instanceNonce: INSTANCE_NONCE,
+    });
+    const funded = fundReserve(ledger, { caller: ISSUER_SK, amount: 1000 });
+    if (!funded.ok) throw new Error("fund");
+    const openedBig = openLine(funded.ledger, {
+      caller: ISSUER_SK,
+      agentSecret: AGENT_SK,
+      limit: 2000,
+      salt: "fee-solv-s0",
+      expiry: 10_000,
+    });
+    if (!openedBig.ok) throw new Error("open");
+    const q = quote(openedBig.ledger, 990, "fee-solv");
+    const r = draw(q.ledger, {
+      agentSecret: AGENT_SK,
+      witness: openedBig.agent.witness!,
+      quote: q.quote,
+      newSalt: "fee-solv-s",
+      fee: 20,
+    });
+    assert.equal(r.ok, false);
+    assert.equal(r.code, "RESERVE_CAPACITY");
+  });
+
+  it("issuer withdraws accrued fees: feeReserve zeroes, totalReserve shrinks", () => {
+    const { r } = drawWithFee(5);
+    assert.equal(r.ok, true);
+    if (!r.ok) throw new Error("draw");
+    const w = withdrawFees(r.ledger, { caller: ISSUER_SK });
+    assert.equal(w.ok, true);
+    if (!w.ok) throw new Error("withdrawFees");
+    assert.equal(w.fees, 5);
+    assert.equal(w.ledger.feeReserve, 0);
+    assert.equal(w.ledger.totalReserve, 995); // 1000 - 5
+    assert.equal(w.ledger.encumberedReserve, 40); // notes untouched
+  });
+
+  it("withdrawFees is issuer-only", () => {
+    const { r } = drawWithFee(5);
+    assert.equal(r.ok, true);
+    if (!r.ok) throw new Error("draw");
+    const w = withdrawFees(r.ledger, { caller: AGENT_SK });
+    assert.equal(w.ok, false);
+    assert.equal(w.code, "AUTH_ISSUER");
+  });
+
+  it("withdrawFees with no accrued fees is rejected", () => {
+    const o = opened();
+    const w = withdrawFees(o.ledger, { caller: ISSUER_SK });
+    assert.equal(w.ok, false);
+    assert.equal(w.code, "NO_FEES");
+  });
+
+  it("withdrawUnencumberedReserve locks accrued fees (only withdrawFees releases them)", () => {
+    const { r } = drawWithFee(5);
+    assert.equal(r.ok, true);
+    if (!r.ok) throw new Error("draw");
+    // total 1000, encumbered 40, feeReserve 5 -> withdrawable = 955
+    const w = withdrawUnencumberedReserve(r.ledger, { caller: ISSUER_SK, amount: 956 });
+    assert.equal(w.ok, false);
+    assert.equal(w.code, "RESERVE_WITHDRAW");
+    const w2 = withdrawUnencumberedReserve(r.ledger, { caller: ISSUER_SK, amount: 955 });
+    assert.equal(w2.ok, true);
+    if (!w2.ok) throw new Error("withdraw");
+    assert.equal(w2.ledger.feeReserve, 5); // fees stay locked
+    assert.equal(w2.ledger.totalReserve, 45); // 1000 - 955
   });
 });

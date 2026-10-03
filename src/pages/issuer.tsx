@@ -17,9 +17,13 @@ export function IssuerPage() {
 
   const doFundReserve = useLine((s) => s.doFundReserve);
   const doWithdrawReserve = useLine((s) => s.doWithdrawReserve);
+  const doWithdrawFees = useLine((s) => s.doWithdrawFees);
   const doRegisterMerchant = useLine((s) => s.doRegisterMerchant);
   const ledger = useLine((s) => s.ledger);
-  const locked = (ledger.encumberedReserve ?? 0) + (ledger.redeemedReserve ?? 0);
+  const feeReserve = ledger.feeReserve ?? 0;
+  // FEE_SPEC §1: feeReserve is part of the locked set.
+  const locked =
+    (ledger.encumberedReserve ?? 0) + (ledger.redeemedReserve ?? 0) + (ledger.feeReserve ?? 0);
   const withdrawable = Math.max(0, (ledger.totalReserve ?? 0) - locked);
 
   return (
@@ -46,6 +50,9 @@ export function IssuerPage() {
               <Button onClick={() => doFundReserve(500)}>Fund Reserve · 500</Button>
               <Button variant="ghost" onClick={() => doWithdrawReserve(withdrawable)} disabled={withdrawable <= 0}>
                 Withdraw Unencumbered ({withdrawable})
+              </Button>
+              <Button variant="ghost" onClick={() => doWithdrawFees()} disabled={feeReserve <= 0}>
+                Withdraw Fees ({feeReserve})
               </Button>
               <Button variant="ghost" onClick={() => doRegisterMerchant()}>
                 Register Merchant B

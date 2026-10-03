@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { snapshotAt } from "./demo.ts";
+import { snapshotAt, DEMO_STEPS } from "./demo.ts";
 
 describe("scripted demo snapshots", () => {
   it("step 1 registers Merchant B", () => {
@@ -59,6 +59,8 @@ describe("scripted demo snapshots", () => {
     assert.equal(s.overLimitRan, true);
     assert.ok(s.lastFail);
     assert.match(s.lastFailReason ?? "", /capacity|exceed/i);
+    // M1: the public view must be exactly the generic error — no reason suffix.
+    assert.equal(DEMO_STEPS[10].publicView, "Clearance could not be proven.");
   });
 
   it("step 11 issuer ack 40 restores capacity", () => {
@@ -93,5 +95,12 @@ describe("scripted demo snapshots", () => {
     const s17 = snapshotAt(17);
     assert.equal(s17.postDefaultRan, true);
     assert.ok(s17.lastFail);
+    // M1: the public view must be exactly the generic error — no reason suffix.
+    assert.equal(DEMO_STEPS[17].publicView, "Clearance could not be proven.");
+  });
+
+  it("L12: step 6 publicView names the NOTE_AUTH failure, not note opening", () => {
+    assert.match(DEMO_STEPS[6].publicView, /designated merchant/i);
+    assert.match(DEMO_STEPS[6].publicView, /Ledger unchanged/i);
   });
 });

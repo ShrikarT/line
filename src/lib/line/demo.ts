@@ -61,7 +61,7 @@ export const DEMO_STEPS = [
   {
     id: 6,
     title: "Attack: Merchant B tries to redeem D1",
-    publicView: "Redemption rejected: note opening invalid. Ledger unchanged.",
+    publicView: "Redemption rejected: caller is not the designated merchant. Ledger unchanged.",
     privateView: "Merchant B cannot steal Merchant A's claim.",
   },
   {
@@ -85,7 +85,7 @@ export const DEMO_STEPS = [
   {
     id: 10,
     title: "Over-limit failure (40 + 120 > 150)",
-    publicView: "Clearance could not be proven. Capacity exceeded.",
+    publicView: "Clearance could not be proven.",
     privateView: "Agent capacity is 110; invoice is 120.",
   },
   {
@@ -127,7 +127,7 @@ export const DEMO_STEPS = [
   {
     id: 17,
     title: "Post-default draw fails",
-    publicView: "Clearance could not be proven. Status defaulted.",
+    publicView: "Clearance could not be proven.",
     privateView: "Draw circuit asserts status == open.",
   },
   {
@@ -148,7 +148,6 @@ export type DemoSnapshot = {
   lastFail: string | null;
   lastFailReason: string | null;
   step: number;
-  replayRan: boolean;
   overLimitRan: boolean;
   postDefaultRan: boolean;
   wrongMerchantRan: boolean;
@@ -174,7 +173,6 @@ export function snapshotAt(step: number): DemoSnapshot {
   let lastAcked = 0;
   let lastFail: string | null = null;
   let lastFailReason: string | null = null;
-  let replayRan = false;
   let overLimitRan = false;
   let postDefaultRan = false;
   let wrongMerchantRan = false;
@@ -452,7 +450,6 @@ export function snapshotAt(step: number): DemoSnapshot {
     lastFail,
     lastFailReason,
     step: n,
-    replayRan,
     overLimitRan,
     postDefaultRan,
     wrongMerchantRan,

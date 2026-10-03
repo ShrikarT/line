@@ -61,6 +61,8 @@ export const FAIL = {
   RESERVE_CAPACITY: "insufficient reserve for draw note",
   RESERVE_WITHDRAW: "withdrawal exceeds unencumbered reserve",
   MERCHANT_REGISTERED: "merchant already registered",
+  NO_FEES: "no fees",
+  RESERVE_DEFICIT: "reserve deficit",
   NOTE_NOT_FOUND: "draw note not found",
   NOTE_USED: "draw note already redeemed",
   NOTE_CANCELLED: "draw note is cancelled",
@@ -83,6 +85,15 @@ export function asBytes32(input: string | Uint8Array): Uint8Array {
   return pad32(input);
 }
 
+/**
+ * L7 — known replica bound: amounts in this TypeScript simulator are JS
+ * `number`s, so every Uint<64>-compatible value must be an integer in
+ * [0, 2^53 − 1] (Number.isSafeInteger). The on-chain Compact contract's native
+ * Uint<64> spans the full 2^64 range; the simulator intentionally narrows it to
+ * the lossless float64-integer domain. All protocol entry points enforce this
+ * via assertSafeUint before reaching u64(), so any value ≥ 2^53 is rejected as
+ * a fail result (never silently rounded) — see FAIL.OVERFLOW / fail() paths.
+ */
 function u64(n: number): bigint {
   if (!Number.isInteger(n) || n < 0 || !Number.isSafeInteger(n)) {
     throw new RangeError("not a Uint<64>-compatible integer");
@@ -211,6 +222,7 @@ export function createLedger(params?: {
     totalReserve: 0,
     encumberedReserve: 0,
     redeemedReserve: 0,
+    feeReserve: 0,
     identityCommitment: null,
     lineCommitment: null,
     lineExpiry: 0,
@@ -300,7 +312,8 @@ export function withdrawUnencumberedReserve(
   if (!isIssuer(next, input.caller)) return fail("AUTH_ISSUER", FAIL.AUTH_ISSUER);
   if (!assertSafeUint(input.amount) || input.amount <= 0) return fail("ZERO", FAIL.ZERO);
 
-  const locked = next.encumberedReserve + next.redeemedReserve;
+  // FEE_SPEC §3: accrued fees are locked — only withdrawFees releases them.
+  const locked = next.encumberedReserve + next.redeemedReserve + next.feeReserve;
   const withdrawable = next.totalReserve - locked;
   if (input.amount > withdrawable) {
     return fail("RESERVE_WITHDRAW", FAIL.RESERVE_WITHDRAW);
@@ -314,6 +327,32 @@ export function withdrawUnencumberedReserve(
     amount: input.amount,
   });
   return { ok: true, ledger: next };
+}
+
+/** FEE_SPEC §4: issuer-only release of accrued fees. Accrued fees are locked
+    inside totalReserve — only withdrawFees releases them (withdrawUnencumberedReserve
+    cannot touch them). In this prototype the reserve is an accounting counter
+    (no tokens move), so "payout" means the issuer's accrued-fee claim is released
+    by shrinking totalReserve. */
+export function withdrawFees(
+  ledger: Ledger,
+  input: { caller: string },
+): CircuitResult<{ ledger: Ledger; fees: number }> {
+  const next = cloneLedger(ledger);
+  if (!isIssuer(next, input.caller)) return fail("AUTH_ISSUER", FAIL.AUTH_ISSUER);
+  const f = next.feeReserve;
+  if (f <= 0) return fail("NO_FEES", FAIL.NO_FEES);
+  const locked = next.encumberedReserve + next.redeemedReserve + next.feeReserve;
+  if (next.totalReserve < locked) return fail("RESERVE_DEFICIT", FAIL.RESERVE_DEFICIT);
+  next.totalReserve -= f;
+  next.feeReserve = 0;
+  pushEvent(next, {
+    circuit: "withdrawFees",
+    ok: true,
+    publicNote: `Issuer withdrew ${f} accrued fees.`,
+    amount: f,
+  });
+  return { ok: true, ledger: next, fees: f };
 }
 
 export function openLine(
@@ -416,6 +455,9 @@ export function draw(
     noteNonce?: string;
     noteSalt?: string;
     noteExpiry?: number;
+    /** Issuer fee (public Uint<64> circuit parameter, appended last per FEE_SPEC §2).
+        fee = 0 reproduces pre-fee behavior exactly. */
+    fee?: number;
   },
 ): CircuitResult<{ ledger: Ledger; agent: AgentStore; note: DrawNote }> {
   const next = cloneLedger(ledger);
@@ -448,15 +490,22 @@ export function draw(
 
   const { L, B } = input.witness;
   const A = input.quote.amount;
-  if (B < 0 || A > Number.MAX_SAFE_INTEGER - B) return fail("OVERFLOW", FAIL.OVERFLOW);
-  const nextB = B + A;
+  // FEE_SPEC §3: cost = amount + fee is charged to the agent's outstanding;
+  // the settlement note encumbers ONLY the invoice amount, the fee accrues to
+  // the issuer's feeReserve. fee = 0 reproduces pre-fee behavior exactly.
+  const f = input.fee ?? 0;
+  if (!assertSafeUint(f)) return fail("AMOUNT", "fee must be a non-negative integer");
+  const cost = A + f;
+  if (cost < A || !assertSafeUint(cost)) return fail("OVERFLOW", FAIL.OVERFLOW); // "fee overflow" guard
+  const nextB = B + cost;
+  if (nextB < B || !assertSafeUint(nextB)) return fail("OVERFLOW", FAIL.OVERFLOW);
   if (nextB > L) return fail("CAPACITY", FAIL.CAPACITY);
-  if (BigInt(nextB) > UINT64_MAX) return fail("OVERFLOW", FAIL.OVERFLOW);
 
-  // Reserve capacity check
-  const locked = next.encumberedReserve + next.redeemedReserve;
-  const withdrawable = next.totalReserve - locked;
-  if (A > withdrawable) {
+  // Reserve capacity check: fee counts toward solvency.
+  const locked = next.encumberedReserve + next.redeemedReserve + next.feeReserve;
+  if (next.totalReserve < locked) return fail("RESERVE_DEFICIT", FAIL.RESERVE_DEFICIT);
+  const free = next.totalReserve - locked; // == unencumberedReserve
+  if (cost > free) {
     return fail("RESERVE_CAPACITY", FAIL.RESERVE_CAPACITY);
   }
 
@@ -495,7 +544,8 @@ export function draw(
   live.used = true;
   next.lineCommitment = C2;
   next.nullifiers.push(N);
-  next.encumberedReserve += A;
+  next.encumberedReserve += A; // note encumbers ONLY the invoice amount (FEE_SPEC §3)
+  next.feeReserve += f; // fee accrues to the issuer
   next.notes.push({
     commitment: D,
     amount: A,
@@ -715,6 +765,7 @@ export function publicLedgerView(ledger: Ledger): Pick<
   | "totalReserve"
   | "encumberedReserve"
   | "redeemedReserve"
+  | "feeReserve"
   | "actionClock"
   | "events"
 > {
@@ -743,6 +794,7 @@ export function publicLedgerView(ledger: Ledger): Pick<
     totalReserve: ledger.totalReserve,
     encumberedReserve: ledger.encumberedReserve,
     redeemedReserve: ledger.redeemedReserve,
+    feeReserve: ledger.feeReserve,
     actionClock: ledger.actionClock,
     events: ledger.events.map((e) => ({ ...e })),
   };

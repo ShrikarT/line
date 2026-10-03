@@ -12,6 +12,7 @@ import {
   redeemDraw,
   registerMerchant,
   setStatus,
+  withdrawFees,
   withdrawUnencumberedReserve,
 } from "./protocol.ts";
 import { snapshotAt, DEMO_STEPS } from "./demo.ts";
@@ -75,10 +76,11 @@ export type LineState = {
   setActiveMerchant: (m: "A" | "B") => void;
   doFundReserve: (amount?: number) => void;
   doWithdrawReserve: (amount?: number) => void;
+  doWithdrawFees: () => void;
   doRegisterMerchant: (merchantPkOrSecret?: string) => void;
   doOpen: (limit?: number) => void;
   doQuote: (amount: number, invoiceId?: string, merchant?: "A" | "B") => void;
-  doDraw: (Q: string) => void;
+  doDraw: (Q: string, fee?: number) => void;
   doRedeem: (D: string, merchant?: "A" | "B") => void;
   doExpireNote: (D: string) => void;
   doAck: (amount?: number) => void;
@@ -100,6 +102,21 @@ export type LineState = {
 function freshSalt() {
   return toHex(randomBytes32());
 }
+
+/**
+ * L8: numeric input guard for store actions (the React-handler boundary).
+ * Protocol entry points return fail results for bad amounts, but this pre-check
+ * guarantees a handler can never propagate a u64() RangeError (or other encoding
+ * throw) into React — handlers only ever set fail flashes.
+ */
+function badAmount(n: unknown): boolean {
+  return typeof n !== "number" || !Number.isSafeInteger(n) || n <= 0;
+}
+
+const amountFail = (what: string): Flash => ({
+  tone: "fail",
+  text: `${what} must be a positive integer (≤ 2^53 − 1).`,
+});
 
 const empty = () => ({
   ledger: createLedger({ issuerSecret: ISSUER_SK, merchantSecret: MERCHANT_A_SK }),
@@ -139,7 +156,11 @@ export const useLine = create<LineState>()(
           pendingRepay: snap.pendingRepay,
           lastAcked: snap.lastAcked,
           demoStep: snap.step,
-          staleWitness: snap.agent?.witness ?? null,
+          // Scripted snapshots carry no stale witness: doDraw's genuinely-stale
+          // `prev` (or a prior attack witness) must not be silently replaced by
+          // the *current* witness here, which made the /lab "Stale C" attack
+          // flash a false "bug" on a legitimate draw. Set to null instead.
+          staleWitness: null,
           flash: {
             tone: snap.lastFail ? "info" : "ok",
             text: snap.lastFail ? `${stepInfo.title}: ${snap.lastFail}` : `${stepInfo.title} applied.`,
@@ -154,6 +175,10 @@ export const useLine = create<LineState>()(
       },
 
       doFundReserve: (amount = 500) => {
+        if (badAmount(amount)) {
+          set({ flash: amountFail("Fund amount") });
+          return;
+        }
         const r = fundReserve(get().ledger, { caller: ISSUER_SK, amount });
         if (!r.ok) {
           set({ flash: { tone: "fail", text: r.reason } });
@@ -172,9 +197,17 @@ export const useLine = create<LineState>()(
       },
 
       doWithdrawReserve: (amount) => {
-        const locked = (get().ledger.encumberedReserve ?? 0) + (get().ledger.redeemedReserve ?? 0);
+        // FEE_SPEC §3: accrued fees are locked — only withdrawFees releases them.
+        const locked =
+          (get().ledger.encumberedReserve ?? 0) +
+          (get().ledger.redeemedReserve ?? 0) +
+          (get().ledger.feeReserve ?? 0);
         const withdrawable = Math.max(0, (get().ledger.totalReserve ?? 0) - locked);
         const toWithdraw = amount ?? withdrawable;
+        if (amount !== undefined && badAmount(amount)) {
+          set({ flash: amountFail("Withdraw amount") });
+          return;
+        }
         const r = withdrawUnencumberedReserve(get().ledger, { caller: ISSUER_SK, amount: toWithdraw });
         if (!r.ok) {
           set({ flash: { tone: "fail", text: r.reason } });
@@ -188,6 +221,24 @@ export const useLine = create<LineState>()(
             ok: true,
             publicView: `Total reserve decreased by ${toWithdraw}.`,
             privateView: `Issuer withdrew unencumbered reserve capital.`,
+          },
+        });
+      },
+
+      doWithdrawFees: () => {
+        const r = withdrawFees(get().ledger, { caller: ISSUER_SK });
+        if (!r.ok) {
+          set({ flash: { tone: "fail", text: r.reason } });
+          return;
+        }
+        set({
+          ledger: r.ledger,
+          flash: { tone: "ok", text: `Issuer withdrew ${r.fees} accrued fees.` },
+          dual: {
+            circuit: "withdrawFees",
+            ok: true,
+            publicView: `Fee reserve released. Total reserve = ${r.ledger.totalReserve}.`,
+            privateView: `Issuer claimed fee revenue from agent draw fees.`,
           },
         });
       },
@@ -211,6 +262,10 @@ export const useLine = create<LineState>()(
       },
 
       doOpen: (limit = 150) => {
+        if (badAmount(limit)) {
+          set({ flash: amountFail("Credit limit") });
+          return;
+        }
         const r = openLine(get().ledger, {
           caller: ISSUER_SK,
           agentSecret: AGENT_SK,
@@ -245,6 +300,10 @@ export const useLine = create<LineState>()(
       },
 
       doQuote: (amount, invoiceId, merchant) => {
+        if (badAmount(amount)) {
+          set({ flash: amountFail("Quote amount") });
+          return;
+        }
         const m = merchant ?? get().activeMerchant;
         const caller = m === "B" ? MERCHANT_B_SK : MERCHANT_A_SK;
         const id = invoiceId ?? `inv-${m}-${amount}-${freshSalt().slice(0, 8)}`;
@@ -275,11 +334,15 @@ export const useLine = create<LineState>()(
         });
       },
 
-      doDraw: (Q) => {
+      doDraw: (Q, fee) => {
         const inv = get().invoices.find((i) => i.Q === Q);
         const agent = get().agent;
         if (!inv || !agent?.witness) {
           set({ flash: { tone: "fail", text: "Clearance could not be proven." } });
+          return;
+        }
+        if (fee !== undefined && (!Number.isSafeInteger(fee) || fee < 0)) {
+          set({ flash: { tone: "fail", text: "Fee must be a non-negative integer (≤ 2^53 − 1)." } });
           return;
         }
         const prev = agent.witness;
@@ -290,6 +353,7 @@ export const useLine = create<LineState>()(
           newSalt: freshSalt(),
           noteNonce: freshSalt(),
           noteSalt: freshSalt(),
+          fee: fee ?? 0,
         });
         if (!r.ok) {
           set({
@@ -379,6 +443,10 @@ export const useLine = create<LineState>()(
           return;
         }
         const R = amount ?? get().pendingRepay;
+        if (badAmount(R)) {
+          set({ flash: amountFail("Repayment amount") });
+          return;
+        }
         const n = freshSalt();
         const receipt: RepayReceipt = {
           identity: agent.witness.I,
@@ -622,7 +690,7 @@ export const useLine = create<LineState>()(
           dual: {
             circuit: "redeemDraw (wrong merchant)",
             ok: r.ok,
-            publicView: r.ok ? "BUG: Encumbered reserve claimed." : "Redemption rejected: note opening invalid.",
+            publicView: r.ok ? "BUG: Encumbered reserve claimed." : "Redemption rejected: caller is not the designated merchant.",
             privateView: r.ok ? "Theft" : "Merchant B secret does not match committed merchantPk.",
           },
         });
