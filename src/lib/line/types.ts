@@ -39,6 +39,9 @@ export type Ledger = {
   totalReserve: number;
   encumberedReserve: number;
   redeemedReserve: number;
+  /** Issuer fee accrual (FEE_SPEC §1). Part of the reserve conservation invariant:
+      encumberedReserve + redeemedReserve + feeReserve <= totalReserve. */
+  feeReserve: number;
   identityCommitment: string | null;
   lineCommitment: string | null;
   lineExpiry: number;

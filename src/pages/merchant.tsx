@@ -7,6 +7,7 @@ import { MERCHANT_A_PK, MERCHANT_B_PK } from "@/lib/line/keys.ts";
 export function MerchantPage() {
   const doQuote = useLine((s) => s.doQuote);
   const doRedeem = useLine((s) => s.doRedeem);
+  const doExpireNote = useLine((s) => s.doExpireNote);
   const activeMerchant = useLine((s) => s.activeMerchant);
   const setActiveMerchant = useLine((s) => s.setActiveMerchant);
   const invoices = useLine((s) => s.invoices);
@@ -82,9 +83,14 @@ export function MerchantPage() {
                         </div>
                       </div>
                       {!isRedeemed && (
-                        <Button onClick={() => doRedeem(n.D, activeMerchant)}>
-                          Redeem {n.preimage.amount} against Reserve
-                        </Button>
+                        <>
+                          <Button onClick={() => doRedeem(n.D, activeMerchant)}>
+                            Redeem {n.preimage.amount} against Reserve
+                          </Button>
+                          <Button variant="ghost" onClick={() => doExpireNote(n.D)}>
+                            Cancel note if expired
+                          </Button>
+                        </>
                       )}
                     </li>
                   );
@@ -113,7 +119,10 @@ export function MerchantPage() {
             </ul>
           </div>
 
-          <Stat label="Private rule" value="Amount and merchant identity never hit public explorer." />
+          <Stat
+            label="Privacy boundary"
+            value="Quote/invoice amounts stay private; settled note amounts are public escrow accounting."
+          />
         </Panel>
         <ExplorerPanel />
       </div>

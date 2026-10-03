@@ -3,7 +3,9 @@ import { Mono, Panel, Stat } from "./ui";
 
 export function ExplorerPanel() {
   const ledger = useLine((s) => s.ledger);
-  const locked = (ledger.encumberedReserve ?? 0) + (ledger.redeemedReserve ?? 0);
+  // FEE_SPEC §1: feeReserve is part of the locked set.
+  const locked =
+    (ledger.encumberedReserve ?? 0) + (ledger.redeemedReserve ?? 0) + (ledger.feeReserve ?? 0);
   const withdrawable = Math.max(0, (ledger.totalReserve ?? 0) - locked);
   const merchantCount = Object.keys(ledger.registeredMerchants ?? {}).length;
 
@@ -28,6 +30,7 @@ export function ExplorerPanel() {
           <Stat label="Total Reserve" value={ledger.totalReserve ?? 0} />
           <Stat label="Encumbered" value={ledger.encumberedReserve ?? 0} />
           <Stat label="Redeemed" value={ledger.redeemedReserve ?? 0} />
+          <Stat label="Fee Reserve" value={ledger.feeReserve ?? 0} />
           <Stat label="Withdrawable" value={withdrawable} />
         </div>
       </div>
