@@ -145,7 +145,7 @@ D = persistentCommit<DrawNotePreimage>(notePreimage, noteSalt)
     lineGeneration: Uint<64>,
   }
   ```
-  (No `merchantPk` field — merchant binding lives in the note *preimage* (`DrawNotePreimage.merchantPk`) and is enforced at redemption via the $N_{\text{redeem}}$ nullifier opening, which proves $sk \to \text{merchantPk}$ in-circuit. The quotes ledger records `QuoteMeta.merchantPk` publicly, so a settled note is linkable to its merchant on-ledger.)
+  (No `merchantPk` field — merchant binding lives in the note *preimage* (`DrawNotePreimage.merchantPk`) and is enforced at redemption via the $N_{\text{redeem}}$ nullifier opening, which proves $sk \to \text{merchantPk}$ in-circuit. `QuoteMeta` also stores no `merchantPk` — the quotes map holds opaque commitments only, so a settled note is NOT linkable to its merchant on-ledger: the quote↔merchant binding is proven in ZK inside `draw`.)
 
 ### Merchant Redemption Nullifier ($N_{\text{redeem}}$)
 ```compact
@@ -174,20 +174,22 @@ N_redeem = persistentHash<Vector<4, Bytes<32>>>([
 
 ---
 
-## 8. Circuits Specification (10 Circuits)
+## 8. Circuits Specification (12 Circuits)
 
 | # | Circuit | Caller | Public Inputs | Private Witnesses | Preconditions | State Changes |
 |---|---|---|---|---|---|---|
 | 1 | `registerMerchant` | Issuer | `merchantPk` | `callerSecret` | Issuer auth, merchant not already registered | `registeredMerchants[merchantPk] = true` |
-| 2 | `fundReserve` | Issuer | `amount` | `callerSecret` | Issuer auth, `amount > 0`, no overflow | `totalReserve += amount` |
-| 3 | `openLine` | Issuer | `limit`, `expiry` | `callerSecret`, `agentSecret`, `salt` | Issuer auth, status NONE or CLOSED, `limit > 0` | `lineCommit = C0`, `lineGeneration++`, `status = OPEN` |
-| 4 | `postQuote` | Merchant | `quoteCommit`, `expiry` | `callerSecret`, `inv`, `amount`, `nonce` | Merchant registered & authenticated, `status == OPEN`, `amount > 0` | `quotes[Q] = QuoteMeta` |
-| 5 | `draw` | Agent | `quoteCommit`, `noteCommit`, `newCommit`, `drawNullifier` | `agentSecret`, preimages, salts | Line OPEN, $B+A \le L$, reserve available, quote unspent & matches gen | Rotate $C \to C'$, spend $N_{\text{draw}}$, create $D$, `encumberedReserve += A` |
-| 6 | `redeemDraw` | Merchant | `noteCommit`, `redeemNullifier` | `merchantSecret`, note preimage, note salt | Note exists, unredeemed, uncancelled, not expired, merchant auth | Spend $N_{\text{redeem}}$, note marked redeemed, `encumberedReserve -= A`, `redeemedReserve += A` |
-| 7 | `acknowledgeRepayment` | Issuer | `repayCommit`, `repayNullifier` | `callerSecret`, receipt, preimages | Issuer auth, $0 < R \le B$, line not NONE | Rotate $C \to C'$, spend $N_{\text{repay}}$ |
-| 8 | `cancelOrExpireNote` | Issuer / Merchant | `noteCommit` | `callerSecret` | Note exists, unredeemed; either expired or cancelled by both parties | Note marked cancelled, `encumberedReserve -= A` |
-| 9 | `setStatus` | Issuer | `newStatus` | `callerSecret` | Issuer auth, valid transitions | `status = newStatus` |
-| 10 | `withdrawUnencumberedReserve` | Issuer | `amount` | `callerSecret` | Issuer auth, $W \le \text{total} - (\text{encumbered} + \text{redeemed})$ | `totalReserve -= amount` |
+| 2 | `disableMerchant` | Issuer | `merchantPk` | `callerSecret` | Issuer auth, merchant known | `registeredMerchants[merchantPk] = false` (existing quotes stay live; new quotes blocked) |
+| 3 | `fundReserve` | Issuer | `amount` | `callerSecret` | Issuer auth, `amount > 0`, no overflow | `totalReserve += amount` |
+| 4 | `withdrawUnencumberedReserve` | Issuer | `amount` | `callerSecret` | Issuer auth, $W \le \text{total} - (\text{encumbered} + \text{redeemed} + \text{feeReserve})$ | `totalReserve -= amount` |
+| 5 | `withdrawFees` | Issuer | — | `callerSecret` | Issuer auth, `feeReserve > 0` | `totalReserve -= feeReserve`, `feeReserve = 0` |
+| 6 | `openLine` | Issuer | `expiry` | `callerSecret`, `agentSecret`, `salt`, `lineLimit` (witness) | Issuer auth, status NONE or CLOSED, witness `limit > 0`, expiry headroom | `lineCommit = C0`, `lineGeneration++`, `status = OPEN` |
+| 7 | `postQuote` | Merchant | `expiry` | `callerSecret`, `invoiceId`, `quoteAmount` (witness), `quoteNonce` | Merchant registered & enabled, `status == OPEN`, witness `amount > 0`, expiry headroom | `quotes[Q] = QuoteMeta` (no merchantPk, no amount) |
+| 8 | `draw` | Agent | `quoteCommitPublic`, `noteExpiry`, `fee` | `agentSecret`, `salt`, `newSalt`, `lineLimit`, `lineOutstanding`, `lineEpoch` (witness books), `drawAmount` (witness), `invoiceId`, `quoteNonce`, `quoteMerchantPk` (witness), `noteNonce`, `noteSalt` | Line OPEN & unexpired, stale check on witness books, $B + A + F \le L$, $\text{withdrawable} \ge A + F$, quote unspent/unexpired/matching gen, witness merchant recomputes $Q$ and is registered, note-expiry headroom | Rotate $C \to C'$ (epoch++), spend $N_{\text{draw}}$, create $D$, `encumberedReserve += A`, `feeReserve += F` |
+| 9 | `redeemDraw` | Merchant | `noteCommitPublic`, `noteExpiry` | `callerSecret`, `redeemAmount` (witness), `noteIdentity`, `noteQuoteCommit`, `noteNonce`, `noteSalt` | Note exists, unredeemed, uncancelled, unexpired; note opening recomputes $D$; $sk \to \text{merchantPk}$ matches | Spend $N_{\text{redeem}}$, note marked redeemed, `encumberedReserve -= A`, `redeemedReserve += A` |
+| 10 | `cancelOrExpireNote` | Anyone (permissionless) | `noteCommitPublic` | — | Note exists, unredeemed, `meta.expiry <= actionClock` | Note marked cancelled, `encumberedReserve -= A` |
+| 11 | `acknowledgeRepayment` | Issuer | `receiptExpiry` | `callerSecret`, `salt`, `newSalt`, `lineLimit`, `lineOutstanding`, `lineEpoch` (witness books), `repayAmount` (witness), `receiptNonce`, `paymentRef` | Issuer auth, line not NONE, stale check on witness books, $0 < R \le B$, receipt not reused | Rotate $C \to C'$ (epoch++), spend $N_{\text{repay}}$, $B$ decreases |
+| 12 | `setStatus` | Issuer | `next` | `callerSecret` | Issuer auth, valid transitions | `status = next` |
 
 ---
 
@@ -208,20 +210,23 @@ N_redeem = persistentHash<Vector<4, Bytes<32>>>([
 
 ## 10. Privacy Map
 
-### Strictly Confidential
-- Line limit $L$, outstanding balance $B$, available capacity $L - B$.
-- Quote amount $A$, invoice ID, quote nonce.
+Rewritten against the implemented witness reality (Oct 2026 rework). The frame: **amounts are visible as anonymous flows; attribution is what the ZK hides.**
+
+### Strictly Confidential (ZK witnesses, never in public inputs or ledger state)
+- Line limit $L$, outstanding balance $B$, epoch, available capacity $L - B$.
+- Per-quote invoice amount $A$, invoice ID, quote nonce (hidden until settlement).
 - Agent secret $sk_A$, salts, note salt.
 - Repayment receipt details, repayment amount $R$, payment reference.
-- Merchant graph: which merchant was paid for which invoice is hidden from public observers (draw note $D$ is opaque).
+- Merchant graph: which merchant was paid for which invoice (draw note $D$ is opaque; `QuoteMeta` stores no `merchantPk`).
 
-### Disclosed On-Chain
-- Identity commitment $I$, line commitment $C$, status, line generation.
-- Quote commitments $Q$, draw-note commitments $D$.
+### Disclosed On-Chain (by design)
+- Identity commitment $I$, line commitment $C$, status, line generation, `actionClock` state-transition counter.
+- Quote commitments $Q$, draw-note commitments $D$ (opaque).
 - Nullifiers ($N_{\text{draw}}, N_{\text{redeem}}, N_{\text{repay}}$).
-- Reserve totals: `totalReserve`, `encumberedReserve`, `redeemedReserve` (disclosed for verifiable solvency).
-- `actionClock` state-transition counter.
-- Registered merchant public keys.
+- Reserve totals and their deltas: `totalReserve`, `encumberedReserve`, `redeemedReserve`, `feeReserve` (disclosed for verifiable solvency — a single draw's size is visible as a counter delta, unattributable).
+- Settled note amounts (`NoteMeta.amount` is public escrow accounting).
+- Fee amounts (`draw`'s public `fee` param).
+- Registered merchant public keys (the allowlist SET is public; which member quoted is not).
 
 ---
 
