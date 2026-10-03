@@ -3,6 +3,7 @@ import { describe, it, before } from "node:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { MERCHANT_A_PK } from "../src/lib/line/keys.ts";
 
 describe("MCP interface", () => {
   let handleMessage;
@@ -14,7 +15,7 @@ describe("MCP interface", () => {
     ({ handleMessage } = await import("./line-mcp.mjs"));
   });
 
-  it("lists all 10 Wave 2 tools", async () => {
+  it("lists all 11 Wave 2 tools", async () => {
     const res = await handleMessage({ jsonrpc: "2.0", id: 1, method: "tools/list" });
     const names = res.result.tools.map((t) => t.name);
     assert.ok(names.includes("line.status"));
@@ -26,8 +27,9 @@ describe("MCP interface", () => {
     assert.ok(names.includes("line.redeem"));
     assert.ok(names.includes("line.expireNote"));
     assert.ok(names.includes("line.withdrawFees"));
+    assert.ok(names.includes("line.disableMerchant"));
     assert.ok(names.includes("line.repay"));
-    assert.equal(names.length, 10);
+    assert.equal(names.length, 11);
   });
 
   it("status on empty ledger is public-only", async () => {
@@ -319,5 +321,67 @@ describe("MCP interface", () => {
       params: { name: "line.withdrawFees", arguments: {} },
     });
     assert.equal(JSON.parse(wf2.result.content[0].text).ok, false);
+  });
+
+  it("L2: line.disableMerchant blocks new quotes; pre-disable quotes stay drawable", async () => {
+    const seedRes = await handleMessage({
+      jsonrpc: "2.0",
+      id: 50,
+      method: "tools/call",
+      params: { name: "line.seed", arguments: { step: 3 } },
+    });
+    assert.equal(JSON.parse(seedRes.result.content[0].text).ok, true);
+
+    // Quote posted while merchant A is enabled succeeds.
+    const q1 = await handleMessage({
+      jsonrpc: "2.0",
+      id: 51,
+      method: "tools/call",
+      params: { name: "line.quote", arguments: { amount: 40, invoiceId: "pre-disable-inv" } },
+    });
+    const q1Body = JSON.parse(q1.result.content[0].text);
+    assert.equal(q1Body.ok, true);
+
+    // Issuer disables merchant A.
+    const dis = await handleMessage({
+      jsonrpc: "2.0",
+      id: 52,
+      method: "tools/call",
+      params: { name: "line.disableMerchant", arguments: { merchantPk: MERCHANT_A_PK } },
+    });
+    const disBody = JSON.parse(dis.result.content[0].text);
+    assert.equal(disBody.ok, true);
+    assert.equal(disBody.merchantPk, MERCHANT_A_PK);
+
+    // New quotes from the disabled merchant are rejected.
+    const q2 = await handleMessage({
+      jsonrpc: "2.0",
+      id: 53,
+      method: "tools/call",
+      params: { name: "line.quote", arguments: { amount: 20, invoiceId: "post-disable-inv" } },
+    });
+    const q2Body = JSON.parse(q2.result.content[0].text);
+    assert.equal(q2Body.ok, false);
+    assert.ok(q2Body.message.toLowerCase().includes("disabled"));
+
+    // The already-posted quote stays drawable (membership-only check).
+    const d = await handleMessage({
+      jsonrpc: "2.0",
+      id: 54,
+      method: "tools/call",
+      params: { name: "line.draw", arguments: { quoteId: q1Body.quoteCommitment } },
+    });
+    const dBody = JSON.parse(d.result.content[0].text);
+    assert.equal(dBody.ok, true);
+    assert.equal(dBody.public.encumberedReserve, 40);
+
+    // Disabling an unknown merchant fails cleanly.
+    const bad = await handleMessage({
+      jsonrpc: "2.0",
+      id: 55,
+      method: "tools/call",
+      params: { name: "line.disableMerchant", arguments: { merchantPk: "ab".repeat(32) } },
+    });
+    assert.equal(JSON.parse(bad.result.content[0].text).ok, false);
   });
 });

@@ -5,6 +5,7 @@ import {
   available,
   cancelOrExpireNote,
   createLedger,
+  disableMerchant,
   draw,
   fundReserve,
   openLine,
@@ -78,6 +79,7 @@ export type LineState = {
   doWithdrawReserve: (amount?: number) => void;
   doWithdrawFees: () => void;
   doRegisterMerchant: (merchantPkOrSecret?: string) => void;
+  doDisableMerchant: (merchantPk?: string) => void;
   doOpen: (limit?: number) => void;
   doQuote: (amount: number, invoiceId?: string, merchant?: "A" | "B") => void;
   doDraw: (Q: string, fee?: number) => void;
@@ -261,18 +263,41 @@ export const useLine = create<LineState>()(
         });
       },
 
+      doDisableMerchant: (merchantPk = MERCHANT_B_PK) => {
+        const r = disableMerchant(get().ledger, { caller: ISSUER_SK, merchantPk });
+        if (!r.ok) {
+          set({ flash: { tone: "fail", text: r.reason } });
+          return;
+        }
+        set({
+          ledger: r.ledger,
+          flash: { tone: "ok", text: `Disabled merchant ${merchantPk.slice(0, 10)}... New quotes blocked; existing quotes stay drawable.` },
+          dual: {
+            circuit: "disableMerchant",
+            ok: true,
+            publicView: `Merchant registry flag cleared for ${merchantPk.slice(0, 10)}...`,
+            privateView: `Issuer disabled merchant. Their posted quotes remain drawable.`,
+          },
+        });
+      },
+
       doOpen: (limit = 150) => {
         if (badAmount(limit)) {
           set({ flash: amountFail("Credit limit") });
           return;
         }
-        const r = openLine(get().ledger, {
-          caller: ISSUER_SK,
-          agentSecret: AGENT_SK,
-          limit,
-          salt: freshSalt(),
-          expiry: get().ledger.actionClock + 10_000,
-        });
+        const r = openLine(
+          get().ledger,
+          {
+            caller: ISSUER_SK,
+            agentSecret: AGENT_SK,
+            salt: freshSalt(),
+            expiry: get().ledger.actionClock + 10_000,
+          },
+          // The limit is a private witness: it travels as a witness argument,
+          // never as a public parameter, and never lands on the ledger.
+          { limit },
+        );
         if (!r.ok) {
           set({
             flash: { tone: "fail", text: r.message },
@@ -307,13 +332,18 @@ export const useLine = create<LineState>()(
         const m = merchant ?? get().activeMerchant;
         const caller = m === "B" ? MERCHANT_B_SK : MERCHANT_A_SK;
         const id = invoiceId ?? `inv-${m}-${amount}-${freshSalt().slice(0, 8)}`;
-        const r = postQuote(get().ledger, {
-          caller,
-          amount,
-          invoiceId: id,
-          expiry: get().ledger.actionClock + 10_000,
-          nonce: freshSalt(),
-        });
+        const r = postQuote(
+          get().ledger,
+          {
+            caller,
+            invoiceId: id,
+            expiry: get().ledger.actionClock + 10_000,
+            nonce: freshSalt(),
+          },
+          // The invoice amount is a private witness: Q commits to it, but it
+          // is never a public parameter and never lands on the ledger.
+          { amount },
+        );
         if (!r.ok) {
           set({ flash: { tone: "fail", text: r.message } });
           return;
@@ -346,15 +376,20 @@ export const useLine = create<LineState>()(
           return;
         }
         const prev = agent.witness;
-        const r = draw(get().ledger, {
-          agentSecret: agent.secret,
-          witness: agent.witness,
-          quote: inv.preimage,
-          newSalt: freshSalt(),
-          noteNonce: freshSalt(),
-          noteSalt: freshSalt(),
-          fee: fee ?? 0,
-        });
+        const r = draw(
+          get().ledger,
+          {
+            agentSecret: agent.secret,
+            // PUBLIC: the opaque quote commitment. The books and the invoice
+            // preimage are private witnesses below.
+            quoteCommit: inv.Q,
+            newSalt: freshSalt(),
+            noteNonce: freshSalt(),
+            noteSalt: freshSalt(),
+            fee: fee ?? 0,
+          },
+          { books: agent.witness, quote: inv.preimage },
+        );
         if (!r.ok) {
           set({
             flash: { tone: "fail", text: r.message },
@@ -395,12 +430,19 @@ export const useLine = create<LineState>()(
         }
         const m = merchant ?? (note.preimage.merchantPk === MERCHANT_B_PK ? "B" : "A");
         const caller = m === "B" ? MERCHANT_B_SK : MERCHANT_A_SK;
-        const r = redeemDraw(get().ledger, {
-          caller,
-          noteCommitment: note.D,
-          notePreimage: note.preimage,
-          noteSalt: note.salt,
-        });
+        const r = redeemDraw(
+          get().ledger,
+          {
+            caller,
+            noteCommitment: note.D,
+            // PUBLIC noteExpiry circuit parameter: the expiry the merchant
+            // committed to inside the note.
+            noteExpiry: note.preimage.expiry,
+            noteSalt: note.salt,
+          },
+          // The note preimage (incl. the redeemAmount() witness) is private.
+          { note: note.preimage },
+        );
         if (!r.ok) {
           set({ flash: { tone: "fail", text: r.reason } });
           return;
@@ -457,12 +499,17 @@ export const useLine = create<LineState>()(
           expiry: get().ledger.actionClock + 10_000,
           contractDomain: get().ledger.contractDomain,
         };
-        const r = acknowledgeRepayment(get().ledger, {
-          caller: ISSUER_SK,
-          witness: agent.witness,
-          receipt,
-          newSalt: freshSalt(),
-        });
+        const r = acknowledgeRepayment(
+          get().ledger,
+          {
+            caller: ISSUER_SK,
+            newSalt: freshSalt(),
+            // PUBLIC receiptExpiry circuit parameter. The books and the
+            // receipt (incl. the repayAmount() witness) are private.
+            receiptExpiry: receipt.expiry,
+          },
+          { books: agent.witness, receipt },
+        );
         if (!r.ok) {
           set({ flash: { tone: "fail", text: r.message } });
           return;
@@ -510,14 +557,17 @@ export const useLine = create<LineState>()(
           set({ flash: { tone: "info", text: "Run a successful draw first." } });
           return;
         }
-        const r = draw(get().ledger, {
-          agentSecret: agent.secret,
-          witness: agent.witness,
-          quote: used.preimage,
-          newSalt: freshSalt(),
-          noteNonce: freshSalt(),
-          noteSalt: freshSalt(),
-        });
+        const r = draw(
+          get().ledger,
+          {
+            agentSecret: agent.secret,
+            quoteCommit: used.Q,
+            newSalt: freshSalt(),
+            noteNonce: freshSalt(),
+            noteSalt: freshSalt(),
+          },
+          { books: agent.witness, quote: used.preimage },
+        );
         set({
           flash: { tone: r.ok ? "fail" : "ok", text: r.ok ? "Replay unexpectedly succeeded." : r.message },
           dual: {
@@ -536,20 +586,24 @@ export const useLine = create<LineState>()(
           set({ flash: { tone: "info", text: "Open a line with outstanding first." } });
           return;
         }
-        const r = acknowledgeRepayment(get().ledger, {
-          caller: AGENT_SK,
-          witness: agent.witness,
-          receipt: {
-            identity: agent.witness.I,
-            currentC: C,
-            amount: Math.max(1, agent.witness.B || 1),
-            paymentRef: "fake",
-            nonce: freshSalt(),
-            expiry: get().ledger.actionClock + 10_000,
-            contractDomain: get().ledger.contractDomain,
+        const receipt = {
+          identity: agent.witness.I,
+          currentC: C,
+          amount: Math.max(1, agent.witness.B || 1),
+          paymentRef: "fake",
+          nonce: freshSalt(),
+          expiry: get().ledger.actionClock + 10_000,
+          contractDomain: get().ledger.contractDomain,
+        };
+        const r = acknowledgeRepayment(
+          get().ledger,
+          {
+            caller: AGENT_SK,
+            newSalt: freshSalt(),
+            receiptExpiry: receipt.expiry,
           },
-          newSalt: freshSalt(),
-        });
+          { books: agent.witness, receipt },
+        );
         set({
           flash: {
             tone: r.ok ? "fail" : "ok",
@@ -571,25 +625,31 @@ export const useLine = create<LineState>()(
           return;
         }
         const amount = agent.witness.L + 1;
-        const q = postQuote(get().ledger, {
-          caller: MERCHANT_A_SK,
-          amount,
-          invoiceId: `atk-over-${freshSalt().slice(0, 8)}`,
-          expiry: get().ledger.actionClock + 10_000,
-          nonce: freshSalt(),
-        });
+        const q = postQuote(
+          get().ledger,
+          {
+            caller: MERCHANT_A_SK,
+            invoiceId: `atk-over-${freshSalt().slice(0, 8)}`,
+            expiry: get().ledger.actionClock + 10_000,
+            nonce: freshSalt(),
+          },
+          { amount },
+        );
         if (!q.ok) {
           set({ flash: { tone: "fail", text: q.message } });
           return;
         }
-        const r = draw(q.ledger, {
-          agentSecret: agent.secret,
-          witness: agent.witness,
-          quote: q.quote,
-          newSalt: freshSalt(),
-          noteNonce: freshSalt(),
-          noteSalt: freshSalt(),
-        });
+        const r = draw(
+          q.ledger,
+          {
+            agentSecret: agent.secret,
+            quoteCommit: q.Q,
+            newSalt: freshSalt(),
+            noteNonce: freshSalt(),
+            noteSalt: freshSalt(),
+          },
+          { books: agent.witness, quote: q.quote },
+        );
         set({
           ledger: q.ledger,
           invoices: [
@@ -625,14 +685,18 @@ export const useLine = create<LineState>()(
           });
           return;
         }
-        const r = draw(get().ledger, {
-          agentSecret: agent.secret,
-          witness: stale,
-          quote: openInv.preimage,
-          newSalt: freshSalt(),
-          noteNonce: freshSalt(),
-          noteSalt: freshSalt(),
-        });
+        const r = draw(
+          get().ledger,
+          {
+            agentSecret: agent.secret,
+            quoteCommit: openInv.Q,
+            newSalt: freshSalt(),
+            noteNonce: freshSalt(),
+            noteSalt: freshSalt(),
+          },
+          // STALE: the previous witness no longer opens the current C.
+          { books: stale, quote: openInv.preimage },
+        );
         set({
           flash: { tone: r.ok ? "fail" : "ok", text: r.ok ? "Stale C accepted — bug." : r.message },
           dual: {
@@ -651,14 +715,17 @@ export const useLine = create<LineState>()(
           set({ flash: { tone: "info", text: "Need a quote and a line." } });
           return;
         }
-        const r = draw(get().ledger, {
-          agentSecret: "intruder-key",
-          witness: agent.witness,
-          quote: inv.preimage,
-          newSalt: freshSalt(),
-          noteNonce: freshSalt(),
-          noteSalt: freshSalt(),
-        });
+        const r = draw(
+          get().ledger,
+          {
+            agentSecret: "intruder-key",
+            quoteCommit: inv.Q,
+            newSalt: freshSalt(),
+            noteNonce: freshSalt(),
+            noteSalt: freshSalt(),
+          },
+          { books: agent.witness, quote: inv.preimage },
+        );
         set({
           flash: { tone: r.ok ? "fail" : "ok", text: r.ok ? "Wrong agent passed — bug." : r.message },
           dual: {
@@ -676,12 +743,16 @@ export const useLine = create<LineState>()(
           set({ flash: { tone: "info", text: "Create an active draw note for Merchant A first (or seed step 5)." } });
           return;
         }
-        const r = redeemDraw(get().ledger, {
-          caller: MERCHANT_B_SK, // Wrong merchant!
-          noteCommitment: note.D,
-          notePreimage: note.preimage,
-          noteSalt: note.salt,
-        });
+        const r = redeemDraw(
+          get().ledger,
+          {
+            caller: MERCHANT_B_SK, // Wrong merchant!
+            noteCommitment: note.D,
+            noteExpiry: note.preimage.expiry,
+            noteSalt: note.salt,
+          },
+          { note: note.preimage },
+        );
         set({
           flash: {
             tone: r.ok ? "fail" : "ok",
@@ -703,12 +774,16 @@ export const useLine = create<LineState>()(
           return;
         }
         const caller = redeemedNote.preimage.merchantPk === MERCHANT_B_PK ? MERCHANT_B_SK : MERCHANT_A_SK;
-        const r = redeemDraw(get().ledger, {
-          caller,
-          noteCommitment: redeemedNote.D,
-          notePreimage: redeemedNote.preimage,
-          noteSalt: redeemedNote.salt,
-        });
+        const r = redeemDraw(
+          get().ledger,
+          {
+            caller,
+            noteCommitment: redeemedNote.D,
+            noteExpiry: redeemedNote.preimage.expiry,
+            noteSalt: redeemedNote.salt,
+          },
+          { note: redeemedNote.preimage },
+        );
         set({
           flash: {
             tone: r.ok ? "fail" : "ok",
@@ -755,12 +830,16 @@ export const useLine = create<LineState>()(
         }
         const foreignLedger = createLedger({ instanceNonce: "99".repeat(32) });
         const caller = note.preimage.merchantPk === MERCHANT_B_PK ? MERCHANT_B_SK : MERCHANT_A_SK;
-        const r = redeemDraw(foreignLedger, {
-          caller,
-          noteCommitment: note.D,
-          notePreimage: note.preimage,
-          noteSalt: note.salt,
-        });
+        const r = redeemDraw(
+          foreignLedger,
+          {
+            caller,
+            noteCommitment: note.D,
+            noteExpiry: note.preimage.expiry,
+            noteSalt: note.salt,
+          },
+          { note: note.preimage },
+        );
         set({
           flash: {
             tone: r.ok ? "fail" : "ok",
