@@ -271,7 +271,7 @@ describe("compact simulator: reserve accounting", () => {
         noteNonce: pad32("nn-40"),
         noteSalt: pad32("ns-40"),
       }),
-      { name: "draw", args: [Q, 150n, 0n, 0n, 40n, EXPIRY] },
+      { name: "draw", args: [Q, 150n, 0n, 0n, 40n, EXPIRY, 0n] },
     );
     assert.equal(d.ok, false);
     assert.match(d.error, /insufficient reserve/);
@@ -292,7 +292,7 @@ describe("compact simulator: reserve accounting", () => {
         noteNonce: pad32("nn-40"),
         noteSalt: pad32("ns-40"),
       }),
-      { name: "draw", args: [Q, 150n, 0n, 0n, 40n, EXPIRY] },
+      { name: "draw", args: [Q, 150n, 0n, 0n, 40n, EXPIRY, 0n] },
     );
     assert.equal(d.ok, true);
     // Total is 1000, encumbered is 40. Withdrawable is 960.
@@ -399,7 +399,7 @@ describe("compact simulator: draw and merchant-bound settlement notes", () => {
         noteNonce: pad32("nn-40"),
         noteSalt: pad32("ns-40"),
       }),
-      { name: "draw", args: [Q, 150n, 0n, 0n, 40n, EXPIRY] },
+      { name: "draw", args: [Q, 150n, 0n, 0n, 40n, EXPIRY, 0n] },
     );
     assert.equal(d.ok, true);
     assert.equal(d.ledger.encumberedReserve, 40n);
@@ -425,7 +425,7 @@ describe("compact simulator: draw and merchant-bound settlement notes", () => {
         noteNonce: pad32("nn-160"),
         noteSalt: pad32("ns-160"),
       }),
-      { name: "draw", args: [Q, 150n, 0n, 0n, 160n, EXPIRY] },
+      { name: "draw", args: [Q, 150n, 0n, 0n, 160n, EXPIRY, 0n] },
     );
     assert.equal(d.ok, false);
     assert.match(d.error, /capacity/);
@@ -447,7 +447,7 @@ describe("compact simulator: draw and merchant-bound settlement notes", () => {
         noteNonce: pad32("nn-40"),
         noteSalt: pad32("ns-40"),
       }),
-      { name: "draw", args: [Q, 150n, 0n, 0n, 39n, EXPIRY] },
+      { name: "draw", args: [Q, 150n, 0n, 0n, 39n, EXPIRY, 0n] },
     );
     assert.equal(d.ok, false);
     assert.match(d.error, /quote preimage/);
@@ -469,7 +469,7 @@ describe("compact simulator: draw and merchant-bound settlement notes", () => {
         noteNonce: pad32("nn-40"),
         noteSalt: pad32("ns-40"),
       }),
-      { name: "draw", args: [Q, 150n, 0n, 0n, 40n, EXPIRY] },
+      { name: "draw", args: [Q, 150n, 0n, 0n, 40n, EXPIRY, 0n] },
     );
     assert.equal(d.ok, false);
     assert.match(d.error, /agent/);
@@ -490,7 +490,7 @@ describe("compact simulator: draw and merchant-bound settlement notes", () => {
         noteNonce: pad32("nn-40-1"),
         noteSalt: pad32("ns-40-1"),
       }),
-      { name: "draw", args: [Q, 150n, 0n, 0n, 40n, EXPIRY] },
+      { name: "draw", args: [Q, 150n, 0n, 0n, 40n, EXPIRY, 0n] },
     );
     assert.equal(d1.ok, true);
 
@@ -506,7 +506,7 @@ describe("compact simulator: draw and merchant-bound settlement notes", () => {
         noteNonce: pad32("nn-40-2"),
         noteSalt: pad32("ns-40-2"),
       }),
-      { name: "draw", args: [Q, 150n, 40n, 1n, 40n, EXPIRY] },
+      { name: "draw", args: [Q, 150n, 40n, 1n, 40n, EXPIRY, 0n] },
     );
     assert.equal(d2.ok, false);
     assert.match(d2.error, /used/);
@@ -529,7 +529,7 @@ describe("compact simulator: merchant redemption", () => {
         noteNonce: pad32("nn-40"),
         noteSalt: pad32("ns-40"),
       }),
-      { name: "draw", args: [Q, 150n, 0n, 0n, 40n, EXPIRY] },
+      { name: "draw", args: [Q, 150n, 0n, 0n, 40n, EXPIRY, 0n] },
     );
     assert.equal(d.ok, true);
     const D = notesOf(d.ledger)[0]!.D;
@@ -654,7 +654,7 @@ describe("compact simulator: note cancellation and expiry", () => {
         noteNonce: pad32("nn-40"),
         noteSalt: pad32("ns-40"),
       }),
-      { name: "draw", args: [Q, 150n, 0n, 0n, 40n, EXPIRY] },
+      { name: "draw", args: [Q, 150n, 0n, 0n, 40n, EXPIRY, 0n] },
     );
     const D = notesOf(d.ledger)[0]!.D;
     const c = await call(d.session, ps(), {
@@ -682,7 +682,7 @@ describe("compact simulator: acknowledgeRepayment", () => {
         noteNonce: pad32("nn-40"),
         noteSalt: pad32("ns-40"),
       }),
-      { name: "draw", args: [Q, 150n, 0n, 0n, 40n, EXPIRY] },
+      { name: "draw", args: [Q, 150n, 0n, 0n, 40n, EXPIRY, 0n] },
     );
     return d;
   }
@@ -767,7 +767,7 @@ describe("compact simulator: setStatus and line generation", () => {
         noteNonce: pad32("nn-40"),
         noteSalt: pad32("ns-40"),
       }),
-      { name: "draw", args: [Q, 150n, 0n, 0n, 40n, EXPIRY] },
+      { name: "draw", args: [Q, 150n, 0n, 0n, 40n, EXPIRY, 0n] },
     );
     assert.equal(d.ok, false);
     assert.match(d.error, /status/);
@@ -803,7 +803,7 @@ describe("compact simulator: setStatus and line generation", () => {
         noteNonce: pad32("nn-40"),
         noteSalt: pad32("ns-40"),
       }),
-      { name: "draw", args: [Q1, 150n, 0n, 0n, 40n, EXPIRY] },
+      { name: "draw", args: [Q1, 150n, 0n, 0n, 40n, EXPIRY, 0n] },
     );
     assert.equal(d.ok, false);
     assert.match(d.error, /line generation mismatch/);
@@ -833,7 +833,7 @@ describe("compact simulator: cross-instance replay rejection", () => {
         noteNonce: pad32("nn-40"),
         noteSalt: pad32("ns-40"),
       }),
-      { name: "draw", args: [QA, 150n, 0n, 0n, 40n, EXPIRY] },
+      { name: "draw", args: [QA, 150n, 0n, 0n, 40n, EXPIRY, 0n] },
     );
     assert.equal(dA.ok, true);
     const DA = notesOf(dA.ledger)[0]!.D;
@@ -852,5 +852,282 @@ describe("compact simulator: cross-instance replay rejection", () => {
     );
     assert.equal(rB.ok, false);
     assert.match(rB.error, /note not found/);
+  });
+});
+
+describe("compact simulator: issuer fees", () => {
+  async function drawWithFee(fee: bigint, amount = 40n, invoice = "inv-fee", nonce = "nfee") {
+    const q = await quoted(amount, invoice, nonce);
+    const Q = firstQuote(q.ledger)!.Q;
+    return call(
+      q.session,
+      ps({
+        callerSecret: DEMO.issuer,
+        agentSecret: DEMO.agent,
+        salt: pad32("salt-0"),
+        newSalt: pad32("salt-1"),
+        invoiceId: pad32(invoice),
+        quoteNonce: pad32(nonce),
+        noteNonce: pad32("nn-fee"),
+        noteSalt: pad32("ns-fee"),
+      }),
+      { name: "draw", args: [Q, 150n, 0n, 0n, amount, EXPIRY, fee] },
+    );
+  }
+
+  it("fee charges outstanding by amount+fee; encumbers amount; accrues feeReserve", async () => {
+    const d = await drawWithFee(5n);
+    assert.equal(d.ok, true, d.ok ? "" : d.error);
+    // Note encumbers only the invoice amount
+    assert.equal(d.ledger.encumberedReserve, 40n);
+    // Fee accrues to the issuer's fee reserve
+    assert.equal(d.ledger.feeReserve, 5n);
+    assert.equal(d.ledger.totalReserve, 1000n);
+    // Agent's outstanding is amount + fee (45), committed in the rotated C
+    const I = agentId(DEMO.agent);
+    const C1 = lineStateCommit(
+      { identity: I, limit: LIMIT, outstanding: 45n, epoch: 1n },
+      pad32("salt-1"),
+    );
+    assert.equal(toHex(d.ledger.lineCommit), toHex(C1));
+    // Reserve invariant holds: encumbered + redeemed + fee <= total
+    assert.ok(d.ledger.encumberedReserve + d.ledger.redeemedReserve + d.ledger.feeReserve <= d.ledger.totalReserve);
+  });
+
+  it("zero fee behaves exactly like the pre-fee draw", async () => {
+    const d = await drawWithFee(0n);
+    assert.equal(d.ok, true, d.ok ? "" : d.error);
+    assert.equal(d.ledger.encumberedReserve, 40n);
+    assert.equal(d.ledger.feeReserve, 0n);
+    const I = agentId(DEMO.agent);
+    const C1 = lineStateCommit(
+      { identity: I, limit: LIMIT, outstanding: 40n, epoch: 1n },
+      pad32("salt-1"),
+    );
+    assert.equal(toHex(d.ledger.lineCommit), toHex(C1));
+  });
+
+  it("fee counts toward the credit limit: B + amount + fee <= L", async () => {
+    // 140 + 20 fee = 160 > 150 limit, but 140 alone would clear it
+    const q = await quoted(140n, "inv-cap", "ncap");
+    const Q = firstQuote(q.ledger)!.Q;
+    const d = await call(
+      q.session,
+      ps({
+        callerSecret: DEMO.issuer,
+        agentSecret: DEMO.agent,
+        salt: pad32("salt-0"),
+        newSalt: pad32("salt-1"),
+        invoiceId: pad32("inv-cap"),
+        quoteNonce: pad32("ncap"),
+        noteNonce: pad32("nn-cap"),
+        noteSalt: pad32("ns-cap"),
+      }),
+      { name: "draw", args: [Q, 150n, 0n, 0n, 140n, EXPIRY, 20n] },
+    );
+    assert.equal(d.ok, false);
+    assert.match(d.error, /capacity/);
+    assert.equal(d.ledger.encumberedReserve, 0n);
+    assert.equal(d.ledger.feeReserve, 0n);
+  });
+
+  it("fee counts toward reserve solvency: amount + fee <= unencumberedReserve", async () => {
+    const s = await genesis();
+    // Fund only 40: the 40 note clears, but 40 + 5 fee does not
+    const f = await call(s, ps(), { name: "fundReserve", args: [40n] });
+    const o = await call(f.session, ps(), { name: "openLine", args: [150n, EXPIRY] });
+    const q = await quoted(40n, "inv-rsv", "nrsv", o.session);
+    const Q = firstQuote(q.ledger)!.Q;
+    const d = await call(
+      q.session,
+      ps({
+        callerSecret: DEMO.issuer,
+        agentSecret: DEMO.agent,
+        salt: pad32("salt-0"),
+        newSalt: pad32("salt-1"),
+        invoiceId: pad32("inv-rsv"),
+        quoteNonce: pad32("nrsv"),
+        noteNonce: pad32("nn-rsv"),
+        noteSalt: pad32("ns-rsv"),
+      }),
+      { name: "draw", args: [Q, 150n, 0n, 0n, 40n, EXPIRY, 5n] },
+    );
+    assert.equal(d.ok, false);
+    assert.match(d.error, /insufficient reserve/);
+  });
+
+  it("issuer withdraws accrued fees: feeReserve zeroes, totalReserve shrinks", async () => {
+    const d = await drawWithFee(5n);
+    assert.equal(d.ok, true);
+    const w = await call(d.session, ps({ callerSecret: DEMO.issuer }), {
+      name: "withdrawFees",
+      args: [],
+    });
+    assert.equal(w.ok, true, w.ok ? "" : w.error);
+    assert.equal(w.ledger.feeReserve, 0n);
+    assert.equal(w.ledger.totalReserve, 995n);
+    // Note liabilities and redemption accounting are untouched
+    assert.equal(w.ledger.encumberedReserve, 40n);
+    assert.equal(w.ledger.redeemedReserve, 0n);
+  });
+
+  it("withdrawFees is issuer-only", async () => {
+    const d = await drawWithFee(5n);
+    const w = await call(d.session, ps({ callerSecret: DEMO.merchantA }), {
+      name: "withdrawFees",
+      args: [],
+    });
+    assert.equal(w.ok, false);
+    assert.match(w.error, /not issuer/);
+    assert.equal(w.ledger.feeReserve, 5n);
+  });
+
+  it("withdrawFees with no accrued fees is rejected", async () => {
+    const s = await genesis();
+    const w = await call(s, ps({ callerSecret: DEMO.issuer }), {
+      name: "withdrawFees",
+      args: [],
+    });
+    assert.equal(w.ok, false);
+    assert.match(w.error, /no fees/);
+  });
+
+  it("withdrawUnencumberedReserve locks accrued fees (only withdrawFees releases them)", async () => {
+    const d = await drawWithFee(5n);
+    assert.equal(d.ok, true);
+    // Unencumbered = 1000 - 40 (encumbered) - 0 (redeemed) - 5 (fees) = 955
+    const tooMuch = await call(d.session, ps({ callerSecret: DEMO.issuer }), {
+      name: "withdrawUnencumberedReserve",
+      args: [956n],
+    });
+    assert.equal(tooMuch.ok, false);
+    assert.match(tooMuch.error, /amount exceeds unencumbered reserve/);
+    const ok = await call(d.session, ps({ callerSecret: DEMO.issuer }), {
+      name: "withdrawUnencumberedReserve",
+      args: [955n],
+    });
+    assert.equal(ok.ok, true, ok.ok ? "" : ok.error);
+    assert.equal(ok.ledger.totalReserve, 45n);
+    assert.equal(ok.ledger.feeReserve, 5n);
+    // Fees still withdrawable afterwards
+    const w = await call(ok.session, ps({ callerSecret: DEMO.issuer }), {
+      name: "withdrawFees",
+      args: [],
+    });
+    assert.equal(w.ok, true);
+    assert.equal(w.ledger.totalReserve, 40n);
+    assert.equal(w.ledger.feeReserve, 0n);
+  });
+});
+
+describe("compact simulator: disableMerchant (audit L2)", () => {
+  it("issuer can disable a merchant; disabled merchant cannot post quotes", async () => {
+    const o = await opened();
+    const mAPk = merchantPublicKey(DEMO.merchantA);
+    const dis = await call(o.session, ps({ callerSecret: DEMO.issuer }), {
+      name: "disableMerchant",
+      args: [mAPk],
+    });
+    assert.equal(dis.ok, true, dis.ok ? "" : dis.error);
+    assert.equal(dis.ledger.registeredMerchants.lookup(mAPk), false);
+
+    const q = await call(
+      dis.session,
+      ps({
+        callerSecret: DEMO.merchantA,
+        invoiceId: pad32("inv-dis"),
+        quoteNonce: pad32("ndis"),
+      }),
+      { name: "postQuote", args: [40n, EXPIRY] },
+    );
+    assert.equal(q.ok, false);
+    assert.match(q.error, /merchant disabled/);
+  });
+
+  it("unauthorized caller cannot disable a merchant", async () => {
+    const o = await opened();
+    const mAPk = merchantPublicKey(DEMO.merchantA);
+    const r = await call(o.session, ps({ callerSecret: DEMO.merchantA }), {
+      name: "disableMerchant",
+      args: [mAPk],
+    });
+    assert.equal(r.ok, false);
+    assert.match(r.error, /not issuer/);
+    assert.equal(r.ledger.registeredMerchants.lookup(mAPk), true);
+  });
+
+  it("disabling an unknown merchant is rejected", async () => {
+    const o = await opened();
+    const unknown = merchantPublicKey(pad32("line:demo:nobody"));
+    const r = await call(o.session, ps({ callerSecret: DEMO.issuer }), {
+      name: "disableMerchant",
+      args: [unknown],
+    });
+    assert.equal(r.ok, false);
+    assert.match(r.error, /unknown merchant/);
+  });
+});
+
+describe("compact simulator: expiry headroom-2 (audit L3)", () => {
+  it("postQuote rejects expiry = clock+1 (would be immediately undrawable)", async () => {
+    const o = await opened();
+    // genesis(0) -> fundReserve(1) -> openLine(2): clock is 2 here
+    assert.equal(o.ledger.actionClock, 2n);
+    const r = await call(o.session, ps({ callerSecret: DEMO.merchantA }), {
+      name: "postQuote",
+      args: [40n, 3n],
+    });
+    assert.equal(r.ok, false);
+    assert.match(r.error, /expiry/);
+    // clock+2 is the minimum that passes
+    const ok = await call(o.session, ps({ callerSecret: DEMO.merchantA }), {
+      name: "postQuote",
+      args: [40n, 4n],
+    });
+    assert.equal(ok.ok, true, ok.ok ? "" : ok.error);
+  });
+
+  it("draw rejects noteExpiry = clock+1 (would be immediately unredeemable)", async () => {
+    const q = await quoted(40n);
+    const Q = firstQuote(q.ledger)!.Q;
+    // clock is 3 after the quote; noteExpiry = 4 is clock+1
+    const d = await call(
+      q.session,
+      ps({
+        callerSecret: DEMO.issuer,
+        agentSecret: DEMO.agent,
+        salt: pad32("salt-0"),
+        newSalt: pad32("salt-1"),
+        invoiceId: pad32("inv-40"),
+        quoteNonce: pad32("n40"),
+        noteNonce: pad32("nn-40"),
+        noteSalt: pad32("ns-40"),
+      }),
+      { name: "draw", args: [Q, 150n, 0n, 0n, 40n, 4n, 0n] },
+    );
+    assert.equal(d.ok, false);
+    assert.match(d.error, /note expiry/);
+    assert.equal(d.ledger.encumberedReserve, 0n);
+  });
+
+  it("draw accepts noteExpiry = clock+2 (survives this circuit's clock tick)", async () => {
+    const q = await quoted(40n, "inv-h2", "nh2");
+    const Q = firstQuote(q.ledger)!.Q;
+    const d = await call(
+      q.session,
+      ps({
+        callerSecret: DEMO.issuer,
+        agentSecret: DEMO.agent,
+        salt: pad32("salt-0"),
+        newSalt: pad32("salt-1"),
+        invoiceId: pad32("inv-h2"),
+        quoteNonce: pad32("nh2"),
+        noteNonce: pad32("nn-h2"),
+        noteSalt: pad32("ns-h2"),
+      }),
+      { name: "draw", args: [Q, 150n, 0n, 0n, 40n, 5n, 0n] },
+    );
+    assert.equal(d.ok, true, d.ok ? "" : d.error);
+    assert.equal(d.ledger.encumberedReserve, 40n);
   });
 });

@@ -7,79 +7,89 @@
     "type": "directory",
     "contract-info.json": {
       "type": "file",
-      "size": 12377,
-      "hash": "158570f0f66a7c26edafbae4946dc853ec1418a305251f50b633e0d62befdc0b"
+      "size": 13751,
+      "hash": "e755f7ccea462faa6516944ff3ed3e35301ea2dfdbd0e042ce87006e563d4205"
     }
   },
   "contract": {
     "type": "directory",
     "index.d.ts": {
       "type": "file",
-      "size": 10264,
-      "hash": "45a2006a58e758b156aa025f699b12b506c31abda715eb08a0db84e4769292ae"
+      "size": 11174,
+      "hash": "397e817563e35c2e13009572f1b59091a30862986dc2cce3abd67ff69f134a70"
     },
     "index.js": {
       "type": "file",
-      "size": 284940,
-      "hash": "1ff7308e0f62a3735dd669fa29fafc5b7279a74fa4a57f68dd9447824e6f8675"
+      "size": 385603,
+      "hash": "4757eabdf2c0a61db936be517a6d9c5c2012e82e9ba1f5794f55d3b08359e866"
     },
     "index.js.map": {
       "type": "file",
-      "size": 11483,
-      "hash": "61158cb97fb864f3aa0567300438404b974db6cec66a02164e2f3c930171df20"
+      "size": 13231,
+      "hash": "feecd156a4a3cb6880a6da94a1d7f91963dfc84e6882bf05a304474c7aa9518f"
     }
   },
   "zkir": {
     "type": "directory",
     "acknowledgeRepayment.zkir": {
       "type": "file",
-      "size": 12997,
-      "hash": "5b11fe55a84898b121baccb474024699b5249e234745efd1a01fb06170155508"
+      "size": 14753,
+      "hash": "b2d5c74083877aa6286827ca03fb7880335427a386eb9f1559bbe833a02f79a4"
     },
     "cancelOrExpireNote.zkir": {
       "type": "file",
-      "size": 7617,
-      "hash": "dd59cee94a015e22fcaf62e9dcda556909b4681117bf1ff81c71e7d1000b78c3"
+      "size": 8870,
+      "hash": "c1069ac87dfafd1b4571e9500e590580ac8cd2ac7f1d6ec776801be1c2d45876"
+    },
+    "disableMerchant.zkir": {
+      "type": "file",
+      "size": 5182,
+      "hash": "7d2d962cbe07e8a1f5e51a0b5d880b6f37439696848d70aef2fd13b2e829d0d9"
     },
     "draw.zkir": {
       "type": "file",
-      "size": 29489,
-      "hash": "35dc78f0473b365691b8a4f40885f05f18e175b73ffcec74f32a9a2ecbf11272"
+      "size": 36712,
+      "hash": "bdee5c085d256f0c6652a469e9e891b095815e166aeb068aef229df8cecb1952"
     },
     "fundReserve.zkir": {
       "type": "file",
-      "size": 4702,
-      "hash": "0614b51137d05e231f3ad73f664a622184436fa33473909c6098a569ae96fcc6"
+      "size": 5645,
+      "hash": "981e8617facc9acb0e9baa78d992f8a49c1fedf3331b161dbc72d22bcc7543c5"
     },
     "openLine.zkir": {
       "type": "file",
-      "size": 10344,
-      "hash": "425b0feb15084a1ba3fd3a7677e4726db2479647b2eff39258ec83a72d09df4a"
+      "size": 12898,
+      "hash": "45e2399498fc9c1c72bedef0b6a906f10e872b7e244c84912e6ff1fe0226622b"
     },
     "postQuote.zkir": {
       "type": "file",
-      "size": 10991,
-      "hash": "a747ae82616d8a5b1ff1cd8a0ab46ba20db45a3c07a60edc6f429ec33b1e4fe3"
+      "size": 12377,
+      "hash": "37c49518e1d31fa89e9139fbca7472ff8fe4ed5fa50de14060cf73ffe2386e95"
     },
     "redeemDraw.zkir": {
       "type": "file",
-      "size": 15192,
-      "hash": "0f4286f3f76dda43b97cda55a754d36c921b51398ca225560950bbf3f1bb1a81"
+      "size": 17486,
+      "hash": "3a663427fe5ebbcba1e1651124f98e5922679b58b2c67d40223dc5f8bd4dd68b"
     },
     "registerMerchant.zkir": {
       "type": "file",
-      "size": 4739,
-      "hash": "f27de045d4b16bfbc45a13953ebf7b4aa0f9d84088fa92065619d548767cc94d"
+      "size": 5238,
+      "hash": "d20ce4beb5d3b165a1d1a7abf6f3bea344fcb9e0e7b738a7e98eebb440bb6391"
     },
     "setStatus.zkir": {
       "type": "file",
-      "size": 6916,
-      "hash": "608f5ac92abcf6171b65ce12cb3b8dde1ae8d9078464424ecbf8f3dea864b707"
+      "size": 8135,
+      "hash": "a5597079092d3a2d2487b66fc68af2ad709b300493b00b53a0f0b12b807344f3"
+    },
+    "withdrawFees.zkir": {
+      "type": "file",
+      "size": 9822,
+      "hash": "ab2f555f1a1e00963439635ed591a8ce6e67c787d7002ddc612ce0883857d9bf"
     },
     "withdrawUnencumberedReserve.zkir": {
       "type": "file",
-      "size": 7108,
-      "hash": "4379209efcc59dcbd41f7670a1007efb57fbdc1ec29ecb46f09b1fb110755646"
+      "size": 9269,
+      "hash": "78b0338d77dc4369857d65d3935a6e2c41ed292509441484b6f6ff8c00b99b0d"
     }
   }
 }

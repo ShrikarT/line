@@ -16,7 +16,18 @@
 //   totalReserve: cumulative funds deposited by issuer
 //   encumberedReserve: reserve committed to outstanding draw notes
 //   redeemedReserve: cumulative reserve redeemed by merchants
-//   Invariant: encumberedReserve + redeemedReserve <= totalReserve
+//   feeReserve: cumulative issuer fees accrued on draws (payout via withdrawFees)
+//   Invariant: encumberedReserve + redeemedReserve + feeReserve <= totalReserve
+//   unencumberedReserve = totalReserve - encumberedReserve - redeemedReserve - feeReserve
+//
+// Issuer fee (the issuer's business model):
+//   `draw` takes a public `fee` param, the issuer's protocol-defined compensation for
+//   extending the line and funding the reserve. The agent's outstanding increases by
+//   amount + fee (capacity check: outstanding + amount + fee <= limit), `encumberedReserve`
+//   grows by amount only, and `feeReserve` grows by fee. The fee must clear the same
+//   solvency check as the note (amount + fee <= unencumberedReserve). The issuer
+//   withdraws accrued fees with `withdrawFees()`, which reduces totalReserve by the
+//   fee amount and zeroes feeReserve.
 //
 // Multi-merchant:
 //   registeredMerchants: Map<Bytes<32>, Boolean> allows multiple merchants.
@@ -72,6 +83,7 @@ export ledger registeredMerchants: Map<Bytes<32>, Boolean>;
 export ledger totalReserve: Uint<64>;
 export ledger encumberedReserve: Uint<64>;
 export ledger redeemedReserve: Uint<64>;
+export ledger feeReserve: Uint<64>;
 
 export ledger identityCommit: Bytes<32>;
 export ledger lineCommit: Bytes<32>;
@@ -81,6 +93,13 @@ export ledger lineGeneration: Uint<64>;
 export ledger quotes: Map<Bytes<32>, QuoteMeta>;
 export ledger notes: Map<Bytes<32>, NoteMeta>;
 export ledger nullifiers: Set<Bytes<32>>;
+// actionClock is a TRANSACTION COUNTER, not a wall clock (audit H4).
+// Every circuit increments it, so note/quote expiries are denominated in
+// actions, not time. Expiry is ADVISORY: the issuer can grind the counter with
+// cheap transactions to force-expire notes, then permissionlessly cancel them
+// via cancelOrExpireNote and withdraw the freed reserve. The issuer is TRUSTED
+// not to grind. The real fix — merchant-countersigned grace window or
+// block-height expiry — is deferred (see WAVE2_SECURITY_REVIEW.md).
 export ledger actionClock: Counter;
 
 witness callerSecret(): Bytes<32>;
@@ -190,6 +209,7 @@ constructor(issuerPk: Bytes<32>, initialMerchantPk: Bytes<32>, instanceNonce: By
   totalReserve = 0;
   encumberedReserve = 0;
   redeemedReserve = 0;
+  feeReserve = 0;
   status = Status.NONE;
   lineGeneration = 0;
 }
@@ -206,6 +226,16 @@ export circuit registerMerchant(merchantPk: Bytes<32>): [] {
   actionClock.increment(1);
 }
 
+// Audit L2: makes the "merchant disabled" assert in postQuote meaningful.
+// A disabled merchant's existing quotes stay live; only new quotes are blocked.
+export circuit disableMerchant(merchantPk: Bytes<32>): [] {
+  requireIssuer();
+  const pubM = disclose(merchantPk);
+  assert(registeredMerchants.member(pubM), "unknown merchant");
+  registeredMerchants.insert(pubM, false);
+  actionClock.increment(1);
+}
+
 export circuit fundReserve(amount: Uint<64>): [] {
   requireIssuer();
   assert(amount > 0, "zero fund");
@@ -219,7 +249,9 @@ export circuit fundReserve(amount: Uint<64>): [] {
 export circuit withdrawUnencumberedReserve(amount: Uint<64>): [] {
   requireIssuer();
   assert(amount > 0, "zero withdraw");
-  const locked = encumberedReserve + redeemedReserve;
+  // feeReserve is locked like encumbered/redeemed: accrued fees can only leave
+  // via withdrawFees(), so withdrawing them here would desync the counters.
+  const locked = encumberedReserve + redeemedReserve + feeReserve;
   assert(totalReserve >= locked, "undercollateralized");
   const withdrawable = totalReserve - locked;
   const a = disclose(amount);
@@ -228,11 +260,30 @@ export circuit withdrawUnencumberedReserve(amount: Uint<64>): [] {
   actionClock.increment(1);
 }
 
+// Issuer-only payout of fees accrued by draws. feeReserve is part of totalReserve,
+// so paying out reduces totalReserve and zeroes feeReserve; the reserve invariant
+// encumberedReserve + redeemedReserve + feeReserve <= totalReserve is preserved.
+// (In this prototype the reserve is an accounting counter — no tokens move.)
+export circuit withdrawFees(): [] {
+  requireIssuer();
+  const f = feeReserve;
+  assert(f > 0, "no fees");
+  // Invariant check: encumbered + redeemed + fee <= totalReserve guarantees f is payable.
+  const locked = encumberedReserve + redeemedReserve + feeReserve;
+  assert(totalReserve >= locked, "reserve deficit");
+  totalReserve = ((totalReserve - f) as Uint<64>);
+  feeReserve = 0;
+  actionClock.increment(1);
+}
+
 export circuit openLine(limit: Uint<64>, expiry: Uint<64>): [] {
   requireIssuer();
   assert(status == Status.NONE || status == Status.CLOSED, "line already open");
   assert(limit > 0, "limit");
-  assert(expiry > actionClock, "expiry");
+  // Headroom-2 rule (audit L3): this circuit ends with actionClock.increment(1),
+  // so expiry = clock+1 would pass this check yet open an immediately-unusable line.
+  // Require expiry > clock+1 (i.e. >= clock+2).
+  assert(expiry > actionClock + 1, "expiry");
   const k = agentSecret();
   const I = agentId(k);
   const p = LinePreimage {
@@ -257,7 +308,10 @@ export circuit postQuote(amount: Uint<64>, expiry: Uint<64>): [] {
   assert(registeredMerchants.lookup(pubM), "merchant disabled");
   assert(status == Status.OPEN, "status");
   assert(amount > 0, "zero");
-  assert(expiry > actionClock, "expiry");
+  // Headroom-2 rule (audit L3): this circuit ends with actionClock.increment(1),
+  // so expiry = clock+1 would pass this check yet be immediately unpostable-to-draw.
+  // Require expiry > clock+1 (i.e. >= clock+2).
+  assert(expiry > actionClock + 1, "expiry");
   const Q = quoteCommit(
     pubM,
     invoiceId(),
@@ -284,7 +338,8 @@ export circuit draw(
   outstanding: Uint<64>,
   epoch: Uint<64>,
   amount: Uint<64>,
-  noteExpiry: Uint<64>
+  noteExpiry: Uint<64>,
+  fee: Uint<64>
 ): [] {
   assert(status == Status.OPEN, "status");
   assert(lineExpiry > actionClock, "line expired");
@@ -315,18 +370,29 @@ export circuit draw(
   );
   assert(disclose(recon) == Q, "quote preimage");
   assert(amount > 0, "zero");
-  const nextB = outstanding + amount;
+  const f = disclose(fee);
+  // Issuer fee accounting (see header): the agent's outstanding increases by
+  // amount + fee, so the capacity check becomes outstanding + amount + fee <= limit.
+  // The fee is the issuer's protocol-defined compensation.
+  const cost = amount + f;
+  assert(cost >= amount, "fee overflow");
+  const nextB = outstanding + cost;
   assert(nextB >= outstanding, "overflow");
   assert(nextB <= limit, "capacity");
 
-  // Reserve solvency check: ensure unencumbered reserve covers the note
-  const locked = encumberedReserve + redeemedReserve;
+  // Reserve solvency: unencumbered reserve must cover the note amount AND the fee.
+  // unencumberedReserve = totalReserve - encumberedReserve - redeemedReserve - feeReserve
+  const locked = encumberedReserve + redeemedReserve + feeReserve;
   assert(totalReserve >= locked, "reserve deficit");
-  const withdrawable = totalReserve - locked;
+  const free = totalReserve - locked;
   const a = disclose(amount);
-  assert(a <= withdrawable, "insufficient reserve");
+  assert(cost <= free, "insufficient reserve");
 
-  assert(noteExpiry > actionClock, "note expiry");
+  // Headroom-2 rule (audit L3): this circuit ends with actionClock.increment(1),
+  // so noteExpiry = clock+1 would pass yet be immediately unredeemable (the note
+  // would still encumber reserve until cancelled). Require noteExpiry > clock+1
+  // (i.e. >= clock+2), guaranteeing at least one post-draw action can redeem it.
+  assert(noteExpiry > actionClock + 1, "note expiry");
 
   const N = drawNullifier(k, Q, contractDomain);
   const pubN = disclose(N);
@@ -362,7 +428,9 @@ export circuit draw(
   });
   nullifiers.insert(pubN);
 
+  // The note encumbers only `amount`; the fee accrues to the issuer's feeReserve.
   encumberedReserve = ((encumberedReserve + a) as Uint<64>);
+  feeReserve = ((feeReserve + f) as Uint<64>);
 
   const p2 = LinePreimage {
     identity: I,
@@ -425,6 +493,9 @@ export circuit redeemDraw(
   actionClock.increment(1);
 }
 
+// NOTE (audit H4): permissionless cancellation past expiry is ADVISORY-only.
+// The issuer is trusted not to grind actionClock to force expiry. Deferred:
+// merchant-countersigned grace window / block-height expiry (see WAVE2_SECURITY_REVIEW.md).
 export circuit cancelOrExpireNote(noteCommitPublic: Bytes<32>): [] {
   const D = disclose(noteCommitPublic);
   assert(notes.member(D), "note not found");

@@ -49,9 +49,12 @@ export type Witnesses<PS> = {
 export type ImpureCircuits<PS> = {
   registerMerchant(context: __compactRuntime.CircuitContext<PS>,
                    merchantPk_0: Uint8Array): Promise<__compactRuntime.CircuitResults<PS, []>>;
+  disableMerchant(context: __compactRuntime.CircuitContext<PS>,
+                  merchantPk_0: Uint8Array): Promise<__compactRuntime.CircuitResults<PS, []>>;
   fundReserve(context: __compactRuntime.CircuitContext<PS>, amount_0: bigint): Promise<__compactRuntime.CircuitResults<PS, []>>;
   withdrawUnencumberedReserve(context: __compactRuntime.CircuitContext<PS>,
                               amount_0: bigint): Promise<__compactRuntime.CircuitResults<PS, []>>;
+  withdrawFees(context: __compactRuntime.CircuitContext<PS>): Promise<__compactRuntime.CircuitResults<PS, []>>;
   openLine(context: __compactRuntime.CircuitContext<PS>,
            limit_0: bigint,
            expiry_0: bigint): Promise<__compactRuntime.CircuitResults<PS, []>>;
@@ -64,7 +67,8 @@ export type ImpureCircuits<PS> = {
        outstanding_0: bigint,
        epoch_0: bigint,
        amount_0: bigint,
-       noteExpiry_0: bigint): Promise<__compactRuntime.CircuitResults<PS, []>>;
+       noteExpiry_0: bigint,
+       fee_0: bigint): Promise<__compactRuntime.CircuitResults<PS, []>>;
   redeemDraw(context: __compactRuntime.CircuitContext<PS>,
              noteCommitPublic_0: Uint8Array,
              amount_0: bigint,
@@ -83,9 +87,12 @@ export type ImpureCircuits<PS> = {
 export type ProvableCircuits<PS> = {
   registerMerchant(context: __compactRuntime.CircuitContext<PS>,
                    merchantPk_0: Uint8Array): Promise<__compactRuntime.CircuitResults<PS, []>>;
+  disableMerchant(context: __compactRuntime.CircuitContext<PS>,
+                  merchantPk_0: Uint8Array): Promise<__compactRuntime.CircuitResults<PS, []>>;
   fundReserve(context: __compactRuntime.CircuitContext<PS>, amount_0: bigint): Promise<__compactRuntime.CircuitResults<PS, []>>;
   withdrawUnencumberedReserve(context: __compactRuntime.CircuitContext<PS>,
                               amount_0: bigint): Promise<__compactRuntime.CircuitResults<PS, []>>;
+  withdrawFees(context: __compactRuntime.CircuitContext<PS>): Promise<__compactRuntime.CircuitResults<PS, []>>;
   openLine(context: __compactRuntime.CircuitContext<PS>,
            limit_0: bigint,
            expiry_0: bigint): Promise<__compactRuntime.CircuitResults<PS, []>>;
@@ -98,7 +105,8 @@ export type ProvableCircuits<PS> = {
        outstanding_0: bigint,
        epoch_0: bigint,
        amount_0: bigint,
-       noteExpiry_0: bigint): Promise<__compactRuntime.CircuitResults<PS, []>>;
+       noteExpiry_0: bigint,
+       fee_0: bigint): Promise<__compactRuntime.CircuitResults<PS, []>>;
   redeemDraw(context: __compactRuntime.CircuitContext<PS>,
              noteCommitPublic_0: Uint8Array,
              amount_0: bigint,
@@ -120,9 +128,12 @@ export type PureCircuits = {
 export type Circuits<PS> = {
   registerMerchant(context: __compactRuntime.CircuitContext<PS>,
                    merchantPk_0: Uint8Array): Promise<__compactRuntime.CircuitResults<PS, []>>;
+  disableMerchant(context: __compactRuntime.CircuitContext<PS>,
+                  merchantPk_0: Uint8Array): Promise<__compactRuntime.CircuitResults<PS, []>>;
   fundReserve(context: __compactRuntime.CircuitContext<PS>, amount_0: bigint): Promise<__compactRuntime.CircuitResults<PS, []>>;
   withdrawUnencumberedReserve(context: __compactRuntime.CircuitContext<PS>,
                               amount_0: bigint): Promise<__compactRuntime.CircuitResults<PS, []>>;
+  withdrawFees(context: __compactRuntime.CircuitContext<PS>): Promise<__compactRuntime.CircuitResults<PS, []>>;
   openLine(context: __compactRuntime.CircuitContext<PS>,
            limit_0: bigint,
            expiry_0: bigint): Promise<__compactRuntime.CircuitResults<PS, []>>;
@@ -135,7 +146,8 @@ export type Circuits<PS> = {
        outstanding_0: bigint,
        epoch_0: bigint,
        amount_0: bigint,
-       noteExpiry_0: bigint): Promise<__compactRuntime.CircuitResults<PS, []>>;
+       noteExpiry_0: bigint,
+       fee_0: bigint): Promise<__compactRuntime.CircuitResults<PS, []>>;
   redeemDraw(context: __compactRuntime.CircuitContext<PS>,
              noteCommitPublic_0: Uint8Array,
              amount_0: bigint,
@@ -164,6 +176,7 @@ export type Ledger = {
   readonly totalReserve: bigint;
   readonly encumberedReserve: bigint;
   readonly redeemedReserve: bigint;
+  readonly feeReserve: bigint;
   readonly identityCommit: Uint8Array;
   readonly lineCommit: Uint8Array;
   readonly lineExpiry: bigint;
