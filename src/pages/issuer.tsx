@@ -19,6 +19,7 @@ export function IssuerPage() {
   const doWithdrawReserve = useLine((s) => s.doWithdrawReserve);
   const doWithdrawFees = useLine((s) => s.doWithdrawFees);
   const doRegisterMerchant = useLine((s) => s.doRegisterMerchant);
+  const doDisableMerchant = useLine((s) => s.doDisableMerchant);
   const ledger = useLine((s) => s.ledger);
   const feeReserve = ledger.feeReserve ?? 0;
   // FEE_SPEC §1: feeReserve is part of the locked set.
@@ -56,6 +57,9 @@ export function IssuerPage() {
               </Button>
               <Button variant="ghost" onClick={() => doRegisterMerchant()}>
                 Register Merchant B
+              </Button>
+              <Button variant="ghost" onClick={() => doDisableMerchant()}>
+                Disable Merchant B
               </Button>
             </div>
           </div>
