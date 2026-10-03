@@ -12,6 +12,7 @@ import {
   nullifiersOf,
   quotesOf,
   readLedger,
+  type CircuitCall,
   type PrivateState,
   type Session,
 } from "./compact-harness.ts";
@@ -20,6 +21,7 @@ import {
   contractDomain,
   drawNoteCommit,
   drawNullifier,
+  encodeU64,
   issuerPublicKey,
   lineStateCommit,
   merchantPublicKey,
@@ -47,6 +49,14 @@ function ps(overrides: Partial<PrivateState> = {}): PrivateState {
     noteSalt: pad32("ns-40"),
     noteIdentity: agentId(DEMO.agent),
     noteQuoteCommit: pad32("0"),
+    lineLimit: LIMIT,
+    lineOutstanding: 0n,
+    lineEpoch: 0n,
+    quoteAmount: 40n,
+    drawAmount: 40n,
+    redeemAmount: 40n,
+    repayAmount: 40n,
+    quoteMerchantPk: merchantPublicKey(DEMO.merchantA),
     ...overrides,
   });
 }
@@ -59,7 +69,7 @@ async function opened(session?: Session) {
   const s = session ?? (await genesis());
   const funded = await call(s, ps(), { name: "fundReserve", args: [1000n] });
   assert.equal(funded.ok, true, funded.ok ? "" : funded.error);
-  const r = await call(funded.session, ps(), { name: "openLine", args: [LIMIT, EXPIRY] });
+  const r = await call(funded.session, ps(), { name: "openLine", args: [EXPIRY] });
   assert.equal(r.ok, true, r.ok ? "" : r.error);
   if (!r.ok) throw new Error("open");
   return r;
@@ -73,8 +83,10 @@ async function quoted(amount = 40n, invoice = "inv-40", nonce = "n40", from?: Se
       callerSecret: merchant,
       invoiceId: pad32(invoice),
       quoteNonce: pad32(nonce),
+      quoteAmount: amount,
+      quoteMerchantPk: merchantPublicKey(merchant),
     }),
-    { name: "postQuote", args: [amount, EXPIRY] },
+    { name: "postQuote", args: [EXPIRY] },
   );
   assert.equal(r.ok, true, r.ok ? "" : r.error);
   if (!r.ok) throw new Error("quote");
@@ -166,8 +178,10 @@ describe("compact simulator: merchant registry", () => {
         callerSecret: DEMO.merchantB,
         invoiceId: pad32("inv-b-1"),
         quoteNonce: pad32("nonce-b-1"),
+        quoteAmount: 60n,
+        quoteMerchantPk: merchantPublicKey(DEMO.merchantB),
       }),
-      { name: "postQuote", args: [60n, EXPIRY] },
+      { name: "postQuote", args: [EXPIRY] },
     );
     assert.equal(q.ok, true);
   });
@@ -181,8 +195,9 @@ describe("compact simulator: merchant registry", () => {
         callerSecret: unregisteredSk,
         invoiceId: pad32("inv-unreg"),
         quoteNonce: pad32("nonce-unreg"),
+        quoteAmount: 50n,
       }),
-      { name: "postQuote", args: [50n, EXPIRY] },
+      { name: "postQuote", args: [EXPIRY] },
     );
     assert.equal(q.ok, false);
     assert.match(q.error, /unregistered merchant/);
@@ -254,7 +269,7 @@ describe("compact simulator: reserve accounting", () => {
     const s = await genesis();
     // Fund only 20
     const f = await call(s, ps(), { name: "fundReserve", args: [20n] });
-    const o = await call(f.session, ps(), { name: "openLine", args: [150n, EXPIRY] });
+    const o = await call(f.session, ps(), { name: "openLine", args: [EXPIRY] });
     const q = await quoted(40n, "inv-40", "n40", o.session);
     const Q = firstQuote(q.ledger)!.Q;
 
@@ -271,7 +286,7 @@ describe("compact simulator: reserve accounting", () => {
         noteNonce: pad32("nn-40"),
         noteSalt: pad32("ns-40"),
       }),
-      { name: "draw", args: [Q, 150n, 0n, 0n, 40n, EXPIRY, 0n] },
+      { name: "draw", args: [Q, EXPIRY, 0n] },
     );
     assert.equal(d.ok, false);
     assert.match(d.error, /insufficient reserve/);
@@ -292,7 +307,7 @@ describe("compact simulator: reserve accounting", () => {
         noteNonce: pad32("nn-40"),
         noteSalt: pad32("ns-40"),
       }),
-      { name: "draw", args: [Q, 150n, 0n, 0n, 40n, EXPIRY, 0n] },
+      { name: "draw", args: [Q, EXPIRY, 0n] },
     );
     assert.equal(d.ok, true);
     // Total is 1000, encumbered is 40. Withdrawable is 960.
@@ -326,7 +341,7 @@ describe("compact simulator: openLine", () => {
     const fake = pad32("line:demo:attacker");
     const r = await call(s, ps({ callerSecret: fake }), {
       name: "openLine",
-      args: [LIMIT, EXPIRY],
+      args: [EXPIRY],
     });
     assert.equal(r.ok, false);
     assert.match(r.error, /not issuer/);
@@ -336,14 +351,14 @@ describe("compact simulator: openLine", () => {
 
   it("second open while active is rejected", async () => {
     const o = await opened();
-    const r = await call(o.session, ps(), { name: "openLine", args: [LIMIT, EXPIRY] });
+    const r = await call(o.session, ps(), { name: "openLine", args: [EXPIRY] });
     assert.equal(r.ok, false);
     assert.match(r.error, /line already open/);
   });
 
   it("zero limit is rejected", async () => {
     const s = await genesis();
-    const r = await call(s, ps(), { name: "openLine", args: [0n, EXPIRY] });
+    const r = await call(s, ps({ lineLimit: 0n }), { name: "openLine", args: [EXPIRY] });
     assert.equal(r.ok, false);
     assert.match(r.error, /limit/);
   });
@@ -360,9 +375,9 @@ describe("compact simulator: postQuote", () => {
 
   it("zero quote is rejected", async () => {
     const o = await opened();
-    const r = await call(o.session, ps({ callerSecret: DEMO.merchantA }), {
+    const r = await call(o.session, ps({ callerSecret: DEMO.merchantA, quoteAmount: 0n }), {
       name: "postQuote",
-      args: [0n, EXPIRY],
+      args: [EXPIRY],
     });
     assert.equal(r.ok, false);
     assert.match(r.error, /zero/);
@@ -376,7 +391,7 @@ describe("compact simulator: postQuote", () => {
     });
     const q = await call(def.session, ps({ callerSecret: DEMO.merchantA }), {
       name: "postQuote",
-      args: [40n, EXPIRY],
+      args: [EXPIRY],
     });
     assert.equal(q.ok, false);
     assert.match(q.error, /status/);
@@ -399,7 +414,7 @@ describe("compact simulator: draw and merchant-bound settlement notes", () => {
         noteNonce: pad32("nn-40"),
         noteSalt: pad32("ns-40"),
       }),
-      { name: "draw", args: [Q, 150n, 0n, 0n, 40n, EXPIRY, 0n] },
+      { name: "draw", args: [Q, EXPIRY, 0n] },
     );
     assert.equal(d.ok, true);
     assert.equal(d.ledger.encumberedReserve, 40n);
@@ -424,8 +439,9 @@ describe("compact simulator: draw and merchant-bound settlement notes", () => {
         quoteNonce: pad32("n160"),
         noteNonce: pad32("nn-160"),
         noteSalt: pad32("ns-160"),
+        drawAmount: 160n,
       }),
-      { name: "draw", args: [Q, 150n, 0n, 0n, 160n, EXPIRY, 0n] },
+      { name: "draw", args: [Q, EXPIRY, 0n] },
     );
     assert.equal(d.ok, false);
     assert.match(d.error, /capacity/);
@@ -446,8 +462,33 @@ describe("compact simulator: draw and merchant-bound settlement notes", () => {
         quoteNonce: pad32("n40"),
         noteNonce: pad32("nn-40"),
         noteSalt: pad32("ns-40"),
+        drawAmount: 39n,
       }),
-      { name: "draw", args: [Q, 150n, 0n, 0n, 39n, EXPIRY, 0n] },
+      { name: "draw", args: [Q, EXPIRY, 0n] },
+    );
+    assert.equal(d.ok, false);
+    assert.match(d.error, /quote preimage/);
+  });
+
+  it("wrong merchant witness fails quote reconstruction (unlinkability enforced)", async () => {
+    const q = await quoted(40n);
+    const Q = firstQuote(q.ledger)!.Q;
+    // The ledger no longer stores the quote's merchant; the agent must supply
+    // the correct merchantPk as a witness. A wrong one cannot open Q.
+    const d = await call(
+      q.session,
+      ps({
+        callerSecret: DEMO.issuer,
+        agentSecret: DEMO.agent,
+        salt: pad32("salt-0"),
+        newSalt: pad32("salt-1"),
+        invoiceId: pad32("inv-40"),
+        quoteNonce: pad32("n40"),
+        noteNonce: pad32("nn-40"),
+        noteSalt: pad32("ns-40"),
+        quoteMerchantPk: merchantPublicKey(DEMO.merchantB),
+      }),
+      { name: "draw", args: [Q, EXPIRY, 0n] },
     );
     assert.equal(d.ok, false);
     assert.match(d.error, /quote preimage/);
@@ -469,7 +510,7 @@ describe("compact simulator: draw and merchant-bound settlement notes", () => {
         noteNonce: pad32("nn-40"),
         noteSalt: pad32("ns-40"),
       }),
-      { name: "draw", args: [Q, 150n, 0n, 0n, 40n, EXPIRY, 0n] },
+      { name: "draw", args: [Q, EXPIRY, 0n] },
     );
     assert.equal(d.ok, false);
     assert.match(d.error, /agent/);
@@ -490,7 +531,7 @@ describe("compact simulator: draw and merchant-bound settlement notes", () => {
         noteNonce: pad32("nn-40-1"),
         noteSalt: pad32("ns-40-1"),
       }),
-      { name: "draw", args: [Q, 150n, 0n, 0n, 40n, EXPIRY, 0n] },
+      { name: "draw", args: [Q, EXPIRY, 0n] },
     );
     assert.equal(d1.ok, true);
 
@@ -505,8 +546,10 @@ describe("compact simulator: draw and merchant-bound settlement notes", () => {
         quoteNonce: pad32("n40"),
         noteNonce: pad32("nn-40-2"),
         noteSalt: pad32("ns-40-2"),
+        lineOutstanding: 40n,
+        lineEpoch: 1n,
       }),
-      { name: "draw", args: [Q, 150n, 40n, 1n, 40n, EXPIRY, 0n] },
+      { name: "draw", args: [Q, EXPIRY, 0n] },
     );
     assert.equal(d2.ok, false);
     assert.match(d2.error, /used/);
@@ -529,7 +572,7 @@ describe("compact simulator: merchant redemption", () => {
         noteNonce: pad32("nn-40"),
         noteSalt: pad32("ns-40"),
       }),
-      { name: "draw", args: [Q, 150n, 0n, 0n, 40n, EXPIRY, 0n] },
+      { name: "draw", args: [Q, EXPIRY, 0n] },
     );
     assert.equal(d.ok, true);
     const D = notesOf(d.ledger)[0]!.D;
@@ -547,7 +590,7 @@ describe("compact simulator: merchant redemption", () => {
         noteNonce: pad32("nn-40"),
         noteSalt: pad32("ns-40"),
       }),
-      { name: "redeemDraw", args: [D, 40n, EXPIRY] },
+      { name: "redeemDraw", args: [D, EXPIRY] },
     );
     assert.equal(r.ok, true);
     assert.equal(r.ledger.encumberedReserve, 0n);
@@ -567,7 +610,7 @@ describe("compact simulator: merchant redemption", () => {
         noteNonce: pad32("nn-40"),
         noteSalt: pad32("ns-40"),
       }),
-      { name: "redeemDraw", args: [D, 40n, EXPIRY] },
+      { name: "redeemDraw", args: [D, EXPIRY] },
     );
     assert.equal(r.ok, false);
     assert.match(r.error, /note opening invalid/);
@@ -584,7 +627,7 @@ describe("compact simulator: merchant redemption", () => {
         noteNonce: pad32("nn-40"),
         noteSalt: pad32("ns-40"),
       }),
-      { name: "redeemDraw", args: [D, 40n, EXPIRY] },
+      { name: "redeemDraw", args: [D, EXPIRY] },
     );
     assert.equal(r1.ok, true);
 
@@ -597,7 +640,7 @@ describe("compact simulator: merchant redemption", () => {
         noteNonce: pad32("nn-40"),
         noteSalt: pad32("ns-40"),
       }),
-      { name: "redeemDraw", args: [D, 40n, EXPIRY] },
+      { name: "redeemDraw", args: [D, EXPIRY] },
     );
     assert.equal(r2.ok, false);
     assert.match(r2.error, /note already redeemed/);
@@ -613,8 +656,9 @@ describe("compact simulator: merchant redemption", () => {
         noteQuoteCommit: Q,
         noteNonce: pad32("nn-40"),
         noteSalt: pad32("ns-40"),
+        redeemAmount: 39n,
       }),
-      { name: "redeemDraw", args: [D, 39n, EXPIRY] },
+      { name: "redeemDraw", args: [D, EXPIRY] },
     );
     assert.equal(r.ok, false);
     assert.match(r.error, /amount mismatch/);
@@ -631,7 +675,7 @@ describe("compact simulator: merchant redemption", () => {
         noteNonce: pad32("nn-40"),
         noteSalt: pad32("wrong-salt"),
       }),
-      { name: "redeemDraw", args: [D, 40n, EXPIRY] },
+      { name: "redeemDraw", args: [D, EXPIRY] },
     );
     assert.equal(r.ok, false);
     assert.match(r.error, /note opening invalid/);
@@ -654,7 +698,7 @@ describe("compact simulator: note cancellation and expiry", () => {
         noteNonce: pad32("nn-40"),
         noteSalt: pad32("ns-40"),
       }),
-      { name: "draw", args: [Q, 150n, 0n, 0n, 40n, EXPIRY, 0n] },
+      { name: "draw", args: [Q, EXPIRY, 0n] },
     );
     const D = notesOf(d.ledger)[0]!.D;
     const c = await call(d.session, ps(), {
@@ -682,7 +726,7 @@ describe("compact simulator: acknowledgeRepayment", () => {
         noteNonce: pad32("nn-40"),
         noteSalt: pad32("ns-40"),
       }),
-      { name: "draw", args: [Q, 150n, 0n, 0n, 40n, EXPIRY, 0n] },
+      { name: "draw", args: [Q, EXPIRY, 0n] },
     );
     return d;
   }
@@ -698,8 +742,10 @@ describe("compact simulator: acknowledgeRepayment", () => {
         newSalt: pad32("salt-2"),
         receiptNonce: pad32("r1"),
         paymentRef: pad32("wire-40"),
+        lineOutstanding: 40n,
+        lineEpoch: 1n,
       }),
-      { name: "acknowledgeRepayment", args: [150n, 40n, 1n, 40n, EXPIRY] },
+      { name: "acknowledgeRepayment", args: [EXPIRY] },
     );
     assert.equal(ack.ok, true);
     const I = agentId(DEMO.agent);
@@ -721,8 +767,10 @@ describe("compact simulator: acknowledgeRepayment", () => {
         newSalt: pad32("salt-2"),
         receiptNonce: pad32("r1"),
         paymentRef: pad32("wire-40"),
+        lineOutstanding: 40n,
+        lineEpoch: 1n,
       }),
-      { name: "acknowledgeRepayment", args: [150n, 40n, 1n, 40n, EXPIRY] },
+      { name: "acknowledgeRepayment", args: [EXPIRY] },
     );
     assert.equal(ack.ok, false);
     assert.match(ack.error, /not issuer/);
@@ -739,8 +787,11 @@ describe("compact simulator: acknowledgeRepayment", () => {
         newSalt: pad32("salt-2"),
         receiptNonce: pad32("r1"),
         paymentRef: pad32("wire-40"),
+        lineOutstanding: 40n,
+        lineEpoch: 1n,
+        repayAmount: 50n,
       }),
-      { name: "acknowledgeRepayment", args: [150n, 40n, 1n, 50n, EXPIRY] },
+      { name: "acknowledgeRepayment", args: [EXPIRY] },
     );
     assert.equal(ack.ok, false);
     assert.match(ack.error, /range/);
@@ -767,7 +818,7 @@ describe("compact simulator: setStatus and line generation", () => {
         noteNonce: pad32("nn-40"),
         noteSalt: pad32("ns-40"),
       }),
-      { name: "draw", args: [Q, 150n, 0n, 0n, 40n, EXPIRY, 0n] },
+      { name: "draw", args: [Q, EXPIRY, 0n] },
     );
     assert.equal(d.ok, false);
     assert.match(d.error, /status/);
@@ -786,7 +837,7 @@ describe("compact simulator: setStatus and line generation", () => {
     // Reopen line in generation 2
     const reopen = await call(closed.session, ps({ callerSecret: DEMO.issuer }), {
       name: "openLine",
-      args: [150n, EXPIRY + 1000n],
+      args: [EXPIRY + 1000n],
     });
     assert.equal(reopen.ledger.lineGeneration, 2n);
 
@@ -803,7 +854,7 @@ describe("compact simulator: setStatus and line generation", () => {
         noteNonce: pad32("nn-40"),
         noteSalt: pad32("ns-40"),
       }),
-      { name: "draw", args: [Q1, 150n, 0n, 0n, 40n, EXPIRY, 0n] },
+      { name: "draw", args: [Q1, EXPIRY, 0n] },
     );
     assert.equal(d.ok, false);
     assert.match(d.error, /line generation mismatch/);
@@ -833,7 +884,7 @@ describe("compact simulator: cross-instance replay rejection", () => {
         noteNonce: pad32("nn-40"),
         noteSalt: pad32("ns-40"),
       }),
-      { name: "draw", args: [QA, 150n, 0n, 0n, 40n, EXPIRY, 0n] },
+      { name: "draw", args: [QA, EXPIRY, 0n] },
     );
     assert.equal(dA.ok, true);
     const DA = notesOf(dA.ledger)[0]!.D;
@@ -848,7 +899,7 @@ describe("compact simulator: cross-instance replay rejection", () => {
         noteNonce: pad32("nn-40"),
         noteSalt: pad32("ns-40"),
       }),
-      { name: "redeemDraw", args: [DA, 40n, EXPIRY] },
+      { name: "redeemDraw", args: [DA, EXPIRY] },
     );
     assert.equal(rB.ok, false);
     assert.match(rB.error, /note not found/);
@@ -870,8 +921,9 @@ describe("compact simulator: issuer fees", () => {
         quoteNonce: pad32(nonce),
         noteNonce: pad32("nn-fee"),
         noteSalt: pad32("ns-fee"),
+        drawAmount: amount,
       }),
-      { name: "draw", args: [Q, 150n, 0n, 0n, amount, EXPIRY, fee] },
+      { name: "draw", args: [Q, EXPIRY, fee] },
     );
   }
 
@@ -922,8 +974,9 @@ describe("compact simulator: issuer fees", () => {
         quoteNonce: pad32("ncap"),
         noteNonce: pad32("nn-cap"),
         noteSalt: pad32("ns-cap"),
+        drawAmount: 140n,
       }),
-      { name: "draw", args: [Q, 150n, 0n, 0n, 140n, EXPIRY, 20n] },
+      { name: "draw", args: [Q, EXPIRY, 20n] },
     );
     assert.equal(d.ok, false);
     assert.match(d.error, /capacity/);
@@ -935,7 +988,7 @@ describe("compact simulator: issuer fees", () => {
     const s = await genesis();
     // Fund only 40: the 40 note clears, but 40 + 5 fee does not
     const f = await call(s, ps(), { name: "fundReserve", args: [40n] });
-    const o = await call(f.session, ps(), { name: "openLine", args: [150n, EXPIRY] });
+    const o = await call(f.session, ps(), { name: "openLine", args: [EXPIRY] });
     const q = await quoted(40n, "inv-rsv", "nrsv", o.session);
     const Q = firstQuote(q.ledger)!.Q;
     const d = await call(
@@ -950,7 +1003,7 @@ describe("compact simulator: issuer fees", () => {
         noteNonce: pad32("nn-rsv"),
         noteSalt: pad32("ns-rsv"),
       }),
-      { name: "draw", args: [Q, 150n, 0n, 0n, 40n, EXPIRY, 5n] },
+      { name: "draw", args: [Q, EXPIRY, 5n] },
     );
     assert.equal(d.ok, false);
     assert.match(d.error, /insufficient reserve/);
@@ -1038,7 +1091,7 @@ describe("compact simulator: disableMerchant (audit L2)", () => {
         invoiceId: pad32("inv-dis"),
         quoteNonce: pad32("ndis"),
       }),
-      { name: "postQuote", args: [40n, EXPIRY] },
+      { name: "postQuote", args: [EXPIRY] },
     );
     assert.equal(q.ok, false);
     assert.match(q.error, /merchant disabled/);
@@ -1066,6 +1119,35 @@ describe("compact simulator: disableMerchant (audit L2)", () => {
     assert.equal(r.ok, false);
     assert.match(r.error, /unknown merchant/);
   });
+
+  it("a disabled merchant's already-posted quotes stay drawable", async () => {
+    const q = await quoted(40n);
+    const Q = firstQuote(q.ledger)!.Q;
+    const mAPk = merchantPublicKey(DEMO.merchantA);
+    const dis = await call(q.session, ps({ callerSecret: DEMO.issuer }), {
+      name: "disableMerchant",
+      args: [mAPk],
+    });
+    assert.equal(dis.ok, true, dis.ok ? "" : dis.error);
+    // draw checks registry membership, not enabled-ness: quotes posted while
+    // the merchant was active remain valid; only NEW quotes are blocked.
+    const d = await call(
+      dis.session,
+      ps({
+        callerSecret: DEMO.issuer,
+        agentSecret: DEMO.agent,
+        salt: pad32("salt-0"),
+        newSalt: pad32("salt-1"),
+        invoiceId: pad32("inv-40"),
+        quoteNonce: pad32("n40"),
+        noteNonce: pad32("nn-40"),
+        noteSalt: pad32("ns-40"),
+      }),
+      { name: "draw", args: [Q, EXPIRY, 0n] },
+    );
+    assert.equal(d.ok, true, d.ok ? "" : d.error);
+    assert.equal(d.ledger.encumberedReserve, 40n);
+  });
 });
 
 describe("compact simulator: expiry headroom-2 (audit L3)", () => {
@@ -1075,14 +1157,14 @@ describe("compact simulator: expiry headroom-2 (audit L3)", () => {
     assert.equal(o.ledger.actionClock, 2n);
     const r = await call(o.session, ps({ callerSecret: DEMO.merchantA }), {
       name: "postQuote",
-      args: [40n, 3n],
+      args: [3n],
     });
     assert.equal(r.ok, false);
     assert.match(r.error, /expiry/);
     // clock+2 is the minimum that passes
     const ok = await call(o.session, ps({ callerSecret: DEMO.merchantA }), {
       name: "postQuote",
-      args: [40n, 4n],
+      args: [4n],
     });
     assert.equal(ok.ok, true, ok.ok ? "" : ok.error);
   });
@@ -1103,7 +1185,7 @@ describe("compact simulator: expiry headroom-2 (audit L3)", () => {
         noteNonce: pad32("nn-40"),
         noteSalt: pad32("ns-40"),
       }),
-      { name: "draw", args: [Q, 150n, 0n, 0n, 40n, 4n, 0n] },
+      { name: "draw", args: [Q, 4n, 0n] },
     );
     assert.equal(d.ok, false);
     assert.match(d.error, /note expiry/);
@@ -1125,9 +1207,306 @@ describe("compact simulator: expiry headroom-2 (audit L3)", () => {
         noteNonce: pad32("nn-h2"),
         noteSalt: pad32("ns-h2"),
       }),
-      { name: "draw", args: [Q, 150n, 0n, 0n, 40n, 5n, 0n] },
+      { name: "draw", args: [Q, 5n, 0n] },
     );
     assert.equal(d.ok, true, d.ok ? "" : d.error);
     assert.equal(d.ledger.encumberedReserve, 40n);
+  });
+});
+
+describe("compact simulator: negative privacy (public observer learns nothing)", () => {
+  // Distinctive secrets: if any of these 64-hex-char encodings shows up in a
+  // public input or public ledger state, it is a real leak, not a coincidence.
+  const PLIMIT = 987_654_321n;
+  const PAMT = 123_456_789n; // drawn quote's invoice amount
+  const Q2AMT = 777_888_999n; // never-drawn quote's invoice amount
+  const PFEE = 7n; // public by design (issuer business model)
+  const PSALT0 = pad32("priv-s0-9f3a7c1e");
+  const PNS0 = pad32("priv-ns0-9f3a7c1e");
+  const PNS1 = pad32("priv-ns1-9f3a7c1e");
+  const PNS2 = pad32("priv-ns2-9f3a7c1e");
+  const PINV = pad32("priv-inv-9f3a7c1e");
+  const PQN = pad32("priv-qn-9f3a7c1e");
+  const PINV2 = pad32("priv-inv2-9f3a7c1");
+  const PQN2 = pad32("priv-qn2-9f3a7c1");
+  const PNN = pad32("priv-nn-9f3a7c1e");
+  const PNSALT = pad32("priv-nsalt-9f3a7c1");
+  const PRN = pad32("priv-rn-9f3a7c1e");
+  const PPR = pad32("priv-pr-9f3a7c1e");
+
+  const u64hx = (n: bigint) => toHex(encodeU64(n));
+  const mAPk = merchantPublicKey(DEMO.merchantA);
+  const I = agentId(DEMO.agent);
+
+  type PubCall = { name: string; args: Array<bigint | Uint8Array | Status> };
+  type Flow = {
+    ledger: ReturnType<typeof readLedger>;
+    pubCalls: PubCall[];
+    Q: Uint8Array;
+    Q2: Uint8Array;
+    D: Uint8Array;
+    C0: Uint8Array;
+    C1: Uint8Array;
+    C2: Uint8Array;
+    Qcheck: Uint8Array;
+    openCommit: Uint8Array;
+    drawCommit: Uint8Array;
+  };
+
+  function basePs(overrides: Partial<PrivateState> = {}): PrivateState {
+    return ps({
+      salt: PSALT0,
+      invoiceId: PINV,
+      quoteNonce: PQN,
+      lineLimit: PLIMIT,
+      quoteAmount: PAMT,
+      drawAmount: PAMT,
+      redeemAmount: PAMT,
+      repayAmount: PAMT,
+      quoteMerchantPk: mAPk,
+      ...overrides,
+    });
+  }
+
+  async function runPrivateFlow(): Promise<Flow> {
+    const pubCalls: PubCall[] = [];
+    let sess = await boot(DEMO.issuer, DEMO.merchantA, pad32("priv-inst-9f3a7c"), basePs());
+    const step = async (p: PrivateState, op: CircuitCall) => {
+      const r = await call(sess, p, op);
+      assert.equal(r.ok, true, r.ok ? "" : (r as { error: string }).error);
+      pubCalls.push({ name: op.name, args: op.args as PubCall["args"] });
+      sess = r.session;
+      return r;
+    };
+    await step(basePs(), { name: "fundReserve", args: [10_000_000_000n] });
+    const openedR = await step(basePs({ newSalt: PNS0 }), { name: "openLine", args: [EXPIRY] });
+    const q1 = await step(basePs({ callerSecret: DEMO.merchantA }), {
+      name: "postQuote",
+      args: [EXPIRY],
+    });
+    const Q = firstQuote(q1.ledger)!.Q;
+    // A second quote that is NEVER drawn: its invoice amount must stay hidden.
+    const q2 = await step(
+      basePs({
+        callerSecret: DEMO.merchantA,
+        invoiceId: PINV2,
+        quoteNonce: PQN2,
+        quoteAmount: Q2AMT,
+      }),
+      { name: "postQuote", args: [EXPIRY] },
+    );
+    const Q2 = [...q2.ledger.quotes].map(([k]) => k).find((k) => toHex(k) !== toHex(Q))!;
+    const drawn = await step(basePs({ newSalt: PNS1, noteNonce: PNN, noteSalt: PNSALT }), {
+      name: "draw",
+      args: [Q, EXPIRY, PFEE],
+    });
+    const D = notesOf(drawn.ledger)[0]!.D;
+    const red = await step(
+      basePs({
+        callerSecret: DEMO.merchantA,
+        noteIdentity: I,
+        noteQuoteCommit: Q,
+        noteNonce: PNN,
+        noteSalt: PNSALT,
+      }),
+      { name: "redeemDraw", args: [D, EXPIRY] },
+    );
+    assert.equal(red.ledger.redeemedReserve, PAMT);
+    const ack = await step(
+      basePs({
+        callerSecret: DEMO.issuer,
+        salt: PNS1,
+        newSalt: PNS2,
+        receiptNonce: PRN,
+        paymentRef: PPR,
+        lineOutstanding: PAMT + PFEE,
+        lineEpoch: 1n,
+      }),
+      { name: "acknowledgeRepayment", args: [EXPIRY] },
+    );
+    // Independent recomputation of every commitment from the SECRET values:
+    // proves the circuits actually consumed the witnesses (not accepted-and-ignored).
+    const C0 = lineStateCommit(
+      { identity: I, limit: PLIMIT, outstanding: 0n, epoch: 0n },
+      PSALT0,
+    );
+    const C1 = lineStateCommit(
+      { identity: I, limit: PLIMIT, outstanding: PAMT + PFEE, epoch: 1n },
+      PNS1,
+    );
+    const C2 = lineStateCommit(
+      { identity: I, limit: PLIMIT, outstanding: PFEE, epoch: 2n },
+      PNS2,
+    );
+    const Qcheck = quoteCommit({
+      merchantPk: mAPk,
+      invoiceId: PINV,
+      amount: PAMT,
+      expiry: EXPIRY,
+      nonce: PQN,
+      generation: 1n,
+      domain: ack.ledger.contractDomain,
+    });
+    return {
+      ledger: ack.ledger,
+      pubCalls,
+      Q,
+      Q2,
+      D,
+      C0,
+      C1,
+      C2,
+      Qcheck,
+      openCommit: openedR.ledger.lineCommit,
+      drawCommit: drawn.ledger.lineCommit,
+    };
+  }
+
+  function argHex(a: bigint | Uint8Array | Status): string {
+    if (typeof a === "bigint") return u64hx(a);
+    if (a instanceof Uint8Array) return toHex(a);
+    return `status:${a}`;
+  }
+
+  function publicArgsBlob(pubCalls: PubCall[]): string {
+    return pubCalls.map((c) => `${c.name}:${c.args.map(argHex).join(",")}`).join("|");
+  }
+
+  function ledgerBlob(L: ReturnType<typeof readLedger>): string {
+    // registeredMerchants is EXCLUDED: a public allowlist is the design, and
+    // the linkage test below scopes merchantPk absence to quote/note entries.
+    const obj = {
+      issuer: toHex(L.issuer),
+      domain: toHex(L.contractDomain),
+      total: u64hx(L.totalReserve),
+      encumbered: u64hx(L.encumberedReserve),
+      redeemed: u64hx(L.redeemedReserve),
+      fees: u64hx(L.feeReserve),
+      identityCommit: toHex(L.identityCommit),
+      lineCommit: toHex(L.lineCommit),
+      lineExpiry: u64hx(L.lineExpiry),
+      status: L.status,
+      generation: u64hx(L.lineGeneration),
+      clock: u64hx(L.actionClock),
+      quotes: [...L.quotes].map(([k, m]) => ({
+        k: toHex(k),
+        expiry: u64hx(m.expiry),
+        gen: u64hx(m.lineGeneration),
+        used: m.used,
+      })),
+      notes: [...L.notes].map(([k, m]) => ({
+        k: toHex(k),
+        amount: u64hx(m.amount),
+        redeemed: m.redeemed,
+        cancelled: m.cancelled,
+        expiry: u64hx(m.expiry),
+        gen: u64hx(m.lineGeneration),
+      })),
+      nullifiers: [...L.nullifiers].map(toHex),
+    };
+    return JSON.stringify(obj);
+  }
+
+  it("witnesses are really consumed: C0/C1/C2/Q recompute from the secret values", async () => {
+    const f = await runPrivateFlow();
+    // If the circuits ignored the witnesses, these would not match: the
+    // public flow above carried NO secret in any argument, yet the on-ledger
+    // commitments equal hashes of the secrets. This is the anti-theater check.
+    assert.equal(toHex(f.openCommit), toHex(f.C0), "C0 must bind witness L");
+    assert.equal(toHex(f.drawCommit), toHex(f.C1), "C1 must bind witness L/B/epoch");
+    assert.equal(toHex(f.ledger.lineCommit), toHex(f.C2), "C2 must bind witness L/B/epoch");
+    assert.notEqual(toHex(f.Q), toHex(f.Q2), "quotes must be distinct");
+    assert.equal(toHex(f.Q), toHex(f.Qcheck), "Q must commit to the witness merchantPk/amount");
+  });
+
+  it("limit, outstanding, and the never-drawn invoice amount appear nowhere public", async () => {
+    const f = await runPrivateFlow();
+    const haystack = publicArgsBlob(f.pubCalls) + "\n" + ledgerBlob(f.ledger);
+    const forbidden = [
+      u64hx(PLIMIT), // credit limit L
+      u64hx(PAMT + PFEE), // outstanding balance B after the draw
+      u64hx(Q2AMT), // invoice amount of the quote that was never drawn
+      toHex(PSALT0),
+      toHex(PNS0),
+      toHex(PNS1),
+      toHex(PNS2),
+      toHex(PINV),
+      toHex(PQN),
+      toHex(PINV2),
+      toHex(PQN2),
+      toHex(PNN),
+      toHex(PNSALT),
+      toHex(PRN),
+      toHex(PPR),
+      toHex(DEMO.agent), // agent secret
+      toHex(DEMO.issuer), // issuer secret
+      toHex(DEMO.merchantA), // merchant secret
+    ];
+    for (const secret of forbidden) {
+      assert.ok(
+        !haystack.includes(secret),
+        `secret leaked into public inputs/state: ${secret.slice(0, 16)}…`,
+      );
+    }
+  });
+
+  it("draw's public args expose no amount, books, invoice material, or merchant", async () => {
+    const f = await runPrivateFlow();
+    const drawCall = f.pubCalls.find((c) => c.name === "draw")!;
+    const blob = drawCall.args.map(argHex).join(",");
+    // Public draw args are exactly [Q, noteExpiry, fee]; everything else is a witness.
+    assert.equal(drawCall.args.length, 3);
+    for (const secret of [
+      u64hx(PLIMIT),
+      u64hx(PAMT),
+      u64hx(PAMT + PFEE),
+      toHex(PINV),
+      toHex(PQN),
+      toHex(PNN),
+      toHex(PNSALT),
+      toHex(PSALT0),
+      toHex(PNS1),
+      toHex(mAPk),
+    ]) {
+      assert.ok(!blob.includes(secret), `draw public arg leaks secret: ${secret.slice(0, 16)}…`);
+    }
+    // The fee IS public by design (issuer business model) — assert it is there.
+    assert.ok(blob.includes(u64hx(PFEE)), "fee must remain a public parameter");
+  });
+
+  it("merchant<->quote unlinkability: merchantPk in no quote/note/nullifier or public arg", async () => {
+    const f = await runPrivateFlow();
+    const mPkHex = toHex(mAPk);
+    // Quote entries: keys are opaque Q, values carry no merchantPk (struct field removed).
+    for (const [k, m] of f.ledger.quotes) {
+      const entry = toHex(k) + u64hx(m.expiry) + u64hx(m.lineGeneration) + String(m.used);
+      assert.ok(!entry.includes(mPkHex), "quote entry links merchant");
+    }
+    // Note entries: NoteMeta has no merchant field; D is an opaque commitment.
+    for (const [k, m] of f.ledger.notes) {
+      const entry =
+        toHex(k) + u64hx(m.amount) + String(m.redeemed) + String(m.cancelled) + u64hx(m.expiry);
+      assert.ok(!entry.includes(mPkHex), "note entry links merchant");
+    }
+    for (const n of f.ledger.nullifiers) {
+      assert.ok(!toHex(n).includes(mPkHex), "nullifier links merchant");
+    }
+    const argsBlob = publicArgsBlob(f.pubCalls);
+    assert.ok(!argsBlob.includes(mPkHex), "public circuit args link merchant");
+    // Sanity: the allowlist DOES contain the merchant (public by design) —
+    // unlinkability is about quote/note linkage, not registry membership.
+    assert.equal(f.ledger.registeredMerchants.member(mAPk), true);
+  });
+
+  it("honest boundary: settled amounts ARE public escrow accounting", async () => {
+    const f = await runPrivateFlow();
+    // The witness migration hides invoice amounts pre-settlement; once a note
+    // settles, its amount is visible via the public counters. Assert this
+    // openly rather than claiming otherwise.
+    assert.equal(f.ledger.redeemedReserve, PAMT);
+    assert.equal(f.ledger.encumberedReserve, 0n);
+    const note = notesOf(f.ledger)[0]!;
+    assert.equal(note.amount, PAMT);
+    assert.equal(note.redeemed, true);
   });
 });

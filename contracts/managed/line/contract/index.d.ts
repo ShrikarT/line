@@ -2,10 +2,7 @@ import type * as __compactRuntime from '@midnight-ntwrk/compact-runtime';
 
 export enum Status { NONE = 0, OPEN = 1, DEFAULTED = 2, CLOSED = 3 }
 
-export type QuoteMeta = { merchantPk: Uint8Array;
-                          expiry: bigint;
-                          lineGeneration: bigint;
-                          used: boolean
+export type QuoteMeta = { expiry: bigint; lineGeneration: bigint; used: boolean
                         };
 
 export type LinePreimage = { identity: Uint8Array;
@@ -44,6 +41,14 @@ export type Witnesses<PS> = {
   noteSalt(context: __compactRuntime.WitnessContext<Ledger, PS>): [PS, Uint8Array];
   noteIdentity(context: __compactRuntime.WitnessContext<Ledger, PS>): [PS, Uint8Array];
   noteQuoteCommit(context: __compactRuntime.WitnessContext<Ledger, PS>): [PS, Uint8Array];
+  lineLimit(context: __compactRuntime.WitnessContext<Ledger, PS>): [PS, bigint];
+  lineOutstanding(context: __compactRuntime.WitnessContext<Ledger, PS>): [PS, bigint];
+  lineEpoch(context: __compactRuntime.WitnessContext<Ledger, PS>): [PS, bigint];
+  quoteAmount(context: __compactRuntime.WitnessContext<Ledger, PS>): [PS, bigint];
+  drawAmount(context: __compactRuntime.WitnessContext<Ledger, PS>): [PS, bigint];
+  redeemAmount(context: __compactRuntime.WitnessContext<Ledger, PS>): [PS, bigint];
+  repayAmount(context: __compactRuntime.WitnessContext<Ledger, PS>): [PS, bigint];
+  quoteMerchantPk(context: __compactRuntime.WitnessContext<Ledger, PS>): [PS, Uint8Array];
 }
 
 export type ImpureCircuits<PS> = {
@@ -55,31 +60,18 @@ export type ImpureCircuits<PS> = {
   withdrawUnencumberedReserve(context: __compactRuntime.CircuitContext<PS>,
                               amount_0: bigint): Promise<__compactRuntime.CircuitResults<PS, []>>;
   withdrawFees(context: __compactRuntime.CircuitContext<PS>): Promise<__compactRuntime.CircuitResults<PS, []>>;
-  openLine(context: __compactRuntime.CircuitContext<PS>,
-           limit_0: bigint,
-           expiry_0: bigint): Promise<__compactRuntime.CircuitResults<PS, []>>;
-  postQuote(context: __compactRuntime.CircuitContext<PS>,
-            amount_0: bigint,
-            expiry_0: bigint): Promise<__compactRuntime.CircuitResults<PS, []>>;
+  openLine(context: __compactRuntime.CircuitContext<PS>, expiry_0: bigint): Promise<__compactRuntime.CircuitResults<PS, []>>;
+  postQuote(context: __compactRuntime.CircuitContext<PS>, expiry_0: bigint): Promise<__compactRuntime.CircuitResults<PS, []>>;
   draw(context: __compactRuntime.CircuitContext<PS>,
        quoteCommitPublic_0: Uint8Array,
-       limit_0: bigint,
-       outstanding_0: bigint,
-       epoch_0: bigint,
-       amount_0: bigint,
        noteExpiry_0: bigint,
        fee_0: bigint): Promise<__compactRuntime.CircuitResults<PS, []>>;
   redeemDraw(context: __compactRuntime.CircuitContext<PS>,
              noteCommitPublic_0: Uint8Array,
-             amount_0: bigint,
              noteExpiry_0: bigint): Promise<__compactRuntime.CircuitResults<PS, []>>;
   cancelOrExpireNote(context: __compactRuntime.CircuitContext<PS>,
                      noteCommitPublic_0: Uint8Array): Promise<__compactRuntime.CircuitResults<PS, []>>;
   acknowledgeRepayment(context: __compactRuntime.CircuitContext<PS>,
-                       limit_0: bigint,
-                       outstanding_0: bigint,
-                       epoch_0: bigint,
-                       amount_0: bigint,
                        receiptExpiry_0: bigint): Promise<__compactRuntime.CircuitResults<PS, []>>;
   setStatus(context: __compactRuntime.CircuitContext<PS>, next_0: Status): Promise<__compactRuntime.CircuitResults<PS, []>>;
 }
@@ -93,31 +85,18 @@ export type ProvableCircuits<PS> = {
   withdrawUnencumberedReserve(context: __compactRuntime.CircuitContext<PS>,
                               amount_0: bigint): Promise<__compactRuntime.CircuitResults<PS, []>>;
   withdrawFees(context: __compactRuntime.CircuitContext<PS>): Promise<__compactRuntime.CircuitResults<PS, []>>;
-  openLine(context: __compactRuntime.CircuitContext<PS>,
-           limit_0: bigint,
-           expiry_0: bigint): Promise<__compactRuntime.CircuitResults<PS, []>>;
-  postQuote(context: __compactRuntime.CircuitContext<PS>,
-            amount_0: bigint,
-            expiry_0: bigint): Promise<__compactRuntime.CircuitResults<PS, []>>;
+  openLine(context: __compactRuntime.CircuitContext<PS>, expiry_0: bigint): Promise<__compactRuntime.CircuitResults<PS, []>>;
+  postQuote(context: __compactRuntime.CircuitContext<PS>, expiry_0: bigint): Promise<__compactRuntime.CircuitResults<PS, []>>;
   draw(context: __compactRuntime.CircuitContext<PS>,
        quoteCommitPublic_0: Uint8Array,
-       limit_0: bigint,
-       outstanding_0: bigint,
-       epoch_0: bigint,
-       amount_0: bigint,
        noteExpiry_0: bigint,
        fee_0: bigint): Promise<__compactRuntime.CircuitResults<PS, []>>;
   redeemDraw(context: __compactRuntime.CircuitContext<PS>,
              noteCommitPublic_0: Uint8Array,
-             amount_0: bigint,
              noteExpiry_0: bigint): Promise<__compactRuntime.CircuitResults<PS, []>>;
   cancelOrExpireNote(context: __compactRuntime.CircuitContext<PS>,
                      noteCommitPublic_0: Uint8Array): Promise<__compactRuntime.CircuitResults<PS, []>>;
   acknowledgeRepayment(context: __compactRuntime.CircuitContext<PS>,
-                       limit_0: bigint,
-                       outstanding_0: bigint,
-                       epoch_0: bigint,
-                       amount_0: bigint,
                        receiptExpiry_0: bigint): Promise<__compactRuntime.CircuitResults<PS, []>>;
   setStatus(context: __compactRuntime.CircuitContext<PS>, next_0: Status): Promise<__compactRuntime.CircuitResults<PS, []>>;
 }
@@ -134,31 +113,18 @@ export type Circuits<PS> = {
   withdrawUnencumberedReserve(context: __compactRuntime.CircuitContext<PS>,
                               amount_0: bigint): Promise<__compactRuntime.CircuitResults<PS, []>>;
   withdrawFees(context: __compactRuntime.CircuitContext<PS>): Promise<__compactRuntime.CircuitResults<PS, []>>;
-  openLine(context: __compactRuntime.CircuitContext<PS>,
-           limit_0: bigint,
-           expiry_0: bigint): Promise<__compactRuntime.CircuitResults<PS, []>>;
-  postQuote(context: __compactRuntime.CircuitContext<PS>,
-            amount_0: bigint,
-            expiry_0: bigint): Promise<__compactRuntime.CircuitResults<PS, []>>;
+  openLine(context: __compactRuntime.CircuitContext<PS>, expiry_0: bigint): Promise<__compactRuntime.CircuitResults<PS, []>>;
+  postQuote(context: __compactRuntime.CircuitContext<PS>, expiry_0: bigint): Promise<__compactRuntime.CircuitResults<PS, []>>;
   draw(context: __compactRuntime.CircuitContext<PS>,
        quoteCommitPublic_0: Uint8Array,
-       limit_0: bigint,
-       outstanding_0: bigint,
-       epoch_0: bigint,
-       amount_0: bigint,
        noteExpiry_0: bigint,
        fee_0: bigint): Promise<__compactRuntime.CircuitResults<PS, []>>;
   redeemDraw(context: __compactRuntime.CircuitContext<PS>,
              noteCommitPublic_0: Uint8Array,
-             amount_0: bigint,
              noteExpiry_0: bigint): Promise<__compactRuntime.CircuitResults<PS, []>>;
   cancelOrExpireNote(context: __compactRuntime.CircuitContext<PS>,
                      noteCommitPublic_0: Uint8Array): Promise<__compactRuntime.CircuitResults<PS, []>>;
   acknowledgeRepayment(context: __compactRuntime.CircuitContext<PS>,
-                       limit_0: bigint,
-                       outstanding_0: bigint,
-                       epoch_0: bigint,
-                       amount_0: bigint,
                        receiptExpiry_0: bigint): Promise<__compactRuntime.CircuitResults<PS, []>>;
   setStatus(context: __compactRuntime.CircuitContext<PS>, next_0: Status): Promise<__compactRuntime.CircuitResults<PS, []>>;
 }

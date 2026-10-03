@@ -15,7 +15,7 @@ import {
   repayNullifier,
   toHex,
 } from "./encoding.ts";
-import { DEMO, boot, call, firstQuote, readLedger } from "./compact-harness.ts";
+import { DEMO, blankPrivate, boot, call, firstQuote, readLedger } from "./compact-harness.ts";
 import {
   createLedger,
   draw,
@@ -59,7 +59,7 @@ describe("cross-language commitment vectors", () => {
     // Issuer funds reserve
     const funded = await call(
       session,
-      {
+      blankPrivate({
         callerSecret: DEMO.issuer,
         agentSecret: DEMO.agent,
         salt: pad32("salt-0"),
@@ -72,7 +72,7 @@ describe("cross-language commitment vectors", () => {
         noteSalt: pad32("ns40"),
         noteIdentity: pad32("0"),
         noteQuoteCommit: pad32("0"),
-      },
+  }),
       { name: "fundReserve", args: [500n] },
     );
     assert.equal(funded.ok, true);
@@ -81,7 +81,7 @@ describe("cross-language commitment vectors", () => {
     // Issuer opens line
     const opened = await call(
       funded.session,
-      {
+      blankPrivate({
         callerSecret: DEMO.issuer,
         agentSecret: DEMO.agent,
         salt: pad32("salt-0"),
@@ -94,8 +94,9 @@ describe("cross-language commitment vectors", () => {
         noteSalt: pad32("ns40"),
         noteIdentity: pad32("0"),
         noteQuoteCommit: pad32("0"),
-      },
-      { name: "openLine", args: [150n, 10_000n] },
+        lineLimit: 150n,
+  }),
+      { name: "openLine", args: [10_000n] },
     );
     assert.equal(opened.ok, true);
     if (!opened.ok) throw new Error("open failed");
@@ -111,7 +112,7 @@ describe("cross-language commitment vectors", () => {
     // Merchant A posts quote
     const quoted = await call(
       opened.session,
-      {
+      blankPrivate({
         callerSecret: DEMO.merchantA,
         agentSecret: DEMO.agent,
         salt: pad32("salt-0"),
@@ -124,8 +125,9 @@ describe("cross-language commitment vectors", () => {
         noteSalt: pad32("ns40"),
         noteIdentity: pad32("0"),
         noteQuoteCommit: pad32("0"),
-      },
-      { name: "postQuote", args: [40n, 10_000n] },
+        quoteAmount: 40n,
+  }),
+      { name: "postQuote", args: [10_000n] },
     );
     assert.equal(quoted.ok, true);
     if (!quoted.ok) throw new Error("quote failed");
@@ -145,7 +147,7 @@ describe("cross-language commitment vectors", () => {
     // Agent draws 40 -> creates draw note D
     const drawn = await call(
       quoted.session,
-      {
+      blankPrivate({
         callerSecret: DEMO.issuer,
         agentSecret: DEMO.agent,
         salt: pad32("salt-0"),
@@ -158,8 +160,13 @@ describe("cross-language commitment vectors", () => {
         noteSalt: pad32("ns40"),
         noteIdentity: pad32("0"),
         noteQuoteCommit: pad32("0"),
-      },
-      { name: "draw", args: [Q, 150n, 0n, 0n, 40n, 10_000n, 0n] },
+        lineLimit: 150n,
+        lineOutstanding: 0n,
+        lineEpoch: 0n,
+        drawAmount: 40n,
+        quoteMerchantPk: merchantPublicKey(DEMO.merchantA),
+  }),
+      { name: "draw", args: [Q, 10_000n, 0n] },
     );
     assert.equal(drawn.ok, true);
     if (!drawn.ok) throw new Error("draw failed");
@@ -188,7 +195,7 @@ describe("cross-language commitment vectors", () => {
     // Merchant A redeems note D
     const redeemed = await call(
       drawn.session,
-      {
+      blankPrivate({
         callerSecret: DEMO.merchantA,
         agentSecret: DEMO.agent,
         salt: pad32("salt-1"),
@@ -201,8 +208,9 @@ describe("cross-language commitment vectors", () => {
         noteSalt: pad32("ns40"),
         noteIdentity: I,
         noteQuoteCommit: Q,
-      },
-      { name: "redeemDraw", args: [D, 40n, 10_000n] },
+        redeemAmount: 40n,
+  }),
+      { name: "redeemDraw", args: [D, 10_000n] },
     );
     assert.equal(redeemed.ok, true);
     if (!redeemed.ok) throw new Error("redeem failed");
@@ -230,7 +238,7 @@ describe("cross-language commitment vectors", () => {
     });
     const ack = await call(
       redeemed.session,
-      {
+      blankPrivate({
         callerSecret: DEMO.issuer,
         agentSecret: DEMO.agent,
         salt: pad32("salt-1"),
@@ -243,8 +251,12 @@ describe("cross-language commitment vectors", () => {
         noteSalt: pad32("ns40"),
         noteIdentity: I,
         noteQuoteCommit: Q,
-      },
-      { name: "acknowledgeRepayment", args: [150n, 40n, 1n, 40n, 10_000n] },
+        lineLimit: 150n,
+        lineOutstanding: 40n,
+        lineEpoch: 1n,
+        repayAmount: 40n,
+  }),
+      { name: "acknowledgeRepayment", args: [10_000n] },
     );
     assert.equal(ack.ok, true);
     if (!ack.ok) throw new Error("ack failed");
@@ -262,47 +274,60 @@ describe("cross-language commitment vectors", () => {
     assert.equal(funded.ok, true);
     if (!funded.ok) throw new Error("fund");
 
-    const open = openLine(funded.ledger, {
-      caller: ISSUER_SK,
-      agentSecret: AGENT_SK,
-      limit: 150,
-      salt: "salt-0",
-      expiry: 10_000,
-    });
+    const open = openLine(
+      funded.ledger,
+      {
+        caller: ISSUER_SK,
+        agentSecret: AGENT_SK,
+        salt: "salt-0",
+        expiry: 10_000,
+      },
+      { limit: 150 },
+    );
     assert.equal(open.ok, true);
     if (!open.ok) throw new Error("open");
     assert.equal(open.agent.witness!.I, identityCommitment(AGENT_SK));
     assert.equal(open.ledger.lineCommitment, lineCommitment(open.agent.witness!));
 
-    const q = postQuote(open.ledger, {
-      caller: MERCHANT_A_SK,
-      amount: 40,
-      invoiceId: "inv-40",
-      expiry: 10_000,
-      nonce: "n40",
-    });
+    const q = postQuote(
+      open.ledger,
+      {
+        caller: MERCHANT_A_SK,
+        invoiceId: "inv-40",
+        expiry: 10_000,
+        nonce: "n40",
+      },
+      { amount: 40 },
+    );
     assert.equal(q.ok, true);
     if (!q.ok) throw new Error("q");
     assert.equal(q.Q, quoteCommitment(q.quote, open.ledger.contractDomain));
 
-    const drawn = draw(q.ledger, {
-      agentSecret: AGENT_SK,
-      witness: open.agent.witness!,
-      quote: q.quote,
-      newSalt: "salt-1",
-      noteNonce: "nn40",
-      noteSalt: "ns40",
-    });
+    const drawn = draw(
+      q.ledger,
+      {
+        agentSecret: AGENT_SK,
+        quoteCommit: q.Q,
+        newSalt: "salt-1",
+        noteNonce: "nn40",
+        noteSalt: "ns40",
+      },
+      { books: open.agent.witness!, quote: q.quote },
+    );
     assert.equal(drawn.ok, true);
     if (!drawn.ok) throw new Error("draw");
     assert.equal(drawn.note.D, drawNoteCommitment(drawn.note.preimage, drawn.note.salt));
 
-    const redeemed = redeemDraw(drawn.ledger, {
-      caller: MERCHANT_A_SK,
-      noteCommitment: drawn.note.D,
-      notePreimage: drawn.note.preimage,
-      noteSalt: drawn.note.salt,
-    });
+    const redeemed = redeemDraw(
+      drawn.ledger,
+      {
+        caller: MERCHANT_A_SK,
+        noteCommitment: drawn.note.D,
+        noteExpiry: drawn.note.preimage.expiry,
+        noteSalt: drawn.note.salt,
+      },
+      { note: drawn.note.preimage },
+    );
     assert.equal(redeemed.ok, true);
   });
 });

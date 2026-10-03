@@ -27,6 +27,16 @@ export type PrivateState = {
   noteSalt: Uint8Array;
   noteIdentity: Uint8Array;
   noteQuoteCommit: Uint8Array;
+  // Private witnesses (audit H1/H2/H3): the credit books, per-quote amounts,
+  // and the quote's merchant travel as witnesses, never as public parameters.
+  lineLimit: bigint;
+  lineOutstanding: bigint;
+  lineEpoch: bigint;
+  quoteAmount: bigint;
+  drawAmount: bigint;
+  redeemAmount: bigint;
+  repayAmount: bigint;
+  quoteMerchantPk: Uint8Array;
 };
 
 export const COIN_PK = "0".repeat(64);
@@ -45,6 +55,14 @@ export const WITNESSES = {
   noteSalt: (ctx: { privateState: PrivateState }) => [ctx.privateState, ctx.privateState.noteSalt] as const,
   noteIdentity: (ctx: { privateState: PrivateState }) => [ctx.privateState, ctx.privateState.noteIdentity] as const,
   noteQuoteCommit: (ctx: { privateState: PrivateState }) => [ctx.privateState, ctx.privateState.noteQuoteCommit] as const,
+  lineLimit: (ctx: { privateState: PrivateState }) => [ctx.privateState, ctx.privateState.lineLimit] as const,
+  lineOutstanding: (ctx: { privateState: PrivateState }) => [ctx.privateState, ctx.privateState.lineOutstanding] as const,
+  lineEpoch: (ctx: { privateState: PrivateState }) => [ctx.privateState, ctx.privateState.lineEpoch] as const,
+  quoteAmount: (ctx: { privateState: PrivateState }) => [ctx.privateState, ctx.privateState.quoteAmount] as const,
+  drawAmount: (ctx: { privateState: PrivateState }) => [ctx.privateState, ctx.privateState.drawAmount] as const,
+  redeemAmount: (ctx: { privateState: PrivateState }) => [ctx.privateState, ctx.privateState.redeemAmount] as const,
+  repayAmount: (ctx: { privateState: PrivateState }) => [ctx.privateState, ctx.privateState.repayAmount] as const,
+  quoteMerchantPk: (ctx: { privateState: PrivateState }) => [ctx.privateState, ctx.privateState.quoteMerchantPk] as const,
 };
 
 export function blankPrivate(overrides: Partial<PrivateState> = {}): PrivateState {
@@ -62,6 +80,14 @@ export function blankPrivate(overrides: Partial<PrivateState> = {}): PrivateStat
     noteSalt: z,
     noteIdentity: z,
     noteQuoteCommit: z,
+    lineLimit: 0n,
+    lineOutstanding: 0n,
+    lineEpoch: 0n,
+    quoteAmount: 0n,
+    drawAmount: 0n,
+    redeemAmount: 0n,
+    repayAmount: 0n,
+    quoteMerchantPk: z,
     ...overrides,
   };
 }
@@ -120,14 +146,14 @@ export type CircuitCall =
   | { name: "registerMerchant"; args: [Uint8Array] }
   | { name: "fundReserve"; args: [bigint] }
   | { name: "withdrawUnencumberedReserve"; args: [bigint] }
-  | { name: "openLine"; args: [bigint, bigint] }
-  | { name: "postQuote"; args: [bigint, bigint] }
-  | { name: "draw"; args: [Uint8Array, bigint, bigint, bigint, bigint, bigint, bigint] }
-  | { name: "redeemDraw"; args: [Uint8Array, bigint, bigint] }
+  | { name: "openLine"; args: [bigint] }
+  | { name: "postQuote"; args: [bigint] }
+  | { name: "draw"; args: [Uint8Array, bigint, bigint] }
+  | { name: "redeemDraw"; args: [Uint8Array, bigint] }
   | { name: "cancelOrExpireNote"; args: [Uint8Array] }
   | { name: "disableMerchant"; args: [Uint8Array] }
   | { name: "withdrawFees"; args: [] }
-  | { name: "acknowledgeRepayment"; args: [bigint, bigint, bigint, bigint, bigint] }
+  | { name: "acknowledgeRepayment"; args: [bigint] }
   | { name: "setStatus"; args: [Status] };
 
 export type CallResult =
@@ -182,7 +208,6 @@ export function firstQuote(ledger: CompactLedger): { Q: Uint8Array; expiry: bigi
 export function quotesOf(ledger: CompactLedger) {
   return [...ledger.quotes].map(([Q, meta]) => ({
     Q,
-    merchantPk: meta.merchantPk,
     expiry: meta.expiry,
     lineGeneration: meta.lineGeneration,
     used: meta.used,
