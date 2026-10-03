@@ -2,9 +2,9 @@
 
 ## 1. Executive Summary
 
-Line is a private revolving credit authorization and settlement prototype engineered for autonomous agents on Midnight Compact (`0.26.0`, toolchain `0.34.0`, runtime `0.19.0`).
+Line is a private spending-guardrail and settlement prototype engineered for autonomous agent fleets on Midnight Compact (`0.26.0`, toolchain `0.34.0`, runtime `0.19.0`).
 
-Wave 2 advances Line from Wave 1 authorization to a complete **Compact Settlement-Accounting Prototype**. In this model, an issuer deposits liquidity into a verifiable reserve pool, an agent proves capacity and issues cryptographically committed, merchant-bound draw notes, and registered merchants redeem those notes directly against the reserve pool without disclosing invoice prices, merchant identities, or agent credit books to the public explorer.
+Wave 2 advances Line from Wave 1 authorization to a complete **Compact Settlement-Accounting Prototype**. In this model, an issuer deposits liquidity into a verifiable reserve pool, an agent proves capacity and issues cryptographically committed, merchant-bound draw notes, and registered merchants redeem those notes directly against the reserve pool. Settled amounts, credit limits, and merchant↔quote linkage are **public on-ledger escrow accounting**; what the protocol keeps private is the secret layer — invoice contents, salts, nonces, merchant/agent secrets, and the agent identity preimage.
 
 This security review itemizes the threat model, formal invariants, attack mitigations, test evidence, and honest operational boundaries.
 
@@ -15,7 +15,7 @@ This security review itemizes the threat model, formal invariants, attack mitiga
 ### 2.1 Role Keys & Authentication
 - **Issuer**: Authenticates `fundReserve`, `withdrawUnencumberedReserve`, `registerMerchant`, `openLine`, `acknowledgeRepayment`, and `setStatus`. Public key is derived via `persistentHash([pad(32, "line:issuer:pk"), sk])`.
 - **Merchants (Merchant A & Merchant B)**: Authenticate `postQuote` and `redeemDraw`. Public keys are derived via `persistentHash([pad(32, "line:merchant:pk"), sk])`. Multiple merchants are tracked on-chain in `registeredMerchants: Map<Bytes<32>, Boolean>`.
-- **Agent**: Authenticates `draw`. Identity is `I = persistentHash([pad(32, "line:id"), sk])`. Credit limits $L$ and outstanding balances $B$ are kept exclusively in the agent's private store.
+- **Agent**: Authenticates `draw`. Identity is `I = persistentHash([pad(32, "line:id"), sk])`. Credit limits $L$ and outstanding balances $B$ are **public circuit parameters** (`openLine`, `draw`, `acknowledgeRepayment`); what stays in the agent's private store is the secret identity preimage (`sk`), note salts, and nonces.
 
 ### 2.2 Instance-Level Domain Separation
 Cross-contract replays are eliminated by binding every commitment, nullifier, and quote to a contract-specific domain tag:
@@ -53,8 +53,8 @@ where `instanceNonce` is an immutable 32-byte nonce passed to the contract const
    Every agent `draw` asserts that $\text{withdrawableReserve} \ge A$ in-circuit before incrementing $\text{encumberedReserve}$ by $A$.
 4. **Non-Replayable Merchant Redemption**:
    A draw note $D$ can be redeemed at most once. Redemption spends $N_{\text{redeem}}$ into `nullifiers` and flips `note.redeemed = true`.
-5. **Role-Separated Merchant Ownership**:
-   The `NoteMeta` stored on the ledger stores only amount, status, expiry, and generation—**never** the merchant's public key. The merchant's identity is sealed within the private note preimage and proven in zero-knowledge via $sk_{\text{merchant}} \to \text{merchantPk}$. Merchant B cannot redeem a note issued to Merchant A.
+5. **Role-Separated Merchant Ownership (NoteMeta-scoped)**:
+   The `NoteMeta` stored on the ledger stores only amount, status, expiry, and generation—**never** the merchant's public key. Merchant B cannot redeem a note issued to Merchant A: redemption proves in-circuit that the caller's secret derives the `merchantPk` bound inside the private note preimage. **Scope note:** this invariant is narrowly true for `NoteMeta` only. Merchant identity IS publicly recorded in `quotes: Map<Bytes<32>, QuoteMeta>` (`QuoteMeta.merchantPk`), and a draw's public `quoteCommitPublic` input links note $D$ to quote $Q$ on-ledger — so the merchant↔quote↔note counterparty chain is publicly linkable. What stays sealed: merchant secrets and the preimage opening itself.
 6. **Anti-Rug Issuer Protection**:
    An issuer attempting to drain reserves via `withdrawUnencumberedReserve` is constrained by the remaining unencumbered balance. Active merchant notes are strictly protected.
 7. **Expiry & Cancellation Safety**:
@@ -114,5 +114,11 @@ After every step, the model tester verifies all 10 invariants simultaneously. Th
 2. **Asset Transfer vs Settlement Accounting**:
    - Wave 2 implements exact Compact on-chain settlement accounting.
    - It does not make live token payouts (Night / Dust tokens) on a live Midnight Testnet node.
-3. **Timing Leakage**:
-   - The public ledger displays `actionClock` increments and transitions $C \to C'$. Observers can see that an operation occurred, but cannot deduce the amount, counterparty, or balances.
+3. **Timing & Amount Leakage**:
+   - The public ledger displays `actionClock` increments and transitions $C \to C'$. Observers can see that an operation occurred.
+   - Unlike earlier drafts of this document claimed, observers **can** see settled amounts: `NoteMeta.amount` is public ledger state, `encumberedReserve`/`redeemedReserve` deltas are visible per draw/redeem, and $L$/$B$ are public circuit parameters. The merchant↔quote↔note chain is publicly linkable via `QuoteMeta.merchantPk` and `quoteCommitPublic`.
+   - What observers cannot deduce: secrets, salts, nonces, the agent identity preimage, quote contents (invoice IDs, nonces), and the reasoning behind any draw or failure.
+4. **Advisory expiry — issuer trusted not to grind `actionClock` (H4)**:
+   - `actionClock` is a **transaction counter, not a clock**: every circuit increments it by 1, and anyone can spam cheap transactions (`fundReserve(1)`, `postQuote`, …) to advance it.
+   - `cancelOrExpireNote` is permissionless and requires only `meta.expiry <= actionClock`. An issuer (or any grinder) can therefore push the counter past a note's `expiry`, cancel the note, release the encumbered reserve, and withdraw it — unilaterally destroying a merchant's redemption right.
+   - Expiry is therefore **advisory** in Wave 2: the issuer is trusted not to grind. Production hardening (block-height binding or merchant-countersigned grace window) is Wave 3 scope.

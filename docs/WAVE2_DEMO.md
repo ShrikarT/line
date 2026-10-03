@@ -1,8 +1,8 @@
 # WAVE2_DEMO.md — Line Wave 2 Narrative & Scripted Flow
 
 Line Wave 2 implements a 19-step end-to-end lifecycle demonstration across four distinct roles:
-1. **Issuer Desk**: Underwrites credit, funds the settlement reserve pool, registers merchants, confirms off-chain cash repayment, and freezes/reopens credit status.
-2. **Merchant A Desk**: Posts opaque quotes, receives private draw notes, and redeems notes against issuer reserves.
+1. **Issuer Desk**: Issues agent budgets, funds the settlement reserve pool, registers merchants, confirms off-chain cash repayment, and freezes/reopens budget status.
+2. **Merchant A Desk**: Posts opaque quotes, receives merchant-bound draw notes, and redeems notes against issuer reserves.
 3. **Merchant B Desk**: Demonstrates multi-merchant isolation, posts quotes, receives notes, and demonstrates failure when attempting cross-merchant note theft.
 4. **Agent Console**: Keeps credit limit $L=150$ and balance $B$ completely private, clears invoices within limit, and issues merchant-bound draw notes.
 5. **Public Explorer**: Discloses only public status, reserve pool totals, anonymous note commitments, action clock progression, and nullifiers. Credit books ($L, B, A$), merchant names, and counterparty bindings are never revealed.

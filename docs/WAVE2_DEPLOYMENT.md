@@ -33,7 +33,7 @@ compact compile --skip-zk contracts/line.compact contracts/managed/line
 
 ### Rationale
 1. **Compilation Speed & Asset Size**:
-   Full ZK proving keys for 10 circuits generate hundreds of megabytes of `.bincode` constraint matrices and proving keys. Generating and checking these keys into Git repositories would slow down developer onboarding and CI runners.
+   Full ZK proving keys for 12 circuits generate hundreds of megabytes of `.bincode` constraint matrices and proving keys. Generating and checking these keys into Git repositories would slow down developer onboarding and CI runners.
 2. **Simulator Compatibility**:
    The Compact simulator (`@midnight-ntwrk/compact-runtime`) executes circuits in interpreter mode via ZKIR representation, verifying arithmetic constraints, witness proofs, ledger transitions, and state commitments without needing full cryptographic proof generation.
 3. **Reproducibility**:
@@ -95,7 +95,7 @@ npm run dev
 ```
 Open `http://localhost:5173` to access the interactive web desks:
 - `/` — Interactive 19-step narrative
-- `/issuer` — Issuer underwriting and reserve management desk
+- `/issuer` — Finance-admin budget issuance and reserve management desk
 - `/merchant` — Multi-merchant quote posting and note redemption desk
 - `/agent` — Agent private console
 - `/explorer` — Public explorer
