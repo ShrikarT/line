@@ -20,15 +20,19 @@ import {
   type CircuitResult,
   type DrawNote,
   type DrawNotePreimage,
+  type DrawWitness,
   type Ledger,
   type LedgerEvent,
   type LineStatus,
   type LineWitness,
   type MerchantInvoice,
   type NoteRecord,
-  type QuotePreimage,
-  type QuoteRecord,
+  type OpenLineWitness,
+  type PostQuoteWitness,
   type RepayReceipt,
+  type QuotePreimage,
+  type RedeemWitness,
+  type RepayWitness,
 } from "./types.ts";
 
 export const FAIL = {
@@ -62,6 +66,10 @@ export const FAIL = {
   RESERVE_CAPACITY: "insufficient reserve for draw note",
   RESERVE_WITHDRAW: "withdrawal exceeds unencumbered reserve",
   MERCHANT_REGISTERED: "merchant already registered",
+  MERCHANT_DISABLED: "merchant is disabled",
+  UNKNOWN_MERCHANT: "merchant is not in the registry",
+  NO_FEES: "no fees",
+  RESERVE_DEFICIT: "reserve deficit",
   NOTE_NOT_FOUND: "draw note not found",
   NOTE_USED: "draw note already redeemed",
   NOTE_CANCELLED: "draw note is cancelled",
@@ -89,6 +97,15 @@ function getCaller(input: { caller?: string; callerSk?: string }): string {
   return input.callerSk ?? input.caller ?? "";
 }
 
+/**
+ * L7 — known replica bound: amounts in this TypeScript simulator are JS
+ * `number`s, so every Uint<64>-compatible value must be an integer in
+ * [0, 2^53 − 1] (Number.isSafeInteger). The on-chain Compact contract's native
+ * Uint<64> spans the full 2^64 range; the simulator intentionally narrows it to
+ * the lossless float64-integer domain. All protocol entry points enforce this
+ * via assertSafeUint before reaching u64(), so any value ≥ 2^53 is rejected as
+ * a fail result (never silently rounded) — see FAIL.OVERFLOW / fail() paths.
+ */
 function u64(n: number): bigint {
   if (!Number.isInteger(n) || n < 0 || !Number.isSafeInteger(n)) {
     throw new RangeError("not a Uint<64>-compatible integer");
@@ -116,7 +133,6 @@ export function lineCommitment(w: LineWitness): string {
   return toHex(
     lineStateCommit(
       {
-        domain: asBytes32(w.domain),
         identity: asBytes32(w.I),
         limit: u64(w.L),
         outstanding: u64(w.B),
@@ -224,6 +240,7 @@ export function createLedger(params?: {
     totalReserve: 0,
     encumberedReserve: 0,
     redeemedReserve: 0,
+    feeReserve: 0,
     identityCommitment: null,
     lineCommitment: null,
     lineExpiry: 0,
@@ -252,11 +269,6 @@ function isIssuer(ledger: Ledger, callerSecret: string) {
   return issuerPublicKey(callerSecret) === ledger.issuerPubKey;
 }
 
-function isRegisteredMerchant(ledger: Ledger, callerSecret: string) {
-  const pk = merchantPublicKey(callerSecret);
-  return ledger.registeredMerchants[pk] === true;
-}
-
 function opens(w: LineWitness, C: string | null): boolean {
   return C != null && lineCommitment(w) === C;
 }
@@ -281,6 +293,34 @@ export function registerMerchant(
     circuit: "registerMerchant",
     ok: true,
     publicNote: `Merchant registered: ${pubM.slice(0, 8)}...`,
+  });
+  return { ok: true, ledger: next };
+}
+
+/**
+ * Mirror of the Compact `disableMerchant(merchantPk)` circuit (audit L2).
+ *
+ * Issuer-only: sets the merchant's registeredMerchants flag to false. The
+ * merchant STAYS in the registry (membership intact) — only new quotes are
+ * blocked at postQuote; already-posted quotes remain drawable (draw checks
+ * membership only, exactly as the circuit). Re-disabling is idempotent,
+ * exactly as the circuit (no "already disabled" assert).
+ */
+export function disableMerchant(
+  ledger: Ledger,
+  input: { caller: string; merchantPk: string },
+): CircuitResult<{ ledger: Ledger }> {
+  const next = cloneLedger(ledger);
+  if (!isIssuer(next, input.caller)) return fail("AUTH_ISSUER", FAIL.AUTH_ISSUER);
+  const pubM = toHex(asBytes32(input.merchantPk));
+  if (!(pubM in next.registeredMerchants)) {
+    return fail("UNKNOWN_MERCHANT", FAIL.UNKNOWN_MERCHANT);
+  }
+  next.registeredMerchants[pubM] = false;
+  pushEvent(next, {
+    circuit: "disableMerchant",
+    ok: true,
+    publicNote: `Merchant disabled: ${pubM.slice(0, 8)}... New quotes blocked; existing quotes stay drawable.`,
   });
   return { ok: true, ledger: next };
 }
@@ -316,7 +356,8 @@ export function withdrawUnencumberedReserve(
   if (!isIssuer(next, caller)) return fail("AUTH_ISSUER", FAIL.AUTH_ISSUER);
   if (!assertSafeUint(input.amount) || input.amount <= 0) return fail("ZERO", FAIL.ZERO);
 
-  const locked = next.encumberedReserve + next.redeemedReserve;
+  // FEE_SPEC §3: accrued fees are locked — only withdrawFees releases them.
+  const locked = next.encumberedReserve + next.redeemedReserve + next.feeReserve;
   const withdrawable = next.totalReserve - locked;
   if (input.amount > withdrawable) {
     return fail("RESERVE_WITHDRAW", FAIL.RESERVE_WITHDRAW);
@@ -332,37 +373,78 @@ export function withdrawUnencumberedReserve(
   return { ok: true, ledger: next };
 }
 
+/** FEE_SPEC §4: issuer-only release of accrued fees. Accrued fees are locked
+    inside totalReserve — only withdrawFees releases them (withdrawUnencumberedReserve
+    cannot touch them). In this prototype the reserve is an accounting counter
+    (no tokens move), so "payout" means the issuer's accrued-fee claim is released
+    by shrinking totalReserve. */
+export function withdrawFees(
+  ledger: Ledger,
+  input: { caller: string },
+): CircuitResult<{ ledger: Ledger; fees: number }> {
+  const next = cloneLedger(ledger);
+  if (!isIssuer(next, input.caller)) return fail("AUTH_ISSUER", FAIL.AUTH_ISSUER);
+  const f = next.feeReserve;
+  if (f <= 0) return fail("NO_FEES", FAIL.NO_FEES);
+  const locked = next.encumberedReserve + next.redeemedReserve + next.feeReserve;
+  if (next.totalReserve < locked) return fail("RESERVE_DEFICIT", FAIL.RESERVE_DEFICIT);
+  next.totalReserve -= f;
+  next.feeReserve = 0;
+  pushEvent(next, {
+    circuit: "withdrawFees",
+    ok: true,
+    publicNote: `Issuer withdrew ${f} accrued fees.`,
+    amount: f,
+  });
+  return { ok: true, ledger: next, fees: f };
+}
+
+/**
+ * Mirror of the Compact `openLine(expiry)` circuit.
+ *
+ * Public circuit parameters travel in `input`; the credit limit is a PRIVATE
+ * witness (lineLimit()) supplied in `witness` — it is never a public
+ * parameter, never logged, and never lands on the public ledger. Only the
+ * identity commitment I and the line-state commitment C0 are disclosed.
+ */
 export function openLine(
   ledger: Ledger,
   input: {
     caller?: string;
     callerSk?: string;
     agentSecret: string;
-    limit: number;
+    limit?: number;
     salt?: string;
     expiry: number;
   },
+  witness?: OpenLineWitness,
 ): CircuitResult<{ ledger: Ledger; agent: AgentStore }> {
   const next = cloneLedger(ledger);
   const caller = getCaller(input);
   if (!isIssuer(next, caller)) return fail("AUTH_ISSUER", FAIL.AUTH_ISSUER);
-  if (!assertSafeUint(input.limit) || input.limit <= 0) return fail("LIMIT", FAIL.LIMIT);
-  if (!assertSafeUint(input.expiry) || input.expiry <= next.actionClock) return fail("EXPIRY", FAIL.EXPIRY);
+  const limit = witness?.limit ?? input.limit ?? 0;
+  if (!assertSafeUint(limit) || limit <= 0) return fail("LIMIT", FAIL.LIMIT);
+  // Headroom-2 rule (audit L3), mirroring the circuit: this circuit ends with
+  // actionClock.increment(1), so expiry = clock+1 would pass yet open an
+  // immediately-unusable line. Require expiry > clock+1 (i.e. >= clock+2).
+  if (!assertSafeUint(input.expiry) || input.expiry <= next.actionClock + 1) {
+    return fail("EXPIRY", FAIL.EXPIRY);
+  }
   if (next.status !== "none" && next.status !== "closed") {
     return fail("LINE_EXISTS", FAIL.LINE_EXISTS);
   }
 
   const saltStr = input.salt ?? toHex(randomBytes32());
   const I = identityCommitment(input.agentSecret);
-  const witness: LineWitness = {
+  const lineWitness: LineWitness = {
     domain: next.contractDomain,
     I,
-    L: input.limit,
+    L: limit,
     B: 0,
     e: 0,
     s: toHex(asBytes32(saltStr)),
   };
-  const C = lineCommitment(witness);
+  const C = lineCommitment(lineWitness);
   next.identityCommitment = I;
   next.lineCommitment = C;
   next.lineExpiry = input.expiry;
@@ -377,34 +459,56 @@ export function openLine(
   return {
     ok: true,
     ledger: next,
-    agent: { secret: toHex(asBytes32(input.agentSecret)), witness, identityCommitment: I },
+    agent: { secret: toHex(asBytes32(input.agentSecret)), witness: lineWitness, identityCommitment: I },
   };
 }
 
+/**
+ * Mirror of the Compact `postQuote(expiry)` circuit.
+ *
+ * The invoice amount is a PRIVATE witness (quoteAmount()) supplied in
+ * `witness` — it is never a public parameter and never lands on the ledger.
+ * The stored QuoteRecord mirrors QuoteMeta {expiry, lineGeneration, used}:
+ * NO merchantPk, so the public ledger cannot link merchant<->quote.
+ * The returned preimage is the merchant's private invoice record (off-ledger).
+ */
 export function postQuote(
   ledger: Ledger,
   input: {
     caller?: string;
     callerSk?: string;
     merchantSecret?: string;
-    amount: number;
+    amount?: number;
     invoiceId: string;
     expiry: number;
     nonce?: string;
   },
+  witness?: PostQuoteWitness,
 ): CircuitResult<{ ledger: Ledger; quote: QuotePreimage; Q: string }> {
   const next = cloneLedger(ledger);
   const caller = input.callerSk ?? input.merchantSecret ?? input.caller ?? "";
-  if (!isRegisteredMerchant(next, caller)) return fail("AUTH_MERCHANT", FAIL.AUTH_MERCHANT);
+  const mPk = merchantPublicKey(caller);
+  // Mirror the circuit's assert order: registry MEMBERSHIP ("unregistered
+  // merchant") is asserted before the enabled flag ("merchant disabled").
+  // A disabled merchant stays in the registry — their new quotes are blocked
+  // here, but their already-posted quotes remain drawable.
+  if (!(mPk in next.registeredMerchants)) return fail("AUTH_MERCHANT", FAIL.AUTH_MERCHANT);
+  if (next.registeredMerchants[mPk] !== true) {
+    return fail("MERCHANT_DISABLED", FAIL.MERCHANT_DISABLED);
+  }
   if (next.status !== "open") return fail("STATUS", FAIL.STATUS);
-  if (!assertSafeUint(input.amount) || input.amount <= 0) return fail("ZERO", FAIL.ZERO);
-  if (!assertSafeUint(input.expiry) || input.expiry <= next.actionClock) return fail("EXPIRY", FAIL.EXPIRY);
+  const amount = witness?.amount ?? input.amount ?? 0;
+  if (!assertSafeUint(amount) || amount <= 0) return fail("ZERO", FAIL.ZERO);
+  // Headroom-2 rule (audit L3), mirroring the circuit: expiry must be >
+  // clock+1 so the quote is still drawable after this circuit's clock tick.
+  if (!assertSafeUint(input.expiry) || input.expiry <= next.actionClock + 1) {
+    return fail("EXPIRY", FAIL.EXPIRY);
+  }
 
   const nonce = input.nonce ?? toHex(randomBytes32());
-  const mPk = merchantPublicKey(caller);
   const preimage: QuotePreimage = {
     merchantCommitment: mPk,
-    amount: input.amount,
+    amount,
     invoiceId: toHex(asBytes32(input.invoiceId)),
     expiry: input.expiry,
     nonce: toHex(asBytes32(nonce)),
@@ -414,9 +518,10 @@ export function postQuote(
   if (next.quotes.some((q) => q.commitment === Q)) {
     return fail("QUOTE_USED", "quote commitment already posted");
   }
+  // Public quote meta carries NO merchantPk (audit H3): the merchant is a
+  // private witness inside draw. Only the opaque commitment is public.
   next.quotes.push({
     commitment: Q,
-    merchantPk: mPk,
     expiry: input.expiry,
     lineGeneration: next.lineGeneration,
     used: false,
@@ -430,6 +535,26 @@ export function postQuote(
   return { ok: true, ledger: next, quote: preimage, Q };
 }
 
+/**
+ * Mirror of the Compact `draw(quoteCommitPublic, noteExpiry, fee)` circuit.
+ *
+ * Public circuit parameters travel in `input` (the quote commitment, the note
+ * expiry, and the public issuer fee). EVERYTHING private travels in `witness`:
+ * the line books (lineLimit()/lineOutstanding()/lineEpoch() witnesses) and the
+ * merchant's invoice preimage (invoiceId()/drawAmount()/quoteNonce()/
+ * quoteMerchantPk() witnesses).
+ *
+ * Merchant unlinkability (audit H3): the quote's merchant is NOT read from
+ * public ledger state — the ledger no longer stores it. The agent supplies it
+ * as a witness and the engine proves, exactly as the circuit does:
+ *   (1) the witness (merchantPk, invoiceId, amount, nonce) recomputed with the
+ *       PUBLIC quote meta (expiry, lineGeneration) opens the public Q, and
+ *   (2) the witness merchantPk is on the registeredMerchants allowlist
+ *       (membership only — a disabled merchant's already-posted quotes stay
+ *       drawable, matching the circuit).
+ * The stale-commitment check and the capacity check evaluate over the witness
+ * books exactly as the circuit does.
+ */
 export function draw(
   ledger: Ledger,
   input: {
@@ -440,68 +565,110 @@ export function draw(
     witness?: LineWitness;
     quote?: QuotePreimage;
     invoice?: MerchantInvoice;
+    quoteCommit?: string;
     newSalt?: string;
     noteNonce?: string;
     noteSalt?: string;
     noteExpiry?: number;
+    fee?: number;
   },
+  witness?: DrawWitness,
 ): CircuitResult<{ ledger: Ledger; agent: AgentStore; note: DrawNote }> {
   const next = cloneLedger(ledger);
   if (next.status !== "open") return fail("STATUS", FAIL.STATUS);
   if (!next.lineCommitment) return fail("NO_LINE", FAIL.NO_LINE);
   if (next.lineExpiry <= next.actionClock) return fail("LINE_EXPIRED", FAIL.LINE_EXPIRED);
 
-  const secret = input.callerSk ?? input.agentSecret ?? input.agent?.secret;
+  const secret = input.agentSecret ?? input.agent?.secret ?? input.callerSk ?? input.caller;
   if (!secret) return fail("AUTH_AGENT", FAIL.AUTH_AGENT);
-  const witness = input.witness ?? input.agent?.witness;
-  if (!witness) return fail("STALE", FAIL.STALE);
-  const quote = input.quote ?? input.invoice?.preimage;
-  if (!quote) return fail("QUOTE", FAIL.QUOTE);
+
+  const books = witness?.books ?? input.witness ?? input.agent?.witness;
+  if (!books) return fail("STALE", FAIL.STALE);
 
   const I = identityCommitment(secret);
-  if (I !== witness.I || I !== next.identityCommitment) {
+  if (I !== books.I || I !== next.identityCommitment) {
     return fail("AUTH_AGENT", FAIL.AUTH_AGENT);
   }
-  if (!opens(witness, next.lineCommitment)) {
+  // Stale check over the WITNESS books: lineStateCommit({I,L,B,e}, s) == lineCommit.
+  if (!opens(books, next.lineCommitment)) {
     return fail("STALE", FAIL.STALE);
   }
 
-  const Q = quoteCommitment(quote, next.contractDomain);
+  const wq = witness?.quote ?? input.quote ?? input.invoice?.preimage;
+  if (!wq) return fail("QUOTE", FAIL.QUOTE);
+
+  const Q = input.quoteCommit ?? quoteCommitment(wq, next.contractDomain);
   const live = next.quotes.find((q) => q.commitment === Q);
   if (!live) return fail("QUOTE", FAIL.QUOTE);
   if (live.used) return fail("QUOTE_USED", FAIL.QUOTE_USED);
   if (live.expiry <= next.actionClock) return fail("QUOTE_EXPIRED", FAIL.QUOTE_EXPIRED);
-  if (live.lineGeneration !== next.lineGeneration || quote.generation !== next.lineGeneration) {
+  if (live.lineGeneration !== next.lineGeneration) {
     return fail("QUOTE_GEN", FAIL.QUOTE_GEN);
   }
-  if (live.merchantPk !== quote.merchantCommitment) {
-    return fail("QUOTE_AUTH", FAIL.QUOTE_AUTH);
-  }
-  if (!assertSafeUint(quote.amount) || quote.amount <= 0) {
+
+  // Private invoice witnesses (audit H1/H3).
+  const wMerchantPk = toHex(asBytes32(wq.merchantCommitment));
+  const A = wq.amount;
+  if (!assertSafeUint(A) || A <= 0) {
     return fail("ZERO", FAIL.ZERO);
   }
+  // Quote reconstruction, exactly as the circuit: the witness
+  // (merchantPk, invoiceId, amount, nonce) is recomputed with the PUBLIC quote
+  // meta (expiry, lineGeneration) and must open the public Q. The preimage's
+  // own expiry/generation copies are the merchant's record and are not
+  // consulted — the circuit uses the ledger meta's values.
+  const recon = quoteCommitment(
+    {
+      merchantCommitment: wMerchantPk,
+      invoiceId: toHex(asBytes32(wq.invoiceId)),
+      amount: A,
+      expiry: live.expiry,
+      nonce: toHex(asBytes32(wq.nonce)),
+      generation: live.lineGeneration,
+    },
+    next.contractDomain,
+  );
+  if (recon !== Q) return fail("QUOTE", "quote preimage does not match a live quote");
+  // Registry MEMBERSHIP only (audit L2): a disabled merchant's already-posted
+  // quotes stay drawable; only new quotes are blocked at postQuote.
+  if (!(wMerchantPk in next.registeredMerchants)) {
+    return fail("QUOTE_AUTH", FAIL.QUOTE_AUTH);
+  }
 
-  const { L, B } = witness;
-  const A = quote.amount;
-  if (B < 0 || A > Number.MAX_SAFE_INTEGER - B) return fail("OVERFLOW", FAIL.OVERFLOW);
-  const nextB = B + A;
+  const { L, B, e } = books;
+  // FEE_SPEC §3: cost = amount + fee is charged to the agent's outstanding;
+  // the settlement note encumbers ONLY the invoice amount, the fee accrues to
+  // the issuer's feeReserve. fee = 0 reproduces pre-fee behavior exactly.
+  const f = input.fee ?? 0;
+  if (!assertSafeUint(f)) return fail("AMOUNT", "fee must be a non-negative integer");
+  const cost = A + f;
+  if (cost < A || !assertSafeUint(cost)) return fail("OVERFLOW", FAIL.OVERFLOW); // "fee overflow" guard
+  const nextB = B + cost;
+  if (nextB < B || !assertSafeUint(nextB)) return fail("OVERFLOW", FAIL.OVERFLOW);
   if (nextB > L) return fail("CAPACITY", FAIL.CAPACITY);
-  if (BigInt(nextB) > UINT64_MAX) return fail("OVERFLOW", FAIL.OVERFLOW);
 
-  // Reserve capacity check
-  const locked = next.encumberedReserve + next.redeemedReserve;
-  const withdrawable = next.totalReserve - locked;
-  if (A > withdrawable) {
+  // Reserve capacity check: fee counts toward solvency.
+  const locked = next.encumberedReserve + next.redeemedReserve + next.feeReserve;
+  if (next.totalReserve < locked) return fail("RESERVE_DEFICIT", FAIL.RESERVE_DEFICIT);
+  const free = next.totalReserve - locked; // == unencumberedReserve
+  if (cost > free) {
     return fail("RESERVE_CAPACITY", FAIL.RESERVE_CAPACITY);
   }
 
+  // Headroom-2 rule (audit L3), mirroring the circuit: this circuit ends with
+  // actionClock.increment(1), so noteExpiry = clock+1 would pass yet be
+  // immediately unredeemable. Require noteExpiry > clock+1 (i.e. >= clock+2).
   const noteExp = input.noteExpiry ?? live.expiry;
-  if (noteExp <= next.actionClock) return fail("NOTE_EXPIRED", FAIL.NOTE_EXPIRED);
+  if (!assertSafeUint(noteExp) || noteExp <= next.actionClock + 1) {
+    return fail("NOTE_EXPIRED", FAIL.NOTE_EXPIRED);
+  }
 
   const N = drawNullifier(secret, Q, next.contractDomain);
   if (next.nullifiers.includes(N)) return fail("NULLIFIER", FAIL.NULLIFIER);
 
-  // Construct merchant-bound settlement note
+  // Construct merchant-bound settlement note. The note binds the WITNESS
+  // merchantPk (disclosed inside the circuit as pubM) — the ledger never
+  // learns which merchant this note is for beyond the opaque commitment D.
   const noteNonce = toHex(asBytes32(input.noteNonce ?? randomBytes32()));
   const noteSalt = toHex(asBytes32(input.noteSalt ?? randomBytes32()));
   const notePreimage: DrawNotePreimage = {
@@ -509,7 +676,7 @@ export function draw(
     lineGeneration: next.lineGeneration,
     identity: I,
     quoteCommit: Q,
-    merchantPk: live.merchantPk,
+    merchantPk: wMerchantPk,
     amount: A,
     noteNonce,
     expiry: noteExp,
@@ -525,14 +692,17 @@ export function draw(
     I,
     L,
     B: nextB,
-    e: witness.e + 1,
+    e: e + 1,
     s: toHex(asBytes32(newSalt)),
   };
   const C2 = lineCommitment(nextWitness);
   live.used = true;
   next.lineCommitment = C2;
   next.nullifiers.push(N);
-  next.encumberedReserve += A;
+  next.encumberedReserve += A; // note encumbers ONLY the invoice amount (FEE_SPEC §3)
+  next.feeReserve += f; // fee accrues to the issuer
+  // Settled amounts ARE public escrow accounting (honest boundary): the note
+  // amount and the reserve-counter deltas stay public by design.
   next.notes.push({
     commitment: D,
     amount: A,
@@ -560,6 +730,21 @@ export function draw(
   };
 }
 
+/**
+ * Mirror of the Compact `redeemDraw(noteCommitPublic, noteExpiry)` circuit.
+ *
+ * Public circuit parameters travel in `input` (the note commitment, the note
+ * expiry, and the note salt). The merchant's note preimage travels in
+ * `witness`: its amount is the redeemAmount() witness, asserted against the
+ * PUBLIC NoteMeta.amount ("amount mismatch") — settled amounts are public
+ * escrow accounting (honest boundary), so this check is public-vs-witness,
+ * not witness-vs-witness.
+ *
+ * Exactly as the circuit does, the note opening is recomputed with the PUBLIC
+ * noteExpiry parameter and the PUBLIC note meta's lineGeneration (not the
+ * witness's copies), and the merchantPk is derived from the caller's secret
+ * (callerSecret() witness) rather than trusted from the witness preimage.
+ */
 export function redeemDraw(
   ledger: Ledger,
   input: {
@@ -568,14 +753,17 @@ export function redeemDraw(
     merchantSecret?: string;
     note?: DrawNote;
     noteCommitment?: string;
+    /** PUBLIC noteExpiry circuit parameter — goes into the note preimage. */
+    noteExpiry?: number;
     notePreimage?: DrawNotePreimage;
     noteSalt?: string;
   },
+  witness?: RedeemWitness,
 ): CircuitResult<{ ledger: Ledger; N_redeem: string }> {
   const next = cloneLedger(ledger);
   const caller = input.callerSk ?? input.merchantSecret ?? input.caller ?? "";
   const commitment = input.noteCommitment ?? input.note?.D ?? "";
-  const preimage = input.notePreimage ?? input.note?.preimage;
+  const preimage = witness?.note ?? input.notePreimage ?? input.note?.preimage;
   const salt = input.noteSalt ?? input.note?.salt ?? "";
 
   const live = next.notes.find((n) => n.commitment === commitment);
@@ -585,23 +773,37 @@ export function redeemDraw(
   if (live.expiry <= next.actionClock) return fail("NOTE_EXPIRED", FAIL.NOTE_EXPIRED);
   if (!preimage) return fail("NOTE_AUTH", FAIL.NOTE_AUTH);
 
-  // Check merchant ownership
+  // Merchant proof of ownership: the caller secret derives the merchantPk
+  // bound in the note. Kept as an explicit NOTE_AUTH check (the circuit would
+  // reject via "note opening invalid"; the TS engine reports the finer code).
   const mPk = merchantPublicKey(caller);
-  if (mPk !== preimage.merchantPk) {
+  if (mPk !== toHex(asBytes32(preimage.merchantPk))) {
     return fail("NOTE_AUTH", FAIL.NOTE_AUTH);
   }
+  // Honest boundary: the settled amount is PUBLIC escrow accounting
+  // (NoteMeta.amount); the redeemAmount() witness must equal it.
   if (preimage.amount !== live.amount) {
     return fail("AMOUNT", "note preimage amount mismatch");
   }
-  if (preimage.lineGeneration !== live.lineGeneration) {
-    return fail("QUOTE_GEN", "note preimage generation mismatch");
-  }
-  if (preimage.expiry !== live.expiry) {
-    return fail("EXPIRY", "note preimage expiry mismatch");
-  }
 
-  // Check note opening
-  const computedD = drawNoteCommitment(preimage, salt);
+  const noteExp = input.noteExpiry ?? preimage.expiry ?? live.expiry;
+
+  // Note opening, exactly as the circuit: public noteExpiry and public
+  // meta.lineGeneration go into the preimage; identity/quoteCommit/nonce come
+  // from witnesses; merchantPk is derived from the caller secret.
+  const computedD = drawNoteCommitment(
+    {
+      domain: next.contractDomain,
+      lineGeneration: live.lineGeneration,
+      identity: toHex(asBytes32(preimage.identity)),
+      quoteCommit: toHex(asBytes32(preimage.quoteCommit)),
+      merchantPk: mPk,
+      amount: preimage.amount,
+      noteNonce: toHex(asBytes32(preimage.noteNonce)),
+      expiry: noteExp,
+    },
+    salt,
+  );
   if (computedD !== commitment) {
     return fail("NOTE_OPENING", FAIL.NOTE_OPENING);
   }
@@ -658,6 +860,16 @@ export function cancelOrExpireNote(
   return { ok: true, ledger: next };
 }
 
+/**
+ * Mirror of the Compact `acknowledgeRepayment(receiptExpiry)` circuit.
+ *
+ * Public circuit parameters travel in `input` (only the receipt expiry).
+ * EVERYTHING else is a private witness in `witness`: the line books
+ * (lineLimit()/lineOutstanding()/lineEpoch() witnesses) and the issuer's
+ * repayment receipt (repayAmount()/receiptNonce()/paymentRef() witnesses).
+ * The stale-commitment check and the range check evaluate over the witness
+ * values exactly as the circuit does. The receipt amount is never published.
+ */
 export function acknowledgeRepayment(
   ledger: Ledger,
   input: {
@@ -665,9 +877,11 @@ export function acknowledgeRepayment(
     callerSk?: string;
     agent?: AgentStore;
     witness?: LineWitness;
-    receipt: RepayReceipt;
+    receipt?: RepayReceipt;
     newSalt?: string;
+    receiptExpiry?: number;
   },
+  witness?: RepayWitness,
 ): CircuitResult<{ ledger: Ledger; witness: LineWitness; agent?: AgentStore }> {
   const next = cloneLedger(ledger);
   const caller = getCaller(input);
@@ -676,20 +890,28 @@ export function acknowledgeRepayment(
     return fail("STATUS", FAIL.STATUS);
   }
   if (!next.lineCommitment) return fail("NO_LINE", FAIL.NO_LINE);
-  const witness = input.witness ?? input.agent?.witness;
-  if (!witness) return fail("STALE", FAIL.STALE);
-  if (!opens(witness, next.lineCommitment)) return fail("STALE", FAIL.STALE);
 
-  const r = input.receipt;
+  const books = witness?.books ?? input.witness ?? input.agent?.witness;
+  if (!books) return fail("STALE", FAIL.STALE);
+  // Stale check over the WITNESS books: lineStateCommit({I,L,B,e}, s) == C.
+  if (!opens(books, next.lineCommitment)) return fail("STALE", FAIL.STALE);
+
+  const r = witness?.receipt ?? input.receipt;
+  if (!r) return fail("RECEIPT", FAIL.RECEIPT);
   if (r.contractDomain !== next.contractDomain) return fail("RECEIPT", FAIL.RECEIPT);
-  if (r.identity !== witness.I || r.identity !== next.identityCommitment) {
+  if (r.identity !== books.I || r.identity !== next.identityCommitment) {
     return fail("RECEIPT", FAIL.RECEIPT);
   }
   if (r.currentC !== next.lineCommitment) return fail("RECEIPT_STALE", FAIL.RECEIPT_STALE);
-  if (!assertSafeUint(r.expiry) || r.expiry <= next.actionClock) return fail("EXPIRY", FAIL.EXPIRY);
+  const receiptExpiry = input.receiptExpiry ?? r.expiry;
+  // The circuit checks the PUBLIC receiptExpiry parameter (> actionClock).
+  if (!assertSafeUint(receiptExpiry) || receiptExpiry <= next.actionClock) {
+    return fail("EXPIRY", FAIL.EXPIRY);
+  }
 
+  // Repayment amount is the repayAmount() WITNESS: 0 < R <= B (witness B).
   const R = r.amount;
-  const { B, L, I, e } = witness;
+  const { B, L, I, e } = books;
   if (!assertSafeUint(R) || R <= 0 || R > B) return fail("RECEIPT_RANGE", FAIL.RECEIPT_RANGE);
 
   const N = repayNullifier(r.nonce, I, next.lineCommitment, R, r.paymentRef, next.contractDomain);
@@ -747,15 +969,16 @@ export function simulateDraw(
   ledger: Ledger,
   input: {
     agentSecret: string;
-    witness: LineWitness;
-    quote: QuotePreimage;
+    quoteCommit: string;
     newSalt: string;
     noteNonce?: string;
     noteSalt?: string;
     noteExpiry?: number;
+    fee?: number;
   },
+  witness: DrawWitness,
 ): CircuitResult<{ availableAfter: number }> {
-  const r = draw(ledger, input);
+  const r = draw(ledger, input, witness);
   if (!r.ok) return r;
   const w = r.agent.witness!;
   return { ok: true, availableAfter: w.L - w.B };
@@ -765,11 +988,29 @@ export function available(w: LineWitness): number {
   return w.L - w.B;
 }
 
+/**
+ * The public ledger view — what a chain observer sees.
+ *
+ * PRIVACY BOUNDARY (audit H1/H2/H3): this view MUST NOT expose L, B,
+ * per-quote invoice amounts, or merchant<->quote linkage. The ledger stores no
+ * merchantPk on quotes (QuoteMeta has no such field), and witness values never
+ * flow here.
+ *
+ * PUBLIC BY DESIGN (honest boundary): reserve totals/deltas (total,
+ * encumbered, redeemed, fee), SETTLED note amounts (NoteMeta.amount is public
+ * escrow accounting — see the note-amount delta between encumberedReserve and
+ * redeemedReserve), commitments (I, C, Q, D), nullifiers, the
+ * registered-merchant allowlist, lineExpiry, status, generation, and the
+ * actionClock.
+ */
 export function publicLedgerView(ledger: Ledger): Pick<
   Ledger,
   | "contractDomain"
+  | "issuerPubKey"
+  | "registeredMerchants"
   | "identityCommitment"
   | "lineCommitment"
+  | "lineExpiry"
   | "status"
   | "lineGeneration"
   | "quotes"
@@ -778,22 +1019,30 @@ export function publicLedgerView(ledger: Ledger): Pick<
   | "totalReserve"
   | "encumberedReserve"
   | "redeemedReserve"
+  | "feeReserve"
   | "actionClock"
   | "events"
 > {
   return {
     contractDomain: ledger.contractDomain,
+    issuerPubKey: ledger.issuerPubKey,
+    // Public allowlist by design (audit H3): membership is public, but nothing
+    // here links a merchant to a specific quote or note.
+    registeredMerchants: { ...ledger.registeredMerchants },
     identityCommitment: ledger.identityCommitment,
     lineCommitment: ledger.lineCommitment,
+    lineExpiry: ledger.lineExpiry,
     status: ledger.status,
     lineGeneration: ledger.lineGeneration,
+    // Quote entries carry NO merchantPk and NO amount: opaque commitments only.
     quotes: ledger.quotes.map((q) => ({
       commitment: q.commitment,
-      merchantPk: q.merchantPk,
       expiry: q.expiry,
       lineGeneration: q.lineGeneration,
       used: q.used,
     })),
+    // Settled note amounts ARE public escrow accounting (honest boundary):
+    // NoteMeta.amount and the reserve-counter deltas stay visible by design.
     notes: ledger.notes.map((n) => ({
       commitment: n.commitment,
       amount: n.amount,
@@ -806,6 +1055,7 @@ export function publicLedgerView(ledger: Ledger): Pick<
     totalReserve: ledger.totalReserve,
     encumberedReserve: ledger.encumberedReserve,
     redeemedReserve: ledger.redeemedReserve,
+    feeReserve: ledger.feeReserve,
     actionClock: ledger.actionClock,
     events: ledger.events.map((e) => ({ ...e })),
   };

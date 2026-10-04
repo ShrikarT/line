@@ -27,7 +27,6 @@ const VEC7 = new CompactTypeVector(7, BYTES32);
 const VEC8 = new CompactTypeVector(8, BYTES32);
 
 export type LinePreimage = {
-  domain: Uint8Array;
   identity: Uint8Array;
   limit: bigint;
   outstanding: bigint;
@@ -37,23 +36,18 @@ export type LinePreimage = {
 class LinePreimageType implements CompactType<LinePreimage> {
   alignment() {
     return BYTES32.alignment().concat(
-      BYTES32.alignment().concat(
-        UINT64.alignment().concat(UINT64.alignment().concat(UINT64.alignment())),
-      ),
+      UINT64.alignment().concat(UINT64.alignment().concat(UINT64.alignment())),
     );
   }
   toValue(value: LinePreimage) {
-    return BYTES32.toValue(value.domain).concat(
-      BYTES32.toValue(value.identity).concat(
-        UINT64.toValue(value.limit).concat(
-          UINT64.toValue(value.outstanding).concat(UINT64.toValue(value.epoch)),
-        ),
+    return BYTES32.toValue(value.identity).concat(
+      UINT64.toValue(value.limit).concat(
+        UINT64.toValue(value.outstanding).concat(UINT64.toValue(value.epoch)),
       ),
     );
   }
   fromValue(value: Parameters<CompactType<LinePreimage>["fromValue"]>[0]) {
     return {
-      domain: BYTES32.fromValue(value),
       identity: BYTES32.fromValue(value),
       limit: UINT64.fromValue(value),
       outstanding: UINT64.fromValue(value),
@@ -194,11 +188,11 @@ export const TAG = {
   issuerPk: pad32("line:issuer:pk"),
   merchantPk: pad32("line:merchant:pk"),
   id: pad32("line:id"),
-  domain: pad32("line:protocol:2:domain"),
-  quote: pad32("line:protocol:2:quote"),
-  draw: pad32("line:protocol:2:draw"),
-  redeem: pad32("line:protocol:2:redeem"),
-  repay: pad32("line:protocol:2:repay"),
+  domain: pad32("line:v2:domain"),
+  quote: pad32("line:v2:quote"),
+  draw: pad32("line:v2:draw"),
+  redeem: pad32("line:v2:redeem"),
+  repay: pad32("line:v2:repay"),
 } as const;
 
 export function issuerPublicKey(sk: Uint8Array): Uint8Array {

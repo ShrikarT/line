@@ -4,7 +4,7 @@ Read this before contributing to Line.
 
 ## Product Context
 
-Line is **private revolving credit and checkout infrastructure for autonomous agents**.
+Line is **private revolving credit and checkout infrastructure for autonomous agents** (private spending guardrails for agent fleets).
 An issuer underwrites confidential credit and allocates verifiable reserve capacity. An agent proves in zero-knowledge that an invoice fits remaining capacity ($B + A \le L$) and that reserve backing exists. A merchant receives an issuer-backed, non-replayable private claim note redeemable once against the reserve pool. An issuer-confirmed repayment restores capacity privately.
 
 ## Core Invariants & Rules
@@ -17,8 +17,8 @@ An issuer underwrites confidential credit and allocates verifiable reserve capac
 6. **One-time redemption**: Draw notes can be redeemed at most once using $N_{\text{redeem}} = \text{persistentHash}([\text{pad}_{32}(\text{"line:redeem"}), sk_{\text{merchant}}, D, \text{domain}])$. Double redemption must fail.
 7. **Instance domain separation**: The constructor takes `(issuerPk, initialMerchantPk, instanceNonce: Bytes<32>)` creating unique `contractDomain`.
 8. **Private failure string**: Failed circuits write nothing to public storage. Any failed draw surfaces: `"Clearance could not be proven."`
-9. **Private books**: Limits $L$, balances $B$, and remaining capacity remain hidden. Note settlement claim amounts $A$ and reserve deltas are public on-chain metadata as documented in `docs/PRIVACY.md`.
-10. **10 Circuits only**: `registerMerchant`, `fundReserve`, `withdrawUnencumberedReserve`, `openLine`, `postQuote`, `draw`, `redeemDraw`, `cancelOrExpireNote`, `acknowledgeRepayment`, `setStatus`.
+9. **Privacy story (witness-private):** credit limit $L$, outstanding $B$, epoch, per-quote invoice amounts, and merchant↔quote↔note linkage are HIDDEN in ZK witnesses — never in public inputs or ledger state. PUBLIC BY DESIGN: reserve totals and their deltas, settled note amounts (`NoteMeta.amount`), commitments ($Q$, $D$, $C$), nullifiers, the registered-merchant allowlist, `actionClock`, and fee amounts.
+10. **12 Circuits**: `registerMerchant`, `disableMerchant`, `fundReserve`, `withdrawUnencumberedReserve`, `withdrawFees`, `openLine`, `postQuote`, `draw`, `redeemDraw`, `cancelOrExpireNote`, `acknowledgeRepayment`, `setStatus`.
 
 ## File Map
 

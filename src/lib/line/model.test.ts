@@ -14,7 +14,7 @@ import {
   withdrawUnencumberedReserve,
 } from "./protocol.ts";
 import type { AgentStore, DrawNote, Ledger, QuotePreimage } from "./types.ts";
-import { AGENT_SK, INSTANCE_NONCE, ISSUER_SK, MERCHANT_A_SK, MERCHANT_B_SK } from "../../test/fixtures/keys.ts";
+import { AGENT_SK, INSTANCE_NONCE, ISSUER_SK, MERCHANT_A_PK, MERCHANT_A_SK, MERCHANT_B_SK } from "../../test/fixtures/keys.ts";
 
 function assertInvariants(ledger: Ledger, agent: AgentStore | null) {
   // 1. Solvency: encumberedReserve + redeemedReserve <= totalReserve
@@ -104,13 +104,16 @@ describe("deterministic state-machine model invariant tests", () => {
         case 2: {
           // Open line (if none or closed)
           const limit = (rand(3) + 1) * 100;
-          const r = openLine(ledger, {
-            caller: ISSUER_SK,
-            agentSecret: AGENT_SK,
-            limit,
-            salt: `salt-step-${step}`,
-            expiry: 50_000,
-          });
+          const r = openLine(
+            ledger,
+            {
+              caller: ISSUER_SK,
+              agentSecret: AGENT_SK,
+              salt: `salt-step-${step}`,
+              expiry: 50_000,
+            },
+            { limit },
+          );
           if (r.ok) {
             ledger = r.ledger;
             agent = r.agent;
@@ -121,13 +124,16 @@ describe("deterministic state-machine model invariant tests", () => {
           // Merchant posts quote
           const merchant = rand(2) === 0 ? MERCHANT_A_SK : MERCHANT_B_SK;
           const amount = (rand(4) + 1) * 20;
-          const r = postQuote(ledger, {
-            caller: merchant,
-            amount,
-            invoiceId: `inv-${step}`,
-            expiry: 50_000,
-            nonce: `nonce-${step}`,
-          });
+          const r = postQuote(
+            ledger,
+            {
+              caller: merchant,
+              invoiceId: `inv-${step}`,
+              expiry: 50_000,
+              nonce: `nonce-${step}`,
+            },
+            { amount },
+          );
           if (r.ok) {
             ledger = r.ledger;
             quotes.push({ quote: r.quote, Q: r.Q });
@@ -138,14 +144,17 @@ describe("deterministic state-machine model invariant tests", () => {
           // Agent draws against a live quote
           if (agent && agent.witness && quotes.length > 0) {
             const q = quotes.pop()!;
-            const r = draw(ledger, {
-              agentSecret: AGENT_SK,
-              witness: agent.witness,
-              quote: q.quote,
-              newSalt: `salt-draw-${step}`,
-              noteNonce: `nn-${step}`,
-              noteSalt: `ns-${step}`,
-            });
+            const r = draw(
+              ledger,
+              {
+                agentSecret: AGENT_SK,
+                quoteCommit: q.Q,
+                newSalt: `salt-draw-${step}`,
+                noteNonce: `nn-${step}`,
+                noteSalt: `ns-${step}`,
+              },
+              { books: agent.witness, quote: q.quote },
+            );
             if (r.ok) {
               ledger = r.ledger;
               agent = r.agent;
@@ -158,12 +167,16 @@ describe("deterministic state-machine model invariant tests", () => {
           // Merchant redeems note
           if (notes.length > 0) {
             const n = notes.pop()!;
-            const r = redeemDraw(ledger, {
-              caller: n.preimage.merchantPk === MERCHANT_A_SK ? MERCHANT_A_SK : MERCHANT_B_SK,
-              noteCommitment: n.D,
-              notePreimage: n.preimage,
-              noteSalt: n.salt,
-            });
+            const r = redeemDraw(
+              ledger,
+              {
+                caller: n.preimage.merchantPk === MERCHANT_A_PK ? MERCHANT_A_SK : MERCHANT_B_SK,
+                noteCommitment: n.D,
+                noteExpiry: n.preimage.expiry,
+                noteSalt: n.salt,
+              },
+              { note: n.preimage },
+            );
             if (r.ok) ledger = r.ledger;
           }
           break;
@@ -181,12 +194,15 @@ describe("deterministic state-machine model invariant tests", () => {
               expiry: 50_000,
               contractDomain: ledger.contractDomain,
             };
-            const r = acknowledgeRepayment(ledger, {
-              caller: ISSUER_SK,
-              witness: agent.witness,
-              receipt: rcpt,
-              newSalt: `salt-repay-${step}`,
-            });
+            const r = acknowledgeRepayment(
+              ledger,
+              {
+                caller: ISSUER_SK,
+                newSalt: `salt-repay-${step}`,
+                receiptExpiry: rcpt.expiry,
+              },
+              { books: agent.witness, receipt: rcpt },
+            );
             if (r.ok) {
               ledger = r.ledger;
               agent.witness = r.witness;

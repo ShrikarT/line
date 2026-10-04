@@ -10,6 +10,9 @@
  *   line.draw           agent draws and issues private settlement note
  *   line.note.status    status of issued draw notes
  *   line.redeem         merchant redeems draw note against issuer reserve
+ *   line.expireNote     cancel an expired note, releasing encumbered reserve
+ *   line.withdrawFees   issuer releases accrued draw fees
+ *   line.disableMerchant issuer disables a merchant (blocks new quotes only)
  *   line.repay          issuer acknowledges repayment
  *
  * State file: .line-mcp-state.json in the working directory.
@@ -61,7 +64,10 @@ const tools = [
       "Attempt a private draw against an opaque quote commitment already posted on the local ledger.",
     inputSchema: {
       type: "object",
-      properties: { quoteId: { type: "string" } },
+      properties: {
+        quoteId: { type: "string" },
+        fee: { type: "number", description: "Optional issuer fee (public Uint<64>). Defaults to 0." },
+      },
       required: ["quoteId"],
     },
   },
@@ -86,6 +92,33 @@ const tools = [
     },
   },
   {
+    name: "line.expireNote",
+    description: "Cancel an expired draw note, releasing its encumbered reserve back to withdrawable.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        noteCommitment: { type: "string" },
+      },
+      required: ["noteCommitment"],
+    },
+  },
+  {
+    name: "line.withdrawFees",
+    description: "Issuer releases accrued draw fees from the fee reserve.",
+    inputSchema: { type: "object", properties: {} },
+  },
+  {
+    name: "line.disableMerchant",
+    description:
+      "Issuer disables a registered merchant: blocks their new quotes; already-posted quotes stay drawable.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        merchantPk: { type: "string", description: "Merchant public key (hex). Defaults to merchant B." },
+      },
+    },
+  },
+  {
     name: "line.repay",
     description: "Issuer acknowledges an off-chain repayment and restores capacity.",
     inputSchema: {
@@ -106,7 +139,9 @@ function writeState(state) {
 }
 
 function publicStatus(ledger) {
-  const locked = (ledger.encumberedReserve ?? 0) + (ledger.redeemedReserve ?? 0);
+  // FEE_SPEC §1: feeReserve is part of the locked set.
+  const locked =
+    (ledger.encumberedReserve ?? 0) + (ledger.redeemedReserve ?? 0) + (ledger.feeReserve ?? 0);
   const withdrawable = Math.max(0, (ledger.totalReserve ?? 0) - locked);
   return {
     status: ledger.status,
@@ -118,6 +153,7 @@ function publicStatus(ledger) {
     totalReserve: ledger.totalReserve,
     encumberedReserve: ledger.encumberedReserve,
     redeemedReserve: ledger.redeemedReserve,
+    feeReserve: ledger.feeReserve ?? 0,
     withdrawableReserve: withdrawable,
     quotes: (ledger.quotes ?? []).map((q) => ({
       commitment: q.commitment,
@@ -137,7 +173,39 @@ function publicStatus(ledger) {
   };
 }
 
+const HEX64 = /^[0-9a-fA-F]{64}$/;
+
+/**
+ * M5: asBytes32/pad32 throw on inputs whose UTF-8 bytes exceed 32 (unless the
+ * input is exactly 64 hex chars). Pre-validate every string that will be
+ * encoded so a bad input yields a clean {ok:false} instead of a crash.
+ */
+function fitsBytes32(value) {
+  if (typeof value !== "string") return false;
+  const clean = value.startsWith("0x") ? value.slice(2) : value;
+  if (HEX64.test(clean)) return true;
+  return new TextEncoder().encode(value).length <= 32;
+}
+
 export async function handleMessage(msg) {
+  // L10: JSON-RPC notifications (no id, e.g. notifications/initialized) must
+  // receive NO response — not even an error.
+  const isNotification = msg == null || msg.id === undefined || msg.id === null;
+  if (isNotification) return undefined;
+
+  try {
+    return await dispatch(msg);
+  } catch (err) {
+    // M5: never crash the stdio server on a throwing handler — report -32603.
+    return {
+      jsonrpc: "2.0",
+      id: msg.id ?? null,
+      error: { code: -32603, message: `internal error: ${err?.message ?? String(err)}` },
+    };
+  }
+}
+
+async function dispatch(msg) {
   const protocol = await import("../src/lib/line/protocol.ts");
   const demo = await import("../src/dev/demo.ts");
   const encoding = await import("../src/lib/line/encoding.ts");
@@ -167,7 +235,16 @@ export async function handleMessage(msg) {
   const args = msg.params?.arguments ?? {};
 
   if (name === "line.seed") {
+    // L10: guard against non-numeric/NaN step — snapshotAt(NaN) would return a
+    // step-0 snapshot mislabeled with step: NaN.
     const step = Number(args.step ?? 0);
+    if (!Number.isInteger(step) || step < 0 || step > 18) {
+      return {
+        jsonrpc: "2.0",
+        id: msg.id,
+        result: { content: [{ type: "text", text: JSON.stringify({ ok: false, message: "step must be an integer 0–18" }) }] },
+      };
+    }
     const snap = demo.snapshotAt(step);
     writeState({
       ledger: snap.ledger,
@@ -222,11 +299,15 @@ export async function handleMessage(msg) {
         jsonrpc: "2.0",
         id: msg.id,
         result: {
-          content: [{ type: "text", text: JSON.stringify({ total: 0, encumbered: 0, redeemed: 0, withdrawable: 0 }) }],
+          content: [{ type: "text", text: JSON.stringify({ total: 0, encumbered: 0, redeemed: 0, feeReserve: 0, withdrawable: 0 }) }],
         },
       };
     }
-    const locked = (state.ledger.encumberedReserve ?? 0) + (state.ledger.redeemedReserve ?? 0);
+    // FEE_SPEC §1: feeReserve is part of the locked set.
+    const locked =
+      (state.ledger.encumberedReserve ?? 0) +
+      (state.ledger.redeemedReserve ?? 0) +
+      (state.ledger.feeReserve ?? 0);
     const withdrawable = Math.max(0, (state.ledger.totalReserve ?? 0) - locked);
     return {
       jsonrpc: "2.0",
@@ -239,6 +320,7 @@ export async function handleMessage(msg) {
               totalReserve: state.ledger.totalReserve,
               encumberedReserve: state.ledger.encumberedReserve,
               redeemedReserve: state.ledger.redeemedReserve,
+              feeReserve: state.ledger.feeReserve ?? 0,
               withdrawableReserve: withdrawable,
             }),
           },
@@ -257,13 +339,35 @@ export async function handleMessage(msg) {
       };
     }
     const merchantSecret = args.merchantSecret ?? keys.MERCHANT_A_SK;
-    const r = protocol.postQuote(state.ledger, {
-      caller: merchantSecret,
-      amount: Number(args.amount),
-      invoiceId: String(args.invoiceId),
-      expiry: state.ledger.actionClock + 10_000,
-      nonce: encoding.toHex(encoding.randomBytes32()),
-    });
+    const invoiceId = String(args.invoiceId);
+    // M5: >32-byte invoiceId used to crash the stdio server via pad32 overflow.
+    // Validate lengths up front so it returns a clean {ok:false} instead.
+    if (!fitsBytes32(invoiceId)) {
+      return {
+        jsonrpc: "2.0",
+        id: msg.id,
+        result: { content: [{ type: "text", text: JSON.stringify({ ok: false, message: "invoiceId exceeds 32 bytes" }) }] },
+      };
+    }
+    if (!fitsBytes32(merchantSecret)) {
+      return {
+        jsonrpc: "2.0",
+        id: msg.id,
+        result: { content: [{ type: "text", text: JSON.stringify({ ok: false, message: "merchantSecret is not a valid 32-byte secret" }) }] },
+      };
+    }
+    const r = protocol.postQuote(
+      state.ledger,
+      {
+        caller: merchantSecret,
+        invoiceId,
+        expiry: state.ledger.actionClock + 10_000,
+        nonce: encoding.toHex(encoding.randomBytes32()),
+      },
+      // The invoice amount is a private witness: Q commits to it, but it is
+      // never a public parameter and never lands on the ledger.
+      { amount: Number(args.amount) },
+    );
     if (!r.ok) {
       return {
         jsonrpc: "2.0",
@@ -274,7 +378,7 @@ export async function handleMessage(msg) {
     state.ledger = r.ledger;
     state.invoices = state.invoices ?? [];
     state.invoices.push({
-      invoiceId: String(args.invoiceId),
+      invoiceId,
       amount: Number(args.amount),
       Q: r.Q,
       used: false,
@@ -312,14 +416,19 @@ export async function handleMessage(msg) {
         },
       };
     }
-    const r = protocol.draw(state.ledger, {
-      agentSecret: state.agent.secret,
-      witness: state.agent.witness,
-      quote: inv.preimage,
-      newSalt: encoding.toHex(encoding.randomBytes32()),
-      noteNonce: encoding.toHex(encoding.randomBytes32()),
-      noteSalt: encoding.toHex(encoding.randomBytes32()),
-    });
+    const r = protocol.draw(
+      state.ledger,
+      {
+        agentSecret: state.agent.secret,
+        // PUBLIC: the opaque quote commitment. Books + invoice preimage are witnesses.
+        quoteCommit: inv.Q,
+        newSalt: encoding.toHex(encoding.randomBytes32()),
+        noteNonce: encoding.toHex(encoding.randomBytes32()),
+        noteSalt: encoding.toHex(encoding.randomBytes32()),
+        fee: args.fee === undefined ? 0 : Number(args.fee),
+      },
+      { books: state.agent.witness, quote: inv.preimage },
+    );
     if (!r.ok) {
       return {
         jsonrpc: "2.0",
@@ -391,12 +500,18 @@ export async function handleMessage(msg) {
     const merchantSecret =
       args.merchantSecret ??
       (note.preimage.merchantPk === keys.MERCHANT_B_PK ? keys.MERCHANT_B_SK : keys.MERCHANT_A_SK);
-    const r = protocol.redeemDraw(state.ledger, {
-      caller: merchantSecret,
-      noteCommitment: note.D,
-      notePreimage: note.preimage,
-      noteSalt: note.salt,
-    });
+    const r = protocol.redeemDraw(
+      state.ledger,
+      {
+        caller: merchantSecret,
+        noteCommitment: note.D,
+        // PUBLIC noteExpiry circuit parameter: the expiry committed in the note.
+        noteExpiry: note.preimage.expiry,
+        noteSalt: note.salt,
+      },
+      // The note preimage (incl. the redeemAmount() witness) is private.
+      { note: note.preimage },
+    );
     if (!r.ok) {
       return {
         jsonrpc: "2.0",
@@ -427,6 +542,128 @@ export async function handleMessage(msg) {
     };
   }
 
+  if (name === "line.expireNote") {
+    const state = readState();
+    const target = String(args.noteCommitment ?? "");
+    if (!state || !target) {
+      return {
+        jsonrpc: "2.0",
+        id: msg.id,
+        result: { content: [{ type: "text", text: JSON.stringify({ ok: false, message: "No active ledger or note commitment" }) }] },
+      };
+    }
+    const r = protocol.cancelOrExpireNote(state.ledger, { noteCommitment: target });
+    if (!r.ok) {
+      return {
+        jsonrpc: "2.0",
+        id: msg.id,
+        result: { content: [{ type: "text", text: JSON.stringify({ ok: false, message: r.reason }) }] },
+      };
+    }
+    state.ledger = r.ledger;
+    writeState(state);
+    return {
+      jsonrpc: "2.0",
+      id: msg.id,
+      result: {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({
+              ok: true,
+              public: publicStatus(r.ledger),
+              message: "Expired note cancelled. Encumbered reserve released.",
+            }),
+          },
+        ],
+      },
+    };
+  }
+
+  if (name === "line.withdrawFees") {
+    const state = readState();
+    if (!state) {
+      return {
+        jsonrpc: "2.0",
+        id: msg.id,
+        result: { content: [{ type: "text", text: JSON.stringify({ ok: false, message: "No active ledger" }) }] },
+      };
+    }
+    const r = protocol.withdrawFees(state.ledger, { caller: keys.ISSUER_SK });
+    if (!r.ok) {
+      return {
+        jsonrpc: "2.0",
+        id: msg.id,
+        result: { content: [{ type: "text", text: JSON.stringify({ ok: false, message: r.reason }) }] },
+      };
+    }
+    state.ledger = r.ledger;
+    writeState(state);
+    return {
+      jsonrpc: "2.0",
+      id: msg.id,
+      result: {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({
+              ok: true,
+              fees: r.fees,
+              public: publicStatus(r.ledger),
+              message: "Accrued fees released to issuer.",
+            }),
+          },
+        ],
+      },
+    };
+  }
+
+  if (name === "line.disableMerchant") {
+    const state = readState();
+    if (!state) {
+      return {
+        jsonrpc: "2.0",
+        id: msg.id,
+        result: { content: [{ type: "text", text: JSON.stringify({ ok: false, message: "No active ledger" }) }] },
+      };
+    }
+    const merchantPk = args.merchantPk ?? keys.MERCHANT_B_PK;
+    // M5: bad input must yield a clean {ok:false}, not a crash in asBytes32.
+    if (!fitsBytes32(merchantPk)) {
+      return {
+        jsonrpc: "2.0",
+        id: msg.id,
+        result: { content: [{ type: "text", text: JSON.stringify({ ok: false, message: "merchantPk is not a valid 32-byte value" }) }] },
+      };
+    }
+    const r = protocol.disableMerchant(state.ledger, { caller: keys.ISSUER_SK, merchantPk });
+    if (!r.ok) {
+      return {
+        jsonrpc: "2.0",
+        id: msg.id,
+        result: { content: [{ type: "text", text: JSON.stringify({ ok: false, message: r.reason }) }] },
+      };
+    }
+    state.ledger = r.ledger;
+    writeState(state);
+    return {
+      jsonrpc: "2.0",
+      id: msg.id,
+      result: {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({
+              ok: true,
+              merchantPk,
+              note: "Merchant disabled. New quotes from this merchant are blocked; already-posted quotes stay drawable.",
+            }),
+          },
+        ],
+      },
+    };
+  }
+
   if (name === "line.repay") {
     const state = readState();
     if (!state?.agent?.witness || !state.ledger.lineCommitment) {
@@ -446,12 +683,16 @@ export async function handleMessage(msg) {
       expiry: state.ledger.actionClock + 10_000,
       contractDomain: state.ledger.contractDomain,
     };
-    const r = protocol.acknowledgeRepayment(state.ledger, {
-      caller: keys.ISSUER_SK,
-      witness: state.agent.witness,
-      receipt: rcpt,
-      newSalt: encoding.toHex(encoding.randomBytes32()),
-    });
+    const r = protocol.acknowledgeRepayment(
+      state.ledger,
+      {
+        caller: keys.ISSUER_SK,
+        newSalt: encoding.toHex(encoding.randomBytes32()),
+        // PUBLIC receiptExpiry circuit parameter. Books + receipt are witnesses.
+        receiptExpiry: rcpt.expiry,
+      },
+      { books: state.agent.witness, receipt: rcpt },
+    );
     if (!r.ok) {
       return {
         jsonrpc: "2.0",
@@ -471,7 +712,8 @@ export async function handleMessage(msg) {
     };
   }
 
-  return { jsonrpc: "2.0", id: msg.id, error: { code: -32601, message: "unknown tool" } };
+  // L10: unknown tool name is invalid params (-32602), not method-not-found.
+  return { jsonrpc: "2.0", id: msg.id, error: { code: -32602, message: `unknown tool: ${name}` } };
 }
 
 const isMain = Boolean(process.argv[1]) && fileURLToPath(import.meta.url) === process.argv[1];
@@ -486,6 +728,8 @@ if (isMain) {
       return;
     }
     const res = await handleMessage(msg);
+    // L10: notifications get no response — handleMessage returns undefined.
+    if (res === undefined) return;
     process.stdout.write(JSON.stringify(res) + "\n");
   });
 }

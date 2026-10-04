@@ -8,12 +8,12 @@ Autonomous AI agents need instantaneous purchasing power for compute, APIs, and 
 
 ## Slide 2 — The Solution: Line
 
-Line delivers **private revolving credit and checkout infrastructure for autonomous agents**.
+Line delivers **private revolving credit and checkout infrastructure for autonomous agents** (private spending guardrails for agent fleets).
 
-- **Issuer**: Underwrites confidential credit facilities and allocates verifiable reserve capacity.
-- **Agent**: Evaluates purchase invoices and proves in zero-knowledge that $B + A \le L$ without disclosing credit limits or current balances.
+- **Issuer (Finance Admin)**: Underwrites confidential credit facilities and allocates verifiable reserve capacity in the pool.
+- **Agent**: Evaluates purchase invoices and proves in zero-knowledge that $B + A + F \le L$ and reserve solvency without disclosing credit limits or current balances.
 - **Merchant**: Receives an issuer-backed, non-replayable claim note redeemable once against the issuer's reserve.
-- **Public Explorer**: Verifies mathematical reserve solvency, commitment transitions ($C \to C'$), and spent nullifiers—never private credit books.
+- **Public Explorer**: Verifies mathematical reserve solvency, commitment transitions ($C \to C'$), and spent nullifiers — never private credit books.
 
 Revolving credit and checkout infrastructure, not a simple wallet spend cap.
 
@@ -21,7 +21,7 @@ Revolving credit and checkout infrastructure, not a simple wallet spend cap.
 
 Confidential limit $L = 150$, Reserve pool 500.
 
-1. Line opens — explorer records commitment $C_0$, concealing the 150 limit.
+1. Line opens — budget $L = 150$ supplied as a private witness, never published; explorer shows only commitment $C_0$.
 2. Merchant A posts opaque invoice quote $Q_{40}$.
 3. Agent draws 40: claim note $D_1$ issued; 40 reserve encumbered on-chain.
 4. **Attack 1**: Merchant B attempts to steal and redeem $D_1$ -> **Rejected in zero-knowledge**.

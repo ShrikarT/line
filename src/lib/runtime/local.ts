@@ -20,6 +20,7 @@ import {
   setStatus,
   issuerPublicKey,
   merchantPublicKey,
+  quoteCommitment,
 } from "../line/protocol.ts";
 
 export class LocalDevelopmentRuntime implements LineRuntime {
@@ -188,12 +189,32 @@ export class LocalDevelopmentRuntime implements LineRuntime {
     quoteNonce: string;
     noteNonce: string;
     noteSalt: string;
+    merchantPk?: string;
   }): Promise<RuntimeTransactionResult> {
     const quoteRec = this.ledger.quotes.find((q) => q.commitment === params.quoteCommit);
     if (!quoteRec) return { ok: false, error: "Clearance could not be proven.", code: "QUOTE_NOT_FOUND" };
 
+    let merchantCommitment = params.merchantPk ?? "";
+    if (!merchantCommitment) {
+      const match = Object.keys(this.ledger.registeredMerchants).find((pk) => {
+        const testCommit = quoteCommitment(
+          {
+            merchantCommitment: pk,
+            amount: params.amount,
+            invoiceId: params.invoiceId,
+            expiry: params.expiry,
+            nonce: params.quoteNonce,
+            generation: quoteRec.lineGeneration,
+          },
+          this.ledger.contractDomain
+        );
+        return testCommit === params.quoteCommit;
+      });
+      if (match) merchantCommitment = match;
+    }
+
     const quotePreimage = {
-      merchantCommitment: quoteRec.merchantPk,
+      merchantCommitment,
       amount: params.amount,
       invoiceId: params.invoiceId,
       expiry: params.expiry,
