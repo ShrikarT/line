@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { snapshotAt } from "./demo.ts";
+import { snapshotAt } from "../../dev/demo.ts";
 
 describe("scripted demo snapshots", () => {
   it("step 1 registers Merchant B", () => {

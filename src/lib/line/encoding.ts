@@ -27,6 +27,7 @@ const VEC7 = new CompactTypeVector(7, BYTES32);
 const VEC8 = new CompactTypeVector(8, BYTES32);
 
 export type LinePreimage = {
+  domain: Uint8Array;
   identity: Uint8Array;
   limit: bigint;
   outstanding: bigint;
@@ -36,18 +37,23 @@ export type LinePreimage = {
 class LinePreimageType implements CompactType<LinePreimage> {
   alignment() {
     return BYTES32.alignment().concat(
-      UINT64.alignment().concat(UINT64.alignment().concat(UINT64.alignment())),
+      BYTES32.alignment().concat(
+        UINT64.alignment().concat(UINT64.alignment().concat(UINT64.alignment())),
+      ),
     );
   }
   toValue(value: LinePreimage) {
-    return BYTES32.toValue(value.identity).concat(
-      UINT64.toValue(value.limit).concat(
-        UINT64.toValue(value.outstanding).concat(UINT64.toValue(value.epoch)),
+    return BYTES32.toValue(value.domain).concat(
+      BYTES32.toValue(value.identity).concat(
+        UINT64.toValue(value.limit).concat(
+          UINT64.toValue(value.outstanding).concat(UINT64.toValue(value.epoch)),
+        ),
       ),
     );
   }
   fromValue(value: Parameters<CompactType<LinePreimage>["fromValue"]>[0]) {
     return {
+      domain: BYTES32.fromValue(value),
       identity: BYTES32.fromValue(value),
       limit: UINT64.fromValue(value),
       outstanding: UINT64.fromValue(value),
@@ -147,6 +153,20 @@ export function fromHex(hex: string): Uint8Array {
   return out;
 }
 
+export function hexToBytes(hex: string): Uint8Array {
+  const clean = hex.startsWith("0x") ? hex.slice(2) : hex;
+  if (clean.length % 2 !== 0 || !/^[0-9a-fA-F]*$/.test(clean)) {
+    throw new Error("Invalid hex string");
+  }
+  const out = new Uint8Array(clean.length / 2);
+  for (let i = 0; i < out.length; i++) {
+    out[i] = Number.parseInt(clean.slice(i * 2, i * 2 + 2), 16);
+  }
+  return out;
+}
+
+export const bytesToHex = toHex;
+
 export function encodeU64(n: bigint): Uint8Array {
   if (n < 0n || n > 18446744073709551615n) {
     throw new Error("Uint<64> out of range");
@@ -174,11 +194,11 @@ export const TAG = {
   issuerPk: pad32("line:issuer:pk"),
   merchantPk: pad32("line:merchant:pk"),
   id: pad32("line:id"),
-  domain: pad32("line:v2:domain"),
-  quote: pad32("line:v2:quote"),
-  draw: pad32("line:v2:draw"),
-  redeem: pad32("line:v2:redeem"),
-  repay: pad32("line:v2:repay"),
+  domain: pad32("line:protocol:2:domain"),
+  quote: pad32("line:protocol:2:quote"),
+  draw: pad32("line:protocol:2:draw"),
+  redeem: pad32("line:protocol:2:redeem"),
+  repay: pad32("line:protocol:2:repay"),
 } as const;
 
 export function issuerPublicKey(sk: Uint8Array): Uint8Array {
@@ -261,3 +281,21 @@ export function shortHex(hex: string, n = 8): string {
   if (hex.length <= n * 2 + 1) return hex;
   return `${hex.slice(0, n)}…${hex.slice(-n)}`;
 }
+
+/**
+ * Deterministic canonical invoice ID encoding:
+ * If a 64-character (32-byte) hex string, decodes directly to bytes.
+ * Otherwise, encodes ASCII/UTF-8 string padded to 32 bytes with zeros.
+ */
+export function canonicalInvoiceIdBytes(invoiceId: string): Uint8Array {
+  const clean = invoiceId.startsWith("0x") ? invoiceId.slice(2) : invoiceId;
+  if (/^[0-9a-fA-F]{64}$/.test(clean)) {
+    return fromHex(clean);
+  }
+  return pad32(invoiceId);
+}
+
+export function canonicalInvoiceIdHex(invoiceId: string): string {
+  return toHex(canonicalInvoiceIdBytes(invoiceId));
+}
+

@@ -14,7 +14,7 @@ import {
   withdrawUnencumberedReserve,
 } from "./protocol.ts";
 import type { AgentStore, DrawNote, Ledger, QuotePreimage } from "./types.ts";
-import { AGENT_SK, INSTANCE_NONCE, ISSUER_SK, MERCHANT_A_SK, MERCHANT_B_SK } from "./keys.ts";
+import { AGENT_SK, INSTANCE_NONCE, ISSUER_SK, MERCHANT_A_SK, MERCHANT_B_SK } from "../../test/fixtures/keys.ts";
 
 function assertInvariants(ledger: Ledger, agent: AgentStore | null) {
   // 1. Solvency: encumberedReserve + redeemedReserve <= totalReserve

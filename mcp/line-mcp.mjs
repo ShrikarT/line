@@ -139,9 +139,9 @@ function publicStatus(ledger) {
 
 export async function handleMessage(msg) {
   const protocol = await import("../src/lib/line/protocol.ts");
-  const demo = await import("../src/lib/line/demo.ts");
+  const demo = await import("../src/dev/demo.ts");
   const encoding = await import("../src/lib/line/encoding.ts");
-  const keys = await import("../src/lib/line/keys.ts");
+  const keys = await import("../src/test/fixtures/keys.ts");
 
   if (msg.method === "initialize") {
     return {

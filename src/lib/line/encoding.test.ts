@@ -15,7 +15,8 @@ import {
   repayNullifier,
   toHex,
 } from "./encoding.ts";
-import { DEMO, boot, call, firstQuote, readLedger } from "./compact-harness.ts";
+import { boot, call, firstQuote, readLedger } from "./compact-harness.ts";
+import { DEMO } from "../../test/fixtures/keys.ts";
 import {
   createLedger,
   draw,
@@ -28,7 +29,7 @@ import {
   quoteCommitment,
   redeemDraw,
 } from "./protocol.ts";
-import { AGENT_SK, INSTANCE_NONCE, ISSUER_SK, MERCHANT_A_SK, MERCHANT_B_SK } from "./keys.ts";
+import { AGENT_SK, INSTANCE_NONCE, ISSUER_SK, MERCHANT_A_SK, MERCHANT_B_SK } from "../../test/fixtures/keys.ts";
 
 describe("browser-safe hex", () => {
   it("round-trips 32-byte values without Node Buffer", () => {
@@ -102,7 +103,7 @@ describe("cross-language commitment vectors", () => {
     assert.equal(opened.ledger.lineGeneration, 1n);
     const I = agentId(DEMO.agent);
     const C0 = lineStateCommit(
-      { identity: I, limit: 150n, outstanding: 0n, epoch: 0n },
+      { domain: opened.ledger.contractDomain, identity: I, limit: 150n, outstanding: 0n, epoch: 0n },
       pad32("salt-0"),
     );
     assert.equal(toHex(opened.ledger.identityCommit), toHex(I));
@@ -214,7 +215,7 @@ describe("cross-language commitment vectors", () => {
     assert.ok(redNulls.includes(toHex(Nredeem)));
 
     const C1 = lineStateCommit(
-      { identity: I, limit: 150n, outstanding: 40n, epoch: 1n },
+      { domain: quoted.ledger.contractDomain, identity: I, limit: 150n, outstanding: 40n, epoch: 1n },
       pad32("salt-1"),
     );
     assert.equal(toHex(drawn.ledger.lineCommit), toHex(C1));
@@ -250,6 +251,21 @@ describe("cross-language commitment vectors", () => {
     if (!ack.ok) throw new Error("ack failed");
     const ns = [...ack.ledger.nullifiers].map(toHex);
     assert.ok(ns.includes(toHex(Nrepay)));
+  });
+
+  it("identical I, L, B, epoch, salt under different contract domains produce different C", () => {
+    const I = agentId(DEMO.agent);
+    const domainA = pad32("domain-A");
+    const domainB = pad32("domain-B");
+    const CA = lineStateCommit(
+      { domain: domainA, identity: I, limit: 150n, outstanding: 0n, epoch: 0n },
+      pad32("salt-0"),
+    );
+    const CB = lineStateCommit(
+      { domain: domainB, identity: I, limit: 150n, outstanding: 0n, epoch: 0n },
+      pad32("salt-0"),
+    );
+    assert.notEqual(toHex(CA), toHex(CB));
   });
 
   it("TypeScript reference engine uses the same encodings as Compact", () => {
