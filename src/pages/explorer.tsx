@@ -6,8 +6,9 @@ import { Mono } from "@/components/line/ui";
 
 
 export function ExplorerPage() {
-  const quotes = useLine((s) => s.ledger.quotes);
-  const nullifiers = useLine((s) => s.ledger.nullifiers);
+  const ledger = useLine((s) => s.ledger);
+  const quotes = (ledger as any).quotes ?? [];
+  const nullifiers = (ledger as any).nullifiers ?? [];
 
   return (
     <Shell>
@@ -19,7 +20,7 @@ export function ExplorerPage() {
               {quotes.length === 0 ? (
                 <li className="text-sm text-subtle">None</li>
               ) : (
-                quotes.map((q) => (
+                quotes.map((q: any) => (
                   <li key={q.commitment} className="text-sm">
                     <Mono value={q.commitment} />{" "}
                     <span className="text-subtle">{q.used ? "used" : "open"}</span>
@@ -33,7 +34,7 @@ export function ExplorerPage() {
               {nullifiers.length === 0 ? (
                 <li className="text-sm text-subtle">None</li>
               ) : (
-                nullifiers.map((n) => (
+                nullifiers.map((n: any) => (
                   <li key={n}>
                     <Mono value={n} />
                   </li>
