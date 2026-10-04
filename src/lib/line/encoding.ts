@@ -147,6 +147,20 @@ export function fromHex(hex: string): Uint8Array {
   return out;
 }
 
+export function hexToBytes(hex: string): Uint8Array {
+  const clean = hex.startsWith("0x") ? hex.slice(2) : hex;
+  if (clean.length % 2 !== 0 || !/^[0-9a-fA-F]*$/.test(clean)) {
+    throw new Error("Invalid hex string");
+  }
+  const out = new Uint8Array(clean.length / 2);
+  for (let i = 0; i < out.length; i++) {
+    out[i] = Number.parseInt(clean.slice(i * 2, i * 2 + 2), 16);
+  }
+  return out;
+}
+
+export const bytesToHex = toHex;
+
 export function encodeU64(n: bigint): Uint8Array {
   if (n < 0n || n > 18446744073709551615n) {
     throw new Error("Uint<64> out of range");
@@ -261,3 +275,21 @@ export function shortHex(hex: string, n = 8): string {
   if (hex.length <= n * 2 + 1) return hex;
   return `${hex.slice(0, n)}…${hex.slice(-n)}`;
 }
+
+/**
+ * Deterministic canonical invoice ID encoding:
+ * If a 64-character (32-byte) hex string, decodes directly to bytes.
+ * Otherwise, encodes ASCII/UTF-8 string padded to 32 bytes with zeros.
+ */
+export function canonicalInvoiceIdBytes(invoiceId: string): Uint8Array {
+  const clean = invoiceId.startsWith("0x") ? invoiceId.slice(2) : invoiceId;
+  if (/^[0-9a-fA-F]{64}$/.test(clean)) {
+    return fromHex(clean);
+  }
+  return pad32(invoiceId);
+}
+
+export function canonicalInvoiceIdHex(invoiceId: string): string {
+  return toHex(canonicalInvoiceIdBytes(invoiceId));
+}
+

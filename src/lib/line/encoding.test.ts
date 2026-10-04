@@ -15,7 +15,8 @@ import {
   repayNullifier,
   toHex,
 } from "./encoding.ts";
-import { DEMO, blankPrivate, boot, call, firstQuote, readLedger } from "./compact-harness.ts";
+import { blankPrivate, boot, call, firstQuote, readLedger } from "./compact-harness.ts";
+import { DEMO } from "../../test/fixtures/keys.ts";
 import {
   createLedger,
   draw,
@@ -28,7 +29,7 @@ import {
   quoteCommitment,
   redeemDraw,
 } from "./protocol.ts";
-import { AGENT_SK, INSTANCE_NONCE, ISSUER_SK, MERCHANT_A_SK, MERCHANT_B_SK } from "./keys.ts";
+import { AGENT_SK, INSTANCE_NONCE, ISSUER_SK, MERCHANT_A_SK, MERCHANT_B_SK } from "../../test/fixtures/keys.ts";
 
 describe("browser-safe hex", () => {
   it("round-trips 32-byte values without Node Buffer", () => {
@@ -262,6 +263,31 @@ describe("cross-language commitment vectors", () => {
     if (!ack.ok) throw new Error("ack failed");
     const ns = [...ack.ledger.nullifiers].map(toHex);
     assert.ok(ns.includes(toHex(Nrepay)));
+  });
+
+  it("identical quote parameters under different contract domains produce different Q", () => {
+    const mPk = merchantPublicKey(DEMO.merchantA);
+    const domainA = pad32("domain-A");
+    const domainB = pad32("domain-B");
+    const QA = quoteCommit({
+      merchantPk: mPk,
+      invoiceId: pad32("inv-40"),
+      amount: 40n,
+      expiry: 1000n,
+      nonce: pad32("n40"),
+      generation: 1n,
+      domain: domainA,
+    });
+    const QB = quoteCommit({
+      merchantPk: mPk,
+      invoiceId: pad32("inv-40"),
+      amount: 40n,
+      expiry: 1000n,
+      nonce: pad32("n40"),
+      generation: 1n,
+      domain: domainB,
+    });
+    assert.notEqual(toHex(QA), toHex(QB));
   });
 
   it("TypeScript reference engine uses the same encodings as Compact", () => {

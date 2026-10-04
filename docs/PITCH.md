@@ -1,42 +1,43 @@
-# Pitch — Line
+# Product Pitch: Line
 
-## Slide 1 — Problem
+## Slide 1 — The Problem
 
-Autonomous AI agents need instantaneous purchasing power for compute, APIs, and data.
-- Prefunded agent wallets trap scarce liquidity and create massive theft targets.
-- Public credit books leak competitive strategy: observers farm merchant counterparties, agent utilization, and trade frequency.
+Autonomous AI agents need instantaneous purchasing power for compute, APIs, and micro-services.
+- Prefunded agent wallets fragment scarce liquidity and create high-risk theft targets.
+- Corporate cards and public credit lines leak commercial secrets: competitors and merchants observe credit limits, utilization rates, cash flows, and trade frequency.
 
-## Slide 2 — Product
+## Slide 2 — The Solution: Line
 
-Line delivers **private spending guardrails for autonomous agent fleets** — corporate cards for AI agents, Midnight-private.
+Line delivers **private revolving credit and checkout infrastructure for autonomous agents** (private spending guardrails for agent fleets).
 
-- **Finance Admin (Issuer)**: Issues capped agent budgets and deposits liquidity into an auditable reserve pool. No underwriting — budgets are policy, not credit risk.
-- **Agent**: Proves `outstanding + invoice ≤ limit` and reserve solvency in-circuit, without exposing its strategy: which invoices it chose, quote contents, or identity secrets.
-- **Merchant**: Receives a cryptographically-bound draw note redeemable once against the reserve pool.
-- **Public Explorer**: Sees verified reserve solvency, settled amounts, commitment progression, and nullifiers — never secrets, salts, or identity preimages.
+- **Issuer (Finance Admin)**: Underwrites confidential credit facilities and allocates verifiable reserve capacity in the pool.
+- **Agent**: Evaluates purchase invoices and proves in zero-knowledge that $B + A + F \le L$ and reserve solvency without disclosing credit limits or current balances.
+- **Merchant**: Receives an issuer-backed, non-replayable claim note redeemable once against the issuer's reserve.
+- **Public Explorer**: Verifies mathematical reserve solvency, commitment transitions ($C \to C'$), and spent nullifiers — never private credit books.
 
-Private budget guardrails with reserve accounting, not a credit line.
+Revolving credit and checkout infrastructure, not a simple wallet spend cap.
 
-## Slide 3 — Demo (19 Real Steps)
+## Slide 3 — The Lifecycle & Attack Resilience
 
-Private limit $L = 150$, Reserve pool 500.
+Confidential limit $L = 150$, Reserve pool 500.
 
-1. Line opens — budget $L = 150$ supplied as a private witness, never published; explorer shows only the $C_0$ commitment.
-2. Merchant A posts opaque quote $Q_{40}$.
-3. Agent draws 40: note $D_1$ issued, 40 reserve encumbered.
-4. **Attack 1**: Merchant B tries to steal and redeem $D_1$ -> **Rejected in ZK**.
+1. Line opens — budget $L = 150$ supplied as a private witness, never published; explorer shows only commitment $C_0$.
+2. Merchant A posts opaque invoice quote $Q_{40}$.
+3. Agent draws 40: claim note $D_1$ issued; 40 reserve encumbered on-chain.
+4. **Attack 1**: Merchant B attempts to steal and redeem $D_1$ -> **Rejected in zero-knowledge**.
 5. Merchant A redeems $D_1$: 40 shifts from encumbered to redeemed reserve.
 6. **Attack 2**: Merchant A attempts double-redemption -> **Rejected by nullifier**.
 7. Merchant B posts quote 120.
-8. Agent draws 120 -> **Rejected**: $40 + 120 > 150$.
-9. Issuer acknowledges 40 repayment: agent balance restored to 0.
-10. Agent draws 120: note $D_2$ issued, 120 reserve encumbered.
+8. Agent draws 120 -> **Rejected**: $40 + 120 > 150$ with generic clearance error.
+9. Issuer acknowledges 40 repayment: agent revolving capacity restored.
+10. Agent draws 120: note $D_2$ issued; 120 reserve encumbered.
 11. **Attack 3**: Issuer tries to withdraw encumbered funds -> **Rejected: locked backing**.
 12. Merchant B redeems $D_2$: 120 claimed from reserve.
-13. Issuer freezes line to DEFAULTED. Subsequent draws fail.
+13. Issuer transitions line to DEFAULTED. Subsequent draws halt immediately.
 
-## Slide 4 — Wave 2 Honesty & Reality
+## Slide 4 — Architecture & Technical Maturity
 
-- **Exact Compact Settlement Accounting**: Formal on-chain reserve pool, encumbered reserve tracking, merchant-bound draw notes, and redemption nullifiers.
-- **Real Compact 0.26 Code**: Compiles with Compact toolchain 0.34.0 into ZKIR and managed TypeScript bindings.
-- **Honest Boundary**: Local simulator prototype. No unverified Preprod contract addresses or live token disbursements claimed.
+- **Compact Smart Contract**: Formal on-chain reserve capacity, encumbered claims tracking, merchant-bound draw notes, and redemption nullifiers.
+- **Real Compact 0.26 Code**: Compiles with Compact toolchain 0.34.0 into ZKIR and managed TypeScript bindings with zero drift.
+- **Model-Checked Invariants**: 50 pseudo-random transitions verifying all 10 protocol and reserve invariants.
+- **Production Runtime Architecture**: Seamless pluggability between `MidnightNetworkRuntime`, `LocalDevelopmentRuntime`, and `InMemoryTestRuntime`.

@@ -1,23 +1,23 @@
 @import "tailwindcss";
 
 @theme {
-  --color-bg: #0a0a0b;
-  --color-elevated: #121214;
-  --color-subtle-fill: #1a1a1e;
-  --color-fg: #f4f4f5;
-  --color-muted: #a1a1aa;
-  --color-subtle: #71717a;
-  --color-border: color-mix(in oklab, #f4f4f5 12%, transparent);
-  --color-accent: #c8ccd4;
-  --color-accent-fg: #0a0a0b;
-  --color-ok: #8fbfa8;
-  --color-danger: #d4a09a;
-  --font-display: "Segoe UI", system-ui, -apple-system, sans-serif;
-  --font-sans: "Segoe UI", system-ui, -apple-system, sans-serif;
+  --color-bg: #090a0c;
+  --color-elevated: #111318;
+  --color-subtle-fill: #181b22;
+  --color-fg: #f8fafc;
+  --color-muted: #94a3b8;
+  --color-subtle: #64748b;
+  --color-border: #1f242f;
+  --color-accent: #0f766e;
+  --color-accent-fg: #ffffff;
+  --color-ok: #10b981;
+  --color-danger: #f43f5e;
+  --font-display: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-sans: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
   --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-xl: 24px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-xl: 16px;
   --motion-quick: 150ms;
   --motion-fast: 250ms;
 }

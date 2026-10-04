@@ -10,8 +10,8 @@ import {
   registerMerchant,
   setStatus,
   withdrawUnencumberedReserve,
-} from "./protocol.ts";
-import type { AgentStore, DrawNote, Ledger, MerchantInvoice, QuotePreimage } from "./types.ts";
+} from "../lib/line/protocol.ts";
+import type { AgentStore, DrawNote, Ledger, MerchantInvoice, QuotePreimage } from "../lib/line/types.ts";
 import {
   AGENT_SK,
   INSTANCE_NONCE,
@@ -20,7 +20,7 @@ import {
   MERCHANT_A_SK,
   MERCHANT_B_PK,
   MERCHANT_B_SK,
-} from "./keys.ts";
+} from "../test/fixtures/keys.ts";
 
 export const DEMO_STEPS = [
   {
@@ -154,6 +154,7 @@ export type DemoSnapshot = {
   wrongMerchantRan: boolean;
   doubleRedeemRan: boolean;
   withdrawBlockedRan: boolean;
+  staleWitness?: any;
 };
 
 function expiry(ledger: Ledger) {
@@ -179,6 +180,7 @@ export function snapshotAt(step: number): DemoSnapshot {
   let wrongMerchantRan = false;
   let doubleRedeemRan = false;
   let withdrawBlockedRan = false;
+  let staleWitness: any = null;
 
   let q40: { quote: QuotePreimage; Q: string } | null = null;
   let note1: DrawNote | null = null;
@@ -239,6 +241,7 @@ export function snapshotAt(step: number): DemoSnapshot {
   // Step 5: Agent draws 40 -> note D1. Q is the public commitment; the books
   // and the invoice preimage are private witnesses.
   if (n >= 5 && agent && q40) {
+    staleWitness = agent.witness;
     const d = draw(
       ledger,
       {
@@ -503,5 +506,6 @@ export function snapshotAt(step: number): DemoSnapshot {
     wrongMerchantRan,
     doubleRedeemRan,
     withdrawBlockedRan,
+    staleWitness,
   };
 }

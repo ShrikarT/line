@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
-  DEMO,
   Status,
   blankPrivate,
   boot,
@@ -16,6 +15,7 @@ import {
   type PrivateState,
   type Session,
 } from "./compact-harness.ts";
+import { DEMO } from "../../test/fixtures/keys.ts";
 import {
   agentId,
   contractDomain,
@@ -903,6 +903,63 @@ describe("compact simulator: cross-instance replay rejection", () => {
     );
     assert.equal(rB.ok, false);
     assert.match(rB.error, /note not found/);
+  });
+
+  it("identical quote parameters under different contract domains produce different Q", async () => {
+    const sA = await genesis(pad32("inst:A"));
+    const sB = await genesis(pad32("inst:B"));
+    const LA = readLedger(sA);
+    const LB = readLedger(sB);
+    const mPk = merchantPublicKey(DEMO.merchantA);
+    const QA = quoteCommit({
+      merchantPk: mPk,
+      invoiceId: pad32("inv-40"),
+      amount: 40n,
+      expiry: EXPIRY,
+      nonce: pad32("n40"),
+      generation: 1n,
+      domain: LA.contractDomain,
+    });
+    const QB = quoteCommit({
+      merchantPk: mPk,
+      invoiceId: pad32("inv-40"),
+      amount: 40n,
+      expiry: EXPIRY,
+      nonce: pad32("n40"),
+      generation: 1n,
+      domain: LB.contractDomain,
+    });
+    assert.notEqual(toHex(QA), toHex(QB));
+  });
+
+  it("line-state opening from instance A fails in instance B even with identical keys", async () => {
+    const sA = await genesis(pad32("inst:A"));
+    const sB = await genesis(pad32("inst:B"));
+
+    const oA = await opened(sA);
+    const oB = await opened(sB);
+
+    // Merchant posts quote on instance B
+    const qB = await quoted(40n, "inv-40", "n40", oB.session);
+    const QB = firstQuote(qB.ledger)!.Q;
+
+    // Agent attempts to use quote QB from instance B on instance A: fails because quote does not exist on instance A
+    const dA_with_QB = await call(
+      oA.session,
+      ps({
+        callerSecret: DEMO.issuer,
+        agentSecret: DEMO.agent,
+        salt: pad32("salt-0"),
+        newSalt: pad32("salt-1"),
+        invoiceId: pad32("inv-40"),
+        quoteNonce: pad32("n40"),
+        noteNonce: pad32("nn-40"),
+        noteSalt: pad32("ns-40"),
+      }),
+      { name: "draw", args: [QB, EXPIRY, 0n] },
+    );
+    assert.equal(dA_with_QB.ok, false);
+    assert.match(dA_with_QB.error, /quote/);
   });
 });
 

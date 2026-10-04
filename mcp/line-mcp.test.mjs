@@ -3,7 +3,7 @@ import { describe, it, before } from "node:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { MERCHANT_A_PK } from "../src/lib/line/keys.ts";
+import { MERCHANT_A_PK } from "../src/test/fixtures/keys.ts";
 
 describe("MCP interface", () => {
   let handleMessage;
@@ -15,7 +15,7 @@ describe("MCP interface", () => {
     ({ handleMessage } = await import("./line-mcp.mjs"));
   });
 
-  it("lists all 11 Wave 2 tools", async () => {
+  it("lists all 11 Line protocol MCP tools", async () => {
     const res = await handleMessage({ jsonrpc: "2.0", id: 1, method: "tools/list" });
     const names = res.result.tools.map((t) => t.name);
     assert.ok(names.includes("line.status"));
@@ -59,7 +59,7 @@ describe("MCP interface", () => {
   });
 
   it("seed + draw note lifecycle through MCP tools", async () => {
-    // Step 5 in Wave 2 demo is after draw 40: Note D1 is issued
+    // Step 5 in reference flow is after draw 40: Note D1 is issued
     const seedRes = await handleMessage({
       jsonrpc: "2.0",
       id: 4,
@@ -124,7 +124,7 @@ describe("MCP interface", () => {
     const noteD = notesList[0].commitment;
 
     // Wrong merchant redemption rejection
-    const { MERCHANT_B_SK } = await import("../src/lib/line/keys.ts");
+    const { MERCHANT_B_SK } = await import("../src/test/fixtures/keys.ts");
     const wrongRedeem = await handleMessage({
       jsonrpc: "2.0",
       id: 9,
