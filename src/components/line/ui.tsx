@@ -1,6 +1,7 @@
 import { cn } from "@/lib/utils";
 import { shortHex } from "@/lib/line/hash.ts";
 import { useLine, type Flash } from "@/lib/line/store.ts";
+import { getRuntime } from "@/lib/runtime";
 
 export function Panel({
   title,
@@ -51,9 +52,9 @@ export function Button({
       onClick={onClick}
       className={cn(
         "inline-flex min-h-11 items-center justify-center rounded-md px-4 text-sm font-medium transition-transform duration-[var(--motion-quick)] enabled:active:scale-[0.98] disabled:opacity-40",
-        variant === "primary" && "bg-accent text-accent-fg",
-        variant === "ghost" && "border border-border bg-transparent text-fg",
-        variant === "danger" && "border border-danger/40 text-danger",
+        variant === "primary" && "bg-accent text-accent-fg hover:opacity-90 transition-opacity",
+        variant === "ghost" && "border border-border bg-transparent text-fg hover:bg-elevated transition-colors",
+        variant === "danger" && "border border-danger/40 text-danger hover:bg-danger/10 transition-colors",
       )}
     >
       {children}
@@ -98,11 +99,12 @@ export function FlashBar({ flash }: { flash: Flash | null }) {
   );
 }
 
-export function ResetRow() {
-  const reset = useLine((s) => s.reset);
-  return (
-    <Button variant="ghost" onClick={reset}>
-      Reset ledger
+export function ResetRow({ onReset }: { onReset?: () => void } = {}) {
+  const runtime = getRuntime();
+  if (runtime.mode === "network") return null;
+  return onReset ? (
+    <Button variant="ghost" onClick={onReset}>
+      Reset simulator
     </Button>
-  );
+  ) : null;
 }

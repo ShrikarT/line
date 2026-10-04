@@ -10,3 +10,6 @@ coverage
 .compact-keys
 proving-keys
 *.pk
+*.prover
+test-results/
+playwright-report/
