@@ -1,20 +1,20 @@
 # Line Product Roadmap
 
-Private revolving credit and checkout infrastructure for autonomous agents.
+Private revolving credit and checkout infrastructure for autonomous agents (private spending guardrails for agent fleets).
 
 ---
 
 ## Current Release (v0.3.0) — Private Credit Authorization & Settlement Accounting Platform
 - **Status:** Shipped & Verified.
-- **Ten Core Compact Circuits:**
-  `registerMerchant`, `fundReserve`, `withdrawUnencumberedReserve`, `openLine`, `postQuote`, `draw`, `redeemDraw`, `cancelOrExpireNote`, `acknowledgeRepayment`, `setStatus`.
-- **Private Revolving Balance:** $L$, $B$, and remaining capacity committed in zero-knowledge; never visible on-chain.
-- **Settlement Reserve Accounting:** Verifiable on-chain capacity tracking (`totalReserve`, `encumberedReserve`, `redeemedReserve`, `withdrawableReserve`).
-- **Multi-Merchant Architecture:** Registered merchant pseudonyms, domain-bound quotes, private merchant-bound draw notes, and single-use redemption nullifiers ($N_{\text{redeem}}$).
+- **Twelve Core Compact Circuits:**
+  `registerMerchant`, `disableMerchant`, `fundReserve`, `withdrawUnencumberedReserve`, `withdrawFees`, `openLine`, `postQuote`, `draw`, `redeemDraw`, `cancelOrExpireNote`, `acknowledgeRepayment`, `setStatus`.
+- **Witness-Private Revolving Books:** $L$, $B$, epoch, and per-quote invoice amounts committed in zero-knowledge witnesses; never visible on-chain.
+- **Settlement Reserve Accounting:** Verifiable on-chain capacity tracking (`totalReserve`, `encumberedReserve`, `redeemedReserve`, `feeReserve`, `withdrawableReserve`).
+- **Multi-Merchant Architecture & Unlinkability:** Registered merchant pseudonyms, domain-bound quotes, private merchant-bound draw notes, allowlist membership proven in ZK, and single-use redemption nullifiers ($N_{\text{redeem}}$).
 - **Contract Domain Separation:** Constructor `instanceNonce` binds all commitments and nullifiers to `contractDomain`.
 - **Runtime Architecture:** `MidnightNetworkRuntime`, `LocalDevelopmentRuntime`, and `InMemoryTestRuntime`.
 - **Client Vault:** WebCrypto AES-GCM 256-bit encrypted storage with PBKDF2-HMAC-SHA256.
-- **Agent Integration:** Standard Model Context Protocol (MCP) server supporting 8 tools over JSON-RPC.
+- **Agent Integration:** Standard Model Context Protocol (MCP) server supporting 11 tools over JSON-RPC.
 - **Machine-Checked Privacy:** Machine-checked privacy inventory (`docs/PRIVACY.md`) and leakage test suite (`src/lib/line/leakage.test.ts`).
 
 ---

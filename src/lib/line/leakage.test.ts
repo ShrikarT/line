@@ -147,10 +147,10 @@ describe("privacy and leakage boundaries", () => {
     });
     assertOk(quoted);
 
-    // Public QuoteMeta contains merchantPk (pseudonym)
+    // Public QuoteMeta does not contain merchantPk (audit H3: unlinkability)
     const quoteMeta = quoted.ledger.quotes.find((q) => q.commitment === quoted.Q);
     assert.ok(quoteMeta, "QuoteMeta exists in ledger array");
-    assert.ok(quoteMeta.merchantPk, "QuoteMeta contains merchantPk pseudonym");
+    assert.equal("merchantPk" in quoteMeta, false, "QuoteMeta must not contain merchantPk");
 
     // Invoice ID and nonce are NOT stored on public ledger
     const serialized = JSON.stringify(quoted.ledger);

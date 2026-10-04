@@ -77,6 +77,7 @@ export interface LineRuntime {
     quoteNonce: string;
     noteNonce: string;
     noteSalt: string;
+    merchantPk?: string;
   }): Promise<RuntimeTransactionResult>;
   redeemDraw(params: {
     noteCommit: string;

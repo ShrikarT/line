@@ -572,10 +572,8 @@ export const useAppStore = create<ProductStoreState>((set, get) => ({
     const salt = toHex(randomBytes32());
     const idBytes = agentId(hexToBytes(agentSecret));
     const identityCommitment = toHex(idBytes);
-    const domainBytes = hexToBytes(get().ledger.contractDomain);
     const c0Bytes = lineStateCommit(
       {
-        domain: domainBytes,
         identity: idBytes,
         limit: BigInt(limit),
         outstanding: 0n,
@@ -849,6 +847,7 @@ export const useAppStore = create<ProductStoreState>((set, get) => ({
         quoteNonce: quote.quoteNonce,
         noteNonce,
         noteSalt,
+        merchantPk: quote.merchantPublicKey,
       });
       if (!res.ok) {
         set({
@@ -862,10 +861,8 @@ export const useAppStore = create<ProductStoreState>((set, get) => ({
       const identityCommitment = toHex(idBytes);
       const newOutstanding = outstanding + quote.amount;
       const newEpoch = epoch + 1;
-      const domainBytes = hexToBytes(get().ledger.contractDomain);
       const newCBytes = lineStateCommit(
         {
-          domain: domainBytes,
           identity: idBytes,
           limit: BigInt(limit),
           outstanding: BigInt(newOutstanding),
@@ -891,6 +888,7 @@ export const useAppStore = create<ProductStoreState>((set, get) => ({
         updatedAt: Date.now(),
       };
 
+      const domainBytes = hexToBytes(get().ledger.contractDomain);
       const dPreimage = {
         domain: domainBytes,
         lineGeneration: BigInt(get().ledger.lineGeneration),
@@ -1225,10 +1223,8 @@ export const useAppStore = create<ProductStoreState>((set, get) => ({
       const identityCommitment = toHex(idBytes);
       const newOutstanding = Math.max(0, outstanding - amount);
       const newEpoch = epoch + 1;
-      const domainBytes = hexToBytes(get().ledger.contractDomain);
       const newCBytes = lineStateCommit(
         {
-          domain: domainBytes,
           identity: idBytes,
           limit: BigInt(limit),
           outstanding: BigInt(newOutstanding),

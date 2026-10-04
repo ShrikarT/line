@@ -6,7 +6,9 @@ export function ExplorerPanel() {
   const total = ledger.totalReserve ?? 0;
   const encumbered = ledger.encumberedReserve ?? 0;
   const redeemed = ledger.redeemedReserve ?? 0;
-  const withdrawable = ledger.withdrawableReserve ?? Math.max(0, total - (encumbered + redeemed));
+  const feeReserve = (ledger as any).feeReserve ?? 0;
+  const locked = encumbered + redeemed + feeReserve;
+  const withdrawable = ledger.withdrawableReserve ?? Math.max(0, total - locked);
 
   const quotesCount = "quoteCount" in ledger ? (ledger as any).quoteCount : (ledger as any).quotes?.length ?? 0;
   const nullifiersCount = "nullifierCount" in ledger ? (ledger as any).nullifierCount : (ledger as any).nullifiers?.length ?? 0;
@@ -32,10 +34,11 @@ export function ExplorerPanel() {
 
       <div className="rounded border border-border bg-surface p-3 space-y-2">
         <p className="text-xs font-semibold uppercase tracking-wider text-muted">On-Chain Settlement Reserve Capacity</p>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
           <Stat label="Total Reserve" value={total} />
           <Stat label="Encumbered" value={encumbered} />
           <Stat label="Redeemed" value={redeemed} />
+          <Stat label="Fee Reserve" value={feeReserve} />
           <Stat label="Withdrawable" value={withdrawable} />
         </div>
       </div>

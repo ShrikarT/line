@@ -23,6 +23,25 @@
       }
     },
     {
+      "name": "disableMerchant",
+      "pure": false,
+      "proof": true,
+      "arguments": [
+        {
+          "name": "merchantPk",
+          "type": {
+            "type-name": "Bytes",
+            "length": 32
+          }
+        }
+      ],
+      "result-type": {
+        "type-name": "Tuple",
+        "types": [
+        ]
+      }
+    },
+    {
       "name": "fundReserve",
       "pure": false,
       "proof": true,
@@ -61,17 +80,22 @@
       }
     },
     {
+      "name": "withdrawFees",
+      "pure": false,
+      "proof": true,
+      "arguments": [
+      ],
+      "result-type": {
+        "type-name": "Tuple",
+        "types": [
+        ]
+      }
+    },
+    {
       "name": "openLine",
       "pure": false,
       "proof": true,
       "arguments": [
-        {
-          "name": "limit",
-          "type": {
-            "type-name": "Uint",
-            "maxval": 18446744073709551615
-          }
-        },
         {
           "name": "expiry",
           "type": {
@@ -91,13 +115,6 @@
       "pure": false,
       "proof": true,
       "arguments": [
-        {
-          "name": "amount",
-          "type": {
-            "type-name": "Uint",
-            "maxval": 18446744073709551615
-          }
-        },
         {
           "name": "expiry",
           "type": {
@@ -125,35 +142,14 @@
           }
         },
         {
-          "name": "limit",
-          "type": {
-            "type-name": "Uint",
-            "maxval": 18446744073709551615
-          }
-        },
-        {
-          "name": "outstanding",
-          "type": {
-            "type-name": "Uint",
-            "maxval": 18446744073709551615
-          }
-        },
-        {
-          "name": "epoch",
-          "type": {
-            "type-name": "Uint",
-            "maxval": 18446744073709551615
-          }
-        },
-        {
-          "name": "amount",
-          "type": {
-            "type-name": "Uint",
-            "maxval": 18446744073709551615
-          }
-        },
-        {
           "name": "noteExpiry",
+          "type": {
+            "type-name": "Uint",
+            "maxval": 18446744073709551615
+          }
+        },
+        {
+          "name": "fee",
           "type": {
             "type-name": "Uint",
             "maxval": 18446744073709551615
@@ -176,13 +172,6 @@
           "type": {
             "type-name": "Bytes",
             "length": 32
-          }
-        },
-        {
-          "name": "amount",
-          "type": {
-            "type-name": "Uint",
-            "maxval": 18446744073709551615
           }
         },
         {
@@ -223,34 +212,6 @@
       "pure": false,
       "proof": true,
       "arguments": [
-        {
-          "name": "limit",
-          "type": {
-            "type-name": "Uint",
-            "maxval": 18446744073709551615
-          }
-        },
-        {
-          "name": "outstanding",
-          "type": {
-            "type-name": "Uint",
-            "maxval": 18446744073709551615
-          }
-        },
-        {
-          "name": "epoch",
-          "type": {
-            "type-name": "Uint",
-            "maxval": 18446744073709551615
-          }
-        },
-        {
-          "name": "amount",
-          "type": {
-            "type-name": "Uint",
-            "maxval": 18446744073709551615
-          }
-        },
         {
           "name": "receiptExpiry",
           "type": {
@@ -399,6 +360,78 @@
         "type-name": "Bytes",
         "length": 32
       }
+    },
+    {
+      "name": "lineLimit",
+      "arguments": [
+      ],
+      "result type": {
+        "type-name": "Uint",
+        "maxval": 18446744073709551615
+      }
+    },
+    {
+      "name": "lineOutstanding",
+      "arguments": [
+      ],
+      "result type": {
+        "type-name": "Uint",
+        "maxval": 18446744073709551615
+      }
+    },
+    {
+      "name": "lineEpoch",
+      "arguments": [
+      ],
+      "result type": {
+        "type-name": "Uint",
+        "maxval": 18446744073709551615
+      }
+    },
+    {
+      "name": "quoteAmount",
+      "arguments": [
+      ],
+      "result type": {
+        "type-name": "Uint",
+        "maxval": 18446744073709551615
+      }
+    },
+    {
+      "name": "drawAmount",
+      "arguments": [
+      ],
+      "result type": {
+        "type-name": "Uint",
+        "maxval": 18446744073709551615
+      }
+    },
+    {
+      "name": "redeemAmount",
+      "arguments": [
+      ],
+      "result type": {
+        "type-name": "Uint",
+        "maxval": 18446744073709551615
+      }
+    },
+    {
+      "name": "repayAmount",
+      "arguments": [
+      ],
+      "result type": {
+        "type-name": "Uint",
+        "maxval": 18446744073709551615
+      }
+    },
+    {
+      "name": "quoteMerchantPk",
+      "arguments": [
+      ],
+      "result type": {
+        "type-name": "Bytes",
+        "length": 32
+      }
     }
   ],
   "contracts": [
@@ -406,7 +439,10 @@
   "ledger": [
     {
       "name": "issuer",
-      "index": 0,
+      "index": [
+        0,
+        0
+      ],
       "exported": true,
       "storage": "Cell",
       "type": {
@@ -416,7 +452,10 @@
     },
     {
       "name": "contractDomain",
-      "index": 1,
+      "index": [
+        1,
+        0
+      ],
       "exported": true,
       "storage": "Cell",
       "type": {
@@ -426,7 +465,10 @@
     },
     {
       "name": "registeredMerchants",
-      "index": 2,
+      "index": [
+        1,
+        1
+      ],
       "exported": true,
       "storage": "Map",
       "key": {
@@ -439,7 +481,10 @@
     },
     {
       "name": "totalReserve",
-      "index": 3,
+      "index": [
+        1,
+        2
+      ],
       "exported": true,
       "storage": "Cell",
       "type": {
@@ -449,7 +494,10 @@
     },
     {
       "name": "encumberedReserve",
-      "index": 4,
+      "index": [
+        1,
+        3
+      ],
       "exported": true,
       "storage": "Cell",
       "type": {
@@ -459,7 +507,23 @@
     },
     {
       "name": "redeemedReserve",
-      "index": 5,
+      "index": [
+        1,
+        4
+      ],
+      "exported": true,
+      "storage": "Cell",
+      "type": {
+        "type-name": "Uint",
+        "maxval": 18446744073709551615
+      }
+    },
+    {
+      "name": "feeReserve",
+      "index": [
+        1,
+        5
+      ],
       "exported": true,
       "storage": "Cell",
       "type": {
@@ -469,7 +533,10 @@
     },
     {
       "name": "identityCommit",
-      "index": 6,
+      "index": [
+        1,
+        6
+      ],
       "exported": true,
       "storage": "Cell",
       "type": {
@@ -479,7 +546,10 @@
     },
     {
       "name": "lineCommit",
-      "index": 7,
+      "index": [
+        1,
+        7
+      ],
       "exported": true,
       "storage": "Cell",
       "type": {
@@ -489,7 +559,10 @@
     },
     {
       "name": "lineExpiry",
-      "index": 8,
+      "index": [
+        1,
+        8
+      ],
       "exported": true,
       "storage": "Cell",
       "type": {
@@ -499,7 +572,10 @@
     },
     {
       "name": "status",
-      "index": 9,
+      "index": [
+        1,
+        9
+      ],
       "exported": true,
       "storage": "Cell",
       "type": {
@@ -515,7 +591,10 @@
     },
     {
       "name": "lineGeneration",
-      "index": 10,
+      "index": [
+        1,
+        10
+      ],
       "exported": true,
       "storage": "Cell",
       "type": {
@@ -525,7 +604,10 @@
     },
     {
       "name": "quotes",
-      "index": 11,
+      "index": [
+        1,
+        11
+      ],
       "exported": true,
       "storage": "Map",
       "key": {
@@ -536,13 +618,6 @@
         "type-name": "Struct",
         "name": "QuoteMeta",
         "elements": [
-          {
-            "name": "merchantPk",
-            "type": {
-              "type-name": "Bytes",
-              "length": 32
-            }
-          },
           {
             "name": "expiry",
             "type": {
@@ -568,7 +643,10 @@
     },
     {
       "name": "notes",
-      "index": 12,
+      "index": [
+        1,
+        12
+      ],
       "exported": true,
       "storage": "Map",
       "key": {
@@ -617,7 +695,10 @@
     },
     {
       "name": "nullifiers",
-      "index": 13,
+      "index": [
+        1,
+        13
+      ],
       "exported": true,
       "storage": "Set",
       "type": {
@@ -627,7 +708,10 @@
     },
     {
       "name": "actionClock",
-      "index": 14,
+      "index": [
+        1,
+        14
+      ],
       "exported": true,
       "storage": "Counter"
     }

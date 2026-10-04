@@ -15,7 +15,7 @@ import {
   repayNullifier,
   toHex,
 } from "./encoding.ts";
-import { boot, call, firstQuote, readLedger } from "./compact-harness.ts";
+import { blankPrivate, boot, call, firstQuote, readLedger } from "./compact-harness.ts";
 import { DEMO } from "../../test/fixtures/keys.ts";
 import {
   createLedger,
@@ -60,7 +60,7 @@ describe("cross-language commitment vectors", () => {
     // Issuer funds reserve
     const funded = await call(
       session,
-      {
+      blankPrivate({
         callerSecret: DEMO.issuer,
         agentSecret: DEMO.agent,
         salt: pad32("salt-0"),
@@ -73,7 +73,7 @@ describe("cross-language commitment vectors", () => {
         noteSalt: pad32("ns40"),
         noteIdentity: pad32("0"),
         noteQuoteCommit: pad32("0"),
-      },
+  }),
       { name: "fundReserve", args: [500n] },
     );
     assert.equal(funded.ok, true);
@@ -82,7 +82,7 @@ describe("cross-language commitment vectors", () => {
     // Issuer opens line
     const opened = await call(
       funded.session,
-      {
+      blankPrivate({
         callerSecret: DEMO.issuer,
         agentSecret: DEMO.agent,
         salt: pad32("salt-0"),
@@ -95,15 +95,16 @@ describe("cross-language commitment vectors", () => {
         noteSalt: pad32("ns40"),
         noteIdentity: pad32("0"),
         noteQuoteCommit: pad32("0"),
-      },
-      { name: "openLine", args: [150n, 10_000n] },
+        lineLimit: 150n,
+  }),
+      { name: "openLine", args: [10_000n] },
     );
     assert.equal(opened.ok, true);
     if (!opened.ok) throw new Error("open failed");
     assert.equal(opened.ledger.lineGeneration, 1n);
     const I = agentId(DEMO.agent);
     const C0 = lineStateCommit(
-      { domain: opened.ledger.contractDomain, identity: I, limit: 150n, outstanding: 0n, epoch: 0n },
+      { identity: I, limit: 150n, outstanding: 0n, epoch: 0n },
       pad32("salt-0"),
     );
     assert.equal(toHex(opened.ledger.identityCommit), toHex(I));
@@ -112,7 +113,7 @@ describe("cross-language commitment vectors", () => {
     // Merchant A posts quote
     const quoted = await call(
       opened.session,
-      {
+      blankPrivate({
         callerSecret: DEMO.merchantA,
         agentSecret: DEMO.agent,
         salt: pad32("salt-0"),
@@ -125,8 +126,9 @@ describe("cross-language commitment vectors", () => {
         noteSalt: pad32("ns40"),
         noteIdentity: pad32("0"),
         noteQuoteCommit: pad32("0"),
-      },
-      { name: "postQuote", args: [40n, 10_000n] },
+        quoteAmount: 40n,
+  }),
+      { name: "postQuote", args: [10_000n] },
     );
     assert.equal(quoted.ok, true);
     if (!quoted.ok) throw new Error("quote failed");
@@ -146,7 +148,7 @@ describe("cross-language commitment vectors", () => {
     // Agent draws 40 -> creates draw note D
     const drawn = await call(
       quoted.session,
-      {
+      blankPrivate({
         callerSecret: DEMO.issuer,
         agentSecret: DEMO.agent,
         salt: pad32("salt-0"),
@@ -159,8 +161,13 @@ describe("cross-language commitment vectors", () => {
         noteSalt: pad32("ns40"),
         noteIdentity: pad32("0"),
         noteQuoteCommit: pad32("0"),
-      },
-      { name: "draw", args: [Q, 150n, 0n, 0n, 40n, 10_000n] },
+        lineLimit: 150n,
+        lineOutstanding: 0n,
+        lineEpoch: 0n,
+        drawAmount: 40n,
+        quoteMerchantPk: merchantPublicKey(DEMO.merchantA),
+  }),
+      { name: "draw", args: [Q, 10_000n, 0n] },
     );
     assert.equal(drawn.ok, true);
     if (!drawn.ok) throw new Error("draw failed");
@@ -189,7 +196,7 @@ describe("cross-language commitment vectors", () => {
     // Merchant A redeems note D
     const redeemed = await call(
       drawn.session,
-      {
+      blankPrivate({
         callerSecret: DEMO.merchantA,
         agentSecret: DEMO.agent,
         salt: pad32("salt-1"),
@@ -202,8 +209,9 @@ describe("cross-language commitment vectors", () => {
         noteSalt: pad32("ns40"),
         noteIdentity: I,
         noteQuoteCommit: Q,
-      },
-      { name: "redeemDraw", args: [D, 40n, 10_000n] },
+        redeemAmount: 40n,
+  }),
+      { name: "redeemDraw", args: [D, 10_000n] },
     );
     assert.equal(redeemed.ok, true);
     if (!redeemed.ok) throw new Error("redeem failed");
@@ -215,7 +223,7 @@ describe("cross-language commitment vectors", () => {
     assert.ok(redNulls.includes(toHex(Nredeem)));
 
     const C1 = lineStateCommit(
-      { domain: quoted.ledger.contractDomain, identity: I, limit: 150n, outstanding: 40n, epoch: 1n },
+      { identity: I, limit: 150n, outstanding: 40n, epoch: 1n },
       pad32("salt-1"),
     );
     assert.equal(toHex(drawn.ledger.lineCommit), toHex(C1));
@@ -231,7 +239,7 @@ describe("cross-language commitment vectors", () => {
     });
     const ack = await call(
       redeemed.session,
-      {
+      blankPrivate({
         callerSecret: DEMO.issuer,
         agentSecret: DEMO.agent,
         salt: pad32("salt-1"),
@@ -244,8 +252,12 @@ describe("cross-language commitment vectors", () => {
         noteSalt: pad32("ns40"),
         noteIdentity: I,
         noteQuoteCommit: Q,
-      },
-      { name: "acknowledgeRepayment", args: [150n, 40n, 1n, 40n, 10_000n] },
+        lineLimit: 150n,
+        lineOutstanding: 40n,
+        lineEpoch: 1n,
+        repayAmount: 40n,
+  }),
+      { name: "acknowledgeRepayment", args: [10_000n] },
     );
     assert.equal(ack.ok, true);
     if (!ack.ok) throw new Error("ack failed");
@@ -253,19 +265,29 @@ describe("cross-language commitment vectors", () => {
     assert.ok(ns.includes(toHex(Nrepay)));
   });
 
-  it("identical I, L, B, epoch, salt under different contract domains produce different C", () => {
-    const I = agentId(DEMO.agent);
+  it("identical quote parameters under different contract domains produce different Q", () => {
+    const mPk = merchantPublicKey(DEMO.merchantA);
     const domainA = pad32("domain-A");
     const domainB = pad32("domain-B");
-    const CA = lineStateCommit(
-      { domain: domainA, identity: I, limit: 150n, outstanding: 0n, epoch: 0n },
-      pad32("salt-0"),
-    );
-    const CB = lineStateCommit(
-      { domain: domainB, identity: I, limit: 150n, outstanding: 0n, epoch: 0n },
-      pad32("salt-0"),
-    );
-    assert.notEqual(toHex(CA), toHex(CB));
+    const QA = quoteCommit({
+      merchantPk: mPk,
+      invoiceId: pad32("inv-40"),
+      amount: 40n,
+      expiry: 1000n,
+      nonce: pad32("n40"),
+      generation: 1n,
+      domain: domainA,
+    });
+    const QB = quoteCommit({
+      merchantPk: mPk,
+      invoiceId: pad32("inv-40"),
+      amount: 40n,
+      expiry: 1000n,
+      nonce: pad32("n40"),
+      generation: 1n,
+      domain: domainB,
+    });
+    assert.notEqual(toHex(QA), toHex(QB));
   });
 
   it("TypeScript reference engine uses the same encodings as Compact", () => {
@@ -278,47 +300,60 @@ describe("cross-language commitment vectors", () => {
     assert.equal(funded.ok, true);
     if (!funded.ok) throw new Error("fund");
 
-    const open = openLine(funded.ledger, {
-      caller: ISSUER_SK,
-      agentSecret: AGENT_SK,
-      limit: 150,
-      salt: "salt-0",
-      expiry: 10_000,
-    });
+    const open = openLine(
+      funded.ledger,
+      {
+        caller: ISSUER_SK,
+        agentSecret: AGENT_SK,
+        salt: "salt-0",
+        expiry: 10_000,
+      },
+      { limit: 150 },
+    );
     assert.equal(open.ok, true);
     if (!open.ok) throw new Error("open");
     assert.equal(open.agent.witness!.I, identityCommitment(AGENT_SK));
     assert.equal(open.ledger.lineCommitment, lineCommitment(open.agent.witness!));
 
-    const q = postQuote(open.ledger, {
-      caller: MERCHANT_A_SK,
-      amount: 40,
-      invoiceId: "inv-40",
-      expiry: 10_000,
-      nonce: "n40",
-    });
+    const q = postQuote(
+      open.ledger,
+      {
+        caller: MERCHANT_A_SK,
+        invoiceId: "inv-40",
+        expiry: 10_000,
+        nonce: "n40",
+      },
+      { amount: 40 },
+    );
     assert.equal(q.ok, true);
     if (!q.ok) throw new Error("q");
     assert.equal(q.Q, quoteCommitment(q.quote, open.ledger.contractDomain));
 
-    const drawn = draw(q.ledger, {
-      agentSecret: AGENT_SK,
-      witness: open.agent.witness!,
-      quote: q.quote,
-      newSalt: "salt-1",
-      noteNonce: "nn40",
-      noteSalt: "ns40",
-    });
+    const drawn = draw(
+      q.ledger,
+      {
+        agentSecret: AGENT_SK,
+        quoteCommit: q.Q,
+        newSalt: "salt-1",
+        noteNonce: "nn40",
+        noteSalt: "ns40",
+      },
+      { books: open.agent.witness!, quote: q.quote },
+    );
     assert.equal(drawn.ok, true);
     if (!drawn.ok) throw new Error("draw");
     assert.equal(drawn.note.D, drawNoteCommitment(drawn.note.preimage, drawn.note.salt));
 
-    const redeemed = redeemDraw(drawn.ledger, {
-      caller: MERCHANT_A_SK,
-      noteCommitment: drawn.note.D,
-      notePreimage: drawn.note.preimage,
-      noteSalt: drawn.note.salt,
-    });
+    const redeemed = redeemDraw(
+      drawn.ledger,
+      {
+        caller: MERCHANT_A_SK,
+        noteCommitment: drawn.note.D,
+        noteExpiry: drawn.note.preimage.expiry,
+        noteSalt: drawn.note.salt,
+      },
+      { note: drawn.note.preimage },
+    );
     assert.equal(redeemed.ok, true);
   });
 });
