@@ -155,7 +155,9 @@ export type ProductStoreState = {
   // Asynchronous mutations via LineRuntime
   doFundReserve: (amount?: number) => Promise<boolean>;
   doWithdrawReserve: (amount?: number) => Promise<boolean>;
+  doWithdrawFees: () => Promise<boolean>;
   doRegisterMerchant: (merchantPk?: string) => Promise<boolean>;
+  doDisableMerchant: (merchantPk: string) => Promise<boolean>;
   doOpen: (limit?: number) => Promise<boolean>;
   doQuote: (amount: number, invoiceId?: string, merchant?: "A" | "B") => Promise<boolean>;
   doDraw: (quoteCommitOrPackage: string | QuoteTransferPackage) => Promise<boolean>;
@@ -486,6 +488,35 @@ export const useAppStore = create<ProductStoreState>((set, get) => ({
     }
   },
 
+  doWithdrawFees: async () => {
+    const runtime = getRuntime();
+    const callerSk = get().issuerRecord?.issuerSecret;
+    if (!callerSk) {
+      set({ flash: { tone: "fail", text: "Fee withdrawal refused: Issuer private key record missing from vault." } });
+      return false;
+    }
+    set({ txLifecycle: "wallet-approval", flash: { tone: "info", text: "Requesting wallet approval..." } });
+    try {
+      set({ txLifecycle: "proving" });
+      const res = await runtime.withdrawFees(callerSk);
+      if (!res.ok) {
+        set({ txLifecycle: "failed", flash: { tone: "fail", text: `Fee withdrawal rejected: ${res.error}` } });
+        return false;
+      }
+      set({
+        txLifecycle: "confirmed",
+        lastTxHash: res.txHash ?? null,
+        lastBlockHeight: res.blockHeight ?? null,
+        flash: { tone: "ok", text: `Accrued issuer fees withdrawn.` },
+      });
+      await get().refreshStatus();
+      return true;
+    } catch (err) {
+      set({ txLifecycle: "failed", flash: { tone: "fail", text: `Fee withdrawal failed: ${err instanceof Error ? err.message : String(err)}` } });
+      return false;
+    }
+  },
+
   doRegisterMerchant: async (merchantPk?: string) => {
     const runtime = getRuntime();
     const callerSk = get().issuerRecord?.issuerSecret;
@@ -534,6 +565,35 @@ export const useAppStore = create<ProductStoreState>((set, get) => ({
         txLifecycle: "failed",
         flash: { tone: "fail", text: `Registration failed: ${err instanceof Error ? err.message : String(err)}` },
       });
+      return false;
+    }
+  },
+
+  doDisableMerchant: async (merchantPk: string) => {
+    const runtime = getRuntime();
+    const callerSk = get().issuerRecord?.issuerSecret;
+    if (!callerSk) {
+      set({ flash: { tone: "fail", text: "Disable merchant refused: Issuer private key record missing from vault." } });
+      return false;
+    }
+    set({ txLifecycle: "wallet-approval", flash: { tone: "info", text: "Requesting wallet approval..." } });
+    try {
+      set({ txLifecycle: "proving" });
+      const res = await runtime.disableMerchant(merchantPk, callerSk);
+      if (!res.ok) {
+        set({ txLifecycle: "failed", flash: { tone: "fail", text: `Disable merchant rejected: ${res.error}` } });
+        return false;
+      }
+      set({
+        txLifecycle: "confirmed",
+        lastTxHash: res.txHash ?? null,
+        lastBlockHeight: res.blockHeight ?? null,
+        flash: { tone: "ok", text: `Merchant disabled in registry.` },
+      });
+      await get().refreshStatus();
+      return true;
+    } catch (err) {
+      set({ txLifecycle: "failed", flash: { tone: "fail", text: `Disable merchant failed: ${err instanceof Error ? err.message : String(err)}` } });
       return false;
     }
   },
@@ -839,6 +899,8 @@ export const useAppStore = create<ProductStoreState>((set, get) => ({
         epoch,
         amount: quote.amount,
         expiry: quote.expiry,
+        noteExpiry: quote.expiry,
+        fee: 0,
         callerSk: agentSecret,
         agentSecret,
         salt,
@@ -1045,6 +1107,7 @@ export const useAppStore = create<ProductStoreState>((set, get) => ({
         noteCommit: note.noteCommitment,
         amount: note.amount,
         expiry: note.expiry,
+        noteExpiry: note.expiry,
         merchantSk,
         noteIdentity: note.identityCommitment,
         noteQuoteCommit: note.quoteCommitment,

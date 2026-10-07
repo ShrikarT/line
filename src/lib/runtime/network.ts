@@ -41,7 +41,26 @@ import { indexerPublicDataProvider } from "@midnight-ntwrk/midnight-js-indexer-p
 import type { PublicDataProvider, ZKConfigProvider } from "@midnight-ntwrk/midnight-js-types";
 import { VaultPrivateStateProvider } from "./vault-provider.ts";
 import { hexToBytes, toHex, canonicalInvoiceIdBytes } from "../line/encoding.ts";
-import { Contract, ledger, Status } from "../../../contracts/managed/line/contract/index.js";
+import {
+  Contract,
+  ledger,
+  Status,
+  type Witnesses,
+  type ImpureCircuits,
+} from "../../../contracts/managed/line/contract/index.js";
+
+export type BoundCircuitFunctions<PS = any> = {
+  [K in keyof ImpureCircuits<PS>]: ImpureCircuits<PS>[K] extends (
+    context: any,
+    ...args: infer Args
+  ) => any
+    ? (...args: Args) => Promise<any>
+    : never;
+};
+
+export interface BoundLineContract<PS = any> {
+  readonly callTx: BoundCircuitFunctions<PS>;
+}
 
 export interface MidnightNetworkConfig {
   networkId: string;
@@ -67,6 +86,14 @@ export interface LinePrivateWitnessContext {
   noteSalt?: Uint8Array;
   noteIdentity?: Uint8Array;
   noteQuoteCommit?: Uint8Array;
+  lineLimit?: bigint | number;
+  lineOutstanding?: bigint | number;
+  lineEpoch?: bigint | number;
+  quoteAmount?: bigint | number;
+  drawAmount?: bigint | number;
+  redeemAmount?: bigint | number;
+  repayAmount?: bigint | number;
+  quoteMerchantPk?: Uint8Array | string;
 }
 
 class AsyncMutex {
@@ -138,7 +165,7 @@ export class MidnightNetworkRuntime implements LineRuntime {
   private contractAddress: string | null;
   private connectedWallet: ConnectedAPI | null = null;
   private cachedProviders: ContractProviders<any> | null = null;
-  private boundContract: any = null;
+  private boundContract: BoundLineContract | null = null;
   private passwordProvider?: () => string | Promise<string>;
   private activeWitnessContext: LinePrivateWitnessContext | null = null;
   private readonly mutex = new AsyncMutex();
@@ -424,7 +451,7 @@ export class MidnightNetworkRuntime implements LineRuntime {
     return this.getStatus();
   }
 
-  private async getBoundContract(): Promise<any> {
+  private async getBoundContract(): Promise<BoundLineContract> {
     if (this.boundContract) return this.boundContract;
     if (!this.contractAddress) {
       throw new ContractNotConfiguredError();
@@ -436,7 +463,7 @@ export class MidnightNetworkRuntime implements LineRuntime {
     const providers = await this.getProviders();
 
     // Typed witnesses read from active operation context or private state provider
-    const witnesses = {
+    const witnesses: Witnesses<any> = {
       callerSecret: (ctx: any) => {
         const val = this.activeWitnessContext?.callerSecret ?? ctx.privateState?.callerSecret;
         if (!val) throw new Error("Witness error: missing callerSecret in active witness context");
@@ -497,9 +524,50 @@ export class MidnightNetworkRuntime implements LineRuntime {
         if (!val) throw new Error("Witness error: missing noteQuoteCommit in active witness context");
         return [ctx.privateState, val];
       },
+      lineLimit: (ctx: any) => {
+        const val = this.activeWitnessContext?.lineLimit ?? ctx.privateState?.lineLimit;
+        if (val === undefined || val === null) throw new Error("Witness error: missing lineLimit in active witness context");
+        return [ctx.privateState, BigInt(val)];
+      },
+      lineOutstanding: (ctx: any) => {
+        const val = this.activeWitnessContext?.lineOutstanding ?? ctx.privateState?.lineOutstanding;
+        if (val === undefined || val === null) throw new Error("Witness error: missing lineOutstanding in active witness context");
+        return [ctx.privateState, BigInt(val)];
+      },
+      lineEpoch: (ctx: any) => {
+        const val = this.activeWitnessContext?.lineEpoch ?? ctx.privateState?.lineEpoch;
+        if (val === undefined || val === null) throw new Error("Witness error: missing lineEpoch in active witness context");
+        return [ctx.privateState, BigInt(val)];
+      },
+      quoteAmount: (ctx: any) => {
+        const val = this.activeWitnessContext?.quoteAmount ?? ctx.privateState?.quoteAmount;
+        if (val === undefined || val === null) throw new Error("Witness error: missing quoteAmount in active witness context");
+        return [ctx.privateState, BigInt(val)];
+      },
+      drawAmount: (ctx: any) => {
+        const val = this.activeWitnessContext?.drawAmount ?? ctx.privateState?.drawAmount;
+        if (val === undefined || val === null) throw new Error("Witness error: missing drawAmount in active witness context");
+        return [ctx.privateState, BigInt(val)];
+      },
+      redeemAmount: (ctx: any) => {
+        const val = this.activeWitnessContext?.redeemAmount ?? ctx.privateState?.redeemAmount;
+        if (val === undefined || val === null) throw new Error("Witness error: missing redeemAmount in active witness context");
+        return [ctx.privateState, BigInt(val)];
+      },
+      repayAmount: (ctx: any) => {
+        const val = this.activeWitnessContext?.repayAmount ?? ctx.privateState?.repayAmount;
+        if (val === undefined || val === null) throw new Error("Witness error: missing repayAmount in active witness context");
+        return [ctx.privateState, BigInt(val)];
+      },
+      quoteMerchantPk: (ctx: any) => {
+        const val = this.activeWitnessContext?.quoteMerchantPk ?? ctx.privateState?.quoteMerchantPk;
+        if (!val) throw new Error("Witness error: missing quoteMerchantPk in active witness context");
+        const bytes = validateWitnessBytes32(val, "quoteMerchantPk");
+        return [ctx.privateState, bytes];
+      },
     };
 
-    const contract = new Contract(witnesses as any);
+    const contract = new Contract(witnesses);
 
     try {
       const { findDeployedContract } = await import("@midnight-ntwrk/midnight-js-contracts");
@@ -507,7 +575,7 @@ export class MidnightNetworkRuntime implements LineRuntime {
         contract,
         contractAddress: this.contractAddress,
         privateStateId: `line-state:${this.contractAddress}`,
-      })) as any;
+      })) as BoundLineContract;
       return this.boundContract;
     } catch (err) {
       throw new CircuitExecutionError("findDeployedContract", err instanceof Error ? err.message : String(err));
@@ -583,6 +651,23 @@ export class MidnightNetworkRuntime implements LineRuntime {
     });
   }
 
+  async withdrawFees(callerSk?: string): Promise<RuntimeTransactionResult> {
+    if (!this.connectedWallet) throw new WalletNotConnectedError();
+    if (!this.contractAddress) throw new ContractNotConfiguredError();
+
+    const sk = callerSk ?? "00".repeat(32);
+    const callerBytes = validateWitnessBytes32(sk, "callerSecret");
+    return this.withOperationLock({ callerSecret: callerBytes }, async () => {
+      try {
+        const bound = await this.getBoundContract();
+        const tx = await bound.callTx.withdrawFees();
+        return this.validateTxResult(tx, "withdrawFees");
+      } catch (err) {
+        return { ok: false, error: err instanceof Error ? err.message : String(err), code: "WITHDRAW_FEES_FAILED" };
+      }
+    });
+  }
+
   async registerMerchant(merchantPk: string, callerSk: string): Promise<RuntimeTransactionResult> {
     if (!this.connectedWallet) throw new WalletNotConnectedError();
     if (!this.contractAddress) throw new ContractNotConfiguredError();
@@ -596,6 +681,24 @@ export class MidnightNetworkRuntime implements LineRuntime {
         return this.validateTxResult(tx, "registerMerchant");
       } catch (err) {
         return { ok: false, error: err instanceof Error ? err.message : String(err), code: "REGISTER_MERCHANT_FAILED" };
+      }
+    });
+  }
+
+  async disableMerchant(merchantPk: string, callerSk?: string): Promise<RuntimeTransactionResult> {
+    if (!this.connectedWallet) throw new WalletNotConnectedError();
+    if (!this.contractAddress) throw new ContractNotConfiguredError();
+
+    const sk = callerSk ?? "00".repeat(32);
+    const callerBytes = validateWitnessBytes32(sk, "callerSecret");
+    const merchantBytes = validateWitnessBytes32(merchantPk, "merchantPublicKey");
+    return this.withOperationLock({ callerSecret: callerBytes }, async () => {
+      try {
+        const bound = await this.getBoundContract();
+        const tx = await bound.callTx.disableMerchant(merchantBytes);
+        return this.validateTxResult(tx, "disableMerchant");
+      } catch (err) {
+        return { ok: false, error: err instanceof Error ? err.message : String(err), code: "DISABLE_MERCHANT_FAILED" };
       }
     });
   }
@@ -614,12 +717,13 @@ export class MidnightNetworkRuntime implements LineRuntime {
       callerSecret: validateWitnessBytes32(params.callerSk, "callerSecret"),
       agentSecret: validateWitnessBytes32(params.agentSecret, "agentSecret"),
       salt: validateWitnessBytes32(params.salt, "salt"),
+      lineLimit: BigInt(params.limit),
     };
 
     return this.withOperationLock(witnessContext, async () => {
       try {
         const bound = await this.getBoundContract();
-        const tx = await bound.callTx.openLine(BigInt(params.limit), BigInt(params.expiry));
+        const tx = await bound.callTx.openLine(BigInt(params.expiry));
         return this.validateTxResult(tx, "openLine");
       } catch (err) {
         return { ok: false, error: err instanceof Error ? err.message : String(err), code: "OPEN_LINE_FAILED" };
@@ -645,12 +749,13 @@ export class MidnightNetworkRuntime implements LineRuntime {
       callerSecret: validateWitnessBytes32(params.merchantSk, "merchantSecret"),
       invoiceId: canonicalInvoiceIdBytes(params.invoiceId),
       quoteNonce: validateWitnessBytes32(params.nonce, "quoteNonce"),
+      quoteAmount: BigInt(params.amount),
     };
 
     return this.withOperationLock(witnessContext, async () => {
       try {
         const bound = await this.getBoundContract();
-        const tx = await bound.callTx.postQuote(BigInt(params.amount), BigInt(params.expiry));
+        const tx = await bound.callTx.postQuote(BigInt(params.expiry));
         return this.validateTxResult(tx, "postQuote");
       } catch (err) {
         return { ok: false, error: err instanceof Error ? err.message : String(err), code: "POST_QUOTE_FAILED" };
@@ -664,7 +769,9 @@ export class MidnightNetworkRuntime implements LineRuntime {
     outstanding: number;
     epoch: number;
     amount: number;
-    expiry: number;
+    expiry?: number;
+    noteExpiry?: number | bigint;
+    fee?: number | bigint;
     callerSk: string;
     agentSecret: string;
     salt: string;
@@ -673,14 +780,20 @@ export class MidnightNetworkRuntime implements LineRuntime {
     quoteNonce: string;
     noteNonce: string;
     noteSalt: string;
+    merchantPk?: string;
   }): Promise<RuntimeTransactionResult> {
     if (!this.connectedWallet) throw new WalletNotConnectedError();
     if (!this.contractAddress) throw new ContractNotConfiguredError();
+
+    const noteExpiry = params.noteExpiry ?? params.expiry ?? 0;
+    const fee = params.fee ?? 0;
+    params = { ...params, noteExpiry, fee };
 
     if (!params.invoiceId || params.invoiceId.trim().length === 0) {
       throw new MissingPrivateWitnessError("invoiceId");
     }
 
+    const mPk = params.merchantPk ?? (params as any).quoteMerchantPk;
     const witnessContext: LinePrivateWitnessContext = {
       callerSecret: validateWitnessBytes32(params.callerSk, "callerSecret"),
       agentSecret: validateWitnessBytes32(params.agentSecret, "agentSecret"),
@@ -690,6 +803,12 @@ export class MidnightNetworkRuntime implements LineRuntime {
       quoteNonce: validateWitnessBytes32(params.quoteNonce, "quoteNonce"),
       noteNonce: validateWitnessBytes32(params.noteNonce, "noteNonce"),
       noteSalt: validateWitnessBytes32(params.noteSalt, "noteSalt"),
+      lineLimit: BigInt(params.limit),
+      lineOutstanding: BigInt(params.outstanding),
+      lineEpoch: BigInt(params.epoch),
+      quoteAmount: BigInt((params as any).quoteAmount ?? params.amount),
+      drawAmount: BigInt((params as any).drawAmount ?? params.amount),
+      ...(mPk ? { quoteMerchantPk: validateWitnessBytes32(mPk, "quoteMerchantPk") } : {}),
     };
 
     const qBytes = validateWitnessBytes32(params.quoteCommit, "quoteCommit");
@@ -699,11 +818,8 @@ export class MidnightNetworkRuntime implements LineRuntime {
         const bound = await this.getBoundContract();
         const tx = await bound.callTx.draw(
           qBytes,
-          BigInt(params.limit),
-          BigInt(params.outstanding),
-          BigInt(params.epoch),
-          BigInt(params.amount),
-          BigInt(params.expiry)
+          BigInt(params.noteExpiry ?? params.expiry ?? 0),
+          BigInt(params.fee ?? 0)
         );
         return this.validateTxResult(tx, "draw");
       } catch {
@@ -715,7 +831,8 @@ export class MidnightNetworkRuntime implements LineRuntime {
   async redeemDraw(params: {
     noteCommit: string;
     amount: number;
-    expiry: number;
+    expiry?: number;
+    noteExpiry?: number | bigint;
     merchantSk: string;
     noteIdentity: string;
     noteQuoteCommit: string;
@@ -725,12 +842,16 @@ export class MidnightNetworkRuntime implements LineRuntime {
     if (!this.connectedWallet) throw new WalletNotConnectedError();
     if (!this.contractAddress) throw new ContractNotConfiguredError();
 
+    const noteExpiry = params.noteExpiry ?? params.expiry ?? 0;
+    params = { ...params, noteExpiry };
+
     const witnessContext: LinePrivateWitnessContext = {
       callerSecret: validateWitnessBytes32(params.merchantSk, "merchantSecret"),
       noteIdentity: validateWitnessBytes32(params.noteIdentity, "noteIdentity"),
       noteQuoteCommit: validateWitnessBytes32(params.noteQuoteCommit, "noteQuoteCommit"),
       noteNonce: validateWitnessBytes32(params.noteNonce, "noteNonce"),
       noteSalt: validateWitnessBytes32(params.noteSalt, "noteSalt"),
+      redeemAmount: BigInt((params as any).redeemAmount ?? params.amount),
     };
 
     const dBytes = validateWitnessBytes32(params.noteCommit, "noteCommit");
@@ -738,7 +859,7 @@ export class MidnightNetworkRuntime implements LineRuntime {
     return this.withOperationLock(witnessContext, async () => {
       try {
         const bound = await this.getBoundContract();
-        const tx = await bound.callTx.redeemDraw(dBytes, BigInt(params.amount), BigInt(params.expiry));
+        const tx = await bound.callTx.redeemDraw(dBytes, BigInt(params.noteExpiry ?? params.expiry ?? 0));
         return this.validateTxResult(tx, "redeemDraw");
       } catch (err) {
         return { ok: false, error: err instanceof Error ? err.message : String(err), code: "REDEEM_DRAW_FAILED" };
@@ -787,16 +908,16 @@ export class MidnightNetworkRuntime implements LineRuntime {
       newSalt: validateWitnessBytes32(params.newSalt, "newSalt"),
       receiptNonce: validateWitnessBytes32(params.receiptNonce, "receiptNonce"),
       paymentRef: validateWitnessBytes32(params.paymentRef, "paymentRef"),
+      lineLimit: BigInt(params.limit),
+      lineOutstanding: BigInt(params.outstanding),
+      lineEpoch: BigInt(params.epoch),
+      repayAmount: BigInt((params as any).repayAmount ?? params.amount),
     };
 
     return this.withOperationLock(witnessContext, async () => {
       try {
         const bound = await this.getBoundContract();
         const tx = await bound.callTx.acknowledgeRepayment(
-          BigInt(params.limit),
-          BigInt(params.outstanding),
-          BigInt(params.epoch),
-          BigInt(params.amount),
           BigInt(params.receiptExpiry)
         );
         return this.validateTxResult(tx, "acknowledgeRepayment");
