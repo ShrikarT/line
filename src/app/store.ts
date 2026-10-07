@@ -857,6 +857,7 @@ export const useAppStore = create<ProductStoreState>((set, get) => ({
         quoteNonce: pkg.quoteNonce,
         quoteCommitment: pkg.quoteCommitment,
         lineGeneration: pkg.lineGeneration,
+        fee: pkg.fee,
         status: "open",
         updatedAt: Date.now(),
       };
@@ -869,6 +870,10 @@ export const useAppStore = create<ProductStoreState>((set, get) => ({
 
     const agentRec = get().agentLineRecord;
     const legacyAgent = get().agentRecord;
+    if (!agentRec && !legacyAgent) {
+      set({ flash: { tone: "fail", text: "Draw refused: vault record missing for this agent. Open a line first." } });
+      return false;
+    }
     const agentSecret = agentRec?.agentSecret ?? legacyAgent?.agentSecret;
     const limit = agentRec?.limit ?? legacyAgent?.L ?? 0;
     const outstanding = agentRec?.outstanding ?? legacyAgent?.B ?? 0;
@@ -880,7 +885,9 @@ export const useAppStore = create<ProductStoreState>((set, get) => ({
       return false;
     }
 
-    if (outstanding + quote.amount > limit) {
+    const fee = quote.fee ?? 0;
+
+    if (outstanding + quote.amount + fee > limit) {
       set({ flash: { tone: "fail", text: "Clearance could not be proven." } });
       return false;
     }
@@ -899,8 +906,6 @@ export const useAppStore = create<ProductStoreState>((set, get) => ({
         epoch,
         amount: quote.amount,
         expiry: quote.expiry,
-        noteExpiry: quote.expiry,
-        fee: 0,
         callerSk: agentSecret,
         agentSecret,
         salt,
@@ -910,6 +915,8 @@ export const useAppStore = create<ProductStoreState>((set, get) => ({
         noteNonce,
         noteSalt,
         merchantPk: quote.merchantPublicKey,
+        fee,
+        noteExpiry: quote.expiry,
       });
       if (!res.ok) {
         set({
@@ -921,7 +928,7 @@ export const useAppStore = create<ProductStoreState>((set, get) => ({
 
       const idBytes = agentId(hexToBytes(agentSecret));
       const identityCommitment = toHex(idBytes);
-      const newOutstanding = outstanding + quote.amount;
+      const newOutstanding = outstanding + quote.amount + fee;
       const newEpoch = epoch + 1;
       const newCBytes = lineStateCommit(
         {
@@ -1227,6 +1234,10 @@ export const useAppStore = create<ProductStoreState>((set, get) => ({
 
     const agentRec = get().agentLineRecord;
     const legacyAgent = get().agentRecord;
+    if (!agentRec && !legacyAgent) {
+      set({ flash: { tone: "fail", text: "Repay ack refused: vault record missing for this agent." } });
+      return false;
+    }
     const agentSecret = agentRec?.agentSecret ?? legacyAgent?.agentSecret;
     const limit = agentRec?.limit ?? legacyAgent?.L ?? 0;
     const outstanding = agentRec?.outstanding ?? legacyAgent?.B ?? 0;
@@ -1421,6 +1432,7 @@ export const useAppStore = create<ProductStoreState>((set, get) => ({
       amount: q.amount,
       expiry: q.expiry,
       quoteNonce: q.quoteNonce,
+      fee: q.fee,
       issuedAt: q.updatedAt,
     };
   },
@@ -1446,6 +1458,7 @@ export const useAppStore = create<ProductStoreState>((set, get) => ({
         quoteNonce: valid.quoteNonce,
         quoteCommitment: valid.quoteCommitment,
         lineGeneration: valid.lineGeneration,
+        fee: valid.fee,
         status: "open",
         updatedAt: valid.issuedAt,
       };

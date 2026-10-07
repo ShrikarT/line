@@ -178,7 +178,7 @@ export function Home() {
             </div>
             <div className="flex items-center gap-3">
               <a href="/lab" className="text-accent hover:underline">Attack Lab →</a>
-              <a href="/circuits" className="text-accent hover:underline">10 Circuits →</a>
+              <a href="/circuits" className="text-accent hover:underline">12 Circuits →</a>
             </div>
           </div>
         </section>
@@ -207,7 +207,7 @@ export function Home() {
 
           <div className="rounded-lg border border-border bg-elevated p-5 space-y-1">
             <span className="text-xs font-mono uppercase text-muted">Midnight Compact</span>
-            <div className="font-display text-3xl font-bold text-fg tracking-tight">10 Circuits</div>
+            <div className="font-display text-3xl font-bold text-fg tracking-tight">12 Circuits</div>
             <p className="text-xs text-subtle">Source of truth, zero managed drift</p>
           </div>
         </section>
@@ -373,7 +373,7 @@ export function Home() {
                 href="/circuits"
                 className="inline-flex min-h-10 items-center justify-center rounded-md border border-border bg-transparent px-4 text-xs font-medium text-fg hover:bg-elevated transition-colors"
               >
-                View Ten Circuits
+                View Twelve Circuits
               </a>
             </div>
           </div>

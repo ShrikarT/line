@@ -99,3 +99,23 @@ Proves merchant ownership of note $D$ in zero-knowledge and ensures single redem
 ### Repayment Nullifier
 $$N_{\text{repay}} = \text{persistentHash}([\text{pad}_{32}(\text{"line:repay"}), \text{receiptNonce}, I, C, A, \text{paymentRef}, \text{domain}])$$
 Ensures that an off-chain wire payment or settlement receipt cannot be credited multiple times.
+
+---
+
+## 7. The 12 Compact Circuits
+
+| Circuit | Caller | Description |
+|---|---|---|
+| `registerMerchant` | Issuer | Whitelists merchant public key in `registeredMerchants` |
+| `disableMerchant` | Issuer | Disables a registered merchant: blocks new quotes while preserving membership for existing quotes |
+| `fundReserve` | Issuer | Allocates settlement reserve capacity backing agent draw notes |
+| `withdrawUnencumberedReserve` | Issuer | Withdraws unencumbered reserve (subject to `encumberedReserve + redeemedReserve + feeReserve`) |
+| `withdrawFees` | Issuer | Releases accrued draw fees from `feeReserve` |
+| `openLine` | Issuer | Establishes revolving line commitment $C_0$; credit limit $L$ is a private witness |
+| `postQuote` | Registered Merchant | Commits to quote terms $Q$; invoice amount $A$ is a private witness |
+| `draw` | Agent | Proves confidential credit clearance ($B + A + \text{fee} \le L$) in ZK; credit books and invoice details are witnesses |
+| `redeemDraw` | Designated Merchant | Redeems note $D$ against reserve pool via nullifier $N_{\text{redeem}}$ |
+| `cancelOrExpireNote` | Any | Releases encumbered capital for expired notes ($\text{actionClock} > \text{noteExpiry}$) |
+| `acknowledgeRepayment` | Issuer | Confirms off-chain payment and restores capacity; credit books and amount are witnesses |
+| `setStatus` | Issuer | Toggles facility status (`OPEN`, `DEFAULTED`, `CLOSED`) |
+
