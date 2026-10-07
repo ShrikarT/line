@@ -7,6 +7,13 @@ export const CIRCUITS = [
     hides: "Issuer secret, merchant secret",
   },
   {
+    name: "disableMerchant",
+    caller: "Issuer",
+    proves: "Authorized issuer, merchant currently registered. Deactivates merchant from posting new quotes.",
+    discloses: "Merchant public key, registered=false",
+    hides: "Issuer secret",
+  },
+  {
     name: "fundReserve",
     caller: "Issuer",
     proves: "Authorized issuer, amount > 0. Records settlement capacity in reserve pool.",
@@ -16,8 +23,15 @@ export const CIRCUITS = [
   {
     name: "withdrawUnencumberedReserve",
     caller: "Issuer",
-    proves: "Authorized issuer, amount <= totalReserve - (encumberedReserve + redeemedReserve). Releases unencumbered capacity.",
+    proves: "Authorized issuer, amount <= totalReserve - (encumberedReserve + redeemedReserve + feeReserve). Releases unencumbered capacity.",
     discloses: "Released capacity amount, updated totalReserve",
+    hides: "Issuer secret",
+  },
+  {
+    name: "withdrawFees",
+    caller: "Issuer",
+    proves: "Authorized issuer, feeReserve > 0. Releases accrued draw fees back to issuer.",
+    discloses: "feeReserve zeroed, totalReserve decrease",
     hides: "Issuer secret",
   },
   {

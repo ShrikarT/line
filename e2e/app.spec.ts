@@ -42,7 +42,7 @@ test.describe("Line — Autonomous Agent Credit Platform", () => {
 
     // 6. Circuits
     await page.goto("/circuits");
-    await expect(page.locator("text=Ten circuits")).toBeVisible();
+    await expect(page.locator("text=Twelve circuits")).toBeVisible();
 
     // Assert zero runtime Buffer reference errors across all navigated routes
     const bufferErrors = pageErrors.filter((e) => e.includes("Buffer is not defined"));

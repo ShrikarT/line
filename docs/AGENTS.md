@@ -8,7 +8,7 @@ Ship a compiling Compact contract (`contracts/line.compact`), managed bindings, 
 
 ## Hard Constraints
 
-- Ten circuits only: `registerMerchant`, `fundReserve`, `withdrawUnencumberedReserve`, `openLine`, `postQuote`, `draw`, `redeemDraw`, `cancelOrExpireNote`, `acknowledgeRepayment`, `setStatus`.
+- Twelve circuits only: `registerMerchant`, `disableMerchant`, `fundReserve`, `withdrawUnencumberedReserve`, `withdrawFees`, `openLine`, `postQuote`, `draw`, `redeemDraw`, `cancelOrExpireNote`, `acknowledgeRepayment`, `setStatus`.
 - Compact is the source of truth. Do not invent Compact APIs. Do not replace `persistentHash` or `persistentCommit` with SHA-256.
 - Issuer authenticates reserve funding, withdrawal, merchant registration, line opening, repay-ack, and status.
 - Merchant authenticates quotes and note redemption.
@@ -24,4 +24,5 @@ Ship a compiling Compact contract (`contracts/line.compact`), managed bindings, 
 2. Change Compact first; compile (`npm run compact:compile`); verify zero drift (`git diff --exit-code contracts/managed/`).
 3. Update encoding / runtime / tests.
 4. Update `docs/ENGINEERING_STATUS.md`.
-5. Ensure all 99 tests pass (`npm test`).
+5. Ensure all 181 tests pass (`npm test`).
+

@@ -219,23 +219,13 @@ export class LocalDevelopmentRuntime implements LineRuntime {
     const exp = Number(params.noteExpiry ?? params.expiry ?? 0);
     const feeNum = Number(params.fee ?? 0);
 
-    let merchantCommitment = params.merchantPk ?? "";
+    const merchantCommitment = params.merchantPk;
     if (!merchantCommitment) {
-      const match = Object.keys(this.ledger.registeredMerchants).find((pk) => {
-        const testCommit = quoteCommitment(
-          {
-            merchantCommitment: pk,
-            amount: params.amount,
-            invoiceId: params.invoiceId,
-            expiry: params.expiry ?? exp,
-            nonce: params.quoteNonce,
-            generation: quoteRec.lineGeneration,
-          },
-          this.ledger.contractDomain
-        );
-        return testCommit === params.quoteCommit;
-      });
-      if (match) merchantCommitment = match;
+      return {
+        ok: false,
+        error: "Missing merchant public key witness for draw.",
+        code: "MISSING_MERCHANT_PK",
+      };
     }
 
     const quotePreimage = {

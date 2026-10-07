@@ -103,6 +103,29 @@ The contract is formally specified in `contracts/line.compact`:
 | `acknowledgeRepayment` | Issuer | Confirms off-chain payment, restores capacity via nullifier $N_{\text{repay}}$. |
 | `setStatus` | Issuer | Toggles facility status (`OPEN`, `DEFAULTED`, `CLOSED`). |
 
+### Proving Key & Constraint Matrix (Toolchain 0.34.0 — October 4, 2026)
+
+Full zero-knowledge proving and verifying key generation across all 12 circuits (`compact compile contracts/line.compact contracts/managed/line` without `--skip-zk`):
+
+| Circuit | Rows | Halo2 Scale ($k$) | Prover Key Size | Verifier Key Size |
+|---|---|---|---|---|
+| `registerMerchant` | 4,445 | $k=13$ | 2.69 MB | 2.07 KB |
+| `disableMerchant` | 4,442 | $k=13$ | 2.69 MB | 2.07 KB |
+| `fundReserve` | 4,338 | $k=13$ | 2.69 MB | 2.07 KB |
+| `withdrawUnencumberedReserve` | 4,346 | $k=13$ | 2.69 MB | 2.07 KB |
+| `withdrawFees` | 4,237 | $k=13$ | 2.69 MB | 2.07 KB |
+| `openLine` | 12,723 | $k=14$ | 4.98 MB | 2.07 KB |
+| `postQuote` | 15,564 | $k=14$ | 4.98 MB | 2.07 KB |
+| `draw` | 39,262 | $k=16$ | 18.60 MB | 2.07 KB |
+| `redeemDraw` | 19,565 | $k=15$ | 9.51 MB | 2.07 KB |
+| `cancelOrExpireNote` | 386 | $k=9$ | 0.15 MB | 1.32 KB |
+| `acknowledgeRepayment` | 21,623 | $k=15$ | 9.53 MB | 2.07 KB |
+| `setStatus` | 4,242 | $k=13$ | 2.69 MB | 2.07 KB |
+
+- **Total Key Size**: 63.92 MB (67,022,121 bytes across 12 `.prover` and 12 `.verifier` artifacts)
+- **Compiler**: Compact `0.34.0` (`pragma language_version 0.26`, runtime `0.19.0`, ledger `9.1.0.0-rc.3`)
+- **Repository Bindings**: Retained as deterministic `--skip-zk` managed bindings (zero drift verified)
+
 ---
 
 ## Runtime Architecture
@@ -248,7 +271,7 @@ See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for full deployment instructions.
 
 ## Security & Audit Limitations
 
-- **Internal Verification:** Line has undergone automated model checking across 50 pseudo-random transitions and maintains 145 automated tests.
+- **Internal Verification:** Line has undergone automated model checking across 50 pseudo-random transitions and maintains 181 automated tests across 38 test suites.
 - **Audit Limitation:** Line has not yet been audited by an independent external cybersecurity firm. Production deployments with institutional funds must follow a formal security audit.
 - **Client Custody:** Browser storage uses WebCrypto AES-GCM 256-bit encryption for local testing. Institutional production deployments must use dedicated hardware security modules (HSM) or institutional MPC signers.
 

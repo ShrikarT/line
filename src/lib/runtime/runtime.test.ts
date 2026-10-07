@@ -6,7 +6,7 @@ import {
   InMemoryTestRuntime,
   getRuntime,
 } from "./index.ts";
-import { ISSUER_SK, MERCHANT_A_SK, AGENT_SK } from "../../test/fixtures/keys.ts";
+import { ISSUER_SK, MERCHANT_A_SK, MERCHANT_A_PK, AGENT_SK } from "../../test/fixtures/keys.ts";
 
 describe("runtime architecture: MidnightNetworkRuntime, LocalDevelopmentRuntime, InMemoryTestRuntime", () => {
   it("MidnightNetworkRuntime defaults to unconfigured in test environment and fails clearly", async () => {
@@ -70,5 +70,69 @@ describe("runtime architecture: MidnightNetworkRuntime, LocalDevelopmentRuntime,
     assert.equal(localRuntime.mode, "local");
     const netRuntime = getRuntime("network");
     assert.equal(netRuntime.mode, "network");
+  });
+
+  it("LocalDevelopmentRuntime.draw requires merchantPk and rejects when missing", async () => {
+    const local = new LocalDevelopmentRuntime();
+    await local.fundReserve(500, ISSUER_SK);
+    await local.registerMerchant(MERCHANT_A_PK, ISSUER_SK);
+    await local.openLine({
+      limit: 150,
+      expiry: 10_000,
+      callerSk: ISSUER_SK,
+      agentSecret: AGENT_SK,
+      salt: "salt-0",
+    });
+
+    const quoteRes = await local.postQuote({
+      amount: 40,
+      expiry: 10_000,
+      invoiceId: "inv-req-pk",
+      nonce: "nonce-1",
+      merchantSk: MERCHANT_A_SK,
+    });
+    assert.equal(quoteRes.ok, true);
+    const quoteCommit = quoteRes.output?.Q as string;
+    assert.ok(quoteCommit);
+
+    // Call draw without merchantPk -> must fail with MISSING_MERCHANT_PK
+    const drawNoPk = await local.draw({
+      quoteCommit,
+      limit: 150,
+      outstanding: 0,
+      epoch: 0,
+      amount: 40,
+      expiry: 10_000,
+      callerSk: AGENT_SK,
+      agentSecret: AGENT_SK,
+      salt: "salt-0",
+      newSalt: "salt-1",
+      invoiceId: "inv-req-pk",
+      quoteNonce: "nonce-1",
+      noteNonce: "note-nonce-1",
+      noteSalt: "note-salt-1",
+    });
+    assert.equal(drawNoPk.ok, false);
+    assert.equal(drawNoPk.code, "MISSING_MERCHANT_PK");
+
+    // Call draw with merchantPk -> must succeed
+    const drawWithPk = await local.draw({
+      quoteCommit,
+      limit: 150,
+      outstanding: 0,
+      epoch: 0,
+      amount: 40,
+      expiry: 10_000,
+      callerSk: AGENT_SK,
+      agentSecret: AGENT_SK,
+      salt: "salt-0",
+      newSalt: "salt-1",
+      invoiceId: "inv-req-pk",
+      quoteNonce: "nonce-1",
+      noteNonce: "note-nonce-1",
+      noteSalt: "note-salt-1",
+      merchantPk: MERCHANT_A_PK,
+    });
+    assert.equal(drawWithPk.ok, true);
   });
 });
