@@ -14,9 +14,12 @@ async function main() {
     process.exit(1);
   }
 
-  const networkId = process.env.MIDNIGHT_NETWORK_ID ?? "midnight-testnet";
-  const indexerUri = process.env.MIDNIGHT_INDEXER_URI ?? "https://indexer.testnet-02.midnight.network/api/v1/graphql";
-  const indexerWsUri = process.env.MIDNIGHT_INDEXER_WS_URI ?? "wss://indexer.testnet-02.midnight.network/api/v1/graphql/ws";
+  const networkId = process.env.MIDNIGHT_NETWORK_ID ?? "midnight-preprod";
+  let indexerUri = process.env.MIDNIGHT_INDEXER_URI ?? "https://indexer.preprod.midnight.network/api/v4/graphql";
+  if (indexerUri.includes("indexer.preprod.midnight.network") && (indexerUri.endsWith("/v1/graphql") || !indexerUri.includes("/graphql"))) {
+    indexerUri = "https://indexer.preprod.midnight.network/api/v4/graphql";
+  }
+  const indexerWsUri = process.env.MIDNIGHT_INDEXER_WS_URI ?? "wss://indexer.preprod.midnight.network/api/v4/graphql/ws";
 
   console.log("=================================================");
   console.log(" Line — Midnight Contract Connection");

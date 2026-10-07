@@ -1,6 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { MidnightNetworkRuntime } from "../src/lib/runtime/network.ts";
+import { LocalDevelopmentRuntime } from "../src/lib/runtime/local.ts";
 import { hexToBytes } from "../src/lib/line/encoding.ts";
 import { AGENT_SK, MERCHANT_A_PK } from "../src/test/fixtures/keys.ts";
 
@@ -154,4 +155,43 @@ describe("proof test: MidnightNetworkRuntime witness and circuit alignment", () 
       }
     });
   });
+
+  it("draw refuses when noteExpiry is missing (hard error), while fee keeps ?? 0 default", async () => {
+    const net = new MidnightNetworkRuntime({
+      networkId: "midnight-testnet",
+      contractAddress: "0x" + "11".repeat(32),
+    });
+    (net as any).connectedWallet = { walletProvider: {}, midnightProvider: {} };
+
+    const validParams = {
+      quoteCommit: "0x" + "aa".repeat(32),
+      limit: 500,
+      outstanding: 50,
+      epoch: 2,
+      amount: 40,
+      callerSk: AGENT_SK,
+      agentSecret: AGENT_SK,
+      salt: "0x" + "bb".repeat(32),
+      newSalt: "0x" + "cc".repeat(32),
+      invoiceId: "inv-test-proof",
+      quoteNonce: "0x" + "dd".repeat(32),
+      noteNonce: "0x" + "ee".repeat(32),
+      noteSalt: "0x" + "ff".repeat(32),
+      merchantPk: MERCHANT_A_PK,
+    };
+
+    // Missing noteExpiry in network runtime must throw
+    await assert.rejects(
+      async () => await net.draw(validParams as any),
+      /Draw refused: noteExpiry is required/
+    );
+
+    // Missing noteExpiry in local runtime must throw
+    const local = new LocalDevelopmentRuntime();
+    await assert.rejects(
+      async () => await local.draw(validParams as any),
+      /Draw refused: noteExpiry is required/
+    );
+  });
 });
+
