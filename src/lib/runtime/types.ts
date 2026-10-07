@@ -38,6 +38,8 @@ export type RuntimeTransactionResult = {
   output?: Record<string, unknown>;
 };
 
+export type LineTransactionResult = RuntimeTransactionResult;
+
 export interface LineRuntime {
   readonly mode: RuntimeMode;
   readonly networkId: string;
@@ -47,7 +49,9 @@ export interface LineRuntime {
   getReserveStatus(): Promise<ReserveStatus>;
   fundReserve(amount: number, callerSk: string): Promise<RuntimeTransactionResult>;
   withdrawReserve(amount: number, callerSk: string): Promise<RuntimeTransactionResult>;
+  withdrawFees(callerSk?: string): Promise<RuntimeTransactionResult>;
   registerMerchant(merchantPk: string, callerSk: string): Promise<RuntimeTransactionResult>;
+  disableMerchant(merchantPk: string, callerSk?: string): Promise<RuntimeTransactionResult>;
   openLine(params: {
     limit: number;
     expiry: number;
@@ -68,7 +72,9 @@ export interface LineRuntime {
     outstanding: number;
     epoch: number;
     amount: number;
-    expiry: number;
+    expiry?: number;
+    noteExpiry?: number | bigint;
+    fee?: number | bigint;
     callerSk: string;
     agentSecret: string;
     salt: string;
@@ -82,7 +88,8 @@ export interface LineRuntime {
   redeemDraw(params: {
     noteCommit: string;
     amount: number;
-    expiry: number;
+    expiry?: number;
+    noteExpiry?: number | bigint;
     merchantSk: string;
     noteIdentity: string;
     noteQuoteCommit: string;
