@@ -213,11 +213,15 @@ export class LocalDevelopmentRuntime implements LineRuntime {
     noteSalt: string;
     merchantPk?: string;
   }): Promise<RuntimeTransactionResult> {
+    const rawExp = params.noteExpiry ?? params.expiry;
+    if (rawExp === undefined || rawExp === null || Number(rawExp) <= 0) {
+      throw new Error("Draw refused: noteExpiry is required");
+    }
+    const exp = Number(rawExp);
+    const feeNum = Number(params.fee ?? 0);
+
     const quoteRec = this.ledger.quotes.find((q) => q.commitment === params.quoteCommit);
     if (!quoteRec) return { ok: false, error: "Clearance could not be proven.", code: "QUOTE_NOT_FOUND" };
-
-    const exp = Number(params.noteExpiry ?? params.expiry ?? 0);
-    const feeNum = Number(params.fee ?? 0);
 
     const merchantCommitment = params.merchantPk;
     if (!merchantCommitment) {

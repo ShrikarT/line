@@ -51,7 +51,7 @@ Compact toolchain `0.34.0`, language `0.26.0`, runtime `0.19.0`, Node `>= 22`.
 npm run compact:compile    # compile Compact contract
 git diff --exit-code contracts/managed/  # check for drift
 npm run compact:test       # run Compact simulator tests
-npm test                   # run complete test suite (181 tests)
+npm test                   # run complete test suite (182 tests)
 npm run typecheck          # TypeScript check
 npm run build              # Frontend build
 npm run network:smoke      # Network connectivity smoke test
