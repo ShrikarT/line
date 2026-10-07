@@ -86,7 +86,7 @@ This verifies that `contracts/line.compact` compiles cleanly without warnings or
 
 ### 4.3 Running the Full Verification Suite
 ```bash
-# Run all 181 automated tests across 38 suites (Compact simulator, reference engine, demo, MCP, model checker)
+# Run all 182 automated tests across 38 suites (Compact simulator, reference engine, demo, MCP, model checker)
 npm test
 
 # Run Compact simulator contract tests specifically
