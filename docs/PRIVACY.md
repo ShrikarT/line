@@ -14,19 +14,19 @@ This document details the exact public disclosure model, state-delta inference v
 The agent's financial credit book $(L, B, \text{capacity})$ is strictly confidential:
 - **Private Witness Only:** $L$ (limit) and $B$ (outstanding debt) exist only within the agent's private circuit witness during execution of `draw`.
 - **State Commitment $C$:** The public ledger records only $C = \text{persistentCommit}(\{ \text{domain}, I, L, B, \text{epoch} \}, \text{salt})$. Observers cannot determine $L$, $B$, or $(L - B)$ from $C$.
-- **ZK Capacity Proof:** The circuit enforces $B + A \le L$ inside zero-knowledge. Observers learn only that the constraint was satisfied.
+- **ZK Capacity Proof:** The circuit enforces $B + A + \text{fee} \le L$ inside zero-knowledge. Observers learn only that the constraint was satisfied.
 - **Generic Failure Response:** If an invoice exceeds available capacity, the protocol rejects the draw with a generic error: `"Clearance could not be proven."` No margin or reason is revealed.
 
 ---
 
 ## Complete Ledger Field Inventory
 
-Every public ledger field in `contracts/line.compact` is documented below:
+Every public ledger field in `contracts/line.compact` across all 12 circuits is documented below:
 
 | Field Name | Source / Type | Public? | Directly Sensitive? | Delta Inference? | Identity Linkage? | Purpose & Justification | Mitigation / Privacy Boundary |
 |---|---|---|---|---|---|---|---|
 | `contractDomain` | `Cell<Bytes<32>>` | Yes | No | No | No | Domain separation across contract deployments. Prevents cross-instance replays. | Cryptographically derived from deployer public keys and `instanceNonce`. |
-| `issuer` | `Cell<Bytes<32>>` | Yes | Low | No | Identifies Issuer | Authenticates admin circuits (`openLine`, `fundReserve`, `repayAck`, `setStatus`). | Issuer is the capital provider; public authority is required for governance. |
+| `issuer` | `Cell<Bytes<32>>` | Yes | Low | No | Identifies Issuer | Authenticates admin circuits (`openLine`, `fundReserve`, `repayAck`, `setStatus`, `withdrawFees`, `disableMerchant`). | Issuer is the capital provider; public authority is required for governance. |
 | `identityCommit` | `Cell<Bytes<32>>` | Yes | No | No | Pseudonymous | Binds active credit line to agent identity commitment $I = \text{agentId}(k)$. | Agent secret key $k$ is never revealed; $I$ is an opaque persistent hash. |
 | `lineCommit` | `Cell<Bytes<32>>` | Yes | No | No | No | Cryptographic root $C$ representing current $(I, L, B, \text{epoch})$. | Commitment hides $L$ and $B$; rotated to fresh $C'$ with random salt on each transition. |
 | `lineExpiry` | `Cell<Uint<64>>` | Yes | Low | No | No | Enforces temporal validity of credit facility. | Standard loan lifecycle parameter. |
@@ -36,8 +36,9 @@ Every public ledger field in `contracts/line.compact` is documented below:
 | `totalReserve` | `Cell<Uint<64>>` | Yes | Moderate | Yes | No | Total capital allocated by issuer to back draw notes. | Reveals aggregate issuer capacity. |
 | `encumberedReserve` | `Cell<Uint<64>>` | Yes | Moderate | Yes ($\Delta = A$) | No | Capital committed to outstanding unredeemed draw notes. | **Delta Analysis:** Increases by draw amount $A$. See State Delta Analysis below. |
 | `redeemedReserve` | `Cell<Uint<64>>` | Yes | Moderate | Yes ($\Delta = A$) | No | Cumulative claims settled by merchants. | **Delta Analysis:** Increases by note amount $A$ upon redemption. |
+| `feeReserve` | `Cell<Uint<64>>` | Yes | Moderate | Yes ($\Delta = \text{fee}$) | No | Total accrued draw fees collected for the issuer. | **Delta Analysis:** Increases by draw fee; zeroed upon `withdrawFees`. |
 | `registeredMerchants` | `Map<Bytes<32>, Boolean>` | Yes | Low | No | Pseudonymous | Authorizes registered merchant public keys (`merchantPk`). | Prevents spam quotes from unauthorized parties. |
-| `quotes[Q]` | `Map<Bytes<32>, QuoteMeta>` | Yes | Moderate | No | Links Merchant | Tracks quote validity and prevents reuse. Contains `merchantPk`. | Quote amount is hidden in hash $Q$; `merchantPk` is public pseudonym. |
+| `quotes[Q]` | `Map<Bytes<32>, QuoteMeta>` | Yes | Moderate | No | Links Merchant | Tracks quote validity and prevents reuse. | Quote amount is hidden in hash $Q$; `merchantPk` is public pseudonym. |
 | `notes[D]` | `Map<Bytes<32>, NoteMeta>` | Yes | Moderate | Reveals $A$ | No | Authorizes one-time merchant redemption. Contains `amount`, `expiry`. | `amount` is public on-chain metadata for settlement claims. Merchant identity is hidden in commitment $D$. |
 | `nullifiers[N]` | `Set<Bytes<32>>` | Yes | No | No | No | Prevents replay of quotes, note redemptions, and repayment receipts. | Nullifiers are pseudorandom one-way hashes; unlinked to preimage. |
 

@@ -221,4 +221,86 @@ describe("production store: full lifecycle, vault custody & witnesses", () => {
     // AGENTS.md hard constraint: generic error copy on rejected draws
     assert.equal(useAppStore.getState().flash?.text, "Clearance could not be proven.");
   });
+
+  it("refuses doDraw and doAck when agent vault record is missing", async () => {
+    const store = useAppStore.getState();
+    await store.unlockVault("VaultPassphrase12345!");
+    await store.generateIdentity("issuer");
+    await store.generateIdentity("merchant");
+    await store.generateIdentity("agent");
+    await store.doFundReserve(500);
+    await store.doRegisterMerchant();
+    await store.doOpen(150);
+    await store.doQuote(40, "inv-no-agent");
+    const quote = useAppStore.getState().merchantQuotes[0];
+    assert.ok(quote);
+
+    // Clear agent vault record
+    useAppStore.setState({ agentLineRecord: null, agentRecord: null });
+
+    const drawOk = await store.doDraw(quote.quoteCommitment);
+    assert.equal(drawOk, false);
+    assert.equal(
+      useAppStore.getState().flash?.text,
+      "Draw refused: vault record missing for this agent. Open a line first."
+    );
+
+    const ackOk = await store.doAck(20, "wire-no-agent");
+    assert.equal(ackOk, false);
+    assert.equal(
+      useAppStore.getState().flash?.text,
+      "Repay ack refused: vault record missing for this agent."
+    );
+  });
+
+  it("enforces fee capacity boundaries and updates outstanding with fee", async () => {
+    const store = useAppStore.getState();
+    await store.unlockVault("VaultPassphrase12345!");
+    await store.generateIdentity("issuer");
+    await store.generateIdentity("merchant");
+    await store.generateIdentity("agent");
+    await store.doFundReserve(500);
+    await store.doRegisterMerchant();
+    await store.doOpen(100);
+
+    // 1. Capacity failure with fee: amount (90) <= limit (100), but amount + fee (15) = 105 > limit (100)
+    await store.doQuote(90, "inv-fee-overdraw");
+    const quoteOver = useAppStore.getState().merchantQuotes[0];
+    assert.ok(quoteOver);
+    useAppStore.setState({
+      merchantQuotes: useAppStore.getState().merchantQuotes.map((q) =>
+        q.quoteCommitment === quoteOver.quoteCommitment ? { ...q, fee: 15 } : q
+      ),
+    });
+
+    const drawFail = await store.doDraw(quoteOver.quoteCommitment);
+    assert.equal(drawFail, false);
+    assert.equal(useAppStore.getState().flash?.text, "Clearance could not be proven.");
+
+    // 2. Successful draw with fee: amount = 40, fee = 10 -> newOutstanding = 50
+    await store.doQuote(40, "inv-fee-ok");
+    const quoteOk = useAppStore.getState().merchantQuotes.find((q) => q.displayInvoiceId === "inv-fee-ok");
+    assert.ok(quoteOk);
+    useAppStore.setState({
+      merchantQuotes: useAppStore.getState().merchantQuotes.map((q) =>
+        q.quoteCommitment === quoteOk.quoteCommitment ? { ...q, fee: 10 } : q
+      ),
+    });
+
+    const drawPass = await store.doDraw(quoteOk.quoteCommitment);
+    assert.equal(drawPass, true);
+    assert.equal(useAppStore.getState().agentLineRecord?.outstanding, 50);
+    assert.equal(useAppStore.getState().agentRecord?.B, 50);
+
+    // 3. Draw with fee === 0: amount = 30, fee = 0 -> newOutstanding = 50 + 30 = 80
+    await store.doQuote(30, "inv-fee-zero");
+    const quoteZero = useAppStore.getState().merchantQuotes.find((q) => q.displayInvoiceId === "inv-fee-zero");
+    assert.ok(quoteZero);
+
+    const drawZero = await store.doDraw(quoteZero.quoteCommitment);
+    assert.equal(drawZero, true);
+    assert.equal(useAppStore.getState().agentLineRecord?.outstanding, 80);
+    assert.equal(useAppStore.getState().agentRecord?.B, 80);
+  });
 });
+

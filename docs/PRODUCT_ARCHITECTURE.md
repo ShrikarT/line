@@ -16,16 +16,18 @@ With Line:
 
 ---
 
-## The 10 Compact Circuits
+## The 12 Compact Circuits
 
-The protocol is formally specified in `contracts/line.compact` across exactly ten circuits:
+The protocol is formally specified in `contracts/line.compact` across exactly 12 circuits:
 
 ```mermaid
 flowchart TD
     subgraph Governance & Capital
         FR[fundReserve]
         WR[withdrawUnencumberedReserve]
+        WF[withdrawFees]
         RM[registerMerchant]
+        DM[disableMerchant]
         SS[setStatus]
     end
 
@@ -46,6 +48,7 @@ flowchart TD
     DR --> CN
     RD --> AR
     WR -.-> FR
+    WF -.-> FR
 ```
 
 ### 1. `registerMerchant(merchantPk: Bytes<32>)`
@@ -53,65 +56,74 @@ flowchart TD
 - **Purpose:** Whitelists merchant public keys in `registeredMerchants` map.
 - **Security:** Ensures only verified merchant pseudonyms can post quotes and receive claim notes.
 
-### 2. `fundReserve(amount: Uint<64>)`
+### 2. `disableMerchant(merchantPk: Bytes<32>)`
+- **Caller:** Issuer
+- **Purpose:** Disables a registered merchant: blocks new quotes from being posted while preserving membership so existing quotes remain drawable.
+
+### 3. `fundReserve(amount: Uint<64>)`
 - **Caller:** Issuer
 - **Purpose:** Allocates settlement reserve capacity backing agent draw notes.
 - **Accounting:** `totalReserve = totalReserve + amount`.
 
-### 3. `withdrawUnencumberedReserve(amount: Uint<64>)`
+### 4. `withdrawUnencumberedReserve(amount: Uint<64>)`
 - **Caller:** Issuer
 - **Purpose:** Permits withdrawal of idle reserve capital.
-- **Invariants:** `amount <= totalReserve - (encumberedReserve + redeemedReserve)`. Prevents issuer from rug-pulling capital encumbered by active draw notes.
+- **Invariants:** `amount <= totalReserve - (encumberedReserve + redeemedReserve + feeReserve)`. Prevents issuer from rug-pulling capital encumbered by active draw notes or accrued fees.
 
-### 4. `openLine(limit: Uint<64>, expiry: Uint<64>)`
+### 5. `withdrawFees()`
+- **Caller:** Issuer
+- **Purpose:** Releases accrued draw fees from `feeReserve` back to the issuer.
+- **Accounting:** Decrements `totalReserve` and `feeReserve` by the accrued fee amount.
+
+### 6. `openLine(expiry: Uint<64>)`
 - **Caller:** Issuer
 - **Purpose:** Establishes the agent's revolving line.
-- **Witnesses:** Agent secret $k$, initial commitment salt $s_0$.
+- **Witnesses:** Agent secret $k$, initial commitment salt $s_0$, and credit limit $L$ (via witness `lineLimit()`).
 - **Commitment:** $C_0 = \text{persistentCommit}(\{ \text{domain}, I, L, 0, 0 \}, s_0)$ where $I = \text{agentId}(k)$.
 - **Privacy:** Credit limit $L$ and balance $B=0$ are committed in witness; neither is stored in plaintext on-chain.
 
-### 5. `postQuote(amount: Uint<64>, expiry: Uint<64>)`
+### 7. `postQuote(expiry: Uint<64>)`
 - **Caller:** Registered Merchant
 - **Purpose:** Commits to purchase price and terms.
-- **Witnesses:** Merchant secret $sk_M$, invoice ID $\text{invId}$, nonce.
+- **Witnesses:** Merchant secret $sk_M$, invoice ID $\text{invId}$, nonce, and quote amount $A$ (via witness `quoteAmount()`).
 - **Commitment:** $Q = \text{persistentHash}([\text{"line:quote"}, \text{merchantPk}, A, \text{invId}, \text{expiry}, \text{nonce}, \text{gen}, \text{domain}])$.
 
-### 6. `draw(quoteCommitPublic, limit, outstanding, epoch, amount, quoteExpiry)`
+### 8. `draw(quoteCommitPublic: Bytes<32>, noteExpiry: Uint<64>, fee: Uint<64>)`
 - **Caller:** Agent
 - **Verification:**
   - Authenticates agent identity: $\text{agentId}(k) == I$.
-  - Opens current commitment $C$: $\text{persistentCommit}(\{ \text{domain}, I, L, B, e \}, s) == C$.
-  - Enforces capacity constraint in ZK: $B + A \le L$.
-  - Reconstructs quote $Q$ to verify merchant price and expiration.
-  - Enforces reserve backing: $\text{withdrawableReserve} \ge A$.
+  - Opens current commitment $C$ using private witness books: $\text{persistentCommit}(\{ \text{domain}, I, L, B, e \}, s) == C$.
+  - Enforces capacity constraint in ZK: $B + A + \text{fee} \le L$.
+  - Reconstructs quote $Q$ from private quote witnesses (amount, nonce, merchantPk, invoiceId) plus public quote metadata to verify merchant price and terms.
+  - Enforces reserve backing: $\text{withdrawableReserve} \ge A + \text{fee}$.
 - **State Mutation:**
   - Spends nullifier $N_{\text{draw}} = \text{persistentHash}([\text{"line:draw"}, k, Q, \text{domain}])$.
-  - Rotates commitment to $C' = \text{persistentCommit}(\{ \text{domain}, I, L, B + A, e + 1 \}, s_{\text{new}})$.
-  - Increases `encumberedReserve = encumberedReserve + A`.
+  - Rotates commitment to $C' = \text{persistentCommit}(\{ \text{domain}, I, L, B + A + \text{fee}, e + 1 \}, s_{\text{new}})$.
+  - Increases `encumberedReserve += A` and `feeReserve += fee`.
   - Creates draw note $D = \text{persistentCommit}(\text{DrawNotePreimage}, \text{noteSalt})$.
 
-### 7. `redeemDraw(noteCommit, amount, expiry)`
+### 9. `redeemDraw(noteCommitPublic: Bytes<32>, noteExpiry: Uint<64>)`
 - **Caller:** Merchant
 - **Verification:**
   - Proves knowledge of note opening and merchant ownership in ZK: $\text{merchantPk} == \text{publicKey}(sk_M)$.
-  - Enforces note has not expired: $\text{actionClock} \le \text{expiry}$.
+  - Enforces note has not expired: $\text{actionClock} \le \text{noteExpiry}$.
 - **State Mutation:**
   - Inserts redemption nullifier $N_{\text{redeem}} = \text{persistentHash}([\text{"line:redeem"}, sk_M, D, \text{domain}])$.
   - Moves encumbered capital: `encumberedReserve -= amount`, `redeemedReserve += amount`.
   - Marks note redeemed in `notes[D].redeemed = true`.
 
-### 8. `cancelOrExpireNote(noteCommit, amount)`
+### 10. `cancelOrExpireNote(noteCommitPublic: Bytes<32>)`
 - **Caller:** Any authorized party
 - **Purpose:** Releases encumbered reserve when a draw note expires without redemption ($\text{actionClock} > \text{expiry}$).
 - **State Mutation:** Marks `notes[D].cancelled = true` and decrements `encumberedReserve -= amount`.
 
-### 9. `acknowledgeRepayment(limit, outstanding, epoch, amount, receiptExpiry)`
+### 11. `acknowledgeRepayment(receiptExpiry: Uint<64>)`
 - **Caller:** Issuer
 - **Purpose:** Reconciles off-chain payment and restores available revolving capacity.
-- **Verification:** Opens current commitment $C$ and spends repayment nullifier $N_{\text{repay}}$.
+- **Verification:** Opens current commitment $C$ via private witness books and spends repayment nullifier $N_{\text{repay}}$.
 - **State Mutation:** Rotates $C \to C'$ with $B' = B - A$ and $e' = e + 1$.
 
-### 10. `setStatus(next: Status)`
+### 12. `setStatus(next: Status)`
 - **Caller:** Issuer
 - **Purpose:** Administrative lifecycle controls (`OPEN`, `DEFAULTED`, `CLOSED`). Defaulting freezes draw circuits immediately.
 

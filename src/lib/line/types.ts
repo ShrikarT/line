@@ -230,6 +230,7 @@ export interface MerchantQuoteRecord {
   quoteNonce: string;
   quoteCommitment: string;
   lineGeneration: number;
+  fee?: number;
   status: "open" | "consumed" | "expired";
   transactionId?: string;
   updatedAt: number;
@@ -286,6 +287,7 @@ export interface QuoteTransferPackage {
   amount: number;
   expiry: number;
   quoteNonce: string;
+  fee?: number;
   issuedAt: number;
 }
 
