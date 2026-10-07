@@ -38,10 +38,10 @@ export function Shell({ children }: { children: React.ReactNode }) {
       <header className="border-b border-border">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-4">
           <div className="flex items-center gap-3">
-            <a href="/" className="flex items-baseline gap-2">
-              <span className="font-display text-lg tracking-tight">Line</span>
-              <span className="hidden text-xs text-muted sm:inline">
-                Private credit authorization
+            <a href="/" className="flex items-center gap-2.5">
+              <img src="/brand/logo-pixel.svg" alt="" className="h-7 w-auto" />
+              <span className="font-display text-lg font-semibold lowercase tracking-tight text-fg">
+                line
               </span>
             </a>
 
@@ -52,7 +52,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
                 isNetwork
                   ? isConnected && contractAddr
                     ? "border-ok/30 bg-ok/10 text-ok"
-                    : "border-amber-500/40 bg-amber-500/10 text-amber-400"
+                    : "border-red/40 bg-red/10 text-red"
                   : "border-border bg-elevated text-muted hover:text-fg"
               )}
               title="Click to configure runtime / wallet"
@@ -63,7 +63,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
                   isNetwork
                     ? isConnected && contractAddr
                       ? "bg-ok"
-                      : "bg-amber-400"
+                      : "bg-red"
                     : "bg-muted"
                 )}
               />
@@ -71,14 +71,14 @@ export function Shell({ children }: { children: React.ReactNode }) {
             </button>
           </div>
 
-          <nav className="flex flex-wrap gap-1">
+          <nav className="-mx-1 flex max-w-full gap-1 overflow-x-auto px-1">
             {NAV.map((item) => (
               <a
                 key={item.to}
                 href={item.to}
                 className={cn(
-                  "rounded-sm px-3 py-2 text-sm text-muted transition-colors duration-[var(--motion-quick)] hover:text-fg",
-                  pathname === item.to && "bg-elevated text-fg",
+                  "shrink-0 whitespace-nowrap border-b-2 border-transparent px-3 py-2 text-sm text-muted transition-colors duration-[var(--motion-quick)] hover:text-fg",
+                  pathname === item.to && "border-accent text-fg",
                 )}
               >
                 {item.label}
@@ -113,7 +113,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
 
       {/* Network warning banner when in network mode without active wallet connection */}
       {isNetwork && (!isConnected || !contractAddr) && !showNetworkSetup && (
-        <div className="border-b border-amber-500/30 bg-amber-500/10 px-4 py-2 text-xs text-amber-300">
+        <div className="border-b border-red/30 bg-red/10 px-4 py-2 text-xs text-red">
           <div className="mx-auto flex max-w-6xl items-center justify-between gap-2">
             <span>
               <strong>Midnight Network Mode:</strong> External wallet or contract address unconfigured. Transactions require on-chain setup.
@@ -121,14 +121,14 @@ export function Shell({ children }: { children: React.ReactNode }) {
             <div className="flex gap-2">
               <button
                 onClick={() => setShowNetworkSetup(true)}
-                className="underline hover:text-amber-200"
+                className="underline hover:text-fg"
               >
                 Configure Connection
               </button>
               <span>·</span>
               <button
                 onClick={handleToggleMode}
-                className="underline hover:text-amber-200"
+                className="underline hover:text-fg"
               >
                 Switch to Simulator
               </button>

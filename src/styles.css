@@ -1,19 +1,27 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap");
 @import "tailwindcss";
 
 @theme {
-  --color-bg: #090a0c;
-  --color-elevated: #111318;
-  --color-subtle-fill: #181b22;
-  --color-fg: #f8fafc;
-  --color-muted: #94a3b8;
-  --color-subtle: #64748b;
-  --color-border: #1f242f;
-  --color-accent: #0f766e;
+  --color-bg: #faf2e7;
+  --color-elevated: #ffffff;
+  --color-surface: #ffffff;
+  --color-subtle-fill: #f1ece1;
+  --color-fg: #0c1522;
+  --color-cream: #faf2e7;
+  --color-muted: #4a5b7c;
+  --color-subtle: #7c8aa5;
+  --color-border: #e4daca;
+  --color-row: #e4dccc;
+  --color-accent: #f47457;
   --color-accent-fg: #ffffff;
-  --color-ok: #10b981;
-  --color-danger: #f43f5e;
-  --font-display: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
-  --font-sans: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --color-navy: #1e3a6e;
+  --color-red: #e85a3c;
+  --color-pink: #f8b0c6;
+  --color-charcoal: #101318;
+  --color-ok: #1f8a5b;
+  --color-danger: #c5344a;
+  --font-display: "Space Grotesk", "Inter", system-ui, sans-serif;
+  --font-sans: "Inter", "Segoe UI", system-ui, sans-serif;
   --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   --radius-sm: 6px;
   --radius-md: 8px;
@@ -41,9 +49,35 @@
     color: var(--color-fg);
   }
 
+  h1,
+  h2,
+  h3,
+  .font-display {
+    font-family: var(--font-display);
+  }
+
   @media (prefers-reduced-motion: reduce) {
     * {
       transition-duration: 0.01ms !important;
     }
   }
+}
+
+/* Charcoal attack-lab surface. Descendant muted text stays readable. */
+.ink-panel {
+  background: var(--color-charcoal);
+  color: var(--color-cream);
+  border: 1px solid color-mix(in srgb, var(--color-pink) 28%, transparent);
+}
+
+.ink-panel .text-muted {
+  color: color-mix(in srgb, var(--color-cream) 78%, var(--color-pink));
+}
+
+.ink-panel .text-subtle {
+  color: var(--color-pink);
+}
+
+.ink-panel h2 {
+  color: var(--color-cream);
 }
