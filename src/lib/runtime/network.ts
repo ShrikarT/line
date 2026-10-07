@@ -785,7 +785,11 @@ export class MidnightNetworkRuntime implements LineRuntime {
     if (!this.connectedWallet) throw new WalletNotConnectedError();
     if (!this.contractAddress) throw new ContractNotConfiguredError();
 
-    const noteExpiry = params.noteExpiry ?? params.expiry ?? 0;
+    const rawExp = params.noteExpiry ?? params.expiry;
+    if (rawExp === undefined || rawExp === null || Number(rawExp) <= 0) {
+      throw new Error("Draw refused: noteExpiry is required");
+    }
+    const noteExpiry = rawExp;
     const fee = params.fee ?? 0;
     params = { ...params, noteExpiry, fee };
 

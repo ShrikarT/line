@@ -271,7 +271,7 @@ See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for full deployment instructions.
 
 ## Security & Audit Limitations
 
-- **Internal Verification:** Line has undergone automated model checking across 50 pseudo-random transitions and maintains 181 automated tests across 38 test suites.
+- **Internal Verification:** Line has undergone automated model checking across 50 pseudo-random transitions and maintains 182 automated tests across 38 test suites.
 - **Audit Limitation:** Line has not yet been audited by an independent external cybersecurity firm. Production deployments with institutional funds must follow a formal security audit.
 - **Client Custody:** Browser storage uses WebCrypto AES-GCM 256-bit encryption for local testing. Institutional production deployments must use dedicated hardware security modules (HSM) or institutional MPC signers.
 
