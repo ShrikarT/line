@@ -41,10 +41,13 @@ async function main() {
   console.log(`Compiler Version: ${manifest["compiler-version"]}`);
   console.log(`Runtime Version:  ${manifest["runtime-version"]}`);
 
-  const networkId = process.env.MIDNIGHT_NETWORK_ID ?? "midnight-testnet";
-  const indexerUri = process.env.MIDNIGHT_INDEXER_URI ?? "https://indexer.testnet-02.midnight.network/api/v1/graphql";
-  const indexerWsUri = process.env.MIDNIGHT_INDEXER_WS_URI ?? "wss://indexer.testnet-02.midnight.network/api/v1/graphql/ws";
-  const nodeUri = process.env.MIDNIGHT_NODE_URI ?? "https://rpc.testnet-02.midnight.network";
+  const networkId = process.env.MIDNIGHT_NETWORK_ID ?? "midnight-preprod";
+  let indexerUri = process.env.MIDNIGHT_INDEXER_URI ?? "https://indexer.preprod.midnight.network/api/v4/graphql";
+  if (indexerUri.includes("indexer.preprod.midnight.network") && (indexerUri.endsWith("/v1/graphql") || !indexerUri.includes("/graphql"))) {
+    indexerUri = "https://indexer.preprod.midnight.network/api/v4/graphql";
+  }
+  const indexerWsUri = process.env.MIDNIGHT_INDEXER_WS_URI ?? "wss://indexer.preprod.midnight.network/api/v4/graphql/ws";
+  const nodeUri = process.env.MIDNIGHT_NODE_URI ?? "https://rpc.preprod.midnight.network";
   const proofServerUri = process.env.MIDNIGHT_PROOF_SERVER_URI ?? "http://127.0.0.1:6300";
   const deployerSeed = process.env.MIDNIGHT_DEPLOYER_SEED;
 
@@ -61,7 +64,7 @@ async function main() {
     console.error("\nTo execute an on-chain deployment, provide the following environment variables:");
     console.error("  MIDNIGHT_DEPLOYER_SEED      Funded deployer seed phrase or secret key");
     console.error("  MIDNIGHT_STORAGE_PASSWORD   (Optional) Encryption password for private state");
-    console.error("  MIDNIGHT_NETWORK_ID         Target network ID (default: midnight-testnet)");
+    console.error("  MIDNIGHT_NETWORK_ID         Target network ID (default: midnight-preprod)");
     console.error("  MIDNIGHT_NODE_URI           Midnight Substrate RPC endpoint");
     console.error("  MIDNIGHT_INDEXER_URI        Midnight GraphQL indexer endpoint");
     console.error("  MIDNIGHT_PROOF_SERVER_URI   Local or remote Midnight proof server");
@@ -115,6 +118,14 @@ async function main() {
     noteSalt: () => [undefined, new Uint8Array(32)],
     noteIdentity: () => [undefined, new Uint8Array(32)],
     noteQuoteCommit: () => [undefined, new Uint8Array(32)],
+    lineLimit: () => [undefined, 0n],
+    lineOutstanding: () => [undefined, 0n],
+    lineEpoch: () => [undefined, 0n],
+    quoteAmount: () => [undefined, 0n],
+    drawAmount: () => [undefined, 0n],
+    redeemAmount: () => [undefined, 0n],
+    repayAmount: () => [undefined, 0n],
+    quoteMerchantPk: () => [undefined, new Uint8Array(32)],
   };
   const lineContract = new Contract(dummyWitnesses);
 
