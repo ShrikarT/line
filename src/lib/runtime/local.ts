@@ -10,7 +10,9 @@ import {
   createLedger,
   fundReserve,
   withdrawUnencumberedReserve,
+  withdrawFees,
   registerMerchant,
+  disableMerchant,
   openLine,
   postQuote,
   draw,
@@ -117,9 +119,27 @@ export class LocalDevelopmentRuntime implements LineRuntime {
     return { ok: true, txHash: this.nextTxHash(), blockHeight: this.ledger.actionClock };
   }
 
+  async withdrawFees(callerSk?: string): Promise<RuntimeTransactionResult> {
+    const caller = callerSk ?? this.ledger.issuerPubKey ?? "";
+    this.bindGenesisIssuer(caller);
+    const res = withdrawFees(this.ledger, { caller });
+    if (!res.ok) return { ok: false, error: res.message, code: res.code };
+    this.ledger = res.ledger;
+    return { ok: true, txHash: this.nextTxHash(), blockHeight: this.ledger.actionClock, output: { fees: res.fees } };
+  }
+
   async registerMerchant(merchantPk: string, callerSk: string): Promise<RuntimeTransactionResult> {
     this.bindGenesisIssuer(callerSk);
     const res = registerMerchant(this.ledger, { caller: callerSk, merchantPk });
+    if (!res.ok) return { ok: false, error: res.message, code: res.code };
+    this.ledger = res.ledger;
+    return { ok: true, txHash: this.nextTxHash(), blockHeight: this.ledger.actionClock };
+  }
+
+  async disableMerchant(merchantPk: string, callerSk?: string): Promise<RuntimeTransactionResult> {
+    const caller = callerSk ?? this.ledger.issuerPubKey ?? "";
+    this.bindGenesisIssuer(caller);
+    const res = disableMerchant(this.ledger, { caller, merchantPk });
     if (!res.ok) return { ok: false, error: res.message, code: res.code };
     this.ledger = res.ledger;
     return { ok: true, txHash: this.nextTxHash(), blockHeight: this.ledger.actionClock };
@@ -180,7 +200,9 @@ export class LocalDevelopmentRuntime implements LineRuntime {
     outstanding: number;
     epoch: number;
     amount: number;
-    expiry: number;
+    expiry?: number;
+    noteExpiry?: number | bigint;
+    fee?: number | bigint;
     callerSk: string;
     agentSecret: string;
     salt: string;
@@ -194,6 +216,9 @@ export class LocalDevelopmentRuntime implements LineRuntime {
     const quoteRec = this.ledger.quotes.find((q) => q.commitment === params.quoteCommit);
     if (!quoteRec) return { ok: false, error: "Clearance could not be proven.", code: "QUOTE_NOT_FOUND" };
 
+    const exp = Number(params.noteExpiry ?? params.expiry ?? 0);
+    const feeNum = Number(params.fee ?? 0);
+
     let merchantCommitment = params.merchantPk ?? "";
     if (!merchantCommitment) {
       const match = Object.keys(this.ledger.registeredMerchants).find((pk) => {
@@ -202,7 +227,7 @@ export class LocalDevelopmentRuntime implements LineRuntime {
             merchantCommitment: pk,
             amount: params.amount,
             invoiceId: params.invoiceId,
-            expiry: params.expiry,
+            expiry: params.expiry ?? exp,
             nonce: params.quoteNonce,
             generation: quoteRec.lineGeneration,
           },
@@ -217,7 +242,7 @@ export class LocalDevelopmentRuntime implements LineRuntime {
       merchantCommitment,
       amount: params.amount,
       invoiceId: params.invoiceId,
-      expiry: params.expiry,
+      expiry: params.expiry ?? exp,
       nonce: params.quoteNonce,
       generation: quoteRec.lineGeneration,
     };
@@ -238,6 +263,8 @@ export class LocalDevelopmentRuntime implements LineRuntime {
       newSalt: params.newSalt,
       noteNonce: params.noteNonce,
       noteSalt: params.noteSalt,
+      noteExpiry: exp,
+      fee: feeNum,
     });
     if (!res.ok) return { ok: false, error: res.message, code: res.code };
     this.ledger = res.ledger;
@@ -252,7 +279,8 @@ export class LocalDevelopmentRuntime implements LineRuntime {
   async redeemDraw(params: {
     noteCommit: string;
     amount: number;
-    expiry: number;
+    expiry?: number;
+    noteExpiry?: number | bigint;
     merchantSk: string;
     noteIdentity: string;
     noteQuoteCommit: string;
@@ -262,6 +290,7 @@ export class LocalDevelopmentRuntime implements LineRuntime {
     const noteRec = this.ledger.notes.find((n) => n.commitment === params.noteCommit);
     if (!noteRec) return { ok: false, error: "Note not found", code: "NOTE_NOT_FOUND" };
 
+    const exp = Number(params.noteExpiry ?? params.expiry ?? noteRec.expiry);
     const preimage = {
       domain: this.ledger.contractDomain,
       lineGeneration: noteRec.lineGeneration,
@@ -270,7 +299,7 @@ export class LocalDevelopmentRuntime implements LineRuntime {
       merchantPk: merchantPublicKey(params.merchantSk),
       amount: params.amount,
       noteNonce: params.noteNonce,
-      expiry: params.expiry,
+      expiry: exp,
     };
 
     const res = redeemDraw(this.ledger, {
@@ -278,6 +307,7 @@ export class LocalDevelopmentRuntime implements LineRuntime {
       noteCommitment: params.noteCommit,
       notePreimage: preimage,
       noteSalt: params.noteSalt,
+      noteExpiry: exp,
     });
     if (!res.ok) return { ok: false, error: res.message, code: res.code };
     this.ledger = res.ledger;
