@@ -39,16 +39,27 @@ compact compile --skip-zk contracts/line.compact contracts/managed/line
 3. **Reproducibility**:
    Compiling with `--skip-zk` produces deterministic, verifiable `contract-manifest.json` and `.zkir` files that are verified in CI for zero drift (`git diff --exit-code contracts/managed/`).
 
-### Transition to Full ZK on Midnight Testnet (Wave 3)
-To produce complete cryptographic proving and verifying keys for deployment to Midnight Preprod / Testnet:
-```bash
-# Full ZK compilation (requires 16GB+ RAM and substantial compilation time)
-compact compile contracts/line.compact contracts/managed/line
-```
-This produces:
-- `proving-key.bincode`
-- `verifier-key.bincode`
-- On-chain deployment transaction package
+### 3.1 Full ZK Keygen Constraint & Key Size Matrix (October 4, 2026)
+
+Full zero-knowledge proving and verifying keys generated via `compact compile contracts/line.compact contracts/managed/line` (Compact compiler `0.34.0`, language `0.26.0`, runtime `0.19.0`, ledger `9.1.0.0-rc.3`):
+
+| Circuit | Rows | Halo2 Scale ($k$) | Prover Key Size | Verifier Key Size | Prover File | Verifier File |
+|---|---|---|---|---|---|---|
+| `registerMerchant` | 4,445 | $k=13$ | 2.69 MB | 2.07 KB | `registerMerchant.prover` | `registerMerchant.verifier` |
+| `disableMerchant` | 4,442 | $k=13$ | 2.69 MB | 2.07 KB | `disableMerchant.prover` | `disableMerchant.verifier` |
+| `fundReserve` | 4,338 | $k=13$ | 2.69 MB | 2.07 KB | `fundReserve.prover` | `fundReserve.verifier` |
+| `withdrawUnencumberedReserve` | 4,346 | $k=13$ | 2.69 MB | 2.07 KB | `withdrawUnencumberedReserve.prover` | `withdrawUnencumberedReserve.verifier` |
+| `withdrawFees` | 4,237 | $k=13$ | 2.69 MB | 2.07 KB | `withdrawFees.prover` | `withdrawFees.verifier` |
+| `openLine` | 12,723 | $k=14$ | 4.98 MB | 2.07 KB | `openLine.prover` | `openLine.verifier` |
+| `postQuote` | 15,564 | $k=14$ | 4.98 MB | 2.07 KB | `postQuote.prover` | `postQuote.verifier` |
+| `draw` | 39,262 | $k=16$ | 18.60 MB | 2.07 KB | `draw.prover` | `draw.verifier` |
+| `redeemDraw` | 19,565 | $k=15$ | 9.51 MB | 2.07 KB | `redeemDraw.prover` | `redeemDraw.verifier` |
+| `cancelOrExpireNote` | 386 | $k=9$ | 0.15 MB | 1.32 KB | `cancelOrExpireNote.prover` | `cancelOrExpireNote.verifier` |
+| `acknowledgeRepayment` | 21,623 | $k=15$ | 9.53 MB | 2.07 KB | `acknowledgeRepayment.prover` | `acknowledgeRepayment.verifier` |
+| `setStatus` | 4,242 | $k=13$ | 2.69 MB | 2.07 KB | `setStatus.prover` | `setStatus.verifier` |
+
+- **Total Key Size**: 63.92 MB (67,022,121 bytes across 24 `.prover` and `.verifier` artifacts)
+- **Repository Policy**: Prover and verifier binaries are intentionally excluded from git tracking to maintain small repo footprint; deterministic `--skip-zk` managed bindings are committed.
 
 ---
 
@@ -75,7 +86,7 @@ This verifies that `contracts/line.compact` compiles cleanly without warnings or
 
 ### 4.3 Running the Full Verification Suite
 ```bash
-# Run all 92 automated tests (Compact simulator, reference engine, demo, MCP, model checker)
+# Run all 181 automated tests across 38 suites (Compact simulator, reference engine, demo, MCP, model checker)
 npm test
 
 # Run Compact simulator contract tests specifically

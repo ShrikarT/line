@@ -34,7 +34,7 @@ An issuer underwrites confidential credit and allocates verifiable reserve capac
 | `src/lib/line/leakage.test.ts` | Machine-checked privacy & state-delta leakage tests |
 | `src/lib/line/model.test.ts` | Deterministic state machine invariant model tester |
 | `src/lib/line/demo.ts` | 19-step scripted lifecycle demo flow and state snapshots |
-| `mcp/line-mcp.mjs` | Standard MCP server exposing 8 tools for autonomous agents |
+| `mcp/line-mcp.mjs` | Standard MCP server exposing 11 tools for autonomous agents |
 | `docs/PRODUCT_ARCHITECTURE.md` | Architecture and technical specification |
 | `docs/PROTOCOL.md` | Cryptographic specifications and commitment schemes |
 | `docs/PRIVACY.md` | Complete machine-checked privacy inventory |
@@ -51,7 +51,7 @@ Compact toolchain `0.34.0`, language `0.26.0`, runtime `0.19.0`, Node `>= 22`.
 npm run compact:compile    # compile Compact contract
 git diff --exit-code contracts/managed/  # check for drift
 npm run compact:test       # run Compact simulator tests
-npm test                   # run complete test suite (99 tests)
+npm test                   # run complete test suite (181 tests)
 npm run typecheck          # TypeScript check
 npm run build              # Frontend build
 npm run network:smoke      # Network connectivity smoke test
