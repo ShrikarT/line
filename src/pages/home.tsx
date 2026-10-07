@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Shell } from "@/components/line/shell";
 import { ExplorerPanel } from "@/components/line/explorer";
-import { Button, FlashBar, Mono, Panel, Stat } from "@/components/line/ui";
+import { Button, FlashBar, Mono, Panel, PixelDivider, Stat } from "@/components/line/ui";
 import { useAppStore } from "@/app/store.ts";
 
 export function Home() {
@@ -15,21 +15,22 @@ export function Home() {
     <Shell>
       <div className="space-y-12 pb-12">
         {/* 1. Hero Section */}
-        <section className="relative pt-6 pb-4">
+        <section className="relative -mx-4 bg-charcoal px-4 py-12 text-cream sm:mx-0 sm:rounded-2xl sm:px-10 sm:py-14">
+          <img src="/brand/logo-pixel.svg" alt="" className="mb-8 h-14 w-auto sm:h-20" />
           <div className="max-w-4xl space-y-6">
             {/* Live Spec Badge */}
-            <div className="inline-flex items-center gap-2 rounded-full border border-border bg-elevated px-3 py-1 text-xs font-mono text-muted">
-              <span className="h-2 w-2 rounded-full bg-accent animate-pulse" />
+            <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs font-mono text-pink">
+              <span className="size-2 bg-accent" />
               <span>LIVE PROTOCOL SPECIFICATION · MIDNIGHT COMPACT DOMAIN</span>
             </div>
 
             {/* Main Headline */}
-            <h1 className="font-display text-4xl font-extrabold leading-[1.15] tracking-tight text-fg sm:text-5xl lg:text-6xl">
+            <h1 className="font-display text-4xl font-semibold leading-[1.1] tracking-tight text-cream sm:text-5xl lg:text-6xl">
               Private revolving credit and reserve settlement for autonomous agents.
             </h1>
 
             {/* Subhead */}
-            <p className="max-w-2xl text-base text-muted sm:text-lg leading-relaxed">
+            <p className="max-w-2xl text-base leading-relaxed text-cream/80 sm:text-lg">
               An autonomous agent proves that a purchase fits its issuer-backed credit line without exposing its
               private credit book, outstanding debt, or counterparty identity.
             </p>
@@ -45,19 +46,19 @@ export function Home() {
               </a>
               <a
                 href="/merchant"
-                className="inline-flex min-h-11 items-center justify-center rounded-md border border-border bg-elevated px-4 text-sm font-medium text-fg transition-colors hover:border-muted hover:bg-subtle-fill"
+                className="inline-flex min-h-11 items-center justify-center rounded-md border border-cream/30 px-4 text-sm font-medium text-cream hover:bg-white/10"
               >
                 Merchant Desk
               </a>
               <a
                 href="/agent"
-                className="inline-flex min-h-11 items-center justify-center rounded-md border border-border bg-elevated px-4 text-sm font-medium text-fg transition-colors hover:border-muted hover:bg-subtle-fill"
+                className="inline-flex min-h-11 items-center justify-center rounded-md border border-cream/30 px-4 text-sm font-medium text-cream hover:bg-white/10"
               >
                 Agent Console
               </a>
               <a
                 href="/explorer"
-                className="inline-flex min-h-11 items-center justify-center rounded-md border border-border bg-transparent px-4 text-sm font-medium text-muted transition-colors hover:text-fg hover:bg-elevated"
+                className="inline-flex min-h-11 items-center justify-center rounded-md px-4 text-sm font-medium text-pink hover:text-cream"
               >
                 Public Ledger
               </a>
@@ -65,11 +66,11 @@ export function Home() {
 
             {/* Real-time Verification Snippet */}
             <div className="pt-2">
-              <div className="inline-flex flex-wrap items-center gap-3 rounded-lg border border-border bg-subtle-fill px-4 py-2 font-mono text-xs text-muted">
+              <div className="inline-flex flex-wrap items-center gap-3 rounded-lg border border-white/10 bg-black/20 px-4 py-2 font-mono text-xs text-cream/80">
                 <span className="text-ok font-semibold">✓ zk-proof::verify(commitment_root, C)</span>
-                <span className="text-subtle">→</span>
-                <span className="text-fg font-medium">DOMAIN VALID ({ledger.actionClock} TXS PROVEN)</span>
-                <span className="rounded bg-accent/20 px-1.5 py-0.5 text-[10px] text-teal-300">
+                <span className="text-pink">→</span>
+                <span className="font-medium text-cream">DOMAIN VALID ({ledger.actionClock} TXS PROVEN)</span>
+                <span className="rounded bg-accent px-1.5 py-0.5 text-[10px] text-accent-fg">
                   Status: {ledger.status.toUpperCase()}
                 </span>
               </div>
@@ -78,6 +79,8 @@ export function Home() {
             <FlashBar flash={flash} />
           </div>
         </section>
+
+        <PixelDivider />
 
         {/* 2. Interactive Zero-Knowledge Pipeline Architecture */}
         <section className="rounded-xl border border-border bg-elevated p-6 lg:p-8">
@@ -108,7 +111,7 @@ export function Home() {
                 </p>
               </div>
               <div className="font-mono text-[10px] bg-elevated p-2 rounded border border-border text-muted">
-                <span className="text-teal-400">Total Reserve:</span> {ledger.totalReserve ?? 0} units<br />
+                <span className="text-navy">Total Reserve:</span> {ledger.totalReserve ?? 0} units<br />
                 <span className="text-subtle">Withdrawable:</span> {withdrawableReserve} units
               </div>
             </div>
@@ -126,7 +129,7 @@ export function Home() {
                 </p>
               </div>
               <div className="font-mono text-[10px] bg-elevated p-2 rounded border border-border text-muted">
-                <span className="text-teal-400">Quotes Bound:</span> {"quoteCount" in ledger ? (ledger as any).quoteCount : Array.isArray((ledger as any).quotes) ? (ledger as any).quotes.length : 0}<br />
+                <span className="text-navy">Quotes Bound:</span> {"quoteCount" in ledger ? (ledger as any).quoteCount : Array.isArray((ledger as any).quotes) ? (ledger as any).quotes.length : 0}<br />
                 <span className="text-subtle">Replay Guard:</span> Nonce &amp; Expiry
               </div>
             </div>
@@ -144,7 +147,7 @@ export function Home() {
                 </p>
               </div>
               <div className="font-mono text-[10px] bg-elevated p-2 rounded border border-border text-muted">
-                <span className="text-teal-400">Agent Capacity:</span> Encrypted (Private State)<br />
+                <span className="text-navy">Agent Capacity:</span> Encrypted (Private State)<br />
                 <span className="text-subtle">Public Ledger:</span> Books Hidden (100%)
               </div>
             </div>
@@ -153,7 +156,7 @@ export function Home() {
             <div className="rounded-lg border border-accent/30 bg-bg p-4 flex flex-col justify-between shadow-inner">
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <span className="font-mono text-[11px] font-semibold text-teal-400 uppercase">Step 04 / Settlement</span>
+                  <span className="font-mono text-[11px] font-semibold text-navy uppercase">Step 04 / Settlement</span>
                   <span className="font-mono text-[10px] text-muted">redeemDraw</span>
                 </div>
                 <h3 className="font-display text-sm font-semibold text-fg mb-1">Single-Redemption Nullifier</h3>
@@ -162,7 +165,7 @@ export function Home() {
                 </p>
               </div>
               <div className="font-mono text-[10px] bg-elevated p-2 rounded border border-border text-muted">
-                <span className="text-teal-400">Encumbered:</span> {ledger.encumberedReserve ?? 0} units<br />
+                <span className="text-navy">Encumbered:</span> {ledger.encumberedReserve ?? 0} units<br />
                 <span className="text-ok">Redeemed:</span> {ledger.redeemedReserve ?? 0} units
               </div>
             </div>
@@ -183,6 +186,8 @@ export function Home() {
           </div>
         </section>
 
+        <PixelDivider />
+
         {/* 3. Protocol Metrics Band */}
         <section className="grid grid-cols-2 gap-4 lg:grid-cols-4">
           <div className="rounded-lg border border-border bg-elevated p-5 space-y-1">
@@ -195,7 +200,7 @@ export function Home() {
 
           <div className="rounded-lg border border-border bg-elevated p-5 space-y-1">
             <span className="text-xs font-mono uppercase text-muted">Proving Overhead</span>
-            <div className="font-display text-3xl font-bold text-teal-400 tracking-tight">&lt; 80ms</div>
+            <div className="font-display text-3xl font-bold text-navy tracking-tight">&lt; 80ms</div>
             <p className="text-xs text-subtle">Client-side Halo2 recursive SNARKs</p>
           </div>
 
@@ -211,6 +216,8 @@ export function Home() {
             <p className="text-xs text-subtle">Source of truth, zero managed drift</p>
           </div>
         </section>
+
+        <PixelDivider />
 
         {/* 4. Tri-Role Institutional Bento Grid */}
         <section className="space-y-6">
@@ -240,16 +247,16 @@ export function Home() {
                 </p>
                 <ul className="space-y-2 text-xs text-muted">
                   <li className="flex items-center gap-2">
-                    <span className="text-ok">✓</span> Confidential revolving credit line commitments (C0)
+                    <span className="size-2 shrink-0 bg-navy" /> Confidential revolving credit line commitments (C0)
                   </li>
                   <li className="flex items-center gap-2">
-                    <span className="text-ok">✓</span> Mathematical solvency: Encumbered + Redeemed ≤ Total
+                    <span className="size-2 shrink-0 bg-navy" /> Mathematical solvency: Encumbered + Redeemed ≤ Total
                   </li>
                   <li className="flex items-center gap-2">
-                    <span className="text-ok">✓</span> Anti-rug reserve protection with withdrawable bounds
+                    <span className="size-2 shrink-0 bg-navy" /> Anti-rug reserve protection with withdrawable bounds
                   </li>
                   <li className="flex items-center gap-2">
-                    <span className="text-ok">✓</span> Issuer-confirmed repayment acknowledgement
+                    <span className="size-2 shrink-0 bg-navy" /> Issuer-confirmed repayment acknowledgement
                   </li>
                 </ul>
               </div>
@@ -276,16 +283,16 @@ export function Home() {
                 </p>
                 <ul className="space-y-2 text-xs text-muted">
                   <li className="flex items-center gap-2">
-                    <span className="text-ok">✓</span> Multi-merchant support (Merchant A &amp; Merchant B)
+                    <span className="size-2 shrink-0 bg-navy" /> Multi-merchant support (Merchant A &amp; Merchant B)
                   </li>
                   <li className="flex items-center gap-2">
-                    <span className="text-ok">✓</span> Private merchant-bound claim notes (Note D)
+                    <span className="size-2 shrink-0 bg-navy" /> Private merchant-bound claim notes (Note D)
                   </li>
                   <li className="flex items-center gap-2">
-                    <span className="text-ok">✓</span> Single-redemption nullifier eliminates double-claims
+                    <span className="size-2 shrink-0 bg-navy" /> Single-redemption nullifier eliminates double-claims
                   </li>
                   <li className="flex items-center gap-2">
-                    <span className="text-ok">✓</span> Direct redemption against issuer settlement reserves
+                    <span className="size-2 shrink-0 bg-navy" /> Direct redemption against issuer settlement reserves
                   </li>
                 </ul>
               </div>
@@ -312,16 +319,16 @@ export function Home() {
                 </p>
                 <ul className="space-y-2 text-xs text-muted">
                   <li className="flex items-center gap-2">
-                    <span className="text-ok">✓</span> Client-side WebCrypto AES-GCM encrypted vault
+                    <span className="size-2 shrink-0 bg-navy" /> Client-side WebCrypto AES-GCM encrypted vault
                   </li>
                   <li className="flex items-center gap-2">
-                    <span className="text-ok">✓</span> Zero plaintext credit book or secret key leakage
+                    <span className="size-2 shrink-0 bg-navy" /> Zero plaintext credit book or secret key leakage
                   </li>
                   <li className="flex items-center gap-2">
-                    <span className="text-ok">✓</span> Prove clearance B + A ≤ L without revealing L or B
+                    <span className="size-2 shrink-0 bg-navy" /> Prove clearance B + A ≤ L without revealing L or B
                   </li>
                   <li className="flex items-center gap-2">
-                    <span className="text-ok">✓</span> Model Context Protocol (MCP) server integration
+                    <span className="size-2 shrink-0 bg-navy" /> Model Context Protocol (MCP) server integration
                   </li>
                 </ul>
               </div>
@@ -334,6 +341,8 @@ export function Home() {
             </div>
           </div>
         </section>
+
+        <PixelDivider />
 
         {/* 5. Live Public Ledger & Circuit Explorer */}
         <section className="space-y-6">
@@ -349,6 +358,8 @@ export function Home() {
 
           <ExplorerPanel />
         </section>
+
+        <PixelDivider />
 
         {/* 6. Protocol Verification & Attack Lab Navigation */}
         <section className="rounded-xl border border-border bg-subtle-fill p-6 space-y-4">
