@@ -83,7 +83,7 @@ export function NetworkSetupScreen({ onConnected, onSwitchToLocal }: NetworkSetu
         {errorMsg && <FlashBar flash={{ tone: "fail", text: errorMsg }} />}
         {successMsg && <FlashBar flash={{ tone: "ok", text: successMsg }} />}
 
-        <div className="rounded-lg border border-border bg-surface p-4 space-y-3">
+        <div className="rounded-lg border border-border bg-subtle-fill p-4 space-y-3">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold uppercase tracking-wider text-muted">1. Browser Wallet</span>
             <span className="text-xs font-mono text-subtle">
@@ -116,7 +116,7 @@ export function NetworkSetupScreen({ onConnected, onSwitchToLocal }: NetworkSetu
           </div>
         </div>
 
-        <div className="rounded-lg border border-border bg-surface p-4 space-y-3">
+        <div className="rounded-lg border border-border bg-subtle-fill p-4 space-y-3">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold uppercase tracking-wider text-muted">2. Deployed Contract</span>
             <span className="text-xs font-mono text-subtle">

@@ -32,7 +32,7 @@ export function ExplorerPanel() {
         <Stat label="Nullifiers" value={nullifiersCount} />
       </div>
 
-      <div className="rounded border border-border bg-surface p-3 space-y-2">
+      <div className="rounded border border-border bg-subtle-fill p-3 space-y-2">
         <p className="text-xs font-semibold uppercase tracking-wider text-muted">On-Chain Settlement Reserve Capacity</p>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
           <Stat label="Total Reserve" value={total} />
@@ -55,7 +55,7 @@ export function ExplorerPanel() {
           <p className="text-xs font-semibold uppercase tracking-wider text-muted">Settlement Claims ({notesList.length})</p>
           <ul className="space-y-2">
             {notesList.map((n: any) => (
-              <li key={n.commitment} className="flex flex-wrap items-center justify-between gap-2 text-xs border-b border-border/50 pb-2">
+              <li key={n.commitment} className="flex flex-wrap items-center justify-between gap-2 text-xs border-b border-row pb-2">
                 <div>
                   <span className="font-mono font-medium">Claim {n.amount}</span>
                   <span className="ml-2 text-muted">
