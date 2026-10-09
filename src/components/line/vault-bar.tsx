@@ -58,10 +58,10 @@ export function VaultBar() {
 
   if (!isVaultUnlocked) {
     return (
-      <div className="border-b border-border bg-surface/80 px-4 py-2 text-xs">
+      <div className="border-b border-border bg-subtle-fill/80 px-4 py-2 text-xs">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2 text-muted">
-            <span className="inline-block h-2 w-2 rounded-full bg-amber-400" />
+            <span className="inline-block h-2 w-2 rounded-full bg-red" />
             <span>
               <strong>Private Vault Locked:</strong> AES-GCM encrypted state in IndexedDB.
             </span>
@@ -88,14 +88,14 @@ export function VaultBar() {
   const hasAllKeys = issuerRecord && agentRecord && merchantRecord;
 
   return (
-    <div className="border-b border-border bg-surface/80 px-4 py-2 text-xs">
+    <div className="border-b border-border bg-subtle-fill/80 px-4 py-2 text-xs">
       <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <span className="inline-block h-2 w-2 rounded-full bg-ok" />
           <span className="text-ok font-medium">Vault Unlocked</span>
           <span className="text-subtle">· Ephemeral session active (AES-GCM WebCrypto)</span>
           {!hasAllKeys && (
-            <span className="rounded bg-amber-500/20 px-1.5 py-0.5 text-[10px] text-amber-300">
+            <span className="rounded bg-red/15 px-1.5 py-0.5 text-red">
               Setup credentials needed
             </span>
           )}
@@ -105,7 +105,7 @@ export function VaultBar() {
           {!hasAllKeys && (
             <button
               onClick={handleGenerateAll}
-              className="rounded bg-accent/20 px-2 py-1 text-accent-fg hover:bg-accent/30 transition-colors"
+              className="rounded bg-accent/15 px-2 py-1 text-navy transition-colors hover:bg-accent/30"
             >
               Generate Role Credentials
             </button>
@@ -132,7 +132,7 @@ export function VaultBar() {
             <div className="rounded border border-border bg-elevated/40 p-3 space-y-1">
               <div className="flex items-center justify-between">
                 <span className="font-semibold text-muted">Issuer Identity</span>
-                <span className={issuerRecord ? "text-ok" : "text-amber-400"}>
+                <span className={issuerRecord ? "text-ok" : "text-red"}>
                   {issuerRecord ? "Configured" : "Missing"}
                 </span>
               </div>
@@ -150,7 +150,7 @@ export function VaultBar() {
             <div className="rounded border border-border bg-elevated/40 p-3 space-y-1">
               <div className="flex items-center justify-between">
                 <span className="font-semibold text-muted">Agent Identity</span>
-                <span className={agentRecord ? "text-ok" : "text-amber-400"}>
+                <span className={agentRecord ? "text-ok" : "text-red"}>
                   {agentRecord ? "Configured" : "Missing"}
                 </span>
               </div>
@@ -174,7 +174,7 @@ export function VaultBar() {
             <div className="rounded border border-border bg-elevated/40 p-3 space-y-1">
               <div className="flex items-center justify-between">
                 <span className="font-semibold text-muted">Merchant Identity</span>
-                <span className={merchantRecord ? "text-ok" : "text-amber-400"}>
+                <span className={merchantRecord ? "text-ok" : "text-red"}>
                   {merchantRecord ? "Configured" : "Missing"}
                 </span>
               </div>

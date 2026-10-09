@@ -109,7 +109,7 @@ export function MerchantPage() {
                   <li key={n.D} className="rounded border border-border p-2 text-sm flex flex-col gap-2">
                     <div className="flex items-center justify-between">
                       <span className="font-semibold">Note Claim: {n.preimage.amount} units</span>
-                      <span className="text-teal-400 text-xs font-medium">Claim Note Active</span>
+                      <span className="text-xs font-medium text-accent">Claim Note Active</span>
                     </div>
                     <div className="text-xs text-muted flex flex-col gap-1">
                       <div className="flex items-center justify-between">
