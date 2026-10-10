@@ -14,18 +14,18 @@ import { isWalletInjected, connectWallet } from "./wallet.ts";
 describe("network integration: MidnightNetworkRuntime & wallet connector", () => {
   it("initializes with explicit configuration and exposes runtime metadata", () => {
     const net = new MidnightNetworkRuntime({
-      networkId: "midnight-testnet",
-      indexerUri: "https://indexer.testnet-02.midnight.network/api/v1/graphql",
-      indexerWsUri: "wss://indexer.testnet-02.midnight.network/api/v1/graphql/ws",
-      nodeUri: "https://rpc.testnet-02.midnight.network",
+      networkId: "preprod",
+      indexerUri: "http://127.0.0.1:8080/graphql",
+      indexerWsUri: "ws://127.0.0.1:8080/graphql/ws",
+      nodeUri: "http://127.0.0.1:9944",
       proofServerUri: "http://127.0.0.1:6300",
     });
 
     assert.equal(net.mode, "network");
-    assert.equal(net.networkId, "midnight-testnet");
-    assert.equal(net.indexerUri, "https://indexer.testnet-02.midnight.network/api/v1/graphql");
-    assert.equal(net.nodeUri, "https://rpc.testnet-02.midnight.network");
-    assert.equal(net.proofServerUri, "http://127.0.0.1:6300");
+    assert.equal(net.networkId, "preprod");
+    assert.equal(net.indexerUri, "http://127.0.0.1:8080/graphql");
+    assert.equal(net.nodeUri, "http://127.0.0.1:9944/");
+    assert.equal(net.proofServerUri, "http://127.0.0.1:6300/");
     assert.equal(net.isConnected(), false);
     assert.equal(net.getContractAddress(), null);
   });
@@ -40,6 +40,7 @@ describe("network integration: MidnightNetworkRuntime & wallet connector", () =>
 
   it("joinContract rejects unreachable indexer with NetworkUnreachableError", async () => {
     const net = new MidnightNetworkRuntime({
+      networkId: "preview",
       indexerUri: "http://127.0.0.1:19999/graphql/invalid",
       indexerWsUri: "ws://127.0.0.1:19999/graphql/ws",
     });
@@ -92,9 +93,7 @@ describe("network integration: MidnightNetworkRuntime & wallet connector", () =>
       (err) => err instanceof WalletNotConnectedError
     );
 
-    await assert.rejects(
-      () =>
-        net.draw({
+    const rejection = await net.draw({
           quoteCommit: "0x" + "00".repeat(32),
           limit: 150,
           outstanding: 0,
@@ -109,9 +108,9 @@ describe("network integration: MidnightNetworkRuntime & wallet connector", () =>
           quoteNonce: "nonce-1",
           noteNonce: "nonce-2",
           noteSalt: "salt-note",
-        }),
-      (err) => err instanceof WalletNotConnectedError
-    );
+        });
+    assert.equal(rejection.ok, false);
+    assert.equal(rejection.error, "Clearance could not be proven.");
   });
 
   it("wallet connector throws WalletNotConnectedError in non-browser Node environment", async () => {
@@ -128,6 +127,7 @@ describe("network integration: MidnightNetworkRuntime & wallet connector", () =>
         rdns: "io.midnight.lace",
         name: "Lace Test",
         icon: "icon.png",
+        apiVersion: "4.0.1",
         connect: async () => {
           throw new Error("User rejected the connection request");
         },
@@ -151,7 +151,7 @@ describe("network integration: MidnightNetworkRuntime & wallet connector", () =>
     const { VaultPrivateStateProvider } = await import("./vault-provider.ts");
     const provider = new VaultPrivateStateProvider({
       passwordProvider: () => "TestVaultSecretPassword456!",
-      networkId: "midnight-testnet",
+      networkId: "preprod",
     });
 
     const testContract = "0x" + "11".repeat(32);
@@ -212,7 +212,7 @@ describe("network integration: MidnightNetworkRuntime & wallet connector", () =>
     assert.equal(rDraw.error, "Clearance could not be proven.");
 
     // Valid finalized transaction
-    const rValid = validate({ txHash: "0xabcdef1234567890", blockHeight: 105 }, "fundReserve");
+    const rValid = validate({ public: { txHash: "0xabcdef1234567890", blockHeight: 105, status: "SucceedEntirely" } }, "fundReserve");
     assert.equal(rValid.ok, true);
     assert.equal(rValid.txHash, "0xabcdef1234567890");
     assert.equal(rValid.blockHeight, 105);

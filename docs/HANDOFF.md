@@ -1,5 +1,7 @@
 # Engineer Handoff: Line Platform
 
+> **Archive notice (10 October 2026):** Historical handoff snapshot. Product positioning, compiler/runtime versions and test inventory below are stale. Current contributor/product authority: [PROGRESS.md](PROGRESS.md), [PRODUCT_DIRECTION.md](PRODUCT_DIRECTION.md), and [ENGINEERING_STATUS.md](ENGINEERING_STATUS.md).
+
 Read this before contributing to Line.
 
 ## Product Context

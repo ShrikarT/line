@@ -1,0 +1,55 @@
+{
+  "auditDate": "2026-10-07",
+  "cases": 11,
+  "evidence": [
+    {
+      "id": "R01",
+      "confirmed": "Missing witnesses are fixed; actual binding still fails",
+      "error": "Failed executing circuit 'findDeployedContract': Cannot read properties of undefined (reading 'Symbol()')"
+    },
+    {
+      "id": "R02",
+      "confirmed": "Identical books and salt yield identical line commitment in different domains"
+    },
+    {
+      "id": "R03",
+      "confirmed": "Merchant public key appears in generated postQuote public transcript"
+    },
+    {
+      "id": "R04",
+      "confirmed": "Zero fee accepted; public initial draw amount reveals initial outstanding balance of 80"
+    },
+    {
+      "id": "R05",
+      "confirmed": "Same payment reference and receipt nonce acknowledged twice on successive commitments",
+      "debtReduction": 40
+    },
+    {
+      "id": "R06",
+      "confirmed": "No-op status calls expire note, allow cancellation/withdrawal; cancelled debt and fee remain",
+      "withdrawn": 495
+    },
+    {
+      "id": "R07",
+      "confirmed": "Vault loses byte-array type, rejects bigint, and returns cached signing key when locked"
+    },
+    {
+      "id": "R08",
+      "confirmed": "Withdrawable reserve excludes fee liability",
+      "displayed": 70,
+      "correct": 65
+    },
+    {
+      "id": "R09",
+      "confirmed": "Merchant A and B quotes use the same private/public key record"
+    },
+    {
+      "id": "R10",
+      "confirmed": "Store can still authorize mutation after underlying vault session locks"
+    },
+    {
+      "id": "R11",
+      "confirmed": "TS model can re-register disabled merchant; generated Compact rejects it"
+    }
+  ]
+}

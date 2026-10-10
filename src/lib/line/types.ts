@@ -1,3 +1,6 @@
+import { requiredDrawFee } from "./encoding.ts";
+
+export const FEE_POLICY = "flat-plus-ceil-bps-v1" as const;
 export type LineStatus = "none" | "open" | "defaulted" | "closed";
 
 export type QuoteRecord = {
@@ -13,10 +16,17 @@ export type QuoteRecord = {
 export type NoteRecord = {
   commitment: string;
   amount: number;
+  fee: number;
   redeemed: boolean;
   cancelled: boolean;
   expiry: number;
   lineGeneration: number;
+  compensationAllocated: boolean;
+  refundCommitment: string;
+  cashRefundOwed: boolean;
+  refundAcknowledged: boolean;
+  /** Exact stable payment reference nullifier attributed to this reported refund. */
+  refundPaymentNullifier: string;
 };
 
 export type LedgerEvent = {
@@ -41,9 +51,15 @@ export type Ledger = {
   totalReserve: number;
   encumberedReserve: number;
   redeemedReserve: number;
-  /** Issuer fee accrual (FEE_SPEC §1). Part of the reserve conservation invariant:
-      encumberedReserve + redeemedReserve + feeReserve <= totalReserve. */
+  /** Fees earned on claim redemption in accounting; not collected cash. */
   feeReserve: number;
+  pendingFeeReserve: number;
+  refundReserve: number;
+  /** Full-cost budgets locked after issuer-reported refunds; not actual cash paid. */
+  reportedRefundReserve: number;
+  /** Issuer-approved public pricing, immutable within a line generation. */
+  feeFlat: number;
+  feeBps: number;
   identityCommitment: string | null;
   lineCommitment: string | null;
   lineExpiry: number;
@@ -140,6 +156,8 @@ export type QuotePreimage = {
   expiry: number;
   nonce: string;
   generation: number;
+  feeFlat: number;
+  feeBps: number;
 };
 
 export type MerchantInvoice = {
@@ -157,6 +175,7 @@ export type DrawNotePreimage = {
   quoteCommit: string;
   merchantPk: string;
   amount: number;
+  fee: number;
   noteNonce: string;
   expiry: number;
 };
@@ -165,6 +184,18 @@ export type DrawNote = {
   D: string;
   preimage: DrawNotePreimage;
   salt: string;
+};
+
+/** Private allocation output. Never serialize into the public ledger. */
+export type RefundAllocation = {
+  domain: string;
+  lineGeneration: number;
+  identity: string;
+  noteCommit: string;
+  amount: number;
+  allocatedCredit: number;
+  salt: string;
+  commitment: string;
 };
 
 export type RepayReceipt = {
@@ -211,6 +242,8 @@ export interface AgentLineRecord {
   identityCommitment: string;
   lineCommitment: string;
   limit: number;
+  feeFlat: number;
+  feeBps: number;
   outstanding: number;
   epoch: number;
   salt: string;
@@ -230,7 +263,10 @@ export interface MerchantQuoteRecord {
   quoteNonce: string;
   quoteCommitment: string;
   lineGeneration: number;
-  fee?: number;
+  feePolicy: typeof FEE_POLICY;
+  feeFlat: number;
+  feeBps: number;
+  fee: number;
   status: "open" | "consumed" | "expired";
   transactionId?: string;
   updatedAt: number;
@@ -247,12 +283,34 @@ export interface DrawNoteRecord {
   quoteCommitment: string;
   merchantPublicKey: string;
   amount: number;
+  fee: number;
   noteNonce: string;
   noteSalt: string;
   expiry: number;
   status: "active" | "redeemed" | "expired" | "cancelled";
   drawTransactionId?: string;
   redemptionTransactionId?: string;
+  updatedAt: number;
+}
+
+export interface RefundRecord {
+  version: 1;
+  networkId: string;
+  contractAddress: string;
+  contractDomain: string;
+  lineGeneration: number;
+  identityCommitment: string;
+  noteCommitment: string;
+  refundCommitment: string;
+  amount: number;
+  allocatedCredit: number;
+  salt: string;
+  status: "allocated" | "issuer-reported";
+  /** Public report observed without recovering the reporting issuer's private receipt. */
+  issuerReportObserved?: boolean;
+  paymentReference?: string;
+  receiptExpiry?: number;
+  transactionId?: string;
   updatedAt: number;
 }
 
@@ -275,7 +333,8 @@ export interface RepaymentRecord {
  * Cross-Role Private Transfer Packages
  */
 export interface QuoteTransferPackage {
-  format: "line:quote-package:v1";
+  format: "line:quote-package:v3";
+  deadlineUnits: "unix-seconds";
   networkId: string;
   contractAddress: string;
   contractDomain: string;
@@ -287,12 +346,16 @@ export interface QuoteTransferPackage {
   amount: number;
   expiry: number;
   quoteNonce: string;
-  fee?: number;
+  feePolicy: typeof FEE_POLICY;
+  feeFlat: number;
+  feeBps: number;
+  fee: number;
   issuedAt: number;
 }
 
 export interface DrawNoteTransferPackage {
-  format: "line:note-package:v1";
+  format: "line:note-package:v3";
+  deadlineUnits: "unix-seconds";
   networkId: string;
   contractAddress: string;
   contractDomain: string;
@@ -302,6 +365,7 @@ export interface DrawNoteTransferPackage {
   identityCommitment: string;
   merchantPublicKey: string;
   amount: number;
+  fee: number;
   noteNonce: string;
   noteSalt: string;
   expiry: number;
@@ -318,6 +382,8 @@ export function validateAgentLineRecord(rec: unknown): AgentLineRecord {
   if (!r.agentSecret || typeof r.agentSecret !== "string") throw new Error("Missing agentSecret in AgentLineRecord");
   if (!r.lineCommitment || typeof r.lineCommitment !== "string") throw new Error("Missing lineCommitment in AgentLineRecord");
   if (typeof r.limit !== "number" || r.limit <= 0) throw new Error("Invalid limit in AgentLineRecord");
+  if (typeof r.feeFlat !== "number" || !Number.isSafeInteger(r.feeFlat) || r.feeFlat < 0) throw new Error("Missing or invalid feeFlat in AgentLineRecord");
+  if (typeof r.feeBps !== "number" || !Number.isSafeInteger(r.feeBps) || r.feeBps < 0 || r.feeBps > 10_000) throw new Error("Missing or invalid feeBps in AgentLineRecord");
   if (typeof r.outstanding !== "number" || r.outstanding < 0) throw new Error("Invalid outstanding balance in AgentLineRecord");
   if (typeof r.epoch !== "number" || r.epoch < 0) throw new Error("Invalid epoch in AgentLineRecord");
   if (!r.salt || typeof r.salt !== "string") throw new Error("Missing salt in AgentLineRecord");
@@ -332,6 +398,7 @@ export function validateMerchantQuoteRecord(rec: unknown): MerchantQuoteRecord {
   if (typeof r.amount !== "number" || r.amount <= 0) throw new Error("Invalid amount in MerchantQuoteRecord");
   if (!r.quoteNonce || typeof r.quoteNonce !== "string") throw new Error("Missing quoteNonce in MerchantQuoteRecord");
   if (!r.merchantPublicKey || typeof r.merchantPublicKey !== "string") throw new Error("Missing merchantPublicKey in MerchantQuoteRecord");
+  validateQuoteFeeTerms(r);
   return r as unknown as MerchantQuoteRecord;
 }
 
@@ -341,7 +408,7 @@ export function validateDrawNoteRecord(rec: unknown): DrawNoteRecord {
   if (r.version !== 1) throw new Error(`Invalid DrawNoteRecord version: ${r.version}`);
   if (!r.noteCommitment || typeof r.noteCommitment !== "string") throw new Error("Missing noteCommitment in DrawNoteRecord");
   if (!r.merchantPublicKey || typeof r.merchantPublicKey !== "string") throw new Error("Missing merchantPublicKey in DrawNoteRecord");
-  if (typeof r.amount !== "number" || r.amount <= 0) throw new Error("Invalid amount in DrawNoteRecord");
+  validateNoteAmounts(r);
   if (!r.noteNonce || typeof r.noteNonce !== "string") throw new Error("Missing noteNonce in DrawNoteRecord");
   if (!r.noteSalt || typeof r.noteSalt !== "string") throw new Error("Missing noteSalt in DrawNoteRecord");
   return r as unknown as DrawNoteRecord;
@@ -350,7 +417,8 @@ export function validateDrawNoteRecord(rec: unknown): DrawNoteRecord {
 export function validateQuoteTransferPackage(pkg: unknown, expectedNetwork?: string, expectedContract?: string): QuoteTransferPackage {
   if (!pkg || typeof pkg !== "object") throw new Error("Invalid QuoteTransferPackage: expected object");
   const p = pkg as Record<string, unknown>;
-  if (p.format !== "line:quote-package:v1") throw new Error(`Invalid QuoteTransferPackage format: ${p.format}`);
+  if (p.format !== "line:quote-package:v3" || p.deadlineUnits !== "unix-seconds") throw new Error("Unsupported quote fee/deadline format. Obtain a new v3 issuer-priced Unix-seconds quote package; legacy terms cannot be migrated automatically.");
+  if (typeof p.expiry !== "number" || !Number.isSafeInteger(p.expiry) || p.expiry < 0) throw new Error("Invalid Unix-seconds quote deadline");
   if (expectedNetwork && p.networkId !== expectedNetwork) {
     throw new Error(`Quote network mismatch: package targets ${p.networkId}, current network is ${expectedNetwork}`);
   }
@@ -360,13 +428,25 @@ export function validateQuoteTransferPackage(pkg: unknown, expectedNetwork?: str
   if (!p.quoteCommitment || typeof p.quoteCommitment !== "string") throw new Error("Missing quoteCommitment in QuoteTransferPackage");
   if (typeof p.amount !== "number" || p.amount <= 0) throw new Error("Invalid quote amount");
   if (!p.quoteNonce || typeof p.quoteNonce !== "string") throw new Error("Missing quoteNonce in package");
+  validateQuoteFeeTerms(p);
   return p as unknown as QuoteTransferPackage;
+}
+
+function validateQuoteFeeTerms(value: Record<string, unknown>): void {
+  if (value.feePolicy !== FEE_POLICY) throw new Error("Missing or unsupported issuer fee policy. Obtain a newly priced quote.");
+  for (const key of ["amount", "feeFlat", "feeBps", "fee"] as const) {
+    if (typeof value[key] !== "number" || !Number.isSafeInteger(value[key]) || (value[key] as number) < 0) throw new Error(`Invalid quote ${key}`);
+  }
+  if ((value.amount as number) <= 0) throw new Error("Invalid quote amount");
+  const expected = requiredDrawFee(BigInt(value.amount as number), BigInt(value.feeFlat as number), BigInt(value.feeBps as number));
+  if (BigInt(value.fee as number) !== expected) throw new Error("Agreed quote fee does not match issuer policy");
 }
 
 export function validateDrawNoteTransferPackage(pkg: unknown, expectedNetwork?: string, expectedContract?: string): DrawNoteTransferPackage {
   if (!pkg || typeof pkg !== "object") throw new Error("Invalid DrawNoteTransferPackage: expected object");
   const p = pkg as Record<string, unknown>;
-  if (p.format !== "line:note-package:v1") throw new Error(`Invalid DrawNoteTransferPackage format: ${p.format}`);
+  if (p.format !== "line:note-package:v3" || p.deadlineUnits !== "unix-seconds") throw new Error("Unsupported note fee/deadline format. Obtain a matching v3 fee-bound Unix-seconds note package; legacy notes cannot be relabelled.");
+  if (typeof p.expiry !== "number" || !Number.isSafeInteger(p.expiry) || p.expiry < 0) throw new Error("Invalid Unix-seconds note deadline");
   if (expectedNetwork && p.networkId !== expectedNetwork) {
     throw new Error(`DrawNote network mismatch: package targets ${p.networkId}, current network is ${expectedNetwork}`);
   }
@@ -375,10 +455,33 @@ export function validateDrawNoteTransferPackage(pkg: unknown, expectedNetwork?: 
   }
   if (!p.noteCommitment || typeof p.noteCommitment !== "string") throw new Error("Missing noteCommitment in DrawNoteTransferPackage");
   if (!p.merchantPublicKey || typeof p.merchantPublicKey !== "string") throw new Error("Missing merchantPublicKey in package");
-  if (typeof p.amount !== "number" || p.amount <= 0) throw new Error("Invalid note amount in package");
+  validateNoteAmounts(p);
   if (!p.noteNonce || typeof p.noteNonce !== "string") throw new Error("Missing noteNonce in package");
   if (!p.noteSalt || typeof p.noteSalt !== "string") throw new Error("Missing noteSalt in package");
   return p as unknown as DrawNoteTransferPackage;
+}
+
+function validateNoteAmounts(value: Record<string, unknown>): void {
+  if (typeof value.amount !== "number" || !Number.isSafeInteger(value.amount) || value.amount <= 0) throw new Error("Invalid note amount");
+  if (typeof value.fee !== "number" || !Number.isSafeInteger(value.fee) || value.fee < 0) throw new Error("Missing or invalid note fee");
+  if (!Number.isSafeInteger(value.amount + value.fee)) throw new Error("Note cost exceeds safe integer range");
+}
+
+export function validateRefundRecord(rec: unknown): RefundRecord {
+  if (!rec || typeof rec !== "object") throw new Error("Invalid RefundRecord: expected object");
+  const r = rec as Record<string, unknown>;
+  if (r.version !== 1) throw new Error("Invalid RefundRecord version");
+  for (const key of ["networkId", "contractAddress", "contractDomain", "identityCommitment", "noteCommitment", "refundCommitment", "salt"] as const) {
+    if (typeof r[key] !== "string" || !r[key]) throw new Error(`Missing ${key} in RefundRecord`);
+  }
+  for (const key of ["lineGeneration", "amount", "allocatedCredit", "updatedAt"] as const) {
+    if (typeof r[key] !== "number" || !Number.isSafeInteger(r[key]) || r[key] < 0) throw new Error(`Invalid ${key} in RefundRecord`);
+  }
+  if (!Number.isSafeInteger((r.amount as number) + (r.allocatedCredit as number))) throw new Error("Invalid refund cost");
+  if (r.status !== "allocated" && r.status !== "issuer-reported") throw new Error("Invalid RefundRecord status");
+  if ("issuerReportObserved" in r && typeof r.issuerReportObserved !== "boolean") throw new Error("Invalid issuerReportObserved in RefundRecord");
+  if (r.status === "issuer-reported" && (typeof r.paymentReference !== "string" || !r.paymentReference.trim() || typeof r.receiptExpiry !== "number" || !Number.isSafeInteger(r.receiptExpiry) || r.receiptExpiry < 0 || r.amount === 0)) throw new Error("Missing issuer refund report terms");
+  return r as unknown as RefundRecord;
 }
 
 

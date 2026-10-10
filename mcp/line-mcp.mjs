@@ -10,8 +10,10 @@
  *   line.draw           agent draws and issues private settlement note
  *   line.note.status    status of issued draw notes
  *   line.redeem         merchant redeems draw note against issuer reserve
- *   line.expireNote     cancel an expired note, releasing encumbered reserve
- *   line.withdrawFees   issuer releases accrued draw fees
+ *   line.expireNote     expire a note and lock its compensation budget
+ *   line.compensate     allocate credit and a private cash obligation once
+ *   line.refund.acknowledge issuer reports a refund; no actual cash verification
+ *   line.withdrawFees   issuer releases fees earned at claim redemption
  *   line.disableMerchant issuer disables a merchant (blocks new quotes only)
  *   line.repay          issuer acknowledges repayment
  *
@@ -22,8 +24,10 @@ import { createInterface } from "node:readline";
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { join } from "node:path";
+import { validateRefundRecord } from "../src/lib/line/types.ts";
 
 const STATE_PATH = process.env.LINE_MCP_STATE ?? join(process.cwd(), ".line-mcp-state.json");
+const COMPENSATION_POLICY = "private-refund-full-cost-lock-v1";
 
 const tools = [
   {
@@ -33,7 +37,7 @@ const tools = [
   },
   {
     name: "line.reserve.status",
-    description: "Public reserve accounting: total, encumbered, redeemed, and withdrawable capacity.",
+    description: "Public reserve accounting: claims, pending/earned fees, compensation and reported-refund budgets, and withdrawable capacity.",
     inputSchema: { type: "object", properties: {} },
   },
   {
@@ -41,7 +45,7 @@ const tools = [
     description: "Load a scripted demo snapshot (0–18) into the MCP ledger.",
     inputSchema: {
       type: "object",
-      properties: { step: { type: "number" } },
+      properties: { step: { type: "number" }, feeFlat: { type: "integer", minimum: 0 }, feeBps: { type: "integer", minimum: 0, maximum: 10000 } },
       required: ["step"],
     },
   },
@@ -66,7 +70,7 @@ const tools = [
       type: "object",
       properties: {
         quoteId: { type: "string" },
-        fee: { type: "number", description: "Optional issuer fee (public Uint<64>). Defaults to 0." },
+        fee: { type: "number", description: "Optional explicit fee; must equal the issuer-approved quote fee. Omission computes the exact agreed fee." },
       },
       required: ["quoteId"],
     },
@@ -93,7 +97,7 @@ const tools = [
   },
   {
     name: "line.expireNote",
-    description: "Cancel an expired draw note, releasing its encumbered reserve back to withdrawable.",
+    description: "Expire an unredeemed draw note and lock its full principal-plus-fee budget for compensation. Does not credit debt or pay cash.",
     inputSchema: {
       type: "object",
       properties: {
@@ -103,8 +107,18 @@ const tools = [
     },
   },
   {
+    name: "line.compensate",
+    description: "Allocate compensation for an expired unredeemed note once: offset the original borrower's debt and privately commit any cash still owed. Old-generation notes cannot affect a new book.",
+    inputSchema: { type: "object", properties: { noteCommitment: { type: "string" } }, required: ["noteCommitment"] },
+  },
+  {
+    name: "line.refund.acknowledge",
+    description: "Issuer reports a cash refund against its exact private obligation and a unique payment reference. No actual cash is verified; the full original-cost budget stays locked.",
+    inputSchema: { type: "object", properties: { noteCommitment: { type: "string" }, paymentRef: { type: "string" } }, required: ["noteCommitment", "paymentRef"] },
+  },
+  {
     name: "line.withdrawFees",
-    description: "Issuer releases accrued draw fees from the fee reserve.",
+    description: "Issuer releases accounting fees earned at merchant claim redemption. Pending draw fees cannot be withdrawn; no tokens move.",
     inputSchema: { type: "object", properties: {} },
   },
   {
@@ -123,7 +137,7 @@ const tools = [
     description: "Issuer acknowledges an off-chain repayment and restores capacity.",
     inputSchema: {
       type: "object",
-      properties: { amount: { type: "number" } },
+      properties: { amount: { type: "number" }, paymentRef: { type: "string", description: "Optional explicit issuer-reported event identity. Omission uses the one-use mcp-repay demo reference." } },
       required: ["amount"],
     },
   },
@@ -131,19 +145,44 @@ const tools = [
 
 function readState() {
   if (!existsSync(STATE_PATH)) return null;
-  return JSON.parse(readFileSync(STATE_PATH, "utf8"));
+  const state = JSON.parse(readFileSync(STATE_PATH, "utf8"));
+  if (state?.deadlineUnits !== "unix-seconds") {
+    throw new Error("Legacy MCP deadline units are unsupported. Call line.seed to reset this local simulator state; action-count deadlines cannot be converted to Unix seconds.");
+  }
+  if (state?.feePolicy !== "flat-plus-ceil-bps-v1" || !Number.isSafeInteger(state.ledger?.feeFlat) ||
+      state.ledger.feeFlat < 0 || !Number.isSafeInteger(state.ledger?.feeBps) || state.ledger.feeBps < 0 || state.ledger.feeBps > 10000) {
+    throw new Error("Legacy MCP fee policy is unsupported. Call line.seed to reset this local simulator state; unpriced quotes cannot be migrated automatically.");
+  }
+  if (state?.compensationPolicy !== COMPENSATION_POLICY || !Array.isArray(state.refunds) ||
+      ["totalReserve", "encumberedReserve", "redeemedReserve", "feeReserve", "pendingFeeReserve", "refundReserve", "reportedRefundReserve"].some(field => !Number.isSafeInteger(state.ledger?.[field]) || state.ledger[field] < 0) ||
+      !Array.isArray(state.ledger?.notes) || !Array.isArray(state.notes) ||
+      (state.ledger?.notes ?? []).some(note => !Number.isSafeInteger(note.fee) || note.fee < 0 || typeof note.compensationAllocated !== "boolean" || typeof note.cashRefundOwed !== "boolean" || typeof note.refundAcknowledged !== "boolean" || typeof note.refundCommitment !== "string" || typeof note.refundPaymentNullifier !== "string" || !HEX64.test(note.refundPaymentNullifier)) ||
+      (state.notes ?? []).some(note => !Number.isSafeInteger(note.preimage?.fee) || note.preimage.fee < 0)) {
+    throw new Error("Legacy MCP compensation policy is unsupported. Call line.seed to explicitly reset this local simulator state; old fee-unbound notes and refund budgets cannot be migrated automatically.");
+  }
+  if (["encumberedReserve", "redeemedReserve", "feeReserve", "pendingFeeReserve", "refundReserve", "reportedRefundReserve"].reduce((sum, field) => sum + BigInt(state.ledger[field]), 0n) > BigInt(state.ledger.totalReserve)) {
+    throw new Error("MCP compensation reserve deficit. Call line.seed to explicitly reset this invalid local simulator state.");
+  }
+  for (const refund of state.refunds) validateRefundRecord(refund);
+  if (state.ledger.notes.some(note => note.refundAcknowledged ? note.refundPaymentNullifier === "0".repeat(64) || !state.ledger.nullifiers.includes(note.refundPaymentNullifier) : note.refundPaymentNullifier !== "0".repeat(64))) {
+    throw new Error("Invalid MCP note-bound refund payment identity. Call line.seed to explicitly reset this invalid local simulator state.");
+  }
+  return state;
 }
 
 function writeState(state) {
-  writeFileSync(STATE_PATH, JSON.stringify(state, null, 2));
+  writeFileSync(STATE_PATH, JSON.stringify({ ...state, deadlineUnits: "unix-seconds", feePolicy: "flat-plus-ceil-bps-v1", compensationPolicy: COMPENSATION_POLICY }, null, 2));
+}
+
+function lockedReserve(ledger) {
+  return ledger.encumberedReserve + ledger.redeemedReserve + ledger.feeReserve + ledger.pendingFeeReserve + ledger.refundReserve + ledger.reportedRefundReserve;
 }
 
 function publicStatus(ledger) {
-  // FEE_SPEC §1: feeReserve is part of the locked set.
-  const locked =
-    (ledger.encumberedReserve ?? 0) + (ledger.redeemedReserve ?? 0) + (ledger.feeReserve ?? 0);
+  const locked = lockedReserve(ledger);
   const withdrawable = Math.max(0, (ledger.totalReserve ?? 0) - locked);
   return {
+    deadlineUnits: "unix-seconds",
     status: ledger.status,
     actionClock: ledger.actionClock,
     lineGeneration: ledger.lineGeneration,
@@ -154,6 +193,13 @@ function publicStatus(ledger) {
     encumberedReserve: ledger.encumberedReserve,
     redeemedReserve: ledger.redeemedReserve,
     feeReserve: ledger.feeReserve ?? 0,
+    pendingFeeReserve: ledger.pendingFeeReserve,
+    refundReserve: ledger.refundReserve,
+    reportedRefundReserve: ledger.reportedRefundReserve,
+    compensationPolicy: COMPENSATION_POLICY,
+    feePolicy: "flat-plus-ceil-bps-v1",
+    feeFlat: ledger.feeFlat,
+    feeBps: ledger.feeBps,
     withdrawableReserve: withdrawable,
     quotes: (ledger.quotes ?? []).map((q) => ({
       commitment: q.commitment,
@@ -163,10 +209,16 @@ function publicStatus(ledger) {
     notes: (ledger.notes ?? []).map((n) => ({
       commitment: n.commitment,
       amount: n.amount,
+      fee: n.fee,
       redeemed: n.redeemed,
       cancelled: n.cancelled,
       expiry: n.expiry,
       lineGeneration: n.lineGeneration,
+      compensationAllocated: n.compensationAllocated,
+      refundCommitment: n.refundCommitment,
+      cashRefundOwed: n.cashRefundOwed,
+      refundAcknowledged: n.refundAcknowledged,
+      refundPaymentNullifier: n.refundPaymentNullifier,
     })),
     nullifiers: ledger.nullifiers,
     note: "Public view only. Private credit books (limit, balance, quote preimage) are confidential.",
@@ -245,12 +297,17 @@ async function dispatch(msg) {
         result: { content: [{ type: "text", text: JSON.stringify({ ok: false, message: "step must be an integer 0–18" }) }] },
       };
     }
-    const snap = demo.snapshotAt(step);
+    const feeFlat = args.feeFlat ?? 0, feeBps = args.feeBps ?? 0;
+    if (!Number.isSafeInteger(feeFlat) || feeFlat < 0 || !Number.isSafeInteger(feeBps) || feeBps < 0 || feeBps > 10000) {
+      return { jsonrpc: "2.0", id: msg.id, result: { content: [{ type: "text", text: JSON.stringify({ ok: false, message: "Invalid issuer fee policy." }) }] } };
+    }
+    const snap = demo.snapshotAt(step, { feeFlat, feeBps });
     writeState({
       ledger: snap.ledger,
       agent: snap.agent,
       invoices: snap.invoices,
       notes: snap.notes,
+      refunds: [],
     });
     return {
       jsonrpc: "2.0",
@@ -299,15 +356,11 @@ async function dispatch(msg) {
         jsonrpc: "2.0",
         id: msg.id,
         result: {
-          content: [{ type: "text", text: JSON.stringify({ total: 0, encumbered: 0, redeemed: 0, feeReserve: 0, withdrawable: 0 }) }],
+          content: [{ type: "text", text: JSON.stringify({ total: 0, encumbered: 0, redeemed: 0, feeReserve: 0, pendingFeeReserve: 0, refundReserve: 0, reportedRefundReserve: 0, withdrawable: 0, compensationPolicy: COMPENSATION_POLICY }) }],
         },
       };
     }
-    // FEE_SPEC §1: feeReserve is part of the locked set.
-    const locked =
-      (state.ledger.encumberedReserve ?? 0) +
-      (state.ledger.redeemedReserve ?? 0) +
-      (state.ledger.feeReserve ?? 0);
+    const locked = lockedReserve(state.ledger);
     const withdrawable = Math.max(0, (state.ledger.totalReserve ?? 0) - locked);
     return {
       jsonrpc: "2.0",
@@ -321,6 +374,10 @@ async function dispatch(msg) {
               encumberedReserve: state.ledger.encumberedReserve,
               redeemedReserve: state.ledger.redeemedReserve,
               feeReserve: state.ledger.feeReserve ?? 0,
+              pendingFeeReserve: state.ledger.pendingFeeReserve,
+              refundReserve: state.ledger.refundReserve,
+              reportedRefundReserve: state.ledger.reportedRefundReserve,
+              compensationPolicy: COMPENSATION_POLICY,
               withdrawableReserve: withdrawable,
             }),
           },
@@ -361,7 +418,7 @@ async function dispatch(msg) {
       {
         caller: merchantSecret,
         invoiceId,
-        expiry: state.ledger.actionClock + 10_000,
+        expiry: Math.floor(Date.now() / 1000) + 10_000,
         nonce: encoding.toHex(encoding.randomBytes32()),
       },
       // The invoice amount is a private witness: Q commits to it, but it is
@@ -425,7 +482,7 @@ async function dispatch(msg) {
         newSalt: encoding.toHex(encoding.randomBytes32()),
         noteNonce: encoding.toHex(encoding.randomBytes32()),
         noteSalt: encoding.toHex(encoding.randomBytes32()),
-        fee: args.fee === undefined ? 0 : Number(args.fee),
+        fee: args.fee === undefined ? Number(encoding.requiredDrawFee(BigInt(inv.amount), BigInt(state.ledger.feeFlat), BigInt(state.ledger.feeBps))) : Number(args.fee),
       },
       { books: state.agent.witness, quote: inv.preimage },
     );
@@ -466,7 +523,7 @@ async function dispatch(msg) {
   if (name === "line.note.status") {
     const state = readState();
     const target = args.noteCommitment;
-    const notes = state?.ledger?.notes ?? [];
+    const notes = state ? publicStatus(state.ledger).notes : [];
     if (target) {
       const match = notes.find((n) => n.commitment === target);
       return {
@@ -572,12 +629,54 @@ async function dispatch(msg) {
             text: JSON.stringify({
               ok: true,
               public: publicStatus(r.ledger),
-              message: "Expired note cancelled. Encumbered reserve released.",
+              message: "Expired note cancelled. Full principal-plus-fee budget locked for compensation; no refund paid.",
             }),
           },
         ],
       },
     };
+  }
+
+  if (name === "line.compensate" || name === "line.refund.acknowledge") {
+    const state = readState(), target = args.noteCommitment;
+    const response = body => ({ jsonrpc: "2.0", id: msg.id, result: { content: [{ type: "text", text: JSON.stringify(body) }] } });
+    if (typeof target !== "string" || !target || !state) return response({ ok: false, message: "No active ledger or note commitment" });
+    const note = state.notes.find(note => note.D === target);
+    if (!note) return response({ ok: false, message: "Original note opening not found in local private store" });
+    const schemas = await import("../src/lib/line/types.ts");
+    if (name === "line.compensate") {
+      const result = protocol.cancelOrExpireNote(state.ledger, {
+        caller: keys.ISSUER_SK, action: 1, note,
+        compensation: { note: note.preimage, noteSalt: note.salt, newSalt: encoding.toHex(encoding.randomBytes32()), books: state.agent?.witness },
+      });
+      if (!result.ok) return response({ ok: false, message: result.reason });
+      const allocation = result.refund;
+      const record = schemas.validateRefundRecord({
+        version: 1, networkId: "local-development", contractAddress: "local-mcp", contractDomain: allocation.domain,
+        lineGeneration: allocation.lineGeneration, identityCommitment: allocation.identity, noteCommitment: allocation.noteCommit,
+        refundCommitment: allocation.commitment, amount: allocation.amount, allocatedCredit: allocation.allocatedCredit,
+        salt: allocation.salt, status: "allocated", updatedAt: Date.now(),
+      });
+      state.ledger = result.ledger;
+      if (result.witness) state.agent.witness = result.witness;
+      state.refunds.push(record);
+      writeState(state);
+      return response({ ok: true, public: publicStatus(result.ledger), message: "Compensation allocated once. Any owed cash remains private and unpaid." });
+    }
+    const stored = state.refunds.find(refund => refund.noteCommitment === target);
+    if (!stored) return response({ ok: false, message: "Private refund obligation has not been allocated" });
+    const obligation = schemas.validateRefundRecord(stored);
+    if (typeof args.paymentRef !== "string") return response({ ok: false, message: "A unique payment reference is required" });
+    try { encoding.canonicalPaymentReferenceBytes(args.paymentRef); }
+    catch { return response({ ok: false, message: "Invalid refund payment reference" }); }
+    const receiptExpiry = Math.floor(Date.now() / 1000) + 10_000;
+    const result = protocol.cancelOrExpireNote(state.ledger, { caller: keys.ISSUER_SK, action: 2, note, refundAck: { identity: obligation.identityCommitment, amount: obligation.amount, salt: obligation.salt, paymentRef: args.paymentRef, receiptExpiry } });
+    if (!result.ok) return response({ ok: false, message: result.reason });
+    const report = schemas.validateRefundRecord({ ...obligation, status: "issuer-reported", paymentReference: args.paymentRef, receiptExpiry, updatedAt: Date.now() });
+    state.ledger = result.ledger;
+    state.refunds = state.refunds.map(record => record.noteCommitment === target ? report : record);
+    writeState(state);
+    return response({ ok: true, public: publicStatus(result.ledger), message: "Issuer reported refund acknowledgment. No cash payment is verified; full original-cost budget remains locked." });
   }
 
   if (name === "line.withdrawFees") {
@@ -674,13 +773,17 @@ async function dispatch(msg) {
       };
     }
     const amount = Number(args.amount);
+    const paymentRef = args.paymentRef === undefined ? "mcp-repay" : args.paymentRef;
+    if (typeof paymentRef !== "string") return { jsonrpc: "2.0", id: msg.id, result: { content: [{ type: "text", text: JSON.stringify({ ok: false, message: "Invalid repayment payment reference" }) }] } };
+    try { encoding.canonicalPaymentReferenceBytes(paymentRef); }
+    catch { return { jsonrpc: "2.0", id: msg.id, result: { content: [{ type: "text", text: JSON.stringify({ ok: false, message: "Invalid repayment payment reference" }) }] } }; }
     const rcpt = {
       identity: state.agent.witness.I,
       currentC: state.ledger.lineCommitment,
       amount,
-      paymentRef: "mcp-repay",
+      paymentRef,
       nonce: encoding.toHex(encoding.randomBytes32()),
-      expiry: state.ledger.actionClock + 10_000,
+      expiry: Math.floor(Date.now() / 1000) + 10_000,
       contractDomain: state.ledger.contractDomain,
     };
     const r = protocol.acknowledgeRepayment(

@@ -1,7 +1,9 @@
+import { boot } from "../../test/fixtures/compact.ts";
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   agentId,
+  canonicalPaymentReferenceBytes,
   contractDomain,
   drawNoteCommit,
   drawNullifier,
@@ -15,7 +17,7 @@ import {
   repayNullifier,
   toHex,
 } from "./encoding.ts";
-import { blankPrivate, boot, call, firstQuote, readLedger } from "./compact-harness.ts";
+import { blankPrivate, call, firstQuote, readLedger } from "./compact-harness.ts";
 import { DEMO } from "../../test/fixtures/keys.ts";
 import {
   createLedger,
@@ -44,6 +46,24 @@ describe("browser-safe hex", () => {
   it("rejects malformed hex", () => {
     assert.throws(() => fromHex("aa"));
     assert.throws(() => fromHex("z".repeat(64)));
+  });
+});
+
+describe("canonical external payment identities", () => {
+  it("preserves full references, exact case, byte length and Unicode without hex guessing", () => {
+    const fingerprint = (value: string) => toHex(canonicalPaymentReferenceBytes(value));
+    assert.equal(fingerprint("rail:preview:USD:event:123"), fingerprint("rail:preview:USD:event:123"));
+    assert.notEqual(fingerprint("a".repeat(32) + ":1"), fingerprint("a".repeat(32) + ":2"));
+    assert.notEqual(fingerprint("rail:Event"), fingerprint("rail:event"));
+    assert.notEqual(fingerprint("ab".repeat(32)), fingerprint("AB".repeat(32)));
+    assert.notEqual(fingerprint("abc"), fingerprint("abc\u0000"));
+    assert.notEqual(fingerprint("rail:é"), fingerprint("rail:e\u0301"));
+    assert.equal(canonicalPaymentReferenceBytes("🚀".repeat(1024)).length, 32);
+  });
+
+  it("rejects ambiguous whitespace, malformed Unicode and oversized UTF-8 references", () => {
+    for (const reference of ["", " rail:1", "rail:1 ", "\ud800", "\udc00", "x\ud800y", "🚀".repeat(1025)])
+      assert.throws(() => canonicalPaymentReferenceBytes(reference));
   });
 });
 
@@ -104,7 +124,7 @@ describe("cross-language commitment vectors", () => {
     assert.equal(opened.ledger.lineGeneration, 1n);
     const I = agentId(DEMO.agent);
     const C0 = lineStateCommit(
-      { identity: I, limit: 150n, outstanding: 0n, epoch: 0n },
+      { domain: opened.ledger.contractDomain, identity: I, limit: 150n, outstanding: 0n, epoch: 0n },
       pad32("salt-0"),
     );
     assert.equal(toHex(opened.ledger.identityCommit), toHex(I));
@@ -223,7 +243,7 @@ describe("cross-language commitment vectors", () => {
     assert.ok(redNulls.includes(toHex(Nredeem)));
 
     const C1 = lineStateCommit(
-      { identity: I, limit: 150n, outstanding: 40n, epoch: 1n },
+      { domain: drawn.ledger.contractDomain, identity: I, limit: 150n, outstanding: 40n, epoch: 1n },
       pad32("salt-1"),
     );
     assert.equal(toHex(drawn.ledger.lineCommit), toHex(C1));
@@ -292,6 +312,7 @@ describe("cross-language commitment vectors", () => {
 
   it("TypeScript reference engine uses the same encodings as Compact", () => {
     const ledger = createLedger({
+      clock: () => 0,
       issuerSecret: ISSUER_SK,
       merchantSecret: MERCHANT_A_SK,
       instanceNonce: INSTANCE_NONCE,

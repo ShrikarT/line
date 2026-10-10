@@ -1,5 +1,7 @@
 # Line — Architecture & Plan
 
+> **Archive notice (10 October 2026):** Historical Wave 2 planning snapshot; its product/privacy promises, compiler versions, tests and file map are superseded by [PRODUCT_DIRECTION.md](PRODUCT_DIRECTION.md), [PRODUCT_VALIDATION.md](PRODUCT_VALIDATION.md), [ENGINEERING_STATUS.md](ENGINEERING_STATUS.md), and [PRIVACY.md](PRIVACY.md). Do not use this file as current product or security evidence.
+
 Private spending guardrails for autonomous agent fleets — corporate cards for AI agents, Midnight-private.
 
 **One-liner:** An enterprise finance admin issues a capped budget to an agent, backed by a funded reserve pool. The chain never sees secrets, salts, nonces, the agent identity preimage, the private books ($L$, $B$, epoch), per-quote invoice amounts, or any merchant↔quote↔note attribution — settled amounts and reserve totals are disclosed as anonymous escrow flows.

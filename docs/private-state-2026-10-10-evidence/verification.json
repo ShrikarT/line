@@ -1,0 +1,36 @@
+{
+  "date": "2026-10-10",
+  "head": "ab9d3d3a75dd4d8d2e6f298ca2effc03ce7e2947",
+  "workingTreeChangesIncluded": true,
+  "scope": "Local private-state safety remediation; no live proof, submission, deployment, customer evidence or payout",
+  "checks": [
+    { "command": "npm test", "exitCode": 0, "tests": 273, "suites": 46, "skipped": 0 },
+    { "command": "npm run test:e2e", "exitCode": 0, "tests": 12, "environment": "Chromium with Vite dev server" },
+    { "command": "npm run build", "exitCode": 0, "remainingWarnings": ["SDK assert browser externalization", "SDK isomorphic-ws default WebSocket export", "large bundles"] },
+    { "command": "npm run compact:check", "exitCode": 0, "freshGeneratedFiles": 16, "compiler": "0.31.1", "normalization": "Only source-map output location" },
+    { "command": "npm run compact:release:validate", "exitCode": 0, "release": "0.31.1-fba1713ebb4a-c1c05363-d42d-49ea-8211-a76544059ba9" },
+    { "command": "npm run check:keys", "exitCode": 0, "productionModules": 43 },
+    { "command": "npm run check:secrets", "exitCode": 0 },
+    { "command": "git -c core.safecrlf=false diff --check", "exitCode": 0 }
+  ],
+  "coverage": [
+    "Live session expiry and all twelve privileged store operations",
+    "Stale decrypt/save, session replacement and confirmed draw returning after lock",
+    "Full Uint64, Uint8Array, optional field and nested-object encrypted serialization",
+    "Real IndexedDB reload, ciphertext relocation/tampering and success-then-abort preserving old opening",
+    "Actual provider authorization revocation after request success aborts write before commit",
+    "Populated real console vault records required; missing/error storage fails rather than proving privacy",
+    "No plaintext provider cache; authorization, wrong-password mutation and explicit encrypted fallback",
+    "Provider disposal and actual runtime connector account scope isolation",
+    "Vault UI visible persistence errors and issued-agent opening protection"
+  ],
+  "stillOpen": [
+    "Independent role and institutional custody",
+    "Crash-durable intent and ambiguous-confirmation recovery",
+    "Encrypted backup/restore and legacy accountless record migration",
+    "Cross-process concurrency and rollback resistance",
+    "Historical/transcript confidentiality and complete domain separation",
+    "Real settlement and finalized network lifecycle",
+    "Customer validation"
+  ]
+}

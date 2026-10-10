@@ -1,62 +1,65 @@
-/**
- * VaultPrivateStateProvider
- *
- * Official implementation of PrivateStateProvider backed by WebCrypto AES-GCM 256-bit
- * encryption and IndexedDB persistence via src/lib/security/vault.ts.
- *
- * Scopes private states by contract address and privateStateId.
- * Complies with @midnight-ntwrk/midnight-js-types.
- */
+/** Encrypted private-state and signing-key storage. No plaintext read cache. */
 import type {
-  PrivateStateProvider,
-  PrivateStateId,
-  ExportPrivateStatesOptions,
-  PrivateStateExport,
-  ImportPrivateStatesOptions,
-  ImportPrivateStatesResult,
-  SigningKeyExport,
-  ExportSigningKeysOptions,
-  ImportSigningKeysOptions,
-  ImportSigningKeysResult,
+  PrivateStateProvider, PrivateStateId, ExportPrivateStatesOptions, PrivateStateExport,
+  ImportPrivateStatesOptions, ImportPrivateStatesResult, SigningKeyExport,
+  ExportSigningKeysOptions, ImportSigningKeysOptions, ImportSigningKeysResult,
 } from "@midnight-ntwrk/midnight-js-types";
 import {
-  saveEncryptedJson,
-  loadEncryptedJson,
-  removeEncryptedSecret,
-  removeEncryptedPrefix,
-  getVaultSessionPassphrase,
-  isVaultSessionUnlocked,
+  saveEncryptedSecret, loadEncryptedJson, removeEncryptedSecret, removeEncryptedPrefix,
+  getVaultSessionPassphrase, isVaultSessionUnlocked, getVaultSessionRevision,
+  onVaultSessionLock, encryptSecret, decryptSecret, encodeVaultJson, decodeVaultJson,
+  loadEncryptedSecret, listEncryptedKeys,
+  type EncryptedEnvelope,
 } from "../security/vault.ts";
 import {
-  ContractNotConfiguredError,
-  VaultLockedError,
-  VaultPassphraseError,
-  VaultTamperedError,
-  VaultPersistenceError,
-  UnsupportedOperationError,
+  ContractNotConfiguredError, VaultLockedError, VaultPersistenceError, UnsupportedOperationError,
 } from "./errors.ts";
 
 export interface VaultPrivateStateProviderConfig {
   passwordProvider?: () => string | Promise<string>;
   networkId?: string;
+  /** Explicit account scope. Omitted/default retains the legacy namespace; key segments are escaped. */
+  accountId?: string;
+  /** Opt-in encrypted, volatile storage on persistence failure, never on authentication failure. */
   allowEphemeralFallback?: boolean;
+}
+
+interface Authorization {
+  passphrase: string;
+  revision: number;
+  sessionBound: boolean;
 }
 
 export class VaultPrivateStateProvider<PS = unknown> implements PrivateStateProvider<PrivateStateId, PS> {
   private currentContractAddress: string | null = null;
-  private inMemoryFallback = new Map<string, PS>();
-  private signingKeys = new Map<string, unknown>();
-  private passwordProvider?: () => string | Promise<string>;
-  private networkId: string;
+  private ephemeral = new Map<string, EncryptedEnvelope>();
+  private readonly passwordProvider?: () => string | Promise<string>;
+  private readonly networkScope: string;
+  private readonly accountScope: string | null;
+  private readonly stopLockListener?: () => void;
+  private disposed = false;
   readonly allowEphemeralFallback: boolean;
 
   constructor(config?: VaultPrivateStateProviderConfig) {
     this.passwordProvider = config?.passwordProvider;
-    this.networkId = config?.networkId ?? "midnight-testnet";
+    const account = config?.accountId ?? "default";
+    this.networkScope = encodeURIComponent(config?.networkId ?? "preprod");
+    this.accountScope = account === "default" ? null : encodeURIComponent(account);
     this.allowEphemeralFallback = config?.allowEphemeralFallback ?? false;
+    if (this.allowEphemeralFallback) {
+      this.stopLockListener = onVaultSessionLock(() => this.ephemeral.clear());
+    }
+  }
+
+  /** Dispose opt-in ephemeral state and its lock listener when replacing a provider. */
+  dispose(): void {
+    this.disposed = true;
+    this.ephemeral.clear();
+    this.stopLockListener?.();
   }
 
   setContractAddress(address: string): void {
+    if (!address.trim()) throw new ContractNotConfiguredError();
     this.currentContractAddress = address;
   }
 
@@ -67,147 +70,142 @@ export class VaultPrivateStateProvider<PS = unknown> implements PrivateStateProv
     return this.currentContractAddress;
   }
 
-  private async getPassphrase(): Promise<string> {
-    if (this.passwordProvider) {
-      const p = await this.passwordProvider();
-      if (p) return p;
+  private assertAuthorized(auth: Authorization): void {
+    if (this.disposed) throw new VaultLockedError("Private storage provider was revoked.");
+    if (auth.sessionBound &&
+      (!isVaultSessionUnlocked() || getVaultSessionRevision() !== auth.revision)) {
+      throw new VaultLockedError("Vault session changed while private storage was in use. Unlock and retry.");
     }
-    const sessionPassphrase = getVaultSessionPassphrase();
-    if (sessionPassphrase) return sessionPassphrase;
-    throw new VaultLockedError("Private state storage locked: Passphrase or active vault session required.");
   }
 
-  private storageKey(privateStateId: string): string {
-    const contract = this.ensureContractConfigured();
-    return `midnight:ps:${this.networkId}:${contract}:${privateStateId}`;
+  private async authorize(): Promise<Authorization> {
+    if (this.disposed) throw new VaultLockedError("Private storage provider was revoked.");
+    // A browser password callback is not a second means of bypassing a locked UI vault.
+    const unlocked = isVaultSessionUnlocked();
+    if (typeof window !== "undefined" && !unlocked) throw new VaultLockedError();
+    const revision = getVaultSessionRevision();
+    const passphrase = this.passwordProvider
+      ? await this.passwordProvider()
+      : getVaultSessionPassphrase();
+    if (!passphrase) throw new VaultLockedError();
+    const auth = { passphrase, revision, sessionBound: unlocked || typeof window !== "undefined" };
+    this.assertAuthorized(auth);
+    return auth;
   }
 
-  async get(privateStateId: PrivateStateId): Promise<PS | null> {
-    const contract = this.ensureContractConfigured();
-    const key = this.storageKey(privateStateId);
+  private statePrefix(): string {
+    return this.storagePrefix("ps") + `${encodeURIComponent(this.ensureContractConfigured())}:`;
+  }
 
+  private storagePrefix(kind: "ps" | "sk"): string {
+    // A distinct namespace also prevents a legacy/default network named "account"
+    // from clearing explicit-account records via a matching prefix.
+    const prefix = this.accountScope === null ? `midnight:${kind}:` : `midnight:${kind}-account:${this.accountScope}:`;
+    return `${prefix}${this.networkScope}:`;
+  }
+
+  private stateKey(privateStateId: string): string {
+    return this.statePrefix() + encodeURIComponent(privateStateId);
+  }
+
+  private signingPrefix(): string { return this.storagePrefix("sk"); }
+  private signingKey(address: string): string { return this.signingPrefix() + encodeURIComponent(address); }
+
+  private canFallback(err: unknown): boolean {
+    return this.allowEphemeralFallback && err instanceof VaultPersistenceError;
+  }
+
+  private async read<T>(key: string): Promise<T | null> {
+    const auth = await this.authorize();
+    let durable: T | null = null;
     try {
-      const passphrase = await this.getPassphrase();
-      const data = await loadEncryptedJson<PS>(key, passphrase);
-      if (data !== null && data !== undefined) {
-        return data;
-      }
+      durable = await loadEncryptedJson<T>(key, auth.passphrase);
+      this.assertAuthorized(auth);
+      // Only a failed durable write creates an ephemeral record. Durable authentication
+      // must still be attempted on every read; MAC/codec failures never fall through.
     } catch (err) {
-      if (!this.allowEphemeralFallback) {
-        throw err;
-      }
+      this.assertAuthorized(auth);
+      if (!this.canFallback(err)) throw err;
     }
-
-    const memKey = `${contract}:${privateStateId}`;
-    return this.inMemoryFallback.get(memKey) ?? null;
+    const envelope = this.ephemeral.get(key);
+    if (!envelope) return durable;
+    const value = decodeVaultJson(await decryptSecret(envelope, auth.passphrase)) as T;
+    this.assertAuthorized(auth);
+    return value;
   }
 
-  async set(privateStateId: PrivateStateId, state: PS): Promise<void> {
-    const contract = this.ensureContractConfigured();
-    const memKey = `${contract}:${privateStateId}`;
-    this.inMemoryFallback.set(memKey, state);
-
+  private async write<T>(key: string, value: T): Promise<void> {
+    const auth = await this.authorize();
+    // Serialize outside the fallback catch: unsupported/cyclic data must never become
+    // an apparent successful write, regardless of persistence configuration.
+    const serialized = encodeVaultJson(value);
+    const existingEphemeral = this.ephemeral.get(key);
+    if (existingEphemeral) await decryptSecret(existingEphemeral, auth.passphrase);
+    this.assertAuthorized(auth);
     try {
-      const passphrase = await this.getPassphrase();
-      const key = this.storageKey(privateStateId);
-      await saveEncryptedJson(key, state, passphrase);
+      // A non-empty callback password is not proof it owns an existing record.
+      await loadEncryptedSecret(key, auth.passphrase);
+      this.assertAuthorized(auth);
+      await saveEncryptedSecret(key, serialized, auth.passphrase, { beforeWrite: () => this.assertAuthorized(auth) });
+      this.assertAuthorized(auth);
+      this.ephemeral.delete(key);
     } catch (err) {
-      if (!this.allowEphemeralFallback) {
-        if (err instanceof VaultLockedError) {
-          throw err;
-        }
-        throw new VaultPersistenceError(err instanceof Error ? err.message : String(err), { privateStateId });
-      }
+      this.assertAuthorized(auth);
+      if (!this.canFallback(err)) throw err;
+      const envelope = await encryptSecret(key, serialized, auth.passphrase);
+      this.assertAuthorized(auth);
+      this.ephemeral.set(key, envelope);
     }
   }
 
-  async remove(privateStateId: PrivateStateId): Promise<void> {
-    const contract = this.ensureContractConfigured();
-    const memKey = `${contract}:${privateStateId}`;
-    this.inMemoryFallback.delete(memKey);
-    const key = this.storageKey(privateStateId);
-    try {
-      await removeEncryptedSecret(key);
-    } catch (err) {
-      if (!this.allowEphemeralFallback) {
-        throw new VaultPersistenceError(err instanceof Error ? err.message : String(err), { privateStateId });
-      }
-    }
+  private async delete(key: string): Promise<void> {
+    const auth = await this.authorize();
+    await loadEncryptedSecret(key, auth.passphrase);
+    const ephemeral = this.ephemeral.get(key);
+    if (ephemeral) await decryptSecret(ephemeral, auth.passphrase);
+    this.assertAuthorized(auth);
+    // A failed delete cannot hide a still-durable record by deleting only a cache.
+    await removeEncryptedSecret(key, { beforeWrite: () => this.assertAuthorized(auth) });
+    this.assertAuthorized(auth);
+    this.ephemeral.delete(key);
   }
 
-  async clear(): Promise<void> {
-    this.inMemoryFallback.clear();
-    if (this.currentContractAddress) {
-      const prefix = `midnight:ps:${this.networkId}:${this.currentContractAddress}:`;
-      await removeEncryptedPrefix(prefix);
+  private async deletePrefix(prefix: string): Promise<void> {
+    const auth = await this.authorize();
+    const keys = await listEncryptedKeys(prefix);
+    for (const key of keys) {
+      await loadEncryptedSecret(key, auth.passphrase);
+      this.assertAuthorized(auth);
     }
+    for (const [key, envelope] of this.ephemeral) {
+      if (key.startsWith(prefix)) await decryptSecret(envelope, auth.passphrase);
+      this.assertAuthorized(auth);
+    }
+    this.assertAuthorized(auth);
+    await removeEncryptedPrefix(prefix, { beforeWrite: () => this.assertAuthorized(auth) });
+    this.assertAuthorized(auth);
+    for (const key of this.ephemeral.keys()) if (key.startsWith(prefix)) this.ephemeral.delete(key);
   }
 
-  async setSigningKey(address: string, signingKey: string): Promise<void> {
-    this.signingKeys.set(address, signingKey);
-    try {
-      const passphrase = await this.getPassphrase();
-      await saveEncryptedJson(`midnight:sk:${this.networkId}:${address}`, signingKey, passphrase);
-    } catch (err) {
-      if (!this.allowEphemeralFallback) {
-        if (err instanceof VaultLockedError) {
-          throw err;
-        }
-        throw new VaultPersistenceError(err instanceof Error ? err.message : String(err), { address });
-      }
-    }
-  }
-
-  async getSigningKey(address: string): Promise<string | null> {
-    const cached = this.signingKeys.get(address) as string | undefined;
-    if (cached !== undefined) {
-      return cached;
-    }
-    try {
-      const passphrase = await this.getPassphrase();
-      const loaded = await loadEncryptedJson<string>(`midnight:sk:${this.networkId}:${address}`, passphrase);
-      if (loaded !== null) {
-        this.signingKeys.set(address, loaded);
-        return loaded;
-      }
-    } catch (err) {
-      if (!this.allowEphemeralFallback) {
-        throw err;
-      }
-    }
-    return null;
-  }
-
-  async removeSigningKey(address: string): Promise<void> {
-    this.signingKeys.delete(address);
-    try {
-      await removeEncryptedSecret(`midnight:sk:${this.networkId}:${address}`);
-    } catch (err) {
-      if (!this.allowEphemeralFallback) {
-        throw new VaultPersistenceError(err instanceof Error ? err.message : String(err), { address });
-      }
-    }
-  }
-
-  async clearSigningKeys(): Promise<void> {
-    this.signingKeys.clear();
-    const prefix = `midnight:sk:${this.networkId}:`;
-    await removeEncryptedPrefix(prefix);
-  }
+  async get(privateStateId: PrivateStateId): Promise<PS | null> { return this.read<PS>(this.stateKey(privateStateId)); }
+  async set(privateStateId: PrivateStateId, state: PS): Promise<void> { return this.write(this.stateKey(privateStateId), state); }
+  async remove(privateStateId: PrivateStateId): Promise<void> { return this.delete(this.stateKey(privateStateId)); }
+  async clear(): Promise<void> { return this.deletePrefix(this.statePrefix()); }
+  async setSigningKey(address: string, signingKey: string): Promise<void> { return this.write(this.signingKey(address), signingKey); }
+  async getSigningKey(address: string): Promise<string | null> { return this.read<string>(this.signingKey(address)); }
+  async removeSigningKey(address: string): Promise<void> { return this.delete(this.signingKey(address)); }
+  async clearSigningKeys(): Promise<void> { return this.deletePrefix(this.signingPrefix()); }
 
   async exportPrivateStates(_options?: ExportPrivateStatesOptions): Promise<PrivateStateExport> {
     throw new UnsupportedOperationError("exportPrivateStates");
   }
-
-  async importPrivateStates(_exportData: PrivateStateExport, _options?: ImportPrivateStatesOptions): Promise<ImportPrivateStatesResult> {
+  async importPrivateStates(_data: PrivateStateExport, _options?: ImportPrivateStatesOptions): Promise<ImportPrivateStatesResult> {
     throw new UnsupportedOperationError("importPrivateStates");
   }
-
   async exportSigningKeys(_options?: ExportSigningKeysOptions): Promise<SigningKeyExport> {
     throw new UnsupportedOperationError("exportSigningKeys");
   }
-
-  async importSigningKeys(_exportData: SigningKeyExport, _options?: ImportSigningKeysOptions): Promise<ImportSigningKeysResult> {
+  async importSigningKeys(_data: SigningKeyExport, _options?: ImportSigningKeysOptions): Promise<ImportSigningKeysResult> {
     throw new UnsupportedOperationError("importSigningKeys");
   }
 }

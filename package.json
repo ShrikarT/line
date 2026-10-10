@@ -4,17 +4,17 @@
   "version": "0.3.0",
   "type": "module",
   "license": "Apache-2.0",
-  "description": "Private revolving credit and checkout infrastructure for autonomous agents (Midnight Compact).",
+  "description": "Protocol prototype for issuer-authorized agent purchasing on Midnight Compact.",
   "scripts": {
     "dev": "vite --host 0.0.0.0 --port 5173",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --host 0.0.0.0 --port 4173",
     "typecheck": "tsc --noEmit",
-    "test": "node --experimental-strip-types --test src/lib/line/protocol.test.ts src/lib/line/demo.test.ts src/lib/line/encoding.test.ts src/lib/line/compact.test.ts src/lib/line/model.test.ts src/lib/line/leakage.test.ts src/lib/runtime/runtime.test.ts src/lib/runtime/network.integration.test.ts src/lib/security/vault.test.ts src/app/store.test.ts mcp/line-mcp.test.mjs tests/network-proof.test.ts",
-    "test:line": "node --experimental-strip-types --test src/lib/line/protocol.test.ts src/lib/line/demo.test.ts src/lib/line/encoding.test.ts src/lib/line/compact.test.ts src/lib/line/model.test.ts src/lib/line/leakage.test.ts src/lib/runtime/runtime.test.ts src/lib/runtime/network.integration.test.ts src/lib/security/vault.test.ts src/app/store.test.ts tests/network-proof.test.ts",
+    "test": "node --experimental-strip-types --test src/lib/line/protocol.test.ts src/lib/line/demo.test.ts src/lib/line/encoding.test.ts src/lib/line/compact.test.ts src/lib/line/model.test.ts src/lib/line/leakage.test.ts src/lib/runtime/runtime.test.ts src/lib/runtime/network.integration.test.ts src/lib/security/vault.test.ts src/app/store.test.ts mcp/line-mcp.test.mjs tests/network-proof.test.ts server/checkout.test.ts server/checkout-resilience.test.ts tests/contract-artifacts.test.mjs tests/endpoints.test.ts tests/network-sdk.test.ts tests/network-smoke.test.mjs tests/vault-provider.test.ts src/lib/security/operation-journal.test.ts tests/network-recovery.test.ts server/checkout-durability.test.ts src/app/console-recovery.test.ts tests/payment-replay.test.ts tests/closing-book.test.ts tests/reconcile-console.test.ts tests/expiry.test.ts tests/fee-policy.test.ts tests/compensation.test.ts",
+    "test:line": "node --experimental-strip-types --test src/lib/line/protocol.test.ts src/lib/line/demo.test.ts src/lib/line/encoding.test.ts src/lib/line/compact.test.ts src/lib/line/model.test.ts src/lib/line/leakage.test.ts src/lib/runtime/runtime.test.ts src/lib/runtime/network.integration.test.ts src/lib/security/vault.test.ts src/app/store.test.ts tests/network-proof.test.ts src/lib/security/operation-journal.test.ts tests/network-recovery.test.ts src/app/console-recovery.test.ts tests/payment-replay.test.ts tests/closing-book.test.ts tests/reconcile-console.test.ts tests/expiry.test.ts tests/fee-policy.test.ts tests/compensation.test.ts",
     "test:leakage": "node --experimental-strip-types --test src/lib/line/leakage.test.ts",
     "compact:compile": "node scripts/compile-compact.mjs --skip-zk contracts/line.compact contracts/managed/line",
-    "compact:compile:release": "node scripts/compile-compact.mjs contracts/line.compact contracts/managed/line",
+    "compact:compile:release": "node scripts/contract-artifacts.mjs build",
     "compact:test": "node --experimental-strip-types --test src/lib/line/compact.test.ts src/lib/line/encoding.test.ts",
     "contract:deploy": "node scripts/contract-deploy.mjs",
     "contract:join": "node scripts/contract-join.mjs",
@@ -25,17 +25,21 @@
     "local:smoke": "node --experimental-strip-types scripts/local-smoke.mjs",
     "check:keys": "node scripts/check-no-fixture-keys.mjs",
     "check:secrets": "node scripts/check-no-secret-patterns.mjs",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "test:checkout": "node --experimental-strip-types --test server/checkout.test.ts server/checkout-resilience.test.ts server/checkout-durability.test.ts",
+    "compact:check": "node scripts/check-compact-artifacts.mjs",
+    "compact:release:validate": "node scripts/contract-artifacts.mjs validate"
   },
   "compact": {
-    "compiler": "0.34.0",
-    "language": "0.26.0",
-    "runtime": "0.19.0",
-    "ledger": "9.1.0.0-rc.3"
+    "compiler": "0.31.1",
+    "language": "0.23.0",
+    "runtime": "0.16.0",
+    "ledger": "8.0.2"
   },
   "dependencies": {
-    "@midnight-ntwrk/compact-runtime": "0.19.0",
+    "@midnight-ntwrk/compact-runtime": "0.16.0",
     "@midnight-ntwrk/dapp-connector-api": "4.0.1",
+    "@midnight-ntwrk/ledger-v8": "8.1.2",
     "@midnight-ntwrk/midnight-js-contracts": "4.1.1",
     "@midnight-ntwrk/midnight-js-fetch-zk-config-provider": "4.1.1",
     "@midnight-ntwrk/midnight-js-http-client-proof-provider": "4.1.1",
@@ -43,7 +47,12 @@
     "@midnight-ntwrk/midnight-js-level-private-state-provider": "4.1.1",
     "@midnight-ntwrk/midnight-js-network-id": "4.1.1",
     "@midnight-ntwrk/midnight-js-node-zk-config-provider": "4.1.1",
+    "@midnight-ntwrk/midnight-js-protocol": "4.1.1",
     "@midnight-ntwrk/midnight-js-types": "4.1.1",
+    "@midnight-ntwrk/midnight-js-utils": "4.1.1",
+    "@midnight-ntwrk/wallet": "^5.0.0",
+    "@midnight-ntwrk/wallet-sdk": "1.2.0",
+    "@scure/base": "2.0.0",
     "clsx": "^2.1.1",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
@@ -61,5 +70,8 @@
     "typescript": "^5.7.0",
     "vite": "^8.2.0",
     "vite-plugin-wasm": "^3.6.0"
+  },
+  "overrides": {
+    "@midnight-ntwrk/ledger-v8": "8.1.2"
   }
 }

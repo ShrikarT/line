@@ -1,5 +1,7 @@
 # WAVE2_DEPLOYMENT.md — Line Wave 2 Deployment & Proving Architecture
 
+> **Archive notice (10 October 2026):** Historical deployment/proving snapshot. Versions, network status, proving and toolchain statements below are superseded. Use [DEPLOYMENT.md](DEPLOYMENT.md), [NETWORK_COMPATIBILITY_2026-10-09.md](NETWORK_COMPATIBILITY_2026-10-09.md), and [ENGINEERING_STATUS.md](ENGINEERING_STATUS.md).
+
 ## 1. Deployment Overview & Status
 
 Line Wave 2 is deployed as a **reproducible local Compact simulator and settlement engine**.

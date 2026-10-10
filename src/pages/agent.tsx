@@ -4,15 +4,21 @@ import { ExplorerPanel } from "@/components/line/explorer";
 import { Button, FlashBar, Mono, Panel, Stat } from "@/components/line/ui";
 import { availableCredit } from "@/lib/line/types.ts";
 import { useAppStore } from "@/app/store.ts";
+import { Deadline } from "@/components/line/deadline";
+import { Pricing } from "@/components/line/pricing";
+import { Compensation } from "@/components/line/compensation";
 
 export function AgentPage() {
   const agentRecord = useAppStore((s) => s.agentRecord);
+  const agentLine = useAppStore((s) => s.agentLineRecord);
+  const generation = useAppStore((s) => s.ledger.lineGeneration);
   const invoices = useAppStore((s) => s.invoices);
   const doDraw = useAppStore((s) => s.doDraw);
   const flash = useAppStore((s) => s.flash);
   const notes = useAppStore((s) => s.notes);
   const isVaultUnlocked = useAppStore((s) => s.isVaultUnlocked);
   const txLifecycle = useAppStore((s) => s.txLifecycle);
+  const operationsUnavailable = useAppStore((s) => s.operationBusy || s.recoveryRequired || !s.isVaultUnlocked);
   const importQuotePackage = useAppStore((s) => s.importQuotePackage);
   const exportDrawNotePackage = useAppStore((s) => s.exportDrawNotePackage);
 
@@ -20,15 +26,16 @@ export function AgentPage() {
   const [showImportQuote, setShowImportQuote] = useState(false);
   const [copiedNote, setCopiedNote] = useState<string | null>(null);
 
-  const w = agentRecord ? { L: agentRecord.L, B: agentRecord.B } : null;
+  const w = agentRecord && (!agentLine || agentLine.lineGeneration === generation) ? { L: agentRecord.L, B: agentRecord.B } : null;
 
   return (
     <Shell>
       <div className="grid gap-6 lg:grid-cols-[1fr_1fr]">
         <Panel kicker="Agent console" title="Private books & Draw Notes">
           <p className="text-sm text-muted">
-            Limit and outstanding live strictly in your private store. Successful draws issue
-            cryptographically-committed settlement notes to merchants backed by issuer reserves.
+            Credit openings are encrypted in your private vault. Draws issue merchant-bound notes
+            backed by reserve accounting. Public amounts and transaction history can reveal debt;
+            local execution does not submit proofs or move tokens.
           </p>
           <FlashBar flash={flash} />
           {w ? (
@@ -65,7 +72,7 @@ export function AgentPage() {
                   rows={3}
                   value={quotePkgInput}
                   onChange={(e) => setQuotePkgInput(e.target.value)}
-                  placeholder='{"format":"line:quote-package:v1", ...}'
+                  placeholder='{"format":"line:quote-package:v3","deadlineUnits":"unix-seconds","feePolicy":"flat-plus-ceil-bps-v1", ...}'
                   className="w-full rounded border border-border bg-elevated p-2 text-xs font-mono text-fg focus:outline-none focus:ring-1 focus:ring-accent"
                 />
                 <Button
@@ -96,10 +103,12 @@ export function AgentPage() {
                   <li key={inv.Q} className="flex items-center justify-between gap-3 border-b border-border/50 pb-2">
                     <span className="text-sm">
                       {inv.invoiceId} · <span className="font-semibold">{inv.amount} units</span>
+                      <Deadline seconds={inv.preimage.expiry} label="Quote and claim deadline:" />
+                      <Pricing amount={inv.amount} feeFlat={inv.preimage.feeFlat} feeBps={inv.preimage.feeBps} />
                     </span>
                     <Button
                       onClick={() => doDraw(inv.Q)}
-                      disabled={txLifecycle === "wallet-approval" || txLifecycle === "proving"}
+                      disabled={operationsUnavailable || txLifecycle === "wallet-approval" || txLifecycle === "proving"}
                     >
                       {txLifecycle === "proving" ? "Proving ZK..." : "Draw & Issue Note"}
                     </Button>
@@ -139,11 +148,13 @@ export function AgentPage() {
                       <span className="text-subtle">Commitment D:</span>
                       <Mono value={n.D} />
                     </div>
+                    <Deadline seconds={n.preimage.expiry} />
                   </li>
                 ))}
               </ul>
             )}
           </div>
+          <Compensation />
         </Panel>
         <ExplorerPanel />
       </div>

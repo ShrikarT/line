@@ -1,5 +1,7 @@
 # WAVE2_SECURITY_REVIEW.md — Line Security & Threat Analysis
 
+> **Archive notice (10 October 2026):** Historical security-review snapshot. Some privacy, attribution, reserve-backing and toolchain statements below are stale or disproven by the current transcript/history audit. In particular, merchant-to-quote unlinkability is not established: `draw` discloses the selected merchant pseudonym; public note amounts and reserve deltas remain visible; `identityCommit` is cross-instance linkable when an agent reuses its secret; reserve counters do not represent deposited assets. The current line commitment is domain-bound. Do not repeat archived statements that observers never learn amounts or merchant identities. Use [PRIVACY.md](PRIVACY.md), [PRODUCT_DIRECTION.md](PRODUCT_DIRECTION.md), and [FULL_AUDIT_2026-10-07.md](FULL_AUDIT_2026-10-07.md) for current boundaries.
+
 ## 1. Executive Summary
 
 Line is a private spending-guardrail and settlement prototype engineered for autonomous agent fleets on Midnight Compact (`0.26.0`, toolchain `0.34.0`, runtime `0.19.0`).

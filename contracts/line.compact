@@ -1,38 +1,44 @@
 // Line — private revolving credit and settlement authorization (Wave 2)
-// Compact language 0.26 / toolchain 0.34.0 / compact-runtime 0.19.0
+// Compact language 0.23 / toolchain 0.31.1 / compact-runtime 0.16.0 (ledger 8)
 //
 // Wave 2 North Star:
-//   A successful private draw creates a merchant-bound private settlement note
-//   redeemable once against an issuer-funded reserve.
+//   A successful draw creates a merchant-bound committed claim note with a
+//   private preimage and public amount, redeemable once against reserve
+//   accounting. Counters do not establish custody funding or an asset payout.
 //
 // Commitments:
-//   C = persistentCommit<LinePreimage>({ identity: I, limit: L, outstanding: B, epoch }, salt)
+//   C = persistentCommit<LinePreimage>({ domain, identity: I, limit: L, outstanding: B, epoch }, salt)
 //   D = persistentCommit<DrawNotePreimage>(notePreimage, noteSalt)
 //
 // Domain separation uses pad(32, "line:…") tags:
-//   line:issuer:pk, line:merchant:pk, line:id, line:v2:domain, line:v2:quote, line:v2:draw, line:v2:redeem, line:v2:repay
+//   line:issuer:pk, line:merchant:pk, line:id, line:v2:domain, line:v3:quote, line:v2:draw, line:v2:redeem, line:v2:repay
 //
-// Reserve accounting:
-//   totalReserve: cumulative funds deposited by issuer
-//   encumberedReserve: reserve committed to outstanding draw notes
-//   redeemedReserve: cumulative reserve redeemed by merchants
-//   feeReserve: cumulative issuer fees accrued on draws (payout via withdrawFees)
-//   Invariant: encumberedReserve + redeemedReserve + feeReserve <= totalReserve
-//   unencumberedReserve = totalReserve - encumberedReserve - redeemedReserve - feeReserve
+// Reserve accounting (no token custody or verified cash payments):
+//   T = totalReserve, E = encumberedReserve, R = redeemedReserve
+//   F = feeReserve (earned at merchant claim redemption), P = pendingFeeReserve
+//   U = refundReserve, X = reportedRefundReserve (full original claim budgets)
+//   E + R + F + P + U + X <= T; withdrawable = T - all six locked budgets.
+//   draw locks principal in E and issuer-priced fee in P; redemption moves
+//   E -> R and P -> F. Expiry moves the full original cost into U without
+//   changing the private book. Authorized allocation credits min(B, cost)
+//   against the current generation or owes full cost to an older borrower.
+//   A private refund commitment binds the exact unpaid cash remainder. A zero
+//   remainder releases the full budget; a positive remainder retains it all.
+//   Issuer reporting consumes a stable payment reference and moves the full
+//   original budget U -> X. It neither verifies cash nor reveals the private
+//   remainder through a partial public reserve delta. X remains locked.
 //
-// Issuer fee (the issuer's business model):
-//   `draw` takes a public `fee` param, the issuer's protocol-defined compensation for
-//   extending the line and funding the reserve. The agent's outstanding increases by
-//   amount + fee (capacity check: outstanding + amount + fee <= limit), `encumberedReserve`
-//   grows by amount only, and `feeReserve` grows by fee. The fee must clear the same
-//   solvency check as the note (amount + fee <= unencumberedReserve). The issuer
-//   withdraws accrued fees with `withdrawFees()`, which reduces totalReserve by the
-//   fee amount and zeroes feeReserve.
+// Issuer-approved pricing:
+//   openLine fixes feeFlat and feeBps; quotes bind this generation's policy.
+//   draw proves fee = feeFlat + ceil(amount * feeBps / 10000) and increases
+//   private outstanding by principal + fee. withdrawFees reduces T and F in
+//   accounting only. Fee earning here proves claim redemption, not delivery,
+//   collected revenue, token payout, or resolution of post-redemption disputes.
 //
 // Multi-merchant:
 //   registeredMerchants: Map<Bytes<32>, Boolean> allows multiple merchants.
 
-pragma language_version 0.26;
+pragma language_version 0.23;
 
 import CompactStandardLibrary;
 
@@ -44,16 +50,17 @@ export enum Status {
 }
 
 export struct QuoteMeta {
-  // NOTE: merchantPk is deliberately NOT stored here (audit H3). The quote's
-  // merchant is a private witness inside `draw`; the agent proves in zero
-  // knowledge that the witness merchantPk opens Q and is registered. The
-  // registeredMerchants allowlist stays public by design.
+  // NOTE: merchantPk is deliberately NOT stored in this map entry. During
+  // `draw`, however, the selected merchant key is disclosed for public
+  // allowlist verification, so quote consumption, merchant and note can be
+  // correlated from the public transcript. The allowlist is public by design.
   expiry: Uint<64>;
   lineGeneration: Uint<64>;
   used: Boolean;
 }
 
 export struct LinePreimage {
+  domain: Bytes<32>;
   identity: Bytes<32>;
   limit: Uint<64>;
   outstanding: Uint<64>;
@@ -67,16 +74,33 @@ export struct DrawNotePreimage {
   quoteCommit: Bytes<32>;
   merchantPk: Bytes<32>;
   amount: Uint<64>;
+  fee: Uint<64>;
   noteNonce: Bytes<32>;
   expiry: Uint<64>;
 }
 
+// Refund amounts are private: a public cost-minus-credit remainder would
+// disclose the current debt when the purchase was partially repaid.
+export struct RefundPreimage {
+  domain: Bytes<32>;
+  lineGeneration: Uint<64>;
+  identity: Bytes<32>;
+  noteCommit: Bytes<32>;
+  amount: Uint<64>;
+}
+
 export struct NoteMeta {
   amount: Uint<64>;
+  fee: Uint<64>;
   redeemed: Boolean;
   cancelled: Boolean;
   expiry: Uint<64>;
   lineGeneration: Uint<64>;
+  compensationAllocated: Boolean;
+  refundCommitment: Bytes<32>;
+  cashRefundOwed: Boolean;
+  refundAcknowledged: Boolean;
+  refundPaymentNullifier: Bytes<32>;
 }
 
 export sealed ledger issuer: Bytes<32>;
@@ -87,6 +111,15 @@ export ledger totalReserve: Uint<64>;
 export ledger encumberedReserve: Uint<64>;
 export ledger redeemedReserve: Uint<64>;
 export ledger feeReserve: Uint<64>;
+export ledger pendingFeeReserve: Uint<64>;
+export ledger refundReserve: Uint<64>;
+// Full original-cost budgets retired by issuer-reported cash refund receipts.
+// This conservative lock avoids revealing a private partial-refund amount via
+// public reserve deltas; it is not an actual cash payment counter.
+export ledger reportedRefundReserve: Uint<64>;
+// Immutable while a generation is active; set only by issuer-authenticated opening.
+export ledger feeFlat: Uint<64>;
+export ledger feeBps: Uint<64>;
 
 export ledger identityCommit: Bytes<32>;
 export ledger lineCommit: Bytes<32>;
@@ -96,13 +129,9 @@ export ledger lineGeneration: Uint<64>;
 export ledger quotes: Map<Bytes<32>, QuoteMeta>;
 export ledger notes: Map<Bytes<32>, NoteMeta>;
 export ledger nullifiers: Set<Bytes<32>>;
-// actionClock is a TRANSACTION COUNTER, not a wall clock (audit H4).
-// Every circuit increments it, so note/quote expiries are denominated in
-// actions, not time. Expiry is ADVISORY: the issuer can grind the counter with
-// cheap transactions to force-expire notes, then permissionlessly cancel them
-// via cancelOrExpireNote and withdraw the freed reserve. The issuer is TRUSTED
-// not to grind. The real fix — merchant-countersigned grace window or
-// block-height expiry — is deferred (see WAVE2_SECURITY_REVIEW.md).
+// Diagnostic transaction ordering only. Monetary validity uses supported
+// ledger block-time comparisons, in seconds since the Unix epoch. Unrelated
+// activity cannot accelerate expiry or release an unexpired merchant claim.
 export ledger actionClock: Counter;
 
 witness callerSecret(): Bytes<32>;
@@ -120,13 +149,14 @@ witness noteQuoteCommit(): Bytes<32>;
 // Private books: the credit limit, outstanding balance, and epoch travel as
 // witnesses, never as public circuit parameters (audit H2). Each caller
 // supplies their own copy; the stale check
-//   lineStateCommit({I, limit, outstanding, epoch}, salt()) == lineCommit
+//   lineStateCommit({domain, I, limit, outstanding, epoch}, salt()) == lineCommit
 // binds the witness values to the committed line state.
 // Private amounts (audit H1): quote/invoice amounts, draw amounts, redemption
 // amounts, and repayment amounts are witnesses. Settled note amounts remain
 // public escrow accounting (NoteMeta.amount, reserve counters) by design.
-// Private quote merchant (audit H3): the merchant bound to a quote is a
-// witness inside `draw`; unlinkability of merchant<->quote holds on the ledger.
+// Merchant quote preimages are witnesses, but `draw` discloses the selected
+// merchant key and links it to quote consumption and note creation. Do not
+// claim merchant-to-quote unlinkability from the absence of a QuoteMeta field.
 witness lineLimit(): Uint<64>;
 witness lineOutstanding(): Uint<64>;
 witness lineEpoch(): Uint<64>;
@@ -156,6 +186,20 @@ circuit lineStateCommit(p: LinePreimage, s: Bytes<32>): Bytes<32> {
   return persistentCommit<LinePreimage>(p, s);
 }
 
+circuit refundCommit(p: RefundPreimage, s: Bytes<32>): Bytes<32> {
+  return persistentCommit<RefundPreimage>(p, s);
+}
+
+circuit cashRefundAmount(outstanding: Uint<64>, cost: Uint<64>): Uint<64> {
+  if (outstanding >= cost) { return 0; }
+  else { return (cost - outstanding) as Uint<64>; }
+}
+
+circuit debtAfterCredit(outstanding: Uint<64>, cost: Uint<64>): Uint<64> {
+  if (outstanding >= cost) { return (outstanding - cost) as Uint<64>; }
+  else { return 0; }
+}
+
 circuit drawNoteCommit(p: DrawNotePreimage, s: Bytes<32>): Bytes<32> {
   return persistentCommit<DrawNotePreimage>(p, s);
 }
@@ -167,17 +211,21 @@ circuit quoteCommit(
   expiry: Uint<64>,
   nonce: Bytes<32>,
   generation: Uint<64>,
-  domain: Bytes<32>
+  domain: Bytes<32>,
+  flatFee: Uint<64>,
+  basisPoints: Uint<64>
 ): Bytes<32> {
-  return persistentHash<Vector<8, Bytes<32>>>([
-    pad(32, "line:v2:quote"),
+  return persistentHash<Vector<10, Bytes<32>>>([
+    pad(32, "line:v3:quote"),
     merchantPk,
     inv,
     encodeU64(amount),
     encodeU64(expiry),
     nonce,
     encodeU64(generation),
-    domain
+    domain,
+    encodeU64(flatFee),
+    encodeU64(basisPoints)
   ]);
 }
 
@@ -218,6 +266,16 @@ circuit repayNullifier(
   ]);
 }
 
+// One authenticated payment reference authorizes one credit allocation for the
+// lifetime of this instance. It cannot be renewed by rotating the credit book,
+// receipt nonce, amount, agent identity or line generation. The sealed issuer's
+// private key blinds low-entropy external references against public guessing.
+circuit paymentNullifier(issuerSk: Bytes<32>, payRef: Bytes<32>, domain: Bytes<32>): Bytes<32> {
+  return persistentHash<Vector<4, Bytes<32>>>([
+    pad(32, "line:v3:payment"), issuerSk, payRef, domain
+  ]);
+}
+
 constructor(issuerPk: Bytes<32>, initialMerchantPk: Bytes<32>, instanceNonce: Bytes<32>) {
   issuer = disclose(issuerPk);
   contractDomain = disclose(persistentHash<Vector<4, Bytes<32>>>([
@@ -231,6 +289,11 @@ constructor(issuerPk: Bytes<32>, initialMerchantPk: Bytes<32>, instanceNonce: By
   encumberedReserve = 0;
   redeemedReserve = 0;
   feeReserve = 0;
+  pendingFeeReserve = 0;
+  refundReserve = 0;
+  reportedRefundReserve = 0;
+  feeFlat = 0;
+  feeBps = 0;
   status = Status.NONE;
   lineGeneration = 0;
 }
@@ -272,7 +335,7 @@ export circuit withdrawUnencumberedReserve(amount: Uint<64>): [] {
   assert(amount > 0, "zero withdraw");
   // feeReserve is locked like encumbered/redeemed: accrued fees can only leave
   // via withdrawFees(), so withdrawing them here would desync the counters.
-  const locked = encumberedReserve + redeemedReserve + feeReserve;
+  const locked = encumberedReserve + redeemedReserve + feeReserve + pendingFeeReserve + refundReserve + reportedRefundReserve;
   assert(totalReserve >= locked, "undercollateralized");
   const withdrawable = totalReserve - locked;
   const a = disclose(amount);
@@ -290,27 +353,26 @@ export circuit withdrawFees(): [] {
   const f = feeReserve;
   assert(f > 0, "no fees");
   // Invariant check: encumbered + redeemed + fee <= totalReserve guarantees f is payable.
-  const locked = encumberedReserve + redeemedReserve + feeReserve;
+  const locked = encumberedReserve + redeemedReserve + feeReserve + pendingFeeReserve + refundReserve + reportedRefundReserve;
   assert(totalReserve >= locked, "reserve deficit");
   totalReserve = ((totalReserve - f) as Uint<64>);
   feeReserve = 0;
   actionClock.increment(1);
 }
 
-export circuit openLine(expiry: Uint<64>): [] {
+export circuit openLine(expiry: Uint<64>, flatFee: Uint<64>, basisPoints: Uint<64>): [] {
   requireIssuer();
   assert(status == Status.NONE || status == Status.CLOSED, "line already open");
   // The credit limit is a private witness: the issuer supplies it, C0 commits
   // to it, and it never appears as a public circuit parameter (audit H2).
   const limit = lineLimit();
   assert(limit > 0, "limit");
-  // Headroom-2 rule (audit L3): this circuit ends with actionClock.increment(1),
-  // so expiry = clock+1 would pass this check yet open an immediately-unusable line.
-  // Require expiry > clock+1 (i.e. >= clock+2).
-  assert(expiry > actionClock + 1, "expiry");
+  assert(blockTimeLt(disclose(expiry)), "expiry");
+  assert(basisPoints <= 10000, "fee rate");
   const k = agentSecret();
   const I = agentId(k);
   const p = LinePreimage {
+    domain: contractDomain,
     identity: I,
     limit: limit,
     outstanding: 0,
@@ -320,6 +382,8 @@ export circuit openLine(expiry: Uint<64>): [] {
   identityCommit = disclose(I);
   lineCommit = disclose(C0);
   lineExpiry = disclose(expiry);
+  feeFlat = disclose(flatFee);
+  feeBps = disclose(basisPoints);
   status = Status.OPEN;
   lineGeneration = ((lineGeneration + 1) as Uint<64>);
   actionClock.increment(1);
@@ -335,10 +399,7 @@ export circuit postQuote(expiry: Uint<64>): [] {
   // commits to it, and it never appears as a public parameter (audit H1).
   const amount = quoteAmount();
   assert(amount > 0, "zero");
-  // Headroom-2 rule (audit L3): this circuit ends with actionClock.increment(1),
-  // so expiry = clock+1 would pass this check yet be immediately unpostable-to-draw.
-  // Require expiry > clock+1 (i.e. >= clock+2).
-  assert(expiry > actionClock + 1, "expiry");
+  assert(blockTimeLt(disclose(expiry)), "expiry");
   const Q = quoteCommit(
     pubM,
     invoiceId(),
@@ -346,7 +407,9 @@ export circuit postQuote(expiry: Uint<64>): [] {
     expiry,
     quoteNonce(),
     lineGeneration,
-    contractDomain
+    contractDomain,
+    feeFlat,
+    feeBps
   );
   const pubQ = disclose(Q);
   assert(!quotes.member(pubQ), "quote exists");
@@ -364,7 +427,7 @@ export circuit draw(
   fee: Uint<64>
 ): [] {
   assert(status == Status.OPEN, "status");
-  assert(lineExpiry > actionClock, "line expired");
+  assert(blockTimeLt(lineExpiry), "line expired");
   const k = agentSecret();
   const I = agentId(k);
   assert(I == identityCommit, "agent");
@@ -376,6 +439,7 @@ export circuit draw(
   // Private draw amount (audit H1).
   const amount = drawAmount();
   const p = LinePreimage {
+    domain: contractDomain,
     identity: I,
     limit: limit,
     outstanding: outstanding,
@@ -386,13 +450,15 @@ export circuit draw(
   assert(quotes.member(Q), "quote");
   const meta = quotes.lookup(Q);
   assert(!meta.used, "used");
-  assert(meta.expiry > actionClock, "expired");
+  assert(blockTimeLt(meta.expiry), "expired");
   assert(meta.lineGeneration == lineGeneration, "line generation mismatch");
-  // Merchant unlinkability (audit H3): the quote's merchant is NOT read from
-  // public ledger state. The agent supplies it as a witness and proves:
-  //   (1) the witness (merchantPk, invoiceId, amount, expiry, nonce,
-  //       generation, domain) recomputes to the public Q, and
-  //   (2) the witness merchantPk is on the registeredMerchants allowlist.
+  // Quote metadata does not store merchantPk, but this draw is not unlinkable:
+  // `disclose(wM)` below makes the merchant pseudonym public for the registry
+  // lookup, and consuming Q while creating D provides a transcript correlation
+  // path. The agent supplies a witness and proves:
+  //   (1) (merchantPk, invoiceId, amount, expiry, nonce, generation, domain)
+  //       recomputes to the public Q, and
+  //   (2) the disclosed merchantPk is in the public registeredMerchants map.
   // A disabled merchant's already-posted quotes stay drawable (their quotes
   // were valid when posted); only new quotes are blocked at postQuote.
   const wM = quoteMerchantPk();
@@ -403,13 +469,28 @@ export circuit draw(
     meta.expiry,
     quoteNonce(),
     meta.lineGeneration,
-    contractDomain
+    contractDomain,
+    feeFlat,
+    feeBps
   );
   assert(disclose(recon) == Q, "quote preimage");
   const pubM = disclose(wM);
   assert(registeredMerchants.member(pubM), "quote merchant unregistered");
   assert(amount > 0, "zero");
   const f = disclose(fee);
+  // Verify flat + ceil(amount * basisPoints / 10000) without inventing a
+  // division API or trusting an off-chain quotient. Products use widened Uint
+  // arithmetic; the provided total is Uint64 and cannot silently wrap.
+  assert(f >= feeFlat, "fee policy");
+  const variableFee = f - feeFlat;
+  if (feeBps == 0) {
+    assert(variableFee == 0, "fee policy");
+  } else {
+    assert(variableFee > 0, "fee policy");
+    const numerator = amount * feeBps;
+    assert((variableFee - 1) * 10000 < numerator, "fee policy");
+    assert(numerator <= variableFee * 10000, "fee policy");
+  }
   // Issuer fee accounting (see header): the agent's outstanding increases by
   // amount + fee, so the capacity check becomes outstanding + amount + fee <= limit.
   // The fee is the issuer's protocol-defined compensation.
@@ -421,17 +502,16 @@ export circuit draw(
 
   // Reserve solvency: unencumbered reserve must cover the note amount AND the fee.
   // unencumberedReserve = totalReserve - encumberedReserve - redeemedReserve - feeReserve
-  const locked = encumberedReserve + redeemedReserve + feeReserve;
+  const locked = encumberedReserve + redeemedReserve + feeReserve + pendingFeeReserve + refundReserve + reportedRefundReserve;
   assert(totalReserve >= locked, "reserve deficit");
   const free = totalReserve - locked;
   const a = disclose(amount);
   assert(cost <= free, "insufficient reserve");
 
-  // Headroom-2 rule (audit L3): this circuit ends with actionClock.increment(1),
-  // so noteExpiry = clock+1 would pass yet be immediately unredeemable (the note
-  // would still encumber reserve until cancelled). Require noteExpiry > clock+1
-  // (i.e. >= clock+2), guaranteeing at least one post-draw action can redeem it.
-  assert(noteExpiry > actionClock + 1, "note expiry");
+  // The authenticated merchant quote fixes the resulting redemption deadline.
+  // An agent cannot substitute a shorter window for the merchant's claim.
+  assert(noteExpiry == meta.expiry, "note expiry terms");
+  assert(blockTimeLt(disclose(noteExpiry)), "note expiry");
 
   const N = drawNullifier(k, Q, contractDomain);
   const pubN = disclose(N);
@@ -445,6 +525,7 @@ export circuit draw(
     quoteCommit: Q,
     merchantPk: pubM,
     amount: amount,
+    fee: f,
     noteNonce: noteNonce(),
     expiry: noteExpiry
   };
@@ -459,18 +540,25 @@ export circuit draw(
   });
   notes.insert(pubD, NoteMeta {
     amount: a,
+    fee: f,
     redeemed: false,
     cancelled: false,
     expiry: disclose(noteExpiry),
-    lineGeneration: disclose(lineGeneration)
+    lineGeneration: disclose(lineGeneration),
+    compensationAllocated: false,
+    refundCommitment: pad(32, ""),
+    cashRefundOwed: false,
+    refundAcknowledged: false,
+    refundPaymentNullifier: default<Bytes<32>>
   });
   nullifiers.insert(pubN);
 
   // The note encumbers only `amount`; the fee accrues to the issuer's feeReserve.
   encumberedReserve = ((encumberedReserve + a) as Uint<64>);
-  feeReserve = ((feeReserve + f) as Uint<64>);
+  pendingFeeReserve = ((pendingFeeReserve + f) as Uint<64>);
 
   const p2 = LinePreimage {
+    domain: contractDomain,
     identity: I,
     limit: limit,
     outstanding: (nextB as Uint<64>),
@@ -489,7 +577,7 @@ export circuit redeemDraw(
   const meta = notes.lookup(D);
   assert(!meta.redeemed, "note already redeemed");
   assert(!meta.cancelled, "note cancelled");
-  assert(meta.expiry > actionClock, "note expired");
+  assert(blockTimeLt(meta.expiry), "note expired");
   // The settled amount is a witness; note that the public NoteMeta.amount and
   // the public encumbered/redeemed reserve counters still expose settled
   // amounts via counter deltas ("settled amounts are public escrow accounting").
@@ -508,6 +596,7 @@ export circuit redeemDraw(
     quoteCommit: noteQuoteCommit(),
     merchantPk: mPk,
     amount: amount,
+    fee: meta.fee,
     noteNonce: noteNonce(),
     expiry: noteExpiry
   };
@@ -522,38 +611,121 @@ export circuit redeemDraw(
   // Update note status
   notes.insert(D, NoteMeta {
     amount: meta.amount,
+    fee: meta.fee,
     redeemed: true,
     cancelled: false,
     expiry: meta.expiry,
-    lineGeneration: meta.lineGeneration
+    lineGeneration: meta.lineGeneration,
+    compensationAllocated: false,
+    refundCommitment: pad(32, ""),
+    cashRefundOwed: false,
+    refundAcknowledged: false,
+    refundPaymentNullifier: default<Bytes<32>>
   });
 
   // Reconcile reserve accounting
   encumberedReserve = ((encumberedReserve - a) as Uint<64>);
   redeemedReserve = ((redeemedReserve + a) as Uint<64>);
+  pendingFeeReserve = ((pendingFeeReserve - meta.fee) as Uint<64>);
+  feeReserve = ((feeReserve + meta.fee) as Uint<64>);
   actionClock.increment(1);
 }
 
-// NOTE (audit H4): permissionless cancellation past expiry is ADVISORY-only.
-// The issuer is trusted not to grind actionClock to force expiry. Deferred:
-// merchant-countersigned grace window / block-height expiry (see WAVE2_SECURITY_REVIEW.md).
-export circuit cancelOrExpireNote(noteCommitPublic: Bytes<32>): [] {
+// action 0: permissionless expiry; 1: authenticated compensation allocation;
+// 2: issuer-reported cash refund acknowledgment. No action proves a token payout.
+export circuit cancelOrExpireNote(noteCommitPublic: Bytes<32>, action: Uint<8>, receiptExpiry: Uint<64>): [] {
   const D = disclose(noteCommitPublic);
+  const mode = disclose(action);
+  assert(mode <= 2, "compensation action");
   assert(notes.member(D), "note not found");
   const meta = notes.lookup(D);
   assert(!meta.redeemed, "note already redeemed");
-  assert(!meta.cancelled, "note already cancelled");
-  assert(meta.expiry <= actionClock, "note not expired");
-
-  notes.insert(D, NoteMeta {
-    amount: meta.amount,
-    redeemed: false,
-    cancelled: true,
-    expiry: meta.expiry,
-    lineGeneration: meta.lineGeneration
-  });
-
-  encumberedReserve = ((encumberedReserve - meta.amount) as Uint<64>);
+  const cost = ((meta.amount + meta.fee) as Uint<64>);
+  if (mode == 0) {
+    assert(!meta.cancelled, "note already cancelled");
+    assert(blockTimeGte(meta.expiry), "note not expired");
+    notes.insert(D, NoteMeta {
+      amount: meta.amount, fee: meta.fee, redeemed: false, cancelled: true,
+      expiry: meta.expiry, lineGeneration: meta.lineGeneration,
+      compensationAllocated: false, refundCommitment: pad(32, ""),
+      cashRefundOwed: false, refundAcknowledged: false,
+    refundPaymentNullifier: default<Bytes<32>>
+    });
+    encumberedReserve = ((encumberedReserve - meta.amount) as Uint<64>);
+    pendingFeeReserve = ((pendingFeeReserve - meta.fee) as Uint<64>);
+    refundReserve = ((refundReserve + cost) as Uint<64>);
+  } else if (mode == 1) {
+    assert(!meta.compensationAllocated, "compensation already allocated");
+    if (!meta.cancelled) {
+      assert(blockTimeGte(meta.expiry), "note not expired");
+      encumberedReserve = ((encumberedReserve - meta.amount) as Uint<64>);
+      pendingFeeReserve = ((pendingFeeReserve - meta.fee) as Uint<64>);
+      refundReserve = ((refundReserve + cost) as Uint<64>);
+    }
+    const owner = noteIdentity();
+    const np = DrawNotePreimage {
+      domain: contractDomain, lineGeneration: meta.lineGeneration, identity: owner,
+      quoteCommit: noteQuoteCommit(), merchantPk: quoteMerchantPk(), amount: meta.amount,
+      fee: meta.fee, noteNonce: noteNonce(), expiry: meta.expiry
+    };
+    assert(drawNoteCommit(np, noteSalt()) == D, "compensation note opening");
+    const caller = callerSecret();
+    assert(issuerPublicKey(caller) == issuer || agentId(caller) == owner, "compensation authority");
+    if (meta.lineGeneration == lineGeneration) {
+      assert(owner == identityCommit, "compensation identity");
+      const outstanding = lineOutstanding();
+      const p = LinePreimage { domain: contractDomain, identity: identityCommit, limit: lineLimit(), outstanding: outstanding, epoch: lineEpoch() };
+      assert(lineStateCommit(p, salt()) == lineCommit, "stale compensation book");
+      const refundAmount = cashRefundAmount(outstanding, cost);
+      const rp = RefundPreimage { domain: contractDomain, lineGeneration: meta.lineGeneration, identity: owner, noteCommit: D, amount: refundAmount };
+      const cashOwed = disclose(refundAmount > 0);
+      if (!cashOwed) { refundReserve = ((refundReserve - cost) as Uint<64>); }
+      const p2 = LinePreimage { domain: contractDomain, identity: identityCommit, limit: lineLimit(), outstanding: debtAfterCredit(outstanding, cost), epoch: ((lineEpoch() + 1) as Uint<64>) };
+      lineCommit = disclose(lineStateCommit(p2, newSalt()));
+      notes.insert(D, NoteMeta {
+        amount: meta.amount, fee: meta.fee, redeemed: false, cancelled: true,
+        expiry: meta.expiry, lineGeneration: meta.lineGeneration,
+        compensationAllocated: true, refundCommitment: disclose(refundCommit(rp, newSalt())),
+        cashRefundOwed: cashOwed, refundAcknowledged: false,
+    refundPaymentNullifier: default<Bytes<32>>
+      });
+    } else {
+      assert(meta.lineGeneration < lineGeneration, "compensation generation");
+      // A zero-debt close was required before replacement. The original holder
+      // receives the full cash obligation; no new agent's books are consulted.
+      const rp = RefundPreimage { domain: contractDomain, lineGeneration: meta.lineGeneration, identity: owner, noteCommit: D, amount: cost };
+      notes.insert(D, NoteMeta {
+        amount: meta.amount, fee: meta.fee, redeemed: false, cancelled: true,
+        expiry: meta.expiry, lineGeneration: meta.lineGeneration,
+        compensationAllocated: true, refundCommitment: disclose(refundCommit(rp, newSalt())),
+        cashRefundOwed: true, refundAcknowledged: false,
+    refundPaymentNullifier: default<Bytes<32>>
+      });
+    }
+  } else {
+    requireIssuer();
+    assert(meta.cancelled && meta.compensationAllocated && meta.cashRefundOwed, "no cash refund obligation");
+    assert(!meta.refundAcknowledged, "refund already acknowledged");
+    assert(blockTimeLt(disclose(receiptExpiry)), "refund receipt expiry");
+    const amount = repayAmount();
+    assert(amount > 0 && amount <= cost, "refund amount");
+    const rp = RefundPreimage { domain: contractDomain, lineGeneration: meta.lineGeneration, identity: noteIdentity(), noteCommit: D, amount: amount };
+    assert(refundCommit(rp, salt()) == meta.refundCommitment, "refund opening");
+    const payRef = paymentRef();
+    assert(payRef != pad(32, ""), "empty payment reference");
+    const P = disclose(paymentNullifier(callerSecret(), payRef, contractDomain));
+    assert(!nullifiers.member(P), "payment used");
+    nullifiers.insert(P);
+    notes.insert(D, NoteMeta {
+      amount: meta.amount, fee: meta.fee, redeemed: false, cancelled: true,
+      expiry: meta.expiry, lineGeneration: meta.lineGeneration,
+      compensationAllocated: true, refundCommitment: meta.refundCommitment,
+      cashRefundOwed: true, refundAcknowledged: true,
+      refundPaymentNullifier: P
+    });
+    refundReserve = ((refundReserve - cost) as Uint<64>);
+    reportedRefundReserve = ((reportedRefundReserve + cost) as Uint<64>);
+  }
   actionClock.increment(1);
 }
 
@@ -572,6 +744,7 @@ export circuit acknowledgeRepayment(
   const epoch = lineEpoch();
   const amount = repayAmount();
   const p = LinePreimage {
+    domain: contractDomain,
     identity: I,
     limit: limit,
     outstanding: outstanding,
@@ -580,19 +753,26 @@ export circuit acknowledgeRepayment(
   assert(lineStateCommit(p, salt()) == C, "stale");
   assert(amount > 0, "zero");
   assert(amount <= outstanding, "range");
-  assert(receiptExpiry > actionClock, "expiry");
+  assert(blockTimeLt(disclose(receiptExpiry)), "expiry");
+  const payRef = paymentRef();
+  assert(payRef != pad(32, ""), "empty payment reference");
+  const P = paymentNullifier(callerSecret(), payRef, contractDomain);
+  const pubP = disclose(P);
+  assert(!nullifiers.member(pubP), "payment used");
   const N = repayNullifier(
     receiptNonce(),
     I,
     C,
     amount,
-    paymentRef(),
+    payRef,
     contractDomain
   );
   const pubN = disclose(N);
   assert(!nullifiers.member(pubN), "receipt used");
+  nullifiers.insert(pubP);
   nullifiers.insert(pubN);
   const p2 = LinePreimage {
+    domain: contractDomain,
     identity: I,
     limit: limit,
     outstanding: ((outstanding - amount) as Uint<64>),
@@ -608,6 +788,20 @@ export circuit setStatus(next: Status): [] {
   assert(status != Status.NONE, "no line");
   assert(n != Status.NONE, "bad status");
   assert(status != Status.CLOSED, "closed");
+  if (n == Status.CLOSED) {
+    // Closing must not make openLine a debt-deletion mechanism. Bind the
+    // issuer's private opening to the current book and prove zero outstanding.
+    const outstanding = lineOutstanding();
+    const p = LinePreimage {
+      domain: contractDomain,
+      identity: identityCommit,
+      limit: lineLimit(),
+      outstanding: outstanding,
+      epoch: lineEpoch()
+    };
+    assert(lineStateCommit(p, salt()) == lineCommit, "stale closing book");
+    assert(outstanding == 0, "outstanding debt");
+  }
   if (n == Status.OPEN) {
     assert(status == Status.OPEN || status == Status.DEFAULTED, "only defaulted reopens");
   }

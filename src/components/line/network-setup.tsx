@@ -1,160 +1,95 @@
-﻿import React, { useState, useEffect } from "react";
-import { Panel, Button, FlashBar, Mono } from "./ui";
-import { isWalletInjected, getAvailableWallets, connectWallet, type WalletInfo } from "@/lib/runtime/wallet";
-import { getRuntime, setRuntime, MidnightNetworkRuntime, LocalDevelopmentRuntime, type RuntimeMode } from "@/lib/runtime";
+import { useState, useEffect } from "react";
+import { Panel, Button, FlashBar } from "./ui";
+import { getAvailableWallets, type WalletInfo } from "@/lib/runtime/wallet";
+import { getRuntime, setRuntime, MidnightNetworkRuntime, LocalDevelopmentRuntime } from "@/lib/runtime";
+import { sanitizeServiceError } from "@/lib/runtime/endpoints";
 
-interface NetworkSetupProps {
-  onConnected?: () => void;
-  onSwitchToLocal?: () => void;
-}
+interface NetworkSetupProps { onConnected?: () => void; onSwitchToLocal?: () => void }
 
 export function NetworkSetupScreen({ onConnected, onSwitchToLocal }: NetworkSetupProps) {
+  const initialRuntime = getRuntime();
   const [wallets, setWallets] = useState<WalletInfo[]>([]);
+  const [networkId, setNetworkId] = useState(initialRuntime.networkId === "preview" ? "preview" : "preprod");
+  const [projectToken, setProjectToken] = useState("");
+  const [proofServerUri, setProofServerUri] = useState("http://127.0.0.1:6300");
+  const [zkConfigBaseUrl, setZkConfigBaseUrl] = useState("/line-zk");
   const [connecting, setConnecting] = useState(false);
   const [connectedWalletName, setConnectedWalletName] = useState<string | null>(null);
-  const [contractAddressInput, setContractAddressInput] = useState("");
+  const [contractAddressInput, setContractAddressInput] = useState(initialRuntime.getContractAddress() ?? "");
   const [joiningContract, setJoiningContract] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const busy = connecting || joiningContract;
+  useEffect(() => { setWallets(getAvailableWallets()); }, []);
 
-  const runtime = getRuntime();
-  const isNetworkMode = runtime.mode === "network";
-
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      setWallets(getAvailableWallets());
-    }
-  }, []);
-
-  const handleConnectWallet = async (preferredRdns?: string) => {
-    setConnecting(true);
-    setErrorMsg(null);
-    setSuccessMsg(null);
+  const handleConnectWallet = async () => {
+    setConnecting(true); setErrorMsg(null); setSuccessMsg(null); setConnectedWalletName(null);
     try {
-      const api = await connectWallet(preferredRdns);
-      const conf = await api.getConfiguration().catch(() => null);
-      setConnectedWalletName(conf?.networkId ?? "Midnight Wallet");
-      setSuccessMsg("Wallet connected successfully via Midnight DApp Connector.");
-      if (onConnected) onConnected();
-    } catch (err) {
-      setErrorMsg(err instanceof Error ? err.message : String(err));
-    } finally {
-      setConnecting(false);
-    }
+      if (networkId === "preprod" && !projectToken.trim()) throw new Error("Enter a Blockfrost Midnight Preprod project token.");
+      const runtime = new MidnightNetworkRuntime({ networkId, blockfrostProjectId: projectToken.trim() || undefined,
+        proofServerUri, zkConfigBaseUrl: new URL(zkConfigBaseUrl, window.location.origin).href });
+      await runtime.attachWallet();
+      setRuntime(runtime);
+      setConnectedWalletName(networkId);
+      setSuccessMsg("Wallet connected. Join your deployed Line contract to continue.");
+    } catch (err) { setErrorMsg(sanitizeServiceError(err instanceof Error ? err.message : String(err))); }
+    finally { setConnecting(false); }
   };
-
   const handleJoinContract = async () => {
-    if (!contractAddressInput.trim()) {
-      setErrorMsg("Please enter a valid Midnight contract address.");
-      return;
-    }
-    setJoiningContract(true);
-    setErrorMsg(null);
-    setSuccessMsg(null);
+    setJoiningContract(true); setErrorMsg(null); setSuccessMsg(null);
     try {
-      if (runtime instanceof MidnightNetworkRuntime) {
-        const status = await runtime.joinContract(contractAddressInput.trim());
-        setSuccessMsg(`Joined Line contract domain 0x${status.contractDomain.slice(0, 10)}... successfully.`);
-        if (onConnected) onConnected();
-      } else {
-        setErrorMsg("Runtime is not in network mode.");
-      }
-    } catch (err) {
-      setErrorMsg(err instanceof Error ? err.message : String(err));
-    } finally {
-      setJoiningContract(false);
-    }
+      const runtime = getRuntime();
+      if (!(runtime instanceof MidnightNetworkRuntime) || !runtime.isWalletConnected()) throw new Error("Connect a wallet for this network first.");
+      const status = await runtime.joinContract(contractAddressInput.trim());
+      setSuccessMsg(`Line contract state loaded: ${status.contractDomain.slice(0, 12)}?`);
+      onConnected?.();
+    } catch (err) { setErrorMsg(sanitizeServiceError(err instanceof Error ? err.message : String(err))); }
+    finally { setJoiningContract(false); }
   };
-
-  const handleSwitchSimulator = () => {
+  const switchLocal = () => {
     setRuntime(new LocalDevelopmentRuntime());
-    if (onSwitchToLocal) onSwitchToLocal();
-    else window.location.reload();
+    onSwitchToLocal?.();
   };
-
-  return (
-    <div className="mx-auto max-w-2xl space-y-6 py-6">
-      <Panel kicker="Network Architecture" title="Midnight Network Setup & Wallet Connection">
-        <p className="text-sm text-muted">
-          Line uses native zero-knowledge smart contracts compiled with Midnight Compact. In network mode,
-          circuit transactions require an external Midnight wallet (such as Lace) and an active on-chain contract.
-        </p>
-
-        {errorMsg && <FlashBar flash={{ tone: "fail", text: errorMsg }} />}
-        {successMsg && <FlashBar flash={{ tone: "ok", text: successMsg }} />}
-
-        <div className="rounded-lg border border-border bg-surface p-4 space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-muted">1. Browser Wallet</span>
-            <span className="text-xs font-mono text-subtle">
-              {connectedWalletName ? `Connected (${connectedWalletName})` : "Not connected"}
-            </span>
-          </div>
-
-          <p className="text-xs text-muted">
-            Connect your browser wallet extension via the standard Midnight DApp Connector API.
-          </p>
-
-          <div className="flex flex-wrap items-center gap-3">
-            <Button
-              onClick={() => handleConnectWallet()}
-              disabled={connecting}
-            >
-              {connecting ? "Connecting..." : "Connect Midnight Wallet"}
-            </Button>
-
-            {wallets.length > 0 && (
-              <span className="text-xs text-subtle">
-                Detected: {wallets.map((w) => w.name).join(", ")}
-              </span>
-            )}
-            {wallets.length === 0 && (
-              <span className="text-xs text-subtle">
-                No extension detected in browser window.
-              </span>
-            )}
-          </div>
-        </div>
-
-        <div className="rounded-lg border border-border bg-surface p-4 space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-muted">2. Deployed Contract</span>
-            <span className="text-xs font-mono text-subtle">
-              {runtime.getContractAddress() ? "Joined" : "Unconfigured"}
-            </span>
-          </div>
-
-          <p className="text-xs text-muted">
-            Enter the address of a Line contract deployed on the Midnight network.
-          </p>
-
-          <div className="flex gap-2">
-            <input
-              type="text"
-              placeholder="e.g. 0x0123456789abcdef..."
-              value={contractAddressInput}
-              onChange={(e) => setContractAddressInput(e.target.value)}
-              className="flex-1 rounded-md border border-border bg-elevated px-3 py-2 text-xs font-mono text-fg focus:outline-none focus:ring-1 focus:ring-accent"
-            />
-            <Button
-              onClick={handleJoinContract}
-              disabled={joiningContract || !contractAddressInput.trim()}
-              variant="ghost"
-            >
-              {joiningContract ? "Verifying..." : "Join Contract"}
-            </Button>
-          </div>
-        </div>
-
-        <div className="border-t border-border pt-4 flex flex-wrap items-center justify-between gap-3">
-          <div className="text-xs text-subtle">
-            Need to test offline or without wallet?
-          </div>
-          <Button variant="ghost" onClick={handleSwitchSimulator}>
-            Switch to Local Development Simulator
-          </Button>
-        </div>
-      </Panel>
-    </div>
-  );
+  const changeConfiguration = (change: () => void) => { change(); setConnectedWalletName(null); setSuccessMsg(null); };
+  const inputClass = "w-full rounded-md border border-border bg-elevated px-3 py-2 text-xs text-fg focus:outline-none focus:ring-1 focus:ring-accent";
+  return <div className="mx-auto max-w-2xl space-y-6 py-6">
+    <Panel kicker="Network setup" title="Midnight Network Setup & Wallet Connection">
+      <p className="text-sm text-muted">Use a wallet on the selected network and a deployed Line contract. Transactions require matching proving assets, a compatible proof server and an unlocked private vault.</p>
+      {errorMsg && <FlashBar flash={{ tone: "fail", text: errorMsg }} />}
+      {successMsg && <FlashBar flash={{ tone: "ok", text: successMsg }} />}
+      <fieldset disabled={busy} className="space-y-3 rounded-lg border border-border bg-surface p-4">
+        <legend className="text-xs font-semibold text-muted">Service configuration</legend>
+        <label className="block text-xs text-muted">Network
+          <select aria-label="Network" className={inputClass} value={networkId} onChange={e => changeConfiguration(() => setNetworkId(e.target.value))}>
+            <option value="preprod">Preprod</option><option value="preview">Preview</option>
+          </select>
+        </label>
+        {networkId === "preprod" && <label className="block text-xs text-muted">Blockfrost Midnight Preprod project token
+          <input type="password" autoComplete="off" spellCheck={false} className={inputClass} value={projectToken} onChange={e => changeConfiguration(() => setProjectToken(e.target.value))} />
+          <span className="text-subtle">Held in memory for this session. The public Preprod services require this token.</span>
+        </label>}
+        <label className="block text-xs text-muted">Proof server URL (8.1.3)
+          <input type="url" className={inputClass} value={proofServerUri} onChange={e => changeConfiguration(() => setProofServerUri(e.target.value))} />
+        </label>
+        <label className="block text-xs text-muted">Published Line proving asset root
+          <input className={inputClass} value={zkConfigBaseUrl} onChange={e => changeConfiguration(() => setZkConfigBaseUrl(e.target.value))} />
+          <span className="text-subtle">Must serve matching keys/ and zkir/ directories from a validated release.</span>
+        </label>
+      </fieldset>
+      <div className="space-y-3 rounded-lg border border-border bg-surface p-4">
+        <div className="flex justify-between text-xs text-muted"><span>1. Browser Wallet</span><span>{connectedWalletName ? `Connected (${connectedWalletName})` : "Not connected"}</span></div>
+        <Button onClick={handleConnectWallet} disabled={busy}>{connecting ? "Connecting..." : "Connect Midnight Wallet"}</Button>
+        <p className="text-xs text-subtle">{wallets.length ? `Detected: ${wallets.map(w => w.name).join(", ")}` : "No extension detected in browser window."}</p>
+      </div>
+      <div className="space-y-3 rounded-lg border border-border bg-surface p-4">
+        <p className="text-xs text-muted">2. Deployed Contract</p>
+        <label className="block text-xs text-muted">Contract address (32 hex bytes)
+          <input spellCheck={false} className={inputClass} value={contractAddressInput} onChange={e => setContractAddressInput(e.target.value)} placeholder="0123456789abcdef?" />
+        </label>
+        <Button onClick={handleJoinContract} disabled={busy || !connectedWalletName || !contractAddressInput.trim()} variant="ghost">{joiningContract ? "Verifying..." : "Join Contract"}</Button>
+        <p className="text-xs text-subtle">Loading public state does not confirm a transaction or token payout. Keep the vault unlocked for private circuit operations.</p>
+      </div>
+      <Button variant="ghost" onClick={switchLocal} disabled={busy}>Switch to Local Development Simulator</Button>
+    </Panel>
+  </div>;
 }

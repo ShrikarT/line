@@ -103,7 +103,7 @@ export class VaultTamperedError extends LineRuntimeError {
 
 export class VaultPersistenceError extends LineRuntimeError {
   constructor(message: string, details?: Record<string, unknown>) {
-    super(`Critical: Local vault persistence failed after on-chain transaction: ${message}`, "VAULT_PERSISTENCE_ERROR", details);
+    super(`Encrypted vault persistence failed: ${message}`, "VAULT_PERSISTENCE_ERROR", details);
   }
 }
 

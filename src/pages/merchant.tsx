@@ -3,6 +3,8 @@ import { Shell } from "@/components/line/shell";
 import { ExplorerPanel } from "@/components/line/explorer";
 import { Button, FlashBar, Mono, Panel, Stat } from "@/components/line/ui";
 import { useAppStore } from "@/app/store.ts";
+import { Deadline } from "@/components/line/deadline";
+import { Pricing } from "@/components/line/pricing";
 
 export function MerchantPage() {
   const doQuote = useAppStore((s) => s.doQuote);
@@ -11,8 +13,10 @@ export function MerchantPage() {
   const setActiveMerchant = useAppStore((s) => s.setActiveMerchant);
   const invoices = useAppStore((s) => s.invoices);
   const notes = useAppStore((s) => s.notes);
+  const drawNotes = useAppStore((s) => s.drawNotes);
   const flash = useAppStore((s) => s.flash);
   const txLifecycle = useAppStore((s) => s.txLifecycle);
+  const operationsUnavailable = useAppStore((s) => s.operationBusy || s.recoveryRequired || !s.isVaultUnlocked);
   const exportQuotePackage = useAppStore((s) => s.exportQuotePackage);
   const importDrawNotePackage = useAppStore((s) => s.importDrawNotePackage);
 
@@ -20,7 +24,8 @@ export function MerchantPage() {
   const [showImportNote, setShowImportNote] = useState(false);
   const [copiedQuote, setCopiedQuote] = useState<string | null>(null);
 
-  const isBusy = txLifecycle === "wallet-approval" || txLifecycle === "proving";
+  const isBusy = operationsUnavailable || txLifecycle === "wallet-approval" || txLifecycle === "proving";
+  const noteStatuses = new Map(drawNotes.map(note => [note.noteCommitment, note.status]));
 
   return (
     <Shell>
@@ -78,7 +83,7 @@ export function MerchantPage() {
                   rows={3}
                   value={drawNotePkgInput}
                   onChange={(e) => setDrawNotePkgInput(e.target.value)}
-                  placeholder='{"format":"line:note-package:v1", ...}'
+                  placeholder='{"format":"line:note-package:v3","deadlineUnits":"unix-seconds", ...}'
                   className="w-full rounded border border-border bg-elevated p-2 text-xs font-mono text-fg focus:outline-none focus:ring-1 focus:ring-accent"
                 />
                 <Button
@@ -109,8 +114,9 @@ export function MerchantPage() {
                   <li key={n.D} className="rounded border border-border p-2 text-sm flex flex-col gap-2">
                     <div className="flex items-center justify-between">
                       <span className="font-semibold">Note Claim: {n.preimage.amount} units</span>
-                      <span className="text-teal-400 text-xs font-medium">Claim Note Active</span>
+                      <span className="text-xs font-medium">Claim {noteStatuses.get(n.D) ?? "status unconfirmed"}</span>
                     </div>
+                    <Deadline seconds={n.preimage.expiry} />
                     <div className="text-xs text-muted flex flex-col gap-1">
                       <div className="flex items-center justify-between">
                         <span>Note D:</span>
@@ -121,7 +127,7 @@ export function MerchantPage() {
                         <Mono value={n.preimage.quoteCommit} />
                       </div>
                     </div>
-                    <Button onClick={() => doRedeem(n.D, activeMerchant)} disabled={isBusy}>
+                    <Button onClick={() => doRedeem(n.D, activeMerchant)} disabled={isBusy || noteStatuses.get(n.D) !== "active"}>
                       Redeem {n.preimage.amount} against Reserve
                     </Button>
                   </li>
@@ -158,6 +164,8 @@ export function MerchantPage() {
                         {copiedQuote === inv.Q ? "Copied Package!" : "Copy Package for Agent"}
                       </button>
                     </div>
+                    <Deadline seconds={inv.preimage.expiry} label="Quote and claim deadline:" />
+                    <Pricing amount={inv.amount} feeFlat={inv.preimage.feeFlat} feeBps={inv.preimage.feeBps} />
                     <div className="flex items-center justify-between text-xs text-muted">
                       <span className="text-subtle">Quote Q:</span>
                       <Mono value={inv.Q} />

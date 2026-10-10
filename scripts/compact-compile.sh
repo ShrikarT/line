@@ -6,4 +6,4 @@ if ! command -v compact >/dev/null 2>&1; then
   echo "compact not on PATH. Run: bash scripts/install-compact.sh" >&2
   exit 1
 fi
-compact compile --skip-zk contracts/line.compact contracts/managed/line
+node scripts/compile-compact.mjs --skip-zk contracts/line.compact contracts/managed/line

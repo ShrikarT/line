@@ -1,0 +1,33 @@
+{
+  "checkedAt": "2026-10-10T03:16:32.639347+00:00",
+  "compiler": "0.31.1",
+  "language": "0.23.0",
+  "runtime": "0.16.0",
+  "compilerLedger": "8.0.2",
+  "ledgerJs": "8.1.2",
+  "walletSdk": "1.2.0",
+  "midnightJs": "4.1.1",
+  "connector": "4.0.1",
+  "tests": 243,
+  "suites": 43,
+  "failures": 0,
+  "skipped": 0,
+  "browserTests": 6,
+  "build": "passed; SDK assert/WebSocket/bundle warnings remain",
+  "managedFreshOutput": "16 files; sourceRoot normalized only",
+  "releaseFiles": 52,
+  "releaseBytes": 67603930,
+  "sourceSha256": "fba1713ebb4a8a1c833941dbb01110e28943517e180944e8b660fd3ccd11d229",
+  "npmKnownVulnerabilities": 0,
+  "scannerModules": 42,
+  "remoteProofExecuted": false,
+  "networkTransactionsConfirmed": false,
+  "tokenPayoutConfirmed": false,
+  "sdkBoundary": "actual binding and construction to test proof-provider sentinel; no balancing/submission",
+  "httpAssetCheck": {
+    "binaryIR": 346,
+    "verifier": 2119,
+    "prover": 2821511,
+    "invalidPathsRejected": true
+  }
+}

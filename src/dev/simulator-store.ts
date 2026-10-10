@@ -499,6 +499,8 @@ export const useSimulator = create<SimulatorState>((set, get) => ({
         expiry: 10_000,
         nonce: toHex(randomBytes32()),
         generation: get().ledger.lineGeneration,
+        feeFlat: get().ledger.feeFlat,
+        feeBps: get().ledger.feeBps,
       },
     };
     const r = draw(get().ledger, { callerSk: labKeys.agentSk, agent: fakeAgent, invoice: inv });

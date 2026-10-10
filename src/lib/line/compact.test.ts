@@ -1,10 +1,9 @@
+import { boot, bootWithPk } from "../../test/fixtures/compact.ts";
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   Status,
   blankPrivate,
-  boot,
-  bootWithPk,
   call,
   firstQuote,
   notesOf,
@@ -65,11 +64,11 @@ async function genesis(instanceNonce?: Uint8Array) {
   return boot(DEMO.issuer, DEMO.merchantA, instanceNonce, ps());
 }
 
-async function opened(session?: Session) {
+async function opened(session?: Session, flatFee = 0n, basisPoints = 0n) {
   const s = session ?? (await genesis());
   const funded = await call(s, ps(), { name: "fundReserve", args: [1000n] });
   assert.equal(funded.ok, true, funded.ok ? "" : funded.error);
-  const r = await call(funded.session, ps(), { name: "openLine", args: [EXPIRY] });
+  const r = await call(funded.session, ps(), { name: "openLine", args: [EXPIRY, flatFee, basisPoints] });
   assert.equal(r.ok, true, r.ok ? "" : r.error);
   if (!r.ok) throw new Error("open");
   return r;
@@ -328,7 +327,7 @@ describe("compact simulator: openLine", () => {
     assert.equal(r.ledger.lineGeneration, 1n);
     const I = agentId(DEMO.agent);
     const C0 = lineStateCommit(
-      { identity: I, limit: LIMIT, outstanding: 0n, epoch: 0n },
+      { domain: r.ledger.contractDomain, identity: I, limit: LIMIT, outstanding: 0n, epoch: 0n },
       pad32("salt-0"),
     );
     assert.equal(toHex(r.ledger.identityCommit), toHex(I));
@@ -750,7 +749,7 @@ describe("compact simulator: acknowledgeRepayment", () => {
     assert.equal(ack.ok, true);
     const I = agentId(DEMO.agent);
     const C2 = lineStateCommit(
-      { identity: I, limit: 150n, outstanding: 0n, epoch: 2n },
+      { domain: ack.ledger.contractDomain, identity: I, limit: 150n, outstanding: 0n, epoch: 2n },
       pad32("salt-2"),
     );
     assert.equal(toHex(ack.ledger.lineCommit), toHex(C2));
@@ -939,6 +938,10 @@ describe("compact simulator: cross-instance replay rejection", () => {
     const oA = await opened(sA);
     const oB = await opened(sB);
 
+    // Identical secrets, limit, debt, epoch and salt still produce distinct
+    // roots because the private line opening is bound to contractDomain.
+    assert.notEqual(toHex(oA.ledger.lineCommit), toHex(oB.ledger.lineCommit));
+
     // Merchant posts quote on instance B
     const qB = await quoted(40n, "inv-40", "n40", oB.session);
     const QB = firstQuote(qB.ledger)!.Q;
@@ -965,7 +968,8 @@ describe("compact simulator: cross-instance replay rejection", () => {
 
 describe("compact simulator: issuer fees", () => {
   async function drawWithFee(fee: bigint, amount = 40n, invoice = "inv-fee", nonce = "nfee") {
-    const q = await quoted(amount, invoice, nonce);
+    const o = await opened(undefined, fee);
+    const q = await quoted(amount, invoice, nonce, o.session);
     const Q = firstQuote(q.ledger)!.Q;
     return call(
       q.session,
@@ -984,23 +988,32 @@ describe("compact simulator: issuer fees", () => {
     );
   }
 
-  it("fee charges outstanding by amount+fee; encumbers amount; accrues feeReserve", async () => {
+  async function redeemedWithFee(fee: bigint) {
+    const d = await drawWithFee(fee);
+    if (!d.ok) return d;
+    return call(d.session, ps({ callerSecret: DEMO.merchantA, noteIdentity: agentId(DEMO.agent),
+      noteQuoteCommit: firstQuote(d.ledger)!.Q, noteNonce: pad32("nn-fee"), noteSalt: pad32("ns-fee") }),
+      { name: "redeemDraw", args: [notesOf(d.ledger)[0].D, EXPIRY] });
+  }
+
+  it("fee charges outstanding by amount+fee; encumbers amount; locks pending fee", async () => {
     const d = await drawWithFee(5n);
     assert.equal(d.ok, true, d.ok ? "" : d.error);
     // Note encumbers only the invoice amount
     assert.equal(d.ledger.encumberedReserve, 40n);
-    // Fee accrues to the issuer's fee reserve
-    assert.equal(d.ledger.feeReserve, 5n);
+    // The issuer earns its pending fee only when the merchant redeems.
+    assert.equal(d.ledger.pendingFeeReserve, 5n);
+    assert.equal(d.ledger.feeReserve, 0n);
     assert.equal(d.ledger.totalReserve, 1000n);
     // Agent's outstanding is amount + fee (45), committed in the rotated C
     const I = agentId(DEMO.agent);
     const C1 = lineStateCommit(
-      { identity: I, limit: LIMIT, outstanding: 45n, epoch: 1n },
+      { domain: d.ledger.contractDomain, identity: I, limit: LIMIT, outstanding: 45n, epoch: 1n },
       pad32("salt-1"),
     );
     assert.equal(toHex(d.ledger.lineCommit), toHex(C1));
     // Reserve invariant holds: encumbered + redeemed + fee <= total
-    assert.ok(d.ledger.encumberedReserve + d.ledger.redeemedReserve + d.ledger.feeReserve <= d.ledger.totalReserve);
+    assert.ok(d.ledger.encumberedReserve + d.ledger.redeemedReserve + d.ledger.feeReserve + d.ledger.pendingFeeReserve + d.ledger.refundReserve + d.ledger.reportedRefundReserve <= d.ledger.totalReserve);
   });
 
   it("zero fee behaves exactly like the pre-fee draw", async () => {
@@ -1010,7 +1023,7 @@ describe("compact simulator: issuer fees", () => {
     assert.equal(d.ledger.feeReserve, 0n);
     const I = agentId(DEMO.agent);
     const C1 = lineStateCommit(
-      { identity: I, limit: LIMIT, outstanding: 40n, epoch: 1n },
+      { domain: d.ledger.contractDomain, identity: I, limit: LIMIT, outstanding: 40n, epoch: 1n },
       pad32("salt-1"),
     );
     assert.equal(toHex(d.ledger.lineCommit), toHex(C1));
@@ -1018,7 +1031,8 @@ describe("compact simulator: issuer fees", () => {
 
   it("fee counts toward the credit limit: B + amount + fee <= L", async () => {
     // 140 + 20 fee = 160 > 150 limit, but 140 alone would clear it
-    const q = await quoted(140n, "inv-cap", "ncap");
+    const o = await opened(undefined, 20n);
+    const q = await quoted(140n, "inv-cap", "ncap", o.session);
     const Q = firstQuote(q.ledger)!.Q;
     const d = await call(
       q.session,
@@ -1045,7 +1059,7 @@ describe("compact simulator: issuer fees", () => {
     const s = await genesis();
     // Fund only 40: the 40 note clears, but 40 + 5 fee does not
     const f = await call(s, ps(), { name: "fundReserve", args: [40n] });
-    const o = await call(f.session, ps(), { name: "openLine", args: [EXPIRY] });
+    const o = await call(f.session, ps(), { name: "openLine", args: [EXPIRY, 5n, 0n] });
     const q = await quoted(40n, "inv-rsv", "nrsv", o.session);
     const Q = firstQuote(q.ledger)!.Q;
     const d = await call(
@@ -1067,7 +1081,7 @@ describe("compact simulator: issuer fees", () => {
   });
 
   it("issuer withdraws accrued fees: feeReserve zeroes, totalReserve shrinks", async () => {
-    const d = await drawWithFee(5n);
+    const d = await redeemedWithFee(5n);
     assert.equal(d.ok, true);
     const w = await call(d.session, ps({ callerSecret: DEMO.issuer }), {
       name: "withdrawFees",
@@ -1077,12 +1091,12 @@ describe("compact simulator: issuer fees", () => {
     assert.equal(w.ledger.feeReserve, 0n);
     assert.equal(w.ledger.totalReserve, 995n);
     // Note liabilities and redemption accounting are untouched
-    assert.equal(w.ledger.encumberedReserve, 40n);
-    assert.equal(w.ledger.redeemedReserve, 0n);
+    assert.equal(w.ledger.encumberedReserve, 0n);
+    assert.equal(w.ledger.redeemedReserve, 40n);
   });
 
   it("withdrawFees is issuer-only", async () => {
-    const d = await drawWithFee(5n);
+    const d = await redeemedWithFee(5n);
     const w = await call(d.session, ps({ callerSecret: DEMO.merchantA }), {
       name: "withdrawFees",
       args: [],
@@ -1103,9 +1117,9 @@ describe("compact simulator: issuer fees", () => {
   });
 
   it("withdrawUnencumberedReserve locks accrued fees (only withdrawFees releases them)", async () => {
-    const d = await drawWithFee(5n);
+    const d = await redeemedWithFee(5n);
     assert.equal(d.ok, true);
-    // Unencumbered = 1000 - 40 (encumbered) - 0 (redeemed) - 5 (fees) = 955
+    // Unencumbered = 1000 - 0 (encumbered) - 40 (redeemed) - 5 (earned fees) = 955
     const tooMuch = await call(d.session, ps({ callerSecret: DEMO.issuer }), {
       name: "withdrawUnencumberedReserve",
       args: [956n],
@@ -1207,71 +1221,36 @@ describe("compact simulator: disableMerchant (audit L2)", () => {
   });
 });
 
-describe("compact simulator: expiry headroom-2 (audit L3)", () => {
-  it("postQuote rejects expiry = clock+1 (would be immediately undrawable)", async () => {
+describe("compact simulator: merchant-authenticated expiry", () => {
+  it("postQuote rejects the current second and accepts one future second", async () => {
     const o = await opened();
-    // genesis(0) -> fundReserve(1) -> openLine(2): clock is 2 here
     assert.equal(o.ledger.actionClock, 2n);
-    const r = await call(o.session, ps({ callerSecret: DEMO.merchantA }), {
-      name: "postQuote",
-      args: [3n],
-    });
-    assert.equal(r.ok, false);
-    assert.match(r.error, /expiry/);
-    // clock+2 is the minimum that passes
-    const ok = await call(o.session, ps({ callerSecret: DEMO.merchantA }), {
-      name: "postQuote",
-      args: [4n],
-    });
-    assert.equal(ok.ok, true, ok.ok ? "" : ok.error);
+    const rejected = await call(o.session, ps({ callerSecret: DEMO.merchantA }), { name: "postQuote", args: [0n] });
+    assert.equal(rejected.ok, false);
+    assert.match(rejected.ok ? "" : rejected.error, /expiry/);
+    const accepted = await call(o.session, ps({ callerSecret: DEMO.merchantA }), { name: "postQuote", args: [1n] });
+    assert.equal(accepted.ok, true, accepted.ok ? "" : accepted.error);
   });
 
-  it("draw rejects noteExpiry = clock+1 (would be immediately unredeemable)", async () => {
-    const q = await quoted(40n);
-    const Q = firstQuote(q.ledger)!.Q;
-    // clock is 3 after the quote; noteExpiry = 4 is clock+1
-    const d = await call(
-      q.session,
-      ps({
-        callerSecret: DEMO.issuer,
-        agentSecret: DEMO.agent,
-        salt: pad32("salt-0"),
-        newSalt: pad32("salt-1"),
-        invoiceId: pad32("inv-40"),
-        quoteNonce: pad32("n40"),
-        noteNonce: pad32("nn-40"),
-        noteSalt: pad32("ns-40"),
-      }),
-      { name: "draw", args: [Q, 4n, 0n] },
-    );
-    assert.equal(d.ok, false);
-    assert.match(d.error, /note expiry/);
-    assert.equal(d.ledger.encumberedReserve, 0n);
+  it("draw rejects shortening the merchant's committed note deadline", async () => {
+    const q = await quoted();
+    const rejected = await call(q.session, ps(), { name: "draw", args: [firstQuote(q.ledger)!.Q, EXPIRY - 1n, 0n] });
+    assert.equal(rejected.ok, false);
+    assert.match(rejected.ok ? "" : rejected.error, /note expiry terms/);
+    assert.equal(rejected.ledger.encumberedReserve, 0n);
+    assert.equal(firstQuote(rejected.ledger)!.used, false);
   });
 
-  it("draw accepts noteExpiry = clock+2 (survives this circuit's clock tick)", async () => {
-    const q = await quoted(40n, "inv-h2", "nh2");
-    const Q = firstQuote(q.ledger)!.Q;
-    const d = await call(
-      q.session,
-      ps({
-        callerSecret: DEMO.issuer,
-        agentSecret: DEMO.agent,
-        salt: pad32("salt-0"),
-        newSalt: pad32("salt-1"),
-        invoiceId: pad32("inv-h2"),
-        quoteNonce: pad32("nh2"),
-        noteNonce: pad32("nn-h2"),
-        noteSalt: pad32("ns-h2"),
-      }),
-      { name: "draw", args: [Q, 5n, 0n] },
-    );
-    assert.equal(d.ok, true, d.ok ? "" : d.error);
-    assert.equal(d.ledger.encumberedReserve, 40n);
+  it("draw uses the merchant's quote deadline unchanged", async () => {
+    const q = await quoted();
+    const accepted = await call(q.session, ps(), { name: "draw", args: [firstQuote(q.ledger)!.Q, EXPIRY, 0n] });
+    assert.equal(accepted.ok, true, accepted.ok ? "" : accepted.error);
+    assert.equal(accepted.ledger.encumberedReserve, 40n);
+    assert.equal(notesOf(accepted.ledger)[0].expiry, EXPIRY);
   });
 });
 
-describe("compact simulator: negative privacy (public observer learns nothing)", () => {
+describe("compact simulator: private direct fields and documented public disclosures", () => {
   // Distinctive secrets: if any of these 64-hex-char encodings shows up in a
   // public input or public ledger state, it is a real leak, not a coincidence.
   const PLIMIT = 987_654_321n;
@@ -1336,7 +1315,7 @@ describe("compact simulator: negative privacy (public observer learns nothing)",
       return r;
     };
     await step(basePs(), { name: "fundReserve", args: [10_000_000_000n] });
-    const openedR = await step(basePs({ newSalt: PNS0 }), { name: "openLine", args: [EXPIRY] });
+    const openedR = await step(basePs({ newSalt: PNS0 }), { name: "openLine", args: [EXPIRY, PFEE, 0n] });
     const q1 = await step(basePs({ callerSecret: DEMO.merchantA }), {
       name: "postQuote",
       args: [EXPIRY],
@@ -1381,18 +1360,19 @@ describe("compact simulator: negative privacy (public observer learns nothing)",
       }),
       { name: "acknowledgeRepayment", args: [EXPIRY] },
     );
+    const domain = ack.ledger.contractDomain;
     // Independent recomputation of every commitment from the SECRET values:
     // proves the circuits actually consumed the witnesses (not accepted-and-ignored).
     const C0 = lineStateCommit(
-      { identity: I, limit: PLIMIT, outstanding: 0n, epoch: 0n },
+      { domain, identity: I, limit: PLIMIT, outstanding: 0n, epoch: 0n },
       PSALT0,
     );
     const C1 = lineStateCommit(
-      { identity: I, limit: PLIMIT, outstanding: PAMT + PFEE, epoch: 1n },
+      { domain, identity: I, limit: PLIMIT, outstanding: PAMT + PFEE, epoch: 1n },
       PNS1,
     );
     const C2 = lineStateCommit(
-      { identity: I, limit: PLIMIT, outstanding: PFEE, epoch: 2n },
+      { domain, identity: I, limit: PLIMIT, outstanding: PFEE, epoch: 2n },
       PNS2,
     );
     const Qcheck = quoteCommit({
@@ -1403,6 +1383,7 @@ describe("compact simulator: negative privacy (public observer learns nothing)",
       nonce: PQN,
       generation: 1n,
       domain: ack.ledger.contractDomain,
+      feeFlat: PFEE, feeBps: 0n,
     });
     return {
       ledger: ack.ledger,
@@ -1439,6 +1420,11 @@ describe("compact simulator: negative privacy (public observer learns nothing)",
       encumbered: u64hx(L.encumberedReserve),
       redeemed: u64hx(L.redeemedReserve),
       fees: u64hx(L.feeReserve),
+      pendingFees: u64hx(L.pendingFeeReserve),
+      refunds: u64hx(L.refundReserve),
+      reportedRefunds: u64hx(L.reportedRefundReserve),
+      feeFlat: u64hx(L.feeFlat),
+      feeBps: u64hx(L.feeBps),
       identityCommit: toHex(L.identityCommit),
       lineCommit: toHex(L.lineCommit),
       lineExpiry: u64hx(L.lineExpiry),
@@ -1454,6 +1440,11 @@ describe("compact simulator: negative privacy (public observer learns nothing)",
       notes: [...L.notes].map(([k, m]) => ({
         k: toHex(k),
         amount: u64hx(m.amount),
+        fee: u64hx(m.fee),
+        compensationAllocated: m.compensationAllocated,
+        refundCommitment: toHex(m.refundCommitment),
+        cashRefundOwed: m.cashRefundOwed,
+        refundAcknowledged: m.refundAcknowledged,
         redeemed: m.redeemed,
         cancelled: m.cancelled,
         expiry: u64hx(m.expiry),
