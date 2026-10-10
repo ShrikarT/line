@@ -3,6 +3,28 @@ import { shortHex } from "@/lib/line/hash.ts";
 import { useLine, type Flash } from "@/lib/line/store.ts";
 import { getRuntime } from "@/lib/runtime";
 
+const PIXEL = ["bg-navy", "bg-accent", "bg-pink"] as const;
+
+export function PixelMark() {
+  return (
+    <span className="inline-flex items-center gap-1" aria-hidden="true">
+      <span className="size-2 bg-navy" />
+      <span className="size-2 bg-accent" />
+      <span className="size-2 bg-pink" />
+    </span>
+  );
+}
+
+export function PixelDivider({ className }: { className?: string }) {
+  return (
+    <div className={cn("flex flex-wrap gap-1", className)} aria-hidden="true">
+      {Array.from({ length: 32 }, (_, i) => (
+        <span key={i} className={cn("size-2 shrink-0", PIXEL[i % 3])} />
+      ))}
+    </div>
+  );
+}
+
 export function Panel({
   title,
   kicker,
@@ -22,11 +44,14 @@ export function Panel({
       )}
     >
       {kicker ? (
-        <p className="mb-1 text-xs font-medium uppercase tracking-wide text-subtle">
+        <p className="mb-2 text-xs font-medium uppercase tracking-wide text-subtle">
           {kicker}
         </p>
       ) : null}
-      <h2 className="font-display text-lg tracking-tight">{title}</h2>
+      <div className="flex items-center gap-3">
+        <PixelMark />
+        <h2 className="font-display text-lg font-semibold tracking-tight text-navy">{title}</h2>
+      </div>
       <div className="mt-4 space-y-4">{children}</div>
     </section>
   );
@@ -52,9 +77,9 @@ export function Button({
       onClick={onClick}
       className={cn(
         "inline-flex min-h-11 items-center justify-center rounded-md px-4 text-sm font-medium transition-transform duration-[var(--motion-quick)] enabled:active:scale-[0.98] disabled:opacity-40",
-        variant === "primary" && "bg-accent text-accent-fg hover:opacity-90 transition-opacity",
-        variant === "ghost" && "border border-border bg-transparent text-fg hover:bg-elevated transition-colors",
-        variant === "danger" && "border border-danger/40 text-danger hover:bg-danger/10 transition-colors",
+        variant === "primary" && "bg-accent text-accent-fg hover:opacity-90",
+        variant === "ghost" && "border border-navy bg-elevated text-navy hover:bg-subtle-fill",
+        variant === "danger" && "border border-danger/40 bg-elevated text-danger hover:bg-danger/10",
       )}
     >
       {children}
@@ -89,9 +114,9 @@ export function FlashBar({ flash }: { flash: Flash | null }) {
     <p
       className={cn(
         "rounded-md border px-3 py-2 text-sm",
-        flash.tone === "ok" && "border-ok/30 text-ok",
-        flash.tone === "fail" && "border-danger/30 text-danger",
-        flash.tone === "info" && "border-border text-muted",
+        flash.tone === "ok" && "border-ok/40 bg-ok/10 text-ok",
+        flash.tone === "fail" && "border-danger/40 bg-danger/10 text-danger",
+        flash.tone === "info" && "border-pink bg-pink/40 text-navy",
       )}
     >
       {flash.text}

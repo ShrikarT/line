@@ -23,17 +23,14 @@ export function LabPage() {
 
   return (
     <Shell>
-      <div className="space-y-6">
-        {/* Isolated Environment Banner */}
-        <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-xs font-mono text-amber-300">
-          <div className="flex items-center gap-2">
-            <span className="h-2 w-2 rounded-full bg-amber-400 animate-pulse" />
-            <span className="font-semibold uppercase tracking-wider">Protocol Verification Lab</span>
-            <span className="text-muted">· Isolated Local Simulator Environment (Not Live Network State)</span>
-          </div>
+      <div className="ink-panel space-y-6 rounded-2xl p-4 md:p-8">
+        <div className="flex items-center gap-2 font-mono text-xs text-pink">
+          <span className="size-2 bg-accent" />
+          <span className="font-semibold uppercase tracking-wider text-cream">Protocol Verification Lab</span>
+          <span className="text-muted">· Isolated Local Simulator Environment (Not Live Network State)</span>
         </div>
 
-        <Panel kicker="QA & Security" title="Attack Vector Execution & Invariant Verification">
+        <Panel kicker="QA & Security" title="Attack Vector Execution & Invariant Verification" className="border-white/10 bg-charcoal">
           <p className="text-sm text-muted">
             Each button is an adversarial attack vector that must fail. A green flash confirms the protocol invariant
             held and the attack was successfully blocked in-circuit or by the Compact execution engine.
@@ -50,30 +47,30 @@ export function LabPage() {
             </div>
           </div>
 
-          <div className="space-y-2 border-t border-border pt-4">
+          <div className="space-y-2 border-t border-white/10 pt-4">
             <p className="text-xs font-semibold uppercase tracking-wider text-muted">Credit Authorization & Invariant Attacks</p>
             <div className="flex flex-wrap gap-2">
-              <Button variant="ghost" onClick={attackReplay}>Replay draw</Button>
-              <Button variant="ghost" onClick={attackFakeRepay}>Fake repay</Button>
-              <Button variant="ghost" onClick={attackOverLimit}>Over-limit</Button>
-              <Button variant="ghost" onClick={attackStale}>Stale C</Button>
-              <Button variant="ghost" onClick={attackWrongAgent}>Wrong agent</Button>
+              <Button onClick={attackReplay}>Replay draw</Button>
+              <Button onClick={attackFakeRepay}>Fake repay</Button>
+              <Button onClick={attackOverLimit}>Over-limit</Button>
+              <Button onClick={attackStale}>Stale C</Button>
+              <Button onClick={attackWrongAgent}>Wrong agent</Button>
             </div>
           </div>
 
-          <div className="space-y-2 border-t border-border pt-4">
+          <div className="space-y-2 border-t border-white/10 pt-4">
             <p className="text-xs font-semibold uppercase tracking-wider text-muted">Settlement Claim & Reserve Solvency Attacks</p>
             <div className="flex flex-wrap gap-2">
-              <Button variant="ghost" onClick={attackWrongMerchantRedeem}>
+              <Button onClick={attackWrongMerchantRedeem}>
                 Wrong Merchant Redeem (B steals A)
               </Button>
-              <Button variant="ghost" onClick={attackDoubleRedeem}>
+              <Button onClick={attackDoubleRedeem}>
                 Double-Redeem Note
               </Button>
-              <Button variant="ghost" onClick={attackWithdrawEncumbered}>
+              <Button onClick={attackWithdrawEncumbered}>
                 Issuer Rug (Drain Encumbered Reserve)
               </Button>
-              <Button variant="ghost" onClick={attackCrossInstanceReplay}>
+              <Button onClick={attackCrossInstanceReplay}>
                 Cross-Instance Replay
               </Button>
             </div>
