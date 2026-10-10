@@ -6,7 +6,7 @@ import { decodeVaultJson, encodeVaultJson } from "../lib/security/vault.ts";
 import { fingerprintOperationIntent, type JournalOperationKind, type JournalOperation, type JournalScope, type OperationJournalLease, type JournalExpectedEffect } from "../lib/security/operation-journal.ts";
 
 /** File provenance only. Never used as a Compact hash or commitment. */
-export const LINE_SOURCE_FINGERPRINT = "bbc4fe7aca282e1e7e5b0176a696238ebd7a703f9eeb5153dc71783b4674945c";
+export const LINE_SOURCE_FINGERPRINT = "35ebd14e19ce682230b685f6f3729923a9c56b0719eb17a684e44e4a39c73eff";
 export interface ConsolePrivateState {
   agentLineRecord: AgentLineRecord | null;
   agentRecord: PrivateAgentRecord | null;

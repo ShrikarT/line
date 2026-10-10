@@ -28,7 +28,8 @@
     "test:e2e": "playwright test",
     "test:checkout": "node --experimental-strip-types --test server/checkout.test.ts server/checkout-resilience.test.ts server/checkout-durability.test.ts",
     "compact:check": "node scripts/check-compact-artifacts.mjs",
-    "compact:release:validate": "node scripts/contract-artifacts.mjs validate"
+    "compact:release:validate": "node scripts/contract-artifacts.mjs validate",
+    "custody:spike": "node --experimental-strip-types scripts/custody-spike.mjs"
   },
   "compact": {
     "compiler": "0.31.1",
