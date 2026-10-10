@@ -1,92 +1,91 @@
-# Engineering Status & Delivery Tracking
+# Engineering status and acceptance evidence
 
-- **Product:** Line — Private Credit & Checkout Infrastructure for Autonomous Agents
-- **Version:** `0.3.0`
-- **Active Branch:** `feat/production-line-platform`
-- **Canonical Contract:** `contracts/line.compact`
-- **Managed Bindings:** `contracts/managed/line/` (verified zero drift)
+Updated **10 October 2026**. Canonical contract: `contracts/line.compact`; managed bindings: `contracts/managed/line/`. Product version `0.3.0`. This replaces older completion checklists that incorrectly described domain binding, history privacy, runtime execution and production readiness.
 
----
+## Current compensation, refund attribution and verification update - 10 October 2026
 
-## Component Status Checklist
+- Generated Compact retains the twelve authorized circuits. Draws lock principal in E and fees in P; merchant redemption moves principal E -> R and pending fees P -> F. Only earned F is withdrawable as a fee counter.
+- Expiry action 0 moves full claim backing E/P -> U without changing borrower debt. Action 1 requires the issuer or original agent, allocates debt relief against the exact note and privately commits any cash remainder. If cash is owed, the full original claim cost stays locked in U; the exact remainder is not public.
+- Action 2 requires an issuer, exact positive private refund opening, stable reference and deadline. It binds that stable payment nullifier to the specific note and moves full backing U -> X. This is an issuer report, not evidence that cash was transferred; X stays locked.
+- Historical agent keys are encrypted for outstanding old-generation notes; compensation does not restore a retired book. Journal-confirmed state remains authoritative over legacy mirrors. A mirror delete alone is not key revocation.
+- The private line commitment now includes `contractDomain` in `LinePreimage`; equal openings and salts in different instances produce different roots. This changes the commitment format. Checkout checkpoints moved to version 4, while source-bound console journals/checkpoints and public verifier fixtures reject stale source. No live deployment or previous private opening was migrated.
+- Verified after the 10 October source-comment/provenance refresh: **462 tests / 60 suites**, **20 browser tests**, typecheck, build, 16-file generated drift check, full release validation, production-key scan and secret-pattern scan passed. The current full Compact release is `0.31.1-bbc4fe7aca28-a1555b3e-0b95-435d-b6b2-8cf30ea373b4`. The 7 October audit and intervening counts below are dated snapshots.
+- Remaining: independent role custody, live proving/submission/finality, real deposits and payouts, full history privacy, cash-refund authenticity, global/partial payment allocation and post-redemption disputes. No customer interviews or pilot are established. See [compensation evidence](COMPENSATION_2026-10-10.md) and [current product direction](PRODUCT_DIRECTION.md).
 
-### 1. Compact Smart Contract (`contracts/line.compact`)
-- [x] Canonical single contract at `contracts/line.compact` (duplicate directories removed)
-- [x] Contract-instance domain separation via `instanceNonce` and derived `contractDomain`
-- [x] Domain-bound line-state commitment $C = \text{persistentCommit}(\{ \text{domain}, I, L, B, \text{epoch} \}, \text{salt})$
-- [x] 10 standard circuits implemented:
-  - `registerMerchant`
-  - `fundReserve`
-  - `withdrawUnencumberedReserve`
-  - `openLine`
-  - `postQuote`
-  - `draw`
-  - `redeemDraw`
-  - `cancelOrExpireNote`
-  - `acknowledgeRepayment`
-  - `setStatus`
-- [x] Multi-merchant registry with whitelisting (`registeredMerchants`)
-- [x] Mathematical reserve solvency invariant: $\text{encumberedReserve} + \text{redeemedReserve} \le \text{totalReserve}$
-- [x] Anti-rug withdrawal constraint: $\Delta \text{withdraw} \le \text{withdrawableReserve}$
-- [x] Merchant-bound claim notes ($D$) with zero-knowledge ownership proof ($N_{\text{redeem}}$)
-- [x] Fast compiler script (`scripts/compile-compact.mjs`) & release compilation script
+## Verified product-direction progress
 
-### 2. Runtime Architecture (`src/lib/runtime/`)
-- [x] `LineRuntime` interface defining unified operations and status queries
-- [x] `MidnightNetworkRuntime`: Production adapter interfacing with Midnight network RPC, indexer, and wallet via `@midnight-ntwrk/dapp-connector-api@4.0.1`, `@midnight-ntwrk/midnight-js-contracts@4.1.1`, and `indexerPublicDataProvider`
-- [x] `VaultPrivateStateProvider`: Production `PrivateStateProvider` conforming to `@midnight-ntwrk/midnight-js-types` with WebCrypto AES-GCM IndexedDB encryption
-- [x] `LocalDevelopmentRuntime`: Developer adapter running Compact simulator with explicit environment indicators
-- [x] `InMemoryTestRuntime`: Isolated in-memory adapter for automated test suites
-- [x] Runtime selection factory `getRuntime()` with environment variable control (`LINE_RUNTIME`)
-- [x] Network setup UI with wallet connector (`window.midnight.mnLace`) and contract join panel
+- [x] Full product direction, buyer/job hypothesis, liability, economics and eighteen acceptance requirements recorded in [PRODUCT_DIRECTION.md](PRODUCT_DIRECTION.md).
+- [x] Three buyer cohorts (platform-as-buyer, enterprise internal agent operator, and integrator with named customer-buyer) are explicit unvalidated hypotheses; no customers, interviews or pilots fabricated.
+- [x] Product-direction execution plan identifies next artifacts and unassigned external roles. Roadmap workstreams now distinguish test-asset integration from real funded customer entry, require privacy/custody/terms gates together, and make final privacy acceptance dependent on actual fleet/proof-path evidence. Funding-cost and participant-account models reject duplicate charges; this is planning evidence, not product operation or a new code verification result.
+- [x] Final direction-only review: two independent cross-document reviews found no material plan contradiction. All twelve exported circuits and eighteen product requirements match the direction tables; UTF-8, relative links/anchors, whitespace and tracked-document diff checks pass. Operational/release evidence is distinct from adoption; interview cohorts are distinct from the deployed privacy population; revenue period and cost allocation are explicit. Direction planning is complete, while technical feasibility, customer validation and operational gates remain open. This documentation pass changed no code and did not rerun the code suites above.
+- [x] Homepage, roadmap, pitch, walkthrough and README aligned with the full private-credit destination and current evidence. No deadline-driven scope cuts.
+- [x] `/checkout` executes the compiler-generated Compact contract, rather than substituting TypeScript credit arithmetic.
+- [x] Fresh instance/issuer/agent/Merchant A/Merchant B keys per evaluation; no fixture keys in this new execution path.
+- [x] Two useful local services compute document-specific analysis and a disclosed processing estimate.
+- [x] Default 40-unit journey: A costs 25 and delivers, B costs 20 and declines generically, issuer acknowledges an evaluation repayment of 25, then only B is purchased again and delivers. A is not charged/delivered twice.
+- [x] Agent HTTP capability cannot issue/fund/read issuer books or acknowledge repayment; designated merchant ownership and single redemption verified against generated Compact.
+- [x] Live-session stage journal resumes an interrupted merchant claim without another draw; immutable request terms, duplicate/concurrent retries and acknowledgement references are checked.
+- [x] Partial facility opening resumes without funding twice. HTTP creation capacity reserved before initialization. Malformed bearer tokens reject with 403.
+- [x] UI distinguishes accounting, redemption, delivery and absent payout; preserves uncertain retry IDs, permits correction after a definite acknowledgement rejection, and discloses volatile sessions.
+- [x] Optional encrypted checkout checkpoints recover generated Compact state after actual process death; prepared/quoted/authorized/redeemed/delivered stages, funding and payment references survive restart without an additional logical charge. Dedicated storage rejects another live owner and incompatible/tampered snapshots.
+- [x] All twelve console operations use a prewritten encrypted candidate journal and exclusive browser Web Lock. Saved transaction IDs precede network submission; exact receipts or public candidate/unique-effect observations reconcile uncertainty without assuming unchanged state means failure.
+- [x] Lost draw response, failed confirmation encryption and failed per-record mirror publication recover the opening. Confirmed completion after locking remains encrypted; duplicate consumed quotes and acknowledged console payment references do not execute again.
+- [x] Mutation buttons remain disabled through journal publication; an explicit recovery control retries observation. Explorer/agent copy acknowledges public-history debt inference and unverified payouts.
+- [x] Compact checks a stable issuer-secret/domain/payment-reference nullifier alongside the existing receipt hash. Exact-reference reuse rejects across changed commitments, amount/nonce changes, later draws/repayments and reopening; genuine cash and global allocations remain open.
+- [x] Authenticated closure proves the current book has zero debt. Default/resume preserves debt and generation; clean reopening preserves merchant claims/backing. Actual SDK construction and console journaling forward the private closing opening.
+- [x] Full-string external repayment-reference encoding aligns across model, network and generated checkout. Nine previously omitted reconciliation tests now run by default.
+- [x] Supported Compact block-time validity replaces all activity-based expiry checks. Note deadlines equal their authenticated merchant quote; generated/model/SDK tests reject grinding and altered windows. Real chain-time/finality acceptance and compensation remain open.
+- [x] Unix-seconds transfer/checkpoint schemas fail closed on old units. Consoles display UTC deadlines and recorded claim status; internal navigation preserves the console session and browser-history behavior.
+- [x] Issuer opening fixes a public flat/basis-point schedule for each generation. Quote v3 binds the schedule; generated Compact proves the exact integer-ceiling fee and rejects under/overcharging. Local/network/MCP adapters align, imports reconstruct Q, and recovery checks observed policy alongside the private opening.
+- [x] Issuer controls configure pricing, and buyer/merchant consoles disclose merchant price, fee and added debt before authorization. Fees remain accounting charges; pending/earned counters and unverified cash-refund reporting are implemented; real collection, refund authenticity and external payout remain open.
 
-### 3. Private State Management & Security Vault (`src/lib/security/`)
-- [x] WebCrypto AES-GCM 256-bit encryption with PBKDF2-HMAC-SHA256 (100,000 iterations)
-- [x] IndexedDB encrypted envelope persistence and in-memory session locking
-- [x] Zero plaintext secret persistence in `localStorage`
-- [x] Automatic legacy plaintext `localStorage` purge (`purgeLegacyPlaintextStorage()`)
-- [x] Structural fixture key elimination: production store (`src/app/store.ts`), lab simulator (`src/dev/simulator-store.ts`), test fixtures (`src/test/fixtures/keys.ts`)
-- [x] Zero hardcoded default amounts: `doFundReserve`, `doOpen`, `doAck` all require explicit parameters; no fabricated inputs
-- [x] Typed vault records: `AgentLineRecord`, `MerchantQuoteRecord`, `DrawNoteRecord`, `RepaymentRecord` with validators
-- [x] Transfer packages: `QuoteTransferPackage` and `DrawNoteTransferPackage` for inter-role state exchange
-- [x] `VaultPrivateStateProvider`: strict error hierarchy — `VaultLockedError`, `VaultPersistenceError`, `ContractNotConfiguredError`
-- [x] `MidnightNetworkRuntime`: `validateWitnessBytes32` enforces 32-byte witnesses; no zero-filled fallbacks
-- [x] Zero fixture keys in production paths verified by `npm run check:keys` (37 modules audited)
-- [x] Negative key audit test suite (`node scripts/check-no-fixture-keys.test.mjs`)
-- [x] Secret pattern scanner (`npm run check:secrets`) with hardcoded session password regression guards
-- [x] Cryptographically secure randomness (`crypto.getRandomValues`) throughout
-- [x] Institutional custody disclaimer documented and tested
+## Current verification
 
-### 4. Machine-Checked Privacy & Leakage Verification (`src/lib/line/leakage.test.ts`)
-- [x] Verified: Credit limit $L$, debt $B$, and remaining capacity are never public
-- [x] Verified: Agent secrets, commitment salts, invoice IDs, and quote nonces are never public
-- [x] Verified: Public note amount and reserve deltas accurately match settlement claim amounts
-- [x] Verified: Merchant pseudonyms and quote linkages operate within documented boundaries
-- [x] Verified: MCP public endpoints conform to privacy inventory
+| Check | Result and meaning |
+|---|---|
+| `npm test` | **462 tests passing, 60 suites**, zero skipped; includes actual generated Compact expiry/compensation/refund attribution, payment replay, line lifecycle, journal/process recovery, fee policy and vault/provider failures |
+| `npm run test:e2e` | **20 browser tests passing**: issuer pricing entry and complete purchase price disclosure, UTC claim deadlines/confirmed statuses, session-preserving role navigation, checkout, populated vault and real journal/IDB/session failure scenarios. Dev-browser evidence does not establish built-preview network operation |
+| `npm run build` | Passed, including TypeScript checking. Existing network SDK browser externalization/WebSocket and large-bundle warnings remain; passing build does not validate network operation |
+| Managed bindings content diff | `npm run compact:check` passed: 16 files match fresh pinned output, normalizing only the source map output location. Managed files intentionally differ from HEAD for this migration; no commit/index changes made |
+| `npm run compact:compile` | Passed with explicit compiler **0.31.1**, language **0.23**, runtime **0.16.0**; all twelve circuits retained |
+| `npm run check:keys` | Passed; 49 production-graph modules inspected |
+| `npm run check:secrets` | Passed; banned hardcoded credential patterns absent |
+| `npm audit` | Passed; zero known dependency vulnerabilities in the current lockfile |
+| Manual browser review | Checkout layout and execution-mode/custody/reload notices inspected in Chrome |
+| Historical built preview checkout | The preceding 9 October checkout increment passed against preview on port 4173; current migration has separate dev-browser/build verification |
+| Historical isolated migration feasibility | **80/80 relevant tests** passed in an isolated compiler 0.31.1/runtime 0.16.0 copy: 67 Compact/encoding plus 13 checkout/resilience. Twelve circuits/twenty witnesses retained. [Reproduction and required migration work](NETWORK_COMPATIBILITY_2026-10-09.md) |
 
-### 5. Automated Verification Suite
-- [x] 46 Compact simulator & cross-language encoding tests (`npm run compact:test`)
-- [x] 31 Reference engine tests (`src/lib/line/protocol.test.ts`)
-- [x] 13 Scripted demo snapshot tests (`src/dev/demo.ts` / `src/lib/line/demo.test.ts`)
-- [x] 1 Deterministic model checker test (`src/lib/line/model.test.ts`) verifying all 10 invariants across 50 operations
-- [x] 4 Privacy & leakage tests (`src/lib/line/leakage.test.ts`)
-- [x] 4 Runtime architecture tests (`src/lib/runtime/runtime.test.ts`)
-- [x] 9 Midnight Network Runtime, wallet connector, and vault provider integration tests (`src/lib/runtime/network.integration.test.ts`)
-- [x] 6 Security vault tests (`src/lib/security/vault.test.ts`)
-- [x] 5 Production store full lifecycle, vault custody & witness tests (`src/app/store.test.ts`)
-- [x] 4 MCP JSON-RPC server tests (`mcp/line-mcp.test.mjs`)
-- [x] **Total Unit/Integration:** **123 passing tests across 31 suites (`npm test`)**
-- [x] **E2E Browser Testing:** **4 passing Playwright browser tests (`npm run test:e2e`)**
+Additional current evidence: `npm run compact:compile:release` regenerated source-bound release `0.31.1-bbc4fe7aca28-a1555b3e-0b95-435d-b6b2-8cf30ea373b4` after the Compact source-comment correction changed the exact source fingerprint; release validation passed during the build. This full release includes all twelve binary ZKIR/prover/verifier triples. The public verifier test fixture has been regenerated from these keys. Manifest fingerprints bind exact source, wrapper, generated output and proving files; this is integrity/provenance validation, not an independent cryptographic proof audit. The preceding recovery release separately verified actual FetchZkConfigProvider dev/preview asset serving; those older byte metrics are historical. Static deployment still needs deliberate asset publication. [Current pricing evidence and migration limits](FEE_POLICY_2026-10-10.md); [preceding expiry repair](EXPIRY_2026-10-10.md) and [repayment/lifecycle repair](REPAYMENT_LIFECYCLE_2026-10-10.md).
 
-### 6. Developer & Deployment Operations
-- [x] `npm run compact:compile`: Deterministic fast compilation with `--skip-zk`
-- [x] `npm run compact:compile:release`: Full release compilation with proving key generation
-- [x] `npm run contract:deploy`: Contract deployment script requiring `MIDNIGHT_DEPLOYER_SEED`, using `persistentHash` for Compact-consistent key derivation, and verifying deployed state via indexer
-- [x] `npm run contract:join`: Connect to existing deployed contract via GraphQL indexer
-- [x] `npm run network:smoke`: Live network connectivity and state smoke test
-- [x] `npm run local:smoke`: Local simulator smoke test verifying end-to-end lifecycle
-- [x] `npm run check:keys`: Deep static analysis guarding against fixture key imports in production graph
-- [x] `npm run check:secrets`: Secret scanner auditing for hardcoded keys, passwords, and seeds
-- [x] `npm run test:e2e`: Playwright headless browser test suite
-- [x] `npm run mcp`: Production MCP server
-- [x] `npm run mcp:dev`: Local development MCP adapter
+The actual Midnight.js `CompiledContract`/`findDeployedContract` path checks all twelve verifier keys, preserves recovered state and seeds only absent state. Actual generated issuer funding and valid zero-debt closure construct unproven transactions and reach the test proving boundary; forged issuer/closing inputs fail before proving. No external proof, wallet balance, submission or target-network finality was tested. Public verifier fixtures are source-fingerprinted test data, not deployable releases.
+
+Wallet SDK is pinned to **1.2.0**, connector **4.0.1**, Midnight.js **4.1.1**. Ledger-v8 is deduplicated at **8.1.2** to retain one native class identity across SDK/wallet packages; tests assert this identity. Compiler ledger model remains **8.0.2**. The source-map-js lockfile patch **1.2.2** closes the [prior advisory](https://github.com/advisories/GHSA-68fv-2mgg-jv7q); `npm audit` currently reports **zero known vulnerabilities**. This does not imply zero application vulnerabilities.
+
+The new server graph is not covered merely by the browser fixture scanner; its generated execution and role boundaries have dedicated tests. See `server/checkout.test.ts`, `server/checkout-resilience.test.ts` and `e2e/checkout.spec.ts`. The original [7 October audit](FULL_AUDIT_2026-10-07.md) retains its 182-test/4-browser snapshot and eleven reproductions as historical evidence, not the current total.
+
+## Exact present implementation
+
+**Compact:** Twelve circuits, authenticated roles, merchant registry, book openings, private-preimage merchant-bound notes with public amount, and draw/redemption nullifiers. Invariant `E+R+F+P+U+X<=T`; `unencumbered=T-E-R-F-P-U-X`. Current `LinePreimage={domain,identity,limit,outstanding,epoch}` binds the private line opening to `contractDomain`; the encoding was regenerated and is tested with identical openings/salts across instances. Repayment retains the mutable transition receipt plus an independent stable payment nullifier; exact-reference replay is blocked within an issuer/domain, but cash verification and global allocations are open. Public amounts, fees and history permit debt inference; public closure reveals zero debt. Permissionless expiry keeps debt unchanged while moving full claim backing to `refundReserve`; authenticated compensation allocates debt relief and privately commits any cash remainder; issuer reports retain full backing in `reportedRefundReserve` without verifying cash. Expiry uses absolute ledger time; notes retain authenticated merchant deadlines. Default/resume preserves debt; closure requires an authentic zero-debt book before a fresh generation can open.
+
+**Existing consoles:** `LocalDevelopmentRuntime` uses the TypeScript protocol model and resets on browser reload. `MidnightNetworkRuntime` remains an integration under validation. All twelve actions now persist an encrypted candidate and serialize their journal lease; exact public observations or saved-ID receipts reconcile interruptions. SDK watchers are reused and application observations bounded; timeout stays uncertain. Actual wallet balancing, remote proving, network finality and independent role-aware recovery remain acceptance dependencies. Existing merchant UI labels/shared stores do not establish independent role custody. MCP remains a local development interface with issuer tools. [Recovery evidence and limits](OPERATION_RECOVERY_2026-10-10.md).
+
+**New checkout:** Generated Compact executes locally inside a Node server supplied by Vite dev/preview middleware. All role secrets live in one process; the evaluator receives both issuer and agent capabilities. With both storage environment variables configured, encrypted phase checkpoints restore ledger/books/roles/order results on server restart. Otherwise sessions are volatile. New purchases close after 30 minutes, while expired sessions with unresolved obligations retain reconciliation evidence and count against the 20-session capacity; browser reload loses evaluation capabilities/IDs, and no operator lookup/recovery UI exists yet. Two services are deterministic local computations and the policy agent is fixed-step. No proofs are submitted, cash collected or tokens paid. Static hosting cannot supply this API. [Configuration, test scope and limits](CHECKOUT_DURABILITY_2026-10-10.md).
+
+**Vault:** Automatic/manual locking and session replacement revoke decrypted records. All twelve actions check the live session and capture recovery candidates before execution; the network boundary rechecks revocation after journal persistence. AES-GCM binds record identity and the typed codec preserves full witness types. Browser saves wait for IndexedDB transaction commit. Confirmed journals restore openings despite failed mirror publication; unresolved work blocks new submission. Portable backup/restore, source/legacy migration, rollback detection, history archival and independent/institutional custody remain open. [Private-state safety](PRIVATE_STATE_SAFETY_2026-10-10.md), [operation recovery](OPERATION_RECOVERY_2026-10-10.md).
+
+## Required outcomes still open
+
+All [PD-01 through PD-18](PRODUCT_DIRECTION.md#requirements-and-acceptance-evidence) remain in scope. Local checkout evidence advances PD-01/02/06/07/13/15, but does not close their production acceptance.
+
+1. Independent role custody and actual supplier operation; issuer cannot impersonate the agent and merchants cannot obtain one another's keys.
+2. Supported network stack, proving artifacts and finalized lifecycle transactions with independently decoded state.
+3. Historical/transcript privacy design satisfying the complete credit-book requirement; accepted public amounts/deltas still reveal history. Line-state commitments are domain-bound; deployment/state migration for the changed opening format must be handled explicitly.
+4. Real asset/currency denomination, custody, deposits, merchant payout and deposit-to-claim-to-payment reconciliation.
+5. Expand verified local journal/checkpoint recovery into live finalized recovery, encrypted device-loss backups, rollback detection, source migration, archival and independent role-aware custody.
+6. One acknowledgement per genuine payment: exact-reference repeat/reopen protection now exists in Compact, but rail authenticity, alternative identifiers, global and partial allocation rules remain open.
+7. Live ledger-time/finality acceptance, commercial validity margins, cash-refund authenticity and post-redemption disputes; local expiry/compensation and exactly-once private debt allocation are implemented and adversarially tested.
+8. Extend verified issuer-approved pricing into independent fee consent, actual collections and measured costs; responsible default/underwriting/recovery.
+9. Concurrent agent fleet exposure/backing, aggregate risk and operational throughput; full future syndication/credentials/rails requirements retained.
+10. Real buyer/supplier observations, pilot evidence and same-workload comparison against existing procurement/payment alternatives.
+
+[PRODUCT_VALIDATION.md](PRODUCT_VALIDATION.md) contains the empty external-evidence register and interview/pilot protocol. A written plan is not adoption evidence. This project is **not marked production-ready or perfect**, and the broader product-fixing goal remains active.

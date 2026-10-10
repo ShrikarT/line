@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   acknowledgeRepayment,
+  cancelOrExpireNote,
   cloneLedger,
   createLedger,
   draw,
@@ -14,10 +15,11 @@ import {
   withdrawUnencumberedReserve,
 } from "./protocol.ts";
 import type { AgentStore, DrawNote, Ledger, QuotePreimage } from "./types.ts";
+import { requiredDrawFee } from "./encoding.ts";
 import { AGENT_SK, INSTANCE_NONCE, ISSUER_SK, MERCHANT_A_PK, MERCHANT_A_SK, MERCHANT_B_SK } from "../../test/fixtures/keys.ts";
 
 function assertInvariants(ledger: Ledger, agent: AgentStore | null) {
-  // 1. Solvency: encumberedReserve + redeemedReserve <= totalReserve
+  // 1. All claim, fee, compensation and reported-refund budgets stay backed.
   assert.ok(
     ledger.encumberedReserve >= 0,
     `encumberedReserve must be nonnegative, got ${ledger.encumberedReserve}`,
@@ -27,9 +29,12 @@ function assertInvariants(ledger: Ledger, agent: AgentStore | null) {
     `redeemedReserve must be nonnegative, got ${ledger.redeemedReserve}`,
   );
   assert.ok(
-    ledger.encumberedReserve + ledger.redeemedReserve <= ledger.totalReserve,
-    `Reserve deficit: encumbered (${ledger.encumberedReserve}) + redeemed (${ledger.redeemedReserve}) > total (${ledger.totalReserve})`,
+    ledger.encumberedReserve + ledger.redeemedReserve + ledger.feeReserve + ledger.pendingFeeReserve + ledger.refundReserve + ledger.reportedRefundReserve <= ledger.totalReserve,
+    "All locked reserve budgets must be at most total reserve",
   );
+  for (const field of ["feeReserve", "pendingFeeReserve", "refundReserve", "reportedRefundReserve"] as const) assert.ok(Number.isSafeInteger(ledger[field]) && ledger[field] >= 0, `${field} must be a safe nonnegative integer`);
+  assert.equal(ledger.pendingFeeReserve, ledger.notes.filter(n => !n.redeemed && !n.cancelled).reduce((sum, n) => sum + n.fee, 0));
+  assert.ok(ledger.notes.every(n => !(n.redeemed && n.cancelled)), "A note cannot be redeemed and cancelled");
 
   // 2. No nullifier duplicate in ledger.nullifiers
   const nullifierSet = new Set(ledger.nullifiers);
@@ -55,7 +60,9 @@ function assertInvariants(ledger: Ledger, agent: AgentStore | null) {
 
 describe("deterministic state-machine model invariant tests", () => {
   it("maintains all 10 protocol and reserve invariants across a randomized sequence of 50 operations", () => {
+    let now = 0;
     let ledger = createLedger({
+      clock: () => now,
       issuerSecret: ISSUER_SK,
       merchantSecret: MERCHANT_A_SK,
       instanceNonce: INSTANCE_NONCE,
@@ -79,7 +86,7 @@ describe("deterministic state-machine model invariant tests", () => {
     }
 
     for (let step = 0; step < 50; step++) {
-      const op = rand(8);
+      const op = rand(10);
       const prevLedger = cloneLedger(ledger);
 
       switch (op) {
@@ -110,7 +117,9 @@ describe("deterministic state-machine model invariant tests", () => {
               caller: ISSUER_SK,
               agentSecret: AGENT_SK,
               salt: `salt-step-${step}`,
-              expiry: 50_000,
+              expiry: now + 50_000,
+              feeFlat: 3,
+              feeBps: 125,
             },
             { limit },
           );
@@ -129,7 +138,7 @@ describe("deterministic state-machine model invariant tests", () => {
             {
               caller: merchant,
               invoiceId: `inv-${step}`,
-              expiry: 50_000,
+              expiry: now + 50_000,
               nonce: `nonce-${step}`,
             },
             { amount },
@@ -150,6 +159,7 @@ describe("deterministic state-machine model invariant tests", () => {
                 agentSecret: AGENT_SK,
                 quoteCommit: q.Q,
                 newSalt: `salt-draw-${step}`,
+                fee: Number(requiredDrawFee(BigInt(q.quote.amount), BigInt(ledger.feeFlat), BigInt(ledger.feeBps))),
                 noteNonce: `nn-${step}`,
                 noteSalt: `ns-${step}`,
               },
@@ -191,7 +201,7 @@ describe("deterministic state-machine model invariant tests", () => {
               amount: repayAmount,
               paymentRef: `pay-${step}`,
               nonce: `rcpt-${step}`,
-              expiry: 50_000,
+              expiry: now + 50_000,
               contractDomain: ledger.contractDomain,
             };
             const r = acknowledgeRepayment(
@@ -218,6 +228,25 @@ describe("deterministic state-machine model invariant tests", () => {
           } else if (ledger.status === "defaulted") {
             const r = setStatus(ledger, { caller: ISSUER_SK, status: "open" });
             if (r.ok) ledger = r.ledger;
+          }
+          break;
+        }
+        case 8: {
+          if (notes.length) {
+            const note = notes[rand(notes.length)]!;
+            now = Math.max(now, note.preimage.expiry);
+            const r = cancelOrExpireNote(ledger, { note });
+            if (r.ok) ledger = r.ledger;
+            else assert.deepEqual(ledger, prevLedger);
+          }
+          break;
+        }
+        case 9: {
+          if (notes.length && agent?.witness) {
+            const note = notes[rand(notes.length)]!;
+            const r = cancelOrExpireNote(ledger, { caller: AGENT_SK, action: 1, note, compensation: { note: note.preimage, noteSalt: note.salt, newSalt: `refund-${step}`, books: agent.witness } });
+            if (r.ok) { ledger = r.ledger; if (r.witness) agent.witness = r.witness; }
+            else assert.deepEqual(ledger, prevLedger);
           }
           break;
         }

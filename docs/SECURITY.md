@@ -2,12 +2,12 @@
 
 ## Executive Summary
 
-Line implements a zero-knowledge revolving credit and settlement state machine compiled with the Midnight Compact compiler (`0.34.0`, Compact language `0.26.0`, runtime `0.19.0`).
+This is a historical security review of an earlier implementation snapshot. Its version numbers, circuit details and test references do not describe the current worktree and must not be used as release evidence. See the current [full audit](FULL_AUDIT_2026-10-07.md), [product direction and acceptance gates](PRODUCT_DIRECTION.md), and [privacy specification](PRIVACY.md).
 
 This document details the threat model, formal protocol invariants, attack defenses, circuit constraints, automated tests, and remaining operational limitations.
 
 > [!NOTE]
-> **Audit Status:** Line has completed internal security reviews, automated invariant model checking, and multi-party test suites. It has not yet undergone an external third-party institutional security audit. Production deployment with institutional capital must follow a formal independent audit.
+> **Scope:** This historical document records claims from an earlier snapshot. It is not a current security certification. No independent external security audit or production certification is established.
 
 ---
 
@@ -39,7 +39,7 @@ This document details the threat model, formal protocol invariants, attack defen
 
 ## Information Leakage & Mitigation Summary
 
-1. **Credit Book ($L, B$):** Fully private in zero-knowledge witness. Tested in `leakage.test.ts`.
+1. **Credit Book ($L, B$):** Openings are private witness inputs; public amounts, reserve deltas, identities and transaction history permit inferences. Full-history privacy is not established. See [PRIVACY.md](PRIVACY.md).
 2. **Settlement Amounts ($A$):** Public on-chain metadata in `notes[D].amount` and observable via reserve delta $\Delta \text{encumberedReserve} = A$. Documented in `docs/PRIVACY.md`.
 3. **Merchant Identity:** Private in claim note commitment $D$, but linkable at quote time via `QuoteMeta.merchantPk`.
 4. **Logical Clock Sequencing:** Logical `actionClock` increments per transaction, eliminating block-timestamp manipulation and miner extractable value (MEV) timestamp arbitrage.

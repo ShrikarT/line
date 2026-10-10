@@ -6,8 +6,8 @@ export class InMemoryTestRuntime extends LocalDevelopmentRuntime {
   override readonly mode: RuntimeMode = "test";
   override readonly networkId: string = "in-memory-test";
 
-  constructor(initialLedger?: Ledger) {
-    super(initialLedger);
+  constructor(initialLedger?: Ledger, options?: { clock?: () => number }) {
+    super(initialLedger, options);
   }
 
   override getContractAddress(): string {

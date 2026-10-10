@@ -1,0 +1,34 @@
+
+> line@0.3.0 test:e2e
+> playwright test
+
+[WebServer] (node:13476) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 4 tests using 1 worker
+
+[WebServer] Sourcemap for "C:/Users/Shrikar/line/node_modules/@midnight-ntwrk/compact-runtime/dist/index.js" points to missing source files
+[WebServer] Sourcemap for "C:/Users/Shrikar/line/node_modules/@midnight-ntwrk/compact-runtime/dist/proof-data.js" points to missing source files
+[WebServer] Sourcemap for "C:/Users/Shrikar/line/node_modules/@midnight-ntwrk/compact-runtime/dist/witness.js" points to missing source files
+[WebServer] Sourcemap for "C:/Users/Shrikar/line/node_modules/@midnight-ntwrk/compact-runtime/dist/providers.js" points to missing source files
+[WebServer] Sourcemap for "C:/Users/Shrikar/line/node_modules/@midnight-ntwrk/compact-runtime/dist/error.js" points to missing source files
+[WebServer] Sourcemap for "C:/Users/Shrikar/line/node_modules/@midnight-ntwrk/compact-runtime/dist/version.js" points to missing source files
+[WebServer] Sourcemap for "C:/Users/Shrikar/line/node_modules/@midnight-ntwrk/compact-runtime/dist/casts.js" points to missing source files
+[WebServer] Sourcemap for "C:/Users/Shrikar/line/node_modules/@midnight-ntwrk/compact-runtime/dist/compact-types.js" points to missing source files
+[WebServer] Sourcemap for "C:/Users/Shrikar/line/node_modules/@midnight-ntwrk/compact-runtime/dist/built-ins.js" points to missing source files
+[WebServer] Sourcemap for "C:/Users/Shrikar/line/node_modules/@midnight-ntwrk/compact-runtime/dist/zswap.js" points to missing source files
+[WebServer] Sourcemap for "C:/Users/Shrikar/line/node_modules/@midnight-ntwrk/compact-runtime/dist/constructor-context.js" points to missing source files
+[WebServer] Sourcemap for "C:/Users/Shrikar/line/node_modules/@midnight-ntwrk/compact-runtime/dist/constants.js" points to missing source files
+[WebServer] Sourcemap for "C:/Users/Shrikar/line/node_modules/@midnight-ntwrk/compact-runtime/dist/circuit-context.js" points to missing source files
+[WebServer] Sourcemap for "C:/Users/Shrikar/line/node_modules/@midnight-ntwrk/compact-runtime/dist/utils.js" points to missing source files
+[WebServer] Sourcemap for "C:/Users/Shrikar/line/node_modules/@midnight-ntwrk/compact-runtime/dist/contract-dependencies.js" points to missing source files
+[WebServer] Sourcemap for "C:/Users/Shrikar/line/node_modules/@midnight-ntwrk/compact-runtime/dist/contract.js" points to missing source files
+[WebServer] Sourcemap for "C:/Users/Shrikar/line/contracts/managed/line/contract/index.js" points to missing source files
+(node:2604) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok 1 [chromium] › e2e\app.spec.ts:4:3 › Line — Autonomous Agent Credit Platform › homepage loads with core architecture and runtime badge (4.4s)
+  ok 2 [chromium] › e2e\app.spec.ts:10:3 › Line — Autonomous Agent Credit Platform › navigates across all role consoles and verify UI elements with zero Buffer errors (2.7s)
+  ok 3 [chromium] › e2e\app.spec.ts:52:3 › Line — Autonomous Agent Credit Platform › runtime switcher opens network setup screen and enforces wallet boundaries (1.7s)
+  ok 4 [chromium] › e2e\app.spec.ts:65:3 › Line — Autonomous Agent Credit Platform › localStorage and IndexedDB privacy audit: zero credit book leakage and encrypted vault (1.1s)
+
+  4 passed (16.6s)

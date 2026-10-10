@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it, before } from "node:test";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { MERCHANT_A_PK } from "../src/test/fixtures/keys.ts";
@@ -15,7 +15,7 @@ describe("MCP interface", () => {
     ({ handleMessage } = await import("./line-mcp.mjs"));
   });
 
-  it("lists all 11 Line protocol MCP tools", async () => {
+  it("lists all 13 Line protocol MCP tools", async () => {
     const res = await handleMessage({ jsonrpc: "2.0", id: 1, method: "tools/list" });
     const names = res.result.tools.map((t) => t.name);
     assert.ok(names.includes("line.status"));
@@ -29,7 +29,9 @@ describe("MCP interface", () => {
     assert.ok(names.includes("line.withdrawFees"));
     assert.ok(names.includes("line.disableMerchant"));
     assert.ok(names.includes("line.repay"));
-    assert.equal(names.length, 11);
+    assert.ok(names.includes("line.compensate"));
+    assert.ok(names.includes("line.refund.acknowledge"));
+    assert.equal(names.length, 13);
   });
 
   it("status on empty ledger is public-only", async () => {
@@ -258,7 +260,7 @@ describe("MCP interface", () => {
     });
     assert.equal(JSON.parse(miss.result.content[0].text).ok, false);
 
-    // Real note but not yet expired (demo expiries are actionClock + 10000)
+    // Real note but not yet expired (demo deadlines use future Unix seconds).
     const noteD = seedBody.public.notes[0].commitment;
     const early = await handleMessage({
       jsonrpc: "2.0",
@@ -271,12 +273,40 @@ describe("MCP interface", () => {
     assert.match(earlyBody.message, /not expired/i);
   });
 
-  it("FEE_SPEC: line.draw with fee accrues feeReserve; line.withdrawFees releases it", async () => {
+  it("persists Unix-seconds deadlines and rejects legacy state until an explicit simulator reset", async () => {
+    const invoke = (name, args = {}) => handleMessage({ jsonrpc: "2.0", id: 60, method: "tools/call", params: { name, arguments: args } });
+    const seeded = await invoke("line.seed", { step: 5 });
+    const body = JSON.parse(seeded.result.content[0].text);
+    assert.equal(body.ok, true);
+    assert.equal(body.public.deadlineUnits, "unix-seconds");
+    const path = join(dir, "state.json");
+    const state = JSON.parse(readFileSync(path, "utf8"));
+    assert.equal(state.deadlineUnits, "unix-seconds");
+    assert.ok(state.ledger.lineExpiry > Math.floor(Date.now() / 1000));
+    assert.ok(state.ledger.notes[0].expiry > Math.floor(Date.now() / 1000));
+    for (const units of [undefined, "action-count"]) {
+      const legacy = { ...state, deadlineUnits: units };
+      const serialized = JSON.stringify(legacy);
+      writeFileSync(path, serialized);
+      for (const name of ["line.status", "line.quote", "line.expireNote"]) {
+        const rejected = await invoke(name, { amount: 1, invoiceId: "cannot-reinterpret", noteCommitment: state.ledger.notes[0].commitment });
+        assert.equal(rejected.error.code, -32603);
+        assert.match(rejected.error.message, /line\.seed.*reset.*action-count deadlines cannot be converted/i);
+        assert.equal(readFileSync(path, "utf8"), serialized, "rejected legacy state was not silently rewritten");
+      }
+    }
+    const reset = await invoke("line.seed", { step: 3 });
+    assert.equal(JSON.parse(reset.result.content[0].text).ok, true);
+    assert.equal(JSON.parse(readFileSync(path, "utf8")).deadlineUnits, "unix-seconds");
+    assert.equal((await invoke("line.status")).error, undefined);
+  });
+
+  it("FEE_SPEC: draw locks pending fees and only merchant redemption earns withdrawable fees", async () => {
     const seedRes = await handleMessage({
       jsonrpc: "2.0",
       id: 40,
       method: "tools/call",
-      params: { name: "line.seed", arguments: { step: 3 } },
+      params: { name: "line.seed", arguments: { step: 3, feeFlat: 5, feeBps: 0 } },
     });
     assert.equal(JSON.parse(seedRes.result.content[0].text).ok, true);
 
@@ -289,6 +319,13 @@ describe("MCP interface", () => {
     const qBody = JSON.parse(quoteRes.result.content[0].text);
     assert.equal(qBody.ok, true);
 
+    for (const fee of [0, 6]) {
+      const rejected = await handleMessage({ jsonrpc: "2.0", id: 45, method: "tools/call", params: { name: "line.draw", arguments: { quoteId: qBody.quoteCommitment, fee } } });
+      const body = JSON.parse(rejected.result.content[0].text);
+      assert.equal(body.ok, false);
+      assert.equal(body.message, "Clearance could not be proven.");
+    }
+
     const drawRes = await handleMessage({
       jsonrpc: "2.0",
       id: 42,
@@ -297,9 +334,18 @@ describe("MCP interface", () => {
     });
     const dBody = JSON.parse(drawRes.result.content[0].text);
     assert.equal(dBody.ok, true);
-    assert.equal(dBody.public.feeReserve, 5);
+    assert.equal(dBody.public.feeReserve, 0);
+    assert.equal(dBody.public.pendingFeeReserve, 5);
     assert.equal(dBody.public.encumberedReserve, 40); // note encumbers amount only
     assert.equal(dBody.public.withdrawableReserve, 500 - 40 - 5);
+
+    const pendingWithdrawal = await handleMessage({ jsonrpc: "2.0", id: 47, method: "tools/call", params: { name: "line.withdrawFees", arguments: {} } });
+    assert.equal(JSON.parse(pendingWithdrawal.result.content[0].text).ok, false);
+    const redeemed = await handleMessage({ jsonrpc: "2.0", id: 48, method: "tools/call", params: { name: "line.redeem", arguments: { noteCommitment: dBody.noteCommitment } } });
+    const redeemedBody = JSON.parse(redeemed.result.content[0].text);
+    assert.equal(redeemedBody.ok, true);
+    assert.equal(redeemedBody.public.pendingFeeReserve, 0);
+    assert.equal(redeemedBody.public.feeReserve, 5);
 
     const wfRes = await handleMessage({
       jsonrpc: "2.0",
@@ -321,6 +367,184 @@ describe("MCP interface", () => {
       params: { name: "line.withdrawFees", arguments: {} },
     });
     assert.equal(JSON.parse(wf2.result.content[0].text).ok, false);
+  });
+
+  it("uses issuer fee policy when draw fee is omitted and refuses legacy unpriced state", async () => {
+    const invoke = (name, args = {}) => handleMessage({ jsonrpc: "2.0", id: 46, method: "tools/call", params: { name, arguments: args } });
+    const seed = JSON.parse((await invoke("line.seed", { step: 3, feeFlat: 3, feeBps: 250 })).result.content[0].text);
+    assert.equal(seed.ok, true);
+    assert.equal(seed.public.feeFlat, 3);
+    assert.equal(seed.public.feeBps, 250);
+    const quoted = JSON.parse((await invoke("line.quote", { amount: 41, invoiceId: "rounded-mcp-fee" })).result.content[0].text);
+    assert.equal(quoted.ok, true);
+    const drawn = JSON.parse((await invoke("line.draw", { quoteId: quoted.quoteCommitment })).result.content[0].text);
+    assert.equal(drawn.ok, true);
+    assert.equal(drawn.public.pendingFeeReserve, 5, "ceil(41*250/10000)+3 is exactly 5");
+    assert.equal(drawn.public.feeReserve, 0);
+    assert.equal(drawn.public.encumberedReserve, 41);
+    const path = join(dir, "state.json");
+    const state = JSON.parse(readFileSync(path, "utf8"));
+    assert.equal(state.feePolicy, "flat-plus-ceil-bps-v1");
+    for (const legacy of [{ ...state, feePolicy: undefined }, { ...state, ledger: { ...state.ledger, feeFlat: undefined } }]) {
+      const serialized = JSON.stringify(legacy);
+      writeFileSync(path, serialized);
+      const rejected = await invoke("line.status");
+      assert.match(rejected.error.message, /fee.*line\.seed|line\.seed.*fee/i);
+      assert.equal(readFileSync(path, "utf8"), serialized);
+    }
+    assert.equal(JSON.parse((await invoke("line.seed", { step: 3 })).result.content[0].text).ok, true);
+  });
+
+  it("expires, allocates compensation and reports a private cash refund without releasing its unverified reserve hold", async (t) => {
+    let now = Math.floor(Date.now() / 1000);
+    t.mock.method(Date, "now", () => now * 1000);
+    const invoke = async (name, args = {}) => {
+      const response = await handleMessage({ jsonrpc: "2.0", id: 49, method: "tools/call", params: { name, arguments: args } });
+      assert.equal(response.error, undefined);
+      return JSON.parse(response.result.content[0].text);
+    };
+    assert.equal((await invoke("line.seed", { step: 3, feeFlat: 5, feeBps: 0 })).ok, true);
+    const quote = await invoke("line.quote", { amount: 40, invoiceId: "mcp-compensation" });
+    assert.equal(quote.ok, true);
+    const drawn = await invoke("line.draw", { quoteId: quote.quoteCommitment });
+    assert.equal(drawn.ok, true);
+    const D = drawn.noteCommitment;
+    assert.equal((await invoke("line.repay", { amount: 20 })).ok, true);
+    const stored = JSON.parse(readFileSync(join(dir, "state.json"), "utf8"));
+    now = stored.ledger.notes.find(note => note.commitment === D).expiry;
+    const expired = await invoke("line.expireNote", { noteCommitment: D });
+    assert.equal(expired.ok, true);
+    assert.equal(expired.public.refundReserve, 45);
+    assert.equal(expired.public.pendingFeeReserve, 0);
+    assert.equal(expired.public.feeReserve, 0);
+    const allocated = await invoke("line.compensate", { noteCommitment: D });
+    assert.equal(allocated.ok, true);
+    assert.equal(allocated.public.refundReserve, 45);
+    const note = allocated.public.notes.find(note => note.commitment === D);
+    assert.equal(note.compensationAllocated, true);
+    assert.equal(note.cashRefundOwed, true);
+    assert.equal(note.refundAcknowledged, false);
+    assert.equal(note.refundPaymentNullifier, "0".repeat(64));
+    assert.equal("refundAmount" in note, false);
+    assert.equal("allocatedCredit" in note, false);
+    const privateAllocation = JSON.parse(readFileSync(join(dir, "state.json"), "utf8"));
+    assert.equal(privateAllocation.compensationPolicy, "private-refund-full-cost-lock-v1");
+    assert.equal(privateAllocation.agent.witness.B, 0);
+    assert.equal(privateAllocation.refunds[0].amount, 20);
+    assert.equal(privateAllocation.refunds[0].allocatedCredit, 25);
+    assert.equal(privateAllocation.refunds[0].status, "allocated");
+    assert.equal(JSON.stringify(allocated).includes(privateAllocation.refunds[0].salt), false);
+    assert.equal(JSON.stringify(allocated).includes("allocatedCredit"), false);
+    assert.equal((await invoke("line.compensate", { noteCommitment: D })).ok, false);
+    const acknowledged = await invoke("line.refund.acknowledge", { noteCommitment: D, paymentRef: "wire-mcp-compensation-refund" });
+    assert.equal(acknowledged.ok, true);
+    assert.equal(acknowledged.public.refundReserve, 0);
+    assert.equal(acknowledged.public.reportedRefundReserve, 45);
+    assert.equal(acknowledged.public.withdrawableReserve, 455);
+    assert.equal(acknowledged.public.totalReserve, 500);
+    const attributed = acknowledged.public.notes.find(note => note.commitment === D).refundPaymentNullifier;
+    assert.notEqual(attributed, "0".repeat(64));
+    assert.ok(acknowledged.public.nullifiers.includes(attributed));
+    assert.match(acknowledged.message, /No cash payment is verified/i);
+    const privateReport = JSON.parse(readFileSync(join(dir, "state.json"), "utf8"));
+    assert.equal(privateReport.refunds[0].status, "issuer-reported");
+    assert.equal(privateReport.refunds[0].paymentReference, "wire-mcp-compensation-refund");
+    assert.equal(JSON.stringify(acknowledged).includes("wire-mcp-compensation-refund"), false);
+    assert.equal((await invoke("line.refund.acknowledge", { noteCommitment: D, paymentRef: "another-refund" })).ok, false);
+  });
+
+  it("requires explicit compensation state migration and preserves rejected files", async () => {
+    const invoke = (name, args = {}) => handleMessage({ jsonrpc: "2.0", id: 70, method: "tools/call", params: { name, arguments: args } });
+    await invoke("line.seed", { step: 5, feeFlat: 5 });
+    const path = join(dir, "state.json"), original = JSON.parse(readFileSync(path, "utf8"));
+    const candidates = [
+      { ...original, compensationPolicy: undefined },
+      { ...original, compensationPolicy: "legacy-public-refund" },
+      { ...original, refunds: undefined },
+      { ...original, ledger: { ...original.ledger, pendingFeeReserve: undefined } },
+      { ...original, ledger: { ...original.ledger, refundReserve: -1 } },
+      { ...original, ledger: { ...original.ledger, reportedRefundReserve: 501 } },
+      { ...original, ledger: { ...original.ledger, notes: original.ledger.notes.map(n => ({ ...n, fee: undefined })) } },
+      { ...original, ledger: { ...original.ledger, notes: original.ledger.notes.map(n => ({ ...n, refundPaymentNullifier: undefined })) } },
+      { ...original, notes: original.notes.map(n => ({ ...n, preimage: { ...n.preimage, fee: undefined } })) },
+    ];
+    for (const candidate of candidates) {
+      const serialized = JSON.stringify(candidate); writeFileSync(path, serialized);
+      for (const name of ["line.status", "line.note.status", "line.compensate", "line.refund.acknowledge"]) {
+        const rejected = await invoke(name, { noteCommitment: original.notes[0].D, paymentRef: "cannot-migrate" });
+        assert.equal(rejected.error.code, -32603);
+        assert.match(rejected.error.message, /compensation.*line\.seed/i);
+        assert.equal(readFileSync(path, "utf8"), serialized);
+      }
+    }
+    const reset = await invoke("line.seed", { step: 3 });
+    assert.equal(JSON.parse(reset.result.content[0].text).ok, true);
+    assert.deepEqual(JSON.parse(readFileSync(path, "utf8")).refunds, []);
+    assert.equal((await invoke("line.status")).error, undefined);
+  });
+
+  it("compensates a fully unpaid purchase without creating cash and rejects premature or unknown claims", async t => {
+    let now = Math.floor(Date.now() / 1000); t.mock.method(Date, "now", () => now * 1000);
+    const invoke = async (name, args = {}) => {
+      const response = await handleMessage({ jsonrpc: "2.0", id: 71, method: "tools/call", params: { name, arguments: args } });
+      assert.equal(response.error, undefined); return JSON.parse(response.result.content[0].text);
+    };
+    const seeded = await invoke("line.seed", { step: 5, feeFlat: 5 });
+    const D = seeded.public.notes[0].commitment, path = join(dir, "state.json"), before = readFileSync(path, "utf8");
+    for (const args of [{}, { noteCommitment: 12 }, { noteCommitment: "missing" }, { noteCommitment: D }]) assert.equal((await invoke("line.compensate", args)).ok, false);
+    assert.equal(readFileSync(path, "utf8"), before);
+    now = seeded.public.notes[0].expiry;
+    const allocated = await invoke("line.compensate", { noteCommitment: D });
+    assert.equal(allocated.ok, true); assert.equal(allocated.public.refundReserve, 0);
+    assert.equal(allocated.public.withdrawableReserve, 500); assert.equal(allocated.public.notes[0].cashRefundOwed, false);
+    const stored = JSON.parse(readFileSync(path, "utf8"));
+    assert.equal(stored.agent.witness.B, 0); assert.equal(stored.refunds[0].amount, 0); assert.equal(stored.refunds[0].allocatedCredit, 45);
+    assert.equal((await invoke("line.refund.acknowledge", { noteCommitment: D, paymentRef: "cannot-report-zero" })).ok, false);
+    assert.equal((await invoke("line.withdrawFees")).ok, false);
+    assert.equal((await invoke("line.redeem", { noteCommitment: D })).ok, false);
+  });
+
+  it("prevents payment reference reuse between repayment and two refunds with exact long-string identities", async t => {
+    let now = Math.floor(Date.now() / 1000); t.mock.method(Date, "now", () => now * 1000);
+    const invoke = async (name, args = {}) => {
+      const response = await handleMessage({ jsonrpc: "2.0", id: 72, method: "tools/call", params: { name, arguments: args } });
+      assert.equal(response.error, undefined); return JSON.parse(response.result.content[0].text);
+    };
+    await invoke("line.seed", { step: 3, feeFlat: 5 });
+    const notes = [];
+    for (const [amount, invoiceId] of [[40, "first-compensated"], [20, "second-compensated"]]) {
+      const quote = await invoke("line.quote", { amount, invoiceId }); assert.equal(quote.ok, true);
+      const draw = await invoke("line.draw", { quoteId: quote.quoteCommitment }); assert.equal(draw.ok, true);
+      notes.push(draw.noteCommitment);
+    }
+    const inboundRef = "rail/bank/durable-event/" + "a".repeat(80);
+    assert.equal((await invoke("line.repay", { amount: 50, paymentRef: inboundRef })).ok, true);
+    const path = join(dir, "state.json"), stored = JSON.parse(readFileSync(path, "utf8"));
+    now = Math.max(...stored.ledger.notes.map(note => note.expiry));
+    for (const D of notes) assert.equal((await invoke("line.compensate", { noteCommitment: D })).ok, true);
+    assert.equal((await invoke("line.refund.acknowledge", { noteCommitment: notes[0], paymentRef: inboundRef })).ok, false);
+    const prefix = "rail/refund/" + "same-prefix".repeat(15);
+    for (const paymentRef of [undefined, "", " whitespace", 12, "x".repeat(4097)]) assert.equal((await invoke("line.refund.acknowledge", { noteCommitment: notes[0], paymentRef })).ok, false);
+    const first = await invoke("line.refund.acknowledge", { noteCommitment: notes[0], paymentRef: prefix + "/first" }); assert.equal(first.ok, true);
+    const beforeRepeated = readFileSync(path, "utf8");
+    const repeated = await invoke("line.refund.acknowledge", { noteCommitment: notes[1], paymentRef: prefix + "/first" }); assert.equal(repeated.ok, false);
+    assert.match(repeated.message, /used/i); assert.equal(readFileSync(path, "utf8"), beforeRepeated);
+    const unreportedNote = JSON.parse(beforeRepeated).ledger.notes.find(note => note.commitment === notes[1]);
+    assert.equal(unreportedNote.refundPaymentNullifier, "0".repeat(64));
+    const second = await invoke("line.refund.acknowledge", { noteCommitment: notes[1], paymentRef: prefix + "/second" }); assert.equal(second.ok, true);
+    assert.equal(second.public.refundReserve, 0); assert.equal(second.public.reportedRefundReserve, 70);
+    assert.equal(second.public.totalReserve, 500); assert.equal(second.public.withdrawableReserve, 430);
+    const final = JSON.parse(readFileSync(path, "utf8"));
+    assert.deepEqual(final.refunds.map(refund => refund.amount), [25, 25]);
+    assert.deepEqual(final.refunds.map(refund => refund.paymentReference), [prefix + "/first", prefix + "/second"]);
+    const [firstPaymentN, secondPaymentN] = notes.map(D => final.ledger.notes.find(note => note.commitment === D).refundPaymentNullifier);
+    assert.notEqual(firstPaymentN, secondPaymentN);
+    assert.ok(final.ledger.nullifiers.includes(firstPaymentN)); assert.ok(final.ledger.nullifiers.includes(secondPaymentN));
+    const status = await invoke("line.status"), noteStatus = await invoke("line.note.status", { noteCommitment: notes[1] });
+    for (const output of [first, second, status, noteStatus]) {
+      const serialized = JSON.stringify(output);
+      for (const privateValue of ["allocatedCredit", "refundAmount", "refundDue", "paymentReference", final.refunds[0].salt, final.refunds[1].salt, prefix]) assert.equal(serialized.includes(privateValue), false);
+    }
   });
 
   it("L2: line.disableMerchant blocks new quotes; pre-disable quotes stay drawable", async () => {

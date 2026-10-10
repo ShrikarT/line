@@ -13,7 +13,7 @@ import {
   CompactTypeBytes,
   CompactTypeUnsignedInteger,
   CompactTypeVector,
-  convertBigintToBytes,
+  convertFieldToBytes,
   persistentCommit,
   persistentHash,
   type CompactType,
@@ -24,9 +24,10 @@ export const UINT64 = new CompactTypeUnsignedInteger(18446744073709551615n, 8);
 const VEC2 = new CompactTypeVector(2, BYTES32);
 const VEC4 = new CompactTypeVector(4, BYTES32);
 const VEC7 = new CompactTypeVector(7, BYTES32);
-const VEC8 = new CompactTypeVector(8, BYTES32);
+const VEC10 = new CompactTypeVector(10, BYTES32);
 
 export type LinePreimage = {
+  domain: Uint8Array;
   identity: Uint8Array;
   limit: bigint;
   outstanding: bigint;
@@ -36,18 +37,23 @@ export type LinePreimage = {
 class LinePreimageType implements CompactType<LinePreimage> {
   alignment() {
     return BYTES32.alignment().concat(
-      UINT64.alignment().concat(UINT64.alignment().concat(UINT64.alignment())),
+      BYTES32.alignment().concat(
+        UINT64.alignment().concat(UINT64.alignment().concat(UINT64.alignment())),
+      ),
     );
   }
   toValue(value: LinePreimage) {
-    return BYTES32.toValue(value.identity).concat(
-      UINT64.toValue(value.limit).concat(
-        UINT64.toValue(value.outstanding).concat(UINT64.toValue(value.epoch)),
+    return BYTES32.toValue(value.domain).concat(
+      BYTES32.toValue(value.identity).concat(
+        UINT64.toValue(value.limit).concat(
+          UINT64.toValue(value.outstanding).concat(UINT64.toValue(value.epoch)),
+        ),
       ),
     );
   }
   fromValue(value: Parameters<CompactType<LinePreimage>["fromValue"]>[0]) {
     return {
+      domain: BYTES32.fromValue(value),
       identity: BYTES32.fromValue(value),
       limit: UINT64.fromValue(value),
       outstanding: UINT64.fromValue(value),
@@ -65,6 +71,8 @@ export type DrawNotePreimage = {
   quoteCommit: Uint8Array;
   merchantPk: Uint8Array;
   amount: bigint;
+  /** Zero defaults are only for low-level hash fixtures. Product records require fee. */
+  fee?: bigint;
   noteNonce: Uint8Array;
   expiry: bigint;
 };
@@ -77,7 +85,7 @@ class DrawNotePreimageType implements CompactType<DrawNotePreimage> {
           BYTES32.alignment().concat(
             BYTES32.alignment().concat(
               UINT64.alignment().concat(
-                BYTES32.alignment().concat(UINT64.alignment()),
+                UINT64.alignment().concat(BYTES32.alignment().concat(UINT64.alignment())),
               ),
             ),
           ),
@@ -92,8 +100,8 @@ class DrawNotePreimageType implements CompactType<DrawNotePreimage> {
           BYTES32.toValue(value.quoteCommit).concat(
             BYTES32.toValue(value.merchantPk).concat(
               UINT64.toValue(value.amount).concat(
-                BYTES32.toValue(value.noteNonce).concat(
-                  UINT64.toValue(value.expiry),
+                UINT64.toValue(value.fee ?? 0n).concat(
+                  BYTES32.toValue(value.noteNonce).concat(UINT64.toValue(value.expiry)),
                 ),
               ),
             ),
@@ -110,6 +118,7 @@ class DrawNotePreimageType implements CompactType<DrawNotePreimage> {
       quoteCommit: BYTES32.fromValue(value),
       merchantPk: BYTES32.fromValue(value),
       amount: UINT64.fromValue(value),
+      fee: UINT64.fromValue(value),
       noteNonce: BYTES32.fromValue(value),
       expiry: UINT64.fromValue(value),
     };
@@ -117,6 +126,32 @@ class DrawNotePreimageType implements CompactType<DrawNotePreimage> {
 }
 
 export const DRAW_NOTE_PREIMAGE_TYPE = new DrawNotePreimageType();
+
+export type RefundPreimage = {
+  domain: Uint8Array;
+  lineGeneration: bigint;
+  identity: Uint8Array;
+  noteCommit: Uint8Array;
+  amount: bigint;
+};
+
+class RefundPreimageType implements CompactType<RefundPreimage> {
+  alignment() {
+    return BYTES32.alignment().concat(UINT64.alignment(), BYTES32.alignment(), BYTES32.alignment(), UINT64.alignment());
+  }
+  toValue(value: RefundPreimage) {
+    return BYTES32.toValue(value.domain).concat(UINT64.toValue(value.lineGeneration), BYTES32.toValue(value.identity), BYTES32.toValue(value.noteCommit), UINT64.toValue(value.amount));
+  }
+  fromValue(value: Parameters<CompactType<RefundPreimage>["fromValue"]>[0]) {
+    return { domain: BYTES32.fromValue(value), lineGeneration: UINT64.fromValue(value), identity: BYTES32.fromValue(value), noteCommit: BYTES32.fromValue(value), amount: UINT64.fromValue(value) };
+  }
+}
+
+export const REFUND_PREIMAGE_TYPE = new RefundPreimageType();
+
+export function refundCommit(preimage: RefundPreimage, salt: Uint8Array): Uint8Array {
+  return persistentCommit(REFUND_PREIMAGE_TYPE, preimage, salt);
+}
 
 export function pad32(label: string): Uint8Array {
   const out = new Uint8Array(32);
@@ -165,7 +200,31 @@ export function encodeU64(n: bigint): Uint8Array {
   if (n < 0n || n > 18446744073709551615n) {
     throw new Error("Uint<64> out of range");
   }
-  return convertBigintToBytes(32, n, "line.encodeU64");
+  return convertFieldToBytes(32, n, "line.encodeU64");
+}
+
+/** Versioned off-chain normalization of an exact external payment/allocation ID.
+ * The entire UTF-8 reference is length-bound; no truncation, hex guessing or
+ * Unicode replacement is allowed. This produces the paymentRef witness bytes,
+ * not a replacement for the Compact paymentNullifier or receipt hash. */
+export function canonicalPaymentReferenceBytes(reference: string): Uint8Array {
+  if (typeof reference !== "string" || !reference.length || reference !== reference.trim())
+    throw new Error("Payment reference must be nonempty with no surrounding whitespace.");
+  for (let i = 0; i < reference.length; i++) {
+    const code = reference.charCodeAt(i);
+    if (code >= 0xd800 && code <= 0xdbff) {
+      const next = reference.charCodeAt(++i);
+      if (!(next >= 0xdc00 && next <= 0xdfff)) throw new Error("Malformed Unicode payment reference.");
+    } else if (code >= 0xdc00 && code <= 0xdfff) throw new Error("Malformed Unicode payment reference.");
+  }
+  const bytes = new TextEncoder().encode(reference);
+  if (bytes.length > 4096) throw new Error("Payment reference exceeds 4096 UTF-8 bytes.");
+  const parts = [pad32("line:payment-ref:v1"), encodeU64(BigInt(bytes.length))];
+  for (let offset = 0; offset < bytes.length; offset += 32) {
+    const part = new Uint8Array(32);
+    part.set(bytes.subarray(offset, offset + 32)); parts.push(part);
+  }
+  return persistentHash(new CompactTypeVector(parts.length, BYTES32), parts);
 }
 
 export function randomBytes32(): Uint8Array {
@@ -189,10 +248,11 @@ export const TAG = {
   merchantPk: pad32("line:merchant:pk"),
   id: pad32("line:id"),
   domain: pad32("line:v2:domain"),
-  quote: pad32("line:v2:quote"),
+  quote: pad32("line:v3:quote"),
   draw: pad32("line:v2:draw"),
   redeem: pad32("line:v2:redeem"),
   repay: pad32("line:v2:repay"),
+  payment: pad32("line:v3:payment"),
 } as const;
 
 export function issuerPublicKey(sk: Uint8Array): Uint8Array {
@@ -231,8 +291,10 @@ export function quoteCommit(parts: {
   nonce: Uint8Array;
   generation: bigint;
   domain: Uint8Array;
+  feeFlat?: bigint;
+  feeBps?: bigint;
 }): Uint8Array {
-  return persistentHash(VEC8, [
+  return persistentHash(VEC10, [
     TAG.quote,
     parts.merchantPk,
     parts.invoiceId,
@@ -241,7 +303,21 @@ export function quoteCommit(parts: {
     parts.nonce,
     encodeU64(parts.generation),
     parts.domain,
+    encodeU64(parts.feeFlat ?? 0n),
+    encodeU64(parts.feeBps ?? 0n),
   ]);
+}
+
+/** Exact issuer policy arithmetic, retaining full Uint64 precision. */
+export function requiredDrawFee(amount: bigint, flat: bigint, bps: bigint): bigint {
+  const max = (1n << 64n) - 1n;
+  for (const value of [amount, flat, bps]) {
+    if (typeof value !== "bigint" || value < 0n || value > max) throw new RangeError("Fee inputs must be Uint64 bigint values");
+  }
+  if (bps > 10_000n) throw new RangeError("Fee basis points exceed supported rate");
+  const fee = flat + (amount * bps + 9_999n) / 10_000n;
+  if (fee > max) throw new RangeError("Required fee exceeds Uint64");
+  return fee;
 }
 
 export function drawNullifier(sk: Uint8Array, Q: Uint8Array, domain: Uint8Array): Uint8Array {
@@ -269,6 +345,13 @@ export function repayNullifier(parts: {
     parts.paymentRef,
     parts.domain,
   ]);
+}
+
+/** One credit allocation per issuer-authenticated payment reference and instance.
+ * Mutable books, amount, identity and receipt nonce deliberately do not enter
+ * this hash. The issuer secret prevents public guessing of low-entropy IDs. */
+export function paymentNullifier(issuerSecret: Uint8Array, paymentRef: Uint8Array, domain: Uint8Array): Uint8Array {
+  return persistentHash(VEC4, [TAG.payment, issuerSecret, paymentRef, domain]);
 }
 
 export function shortHex(hex: string, n = 8): string {

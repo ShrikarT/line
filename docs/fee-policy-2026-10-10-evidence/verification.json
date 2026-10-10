@@ -1,0 +1,90 @@
+{
+  "date": "2026-10-10",
+  "scope": "current dirty worktree; issuer-approved immutable pricing, exact fee proof, quote/recovery authentication and price disclosure",
+  "compactSourceSha256": "45bd4ab03182531b899fd563627bfc6881f2bdd6e20e20efac88b9c48597a445",
+  "checks": {
+    "npm test": {
+      "exitCode": 0,
+      "tests": 404,
+      "suites": 58,
+      "failed": 0,
+      "skipped": 0,
+      "log": "npm-test.log"
+    },
+    "npm run test:e2e": {
+      "exitCode": 0,
+      "tests": 19,
+      "failed": 0,
+      "browser": "Chromium",
+      "server": "Vite development",
+      "log": "browser-tests.log"
+    },
+    "npm run typecheck": {
+      "exitCode": 0
+    },
+    "npm run build": {
+      "exitCode": 0,
+      "log": "build.log",
+      "warnings": [
+        "SDK browser externalization",
+        "isomorphic-ws named WebSocket import",
+        "large browser bundles"
+      ]
+    },
+    "npm run compact:compile": {
+      "exitCode": 0,
+      "compiler": "0.31.1",
+      "language": "0.23.0",
+      "runtime": "0.16.0",
+      "circuits": 12,
+      "witnesses": 20
+    },
+    "npm run compact:check": {
+      "exitCode": 0,
+      "matchedFiles": 16,
+      "normalization": "source-map output location only; generated changes intentionally unstaged"
+    },
+    "npm run compact:compile:release": {
+      "exitCode": 0,
+      "release": "0.31.1-45bd4ab03182-8d30902f-d8ce-415a-bd76-1b04d913106f",
+      "files": 52,
+      "bytes": 74810486
+    },
+    "npm run compact:release:validate": {
+      "exitCode": 0,
+      "releaseSha256": "4924f6b0c1b4bd867f5cbaabdf382319b1ebed398fdc180a3e98b7079918c094"
+    },
+    "npm run check:keys": {
+      "exitCode": 0,
+      "productionModules": 48
+    },
+    "npm run check:secrets": {
+      "exitCode": 0
+    },
+    "git diff --check": {
+      "exitCode": 0
+    }
+  },
+  "focusedEvidence": {
+    "generatedFeeTests": 11,
+    "exactFormula": "flat + ceil(principal * bps / 10000)",
+    "largeValues": "generated Uint64 values above JavaScript safe integer range",
+    "quoteFormat": "line:quote-package:v3",
+    "noteFormat": "line:note-package:v2",
+    "quoteTag": "line:v3:quote",
+    "quoteVectorLength": 10,
+    "invalidTerms": "underpayment, overcharge, invalid rate, active/defaulted policy mutation, missing terms, altered commitment or recovery policy reject",
+    "actualSdk": "real SDK/generated execution and unproven transaction construction, provider I/O simulated; proof sentinel only, no balancing/submission",
+    "browser": "issuer configures3/250; merchant quote40; both roles see4fee/44added debt; confirmed principal40/fee4/debt44"
+  },
+  "notEstablished": [
+    "pending versus earned fees, compensation, cash refunds or genuine collection",
+    "independent buyer consent and production role custody",
+    "live proofs, target-network finality or deployment",
+    "asset/currency denomination, reserves, payouts and genuine repayment receipts",
+    "full-history privacy, fleet operations or external customers",
+    "automatic migration of prior deployed contracts or source-bound records",
+    "checkout browser capability recovery after unmount/reload"
+  ],
+  "goalStatus": "active; all fifteen product requirements retained"
+}

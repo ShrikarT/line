@@ -1,0 +1,3 @@
+
+> line@0.3.0 compact:compile
+> node scripts/compile-compact.mjs --skip-zk contracts/line.compact contracts/managed/line

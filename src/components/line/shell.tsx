@@ -6,6 +6,7 @@ import { VaultBar } from "./vault-bar";
 
 const NAV = [
   { to: "/", label: "Overview" },
+  { to: "/checkout", label: "API checkout" },
   { to: "/issuer", label: "Issuer" },
   { to: "/merchant", label: "Merchant" },
   { to: "/agent", label: "Agent" },
@@ -15,7 +16,7 @@ const NAV = [
   { to: "/roadmap", label: "Roadmap" },
 ];
 
-export function Shell({ children }: { children: React.ReactNode }) {
+export function Shell({ children, evaluation = false }: { children: React.ReactNode; evaluation?: boolean }) {
   const pathname = typeof window !== "undefined" ? window.location.pathname : "/";
   const [showNetworkSetup, setShowNetworkSetup] = useState(false);
   const runtime = getRuntime();
@@ -41,11 +42,11 @@ export function Shell({ children }: { children: React.ReactNode }) {
             <a href="/" className="flex items-baseline gap-2">
               <span className="font-display text-lg tracking-tight">Line</span>
               <span className="hidden text-xs text-muted sm:inline">
-                Private credit authorization
+                Agent purchasing prototype
               </span>
             </a>
 
-            <button
+            {evaluation ? <span className="border border-border px-2.5 py-1 text-xs text-muted">Generated Compact · local evaluation</span> : <button
               onClick={() => (isNetwork ? setShowNetworkSetup(!showNetworkSetup) : handleToggleMode())}
               className={cn(
                 "inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-mono transition-colors border",
@@ -68,7 +69,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
                 )}
               />
               {isNetwork ? "Midnight Network" : "Local Simulator"}
-            </button>
+            </button>}
           </div>
 
           <nav className="flex flex-wrap gap-1">
@@ -88,10 +89,10 @@ export function Shell({ children }: { children: React.ReactNode }) {
         </div>
       </header>
 
-      <VaultBar />
+      {!evaluation && <VaultBar />}
 
       {/* Network Setup screen if toggled or if in unconfigured network mode */}
-      {showNetworkSetup && (
+      {!evaluation && showNetworkSetup && (
         <div className="border-b border-border bg-elevated/40 px-4 py-4">
           <div className="mx-auto max-w-6xl flex justify-end pb-2">
             <button
@@ -112,7 +113,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
       )}
 
       {/* Network warning banner when in network mode without active wallet connection */}
-      {isNetwork && (!isConnected || !contractAddr) && !showNetworkSetup && (
+      {!evaluation && isNetwork && (!isConnected || !contractAddr) && !showNetworkSetup && (
         <div className="border-b border-amber-500/30 bg-amber-500/10 px-4 py-2 text-xs text-amber-300">
           <div className="mx-auto flex max-w-6xl items-center justify-between gap-2">
             <span>
