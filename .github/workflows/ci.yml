@@ -50,6 +50,9 @@ jobs:
       - name: TypeScript reference + encoding + demo + MCP tests
         run: npm test
 
+      - name: Compiled independent-key opening experiment
+        run: npm run custody:spike
+
       - name: Typecheck
         run: npm run typecheck
 
