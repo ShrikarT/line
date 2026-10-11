@@ -24,6 +24,8 @@ Keep exactly the twelve circuit names, authenticated roles, domain separation, e
 
 The private reserve book creates a custody and availability question: which actor obtains its current opening to prove a draw or redemption? Giving every merchant/agent that opening reveals pool balances to those actors; placing all signing secrets in one reserve service breaks independent custody. Do not call either a solution. Compare an independently operated, explicitly trusted reserve co-prover/capability boundary with shielded asset-native accounting or a supported compositional proof construction. Confirm actual pinned Compact/SDK APIs before choosing. Shared host processes and differently addressed provers are feasibility tools, not independently operated institutions.
 
+Hiding an amount field also does not hide an amount implied by a public fixed-price service catalog, the selected merchant, or recognizable request timing. Include that inference in the redesign. A whole public history must satisfy the observer model; an absence-of-fields test is insufficient.
+
 ## Verification and migration gates
 
 1. Write the precise observer and authorized-information model: issuer, legal borrower, each merchant, public reader, fee payer/relayer, prover and settlement operator. A merchant necessarily knows its own purchase; it must not learn unrelated book facts through shared openings or metadata.

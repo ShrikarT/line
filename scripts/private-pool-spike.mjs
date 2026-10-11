@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 /** Full twelve-circuit experimental pool, not a canonical migration or privacy
  * certification. Keys are generated inside six actor processes. Only public
- * query transcripts are inspected; proof preimages/signing keys are never saved.
+ * query transcripts are inspected; emitted evidence excludes private preimages
+ * and signing keys. A configured proof service receives private witnesses.
  * The coordinator remains trusted and handles authorized private book openings.
  */
 import assert from 'node:assert/strict';
@@ -29,7 +30,7 @@ function stateBytes(data){const state=new RT.ContractState();state.data=data ins
 
 async function actorMain(role,dir,proofUri='http://127.0.0.1:6301'){
  const endpoint=new URL(proofUri);assert(endpoint.protocol==='http:'&&endpoint.hostname==='127.0.0.1'&&endpoint.pathname==='/'&&!endpoint.search,'Only a role-local loopback prover is accepted.');
- const key=bytes(); // No other process obtains this key.
+ const key=bytes(); // No coordinator/peer actor receives it; the role prover does.
  const publicKey=role==='issuer'?issuerPublicKey(key):role==='agent'?agentId(key):merchantPublicKey(key);
  const {Contract}=await import(pathToFileURL(join(dir,'contract/index.js')).href);
  const info=JSON.parse(readFileSync(join(dir,'compiler/contract-info.json'),'utf8'));

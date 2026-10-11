@@ -46,6 +46,7 @@ async function main(){
  assert.deepEqual(info.circuits.map(c=>c.name).sort(),original.circuits.map(c=>c.name).sort());
  const native=resolve('.compact-keys/native-proof-target/debug',process.platform==='win32'?'line-native-proof-verifier.exe':'line-native-proof-verifier');
  assert(existsSync(native),'Build the native verifier with npm run proof:native:build.');
+ const nativeVerifierSha256=digest(readFileSync(native));
  mkdirSync('.compact-keys',{recursive:true});const work=mkdtempSync(resolve('.compact-keys/pool-proof-'));
  // Default: freshly compile. A prior successful generated-execution snapshot
  // is also an explicit source-bound comparison, not a substitute/mock contract.
@@ -74,7 +75,7 @@ async function main(){
  const endpoint=role=>isolatedProvers?proverUrls[role]:'http://127.0.0.1:6301';
  const actors=[startActor('issuer',dir,'issuer',endpoint('issuer')),startActor('agent',dir,'agent-a',endpoint('agent-a')),startActor('agent',dir,'agent-b',endpoint('agent-b')),
   startActor('merchant',dir,'merchant-a',endpoint('merchant-a')),startActor('merchant',dir,'merchant-b',endpoint('merchant-b'))];
- const [issuer,a,b,ma,mb]=actors;
+ const [issuer,a,b,ma,mb]=actors;let runFailed=false;
  try{
   const [i,aa,bb,mA,mB]=await Promise.all(actors.map(actor=>actor.ready));
   assert.equal(new Set((await Promise.all(actors.map(actor=>actor.ready))).map(r=>r.pid)).size,5);
@@ -99,6 +100,8 @@ async function main(){
   const writeProgress=()=>writeFileSync(join(work,'progress.json'),JSON.stringify({schema:'line-private-pool-proof-progress/v1',
    complete:false,sourceSha256:feasibility.sourceSha256,proofServerVersion:version,commonProverUsed:!isolatedProvers,
    ephemeralRoleProvers:ephemeralProvers,
+   artifacts,nativeVerifierSha256,
+   compiledCheck:checkFlag>=0?'previously-source-bound-generated-execution':'fresh-pinned-compilation',
    feeBalancingEnabled:false,networkSubmitted:false,assetTransfers:false,fullHistoryPrivacyPassed:false,traces,negativeChecks},null,2)+'\n');
   const apply=(tx,name)=>{
    const verified=nativeVerify(tx,`${traces.length}-${name}`);assert.equal(verified.status,0,verified.output);
@@ -166,7 +169,7 @@ async function main(){
   assert.equal(view().totalReserve,100n);assert.equal(view().encumberedReserve,35n);assert.equal(view().pendingFeeReserve,2n);
   const proved=new Set(traces.map(t=>t.circuit));
   const report={schema:'line-private-pool-proof/v1',createdAt:new Date().toISOString(),sourceSha256:feasibility.sourceSha256,
-   artifacts,nativeVerifierSha256:digest(readFileSync(native)),proofServerVersion:version,
+   artifacts,nativeVerifierSha256,proofServerVersion:version,
    compiledCheck:checkFlag>=0?'previously-source-bound-generated-execution':'fresh-pinned-compilation',
    privateBookProofsVerified:true,independentKeyProcesses:5,coordinatorHasSigningSecrets:false,coordinatorHasPrivateBooks:true,
    proverReceivesPrivatePreimages:true,commonProverUsed:!isolatedProvers,proverEndpoints:isolatedProvers?proverUrls:undefined,
@@ -174,7 +177,23 @@ async function main(){
    canonicalIntegrated:false,productionCustodyEstablished:false,fullHistoryPrivacyPassed:false,customerDemandValidated:false,
    circuitsNotProved:info.circuits.map(c=>c.name).filter(name=>!proved.has(name)),traces,negativeChecks};
   writeFileSync(join(work,'evidence.json'),JSON.stringify(report,null,2)+'\n');
-  console.log(JSON.stringify({result:'EXPERIMENTAL PRIVATE-BOOK REAL PROOFS VERIFIED; FULL PRODUCT GATES OPEN',evidence:join(work,'evidence.json')}));
- }finally{for(const actor of actors)actor.child.kill();if(ephemeralProvers&&runningRole)await manage('stop',runningRole);}
+ }catch(error){
+  runFailed=true;
+  // Record only classification, never exception payloads or private witnesses.
+  try{const path=join(work,'progress.json');if(existsSync(path)){
+   const progress=JSON.parse(readFileSync(path,'utf8'));progress.executionFailed=true;
+   progress.failureClass=error.name;writeFileSync(path,JSON.stringify(progress,null,2)+'\n');
+  }}catch{console.error('Public failure checkpoint could not be saved; original execution error preserved.');}
+  throw error;
+ }finally{
+  for(const actor of actors)actor.child.kill();
+  if(ephemeralProvers&&runningRole){
+   try{await manage('stop',runningRole);}catch(cleanupError){
+    if(!runFailed)throw cleanupError;
+    console.error('Owned role-prover cleanup also failed; original execution error preserved.');
+   }
+  }
+ }
+ console.log(JSON.stringify({result:'EXPERIMENTAL PRIVATE-BOOK CORE REAL PROOFS VERIFIED; FULL PRODUCT GATES OPEN',evidence:join(work,'evidence.json')}));
 }
 main().catch(error=>{console.error(error.message);process.exitCode=1;});
