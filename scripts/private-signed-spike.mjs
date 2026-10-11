@@ -199,6 +199,8 @@ export async function runPrivateSignedFixture({compiledDir,onInitialize,onAccept
   const newQA=await quote('merchant-a',bookA,89n,BigInt(NOW+86400)),newA=await draw('agent-a',mA,bookA,saltA,newQA);bookA=newA.book;saltA=newA.salt;
   const qc=await quote('merchant-b',bookB,71n,BigInt(NOW+100)),cancelB=await draw('agent-b',mB,bookB,saltB,qc);bookB=cancelB.book;saltB=cancelB.salt;
   await reject('premature-expiry','attacker','cancelOrExpireNote',[cancelB.D,0n,0n]);
+  await reject('allocation-owner-or-issuer-only','attacker','cancelOrExpireNote',[cancelB.D,1n,0n],
+   {...bookValues(bookB,saltB),...noteValues(cancelB)},{time:Number(qc.expiry)});
   const beforeRepayment=state,zeroCashSalt=bytes();
   const noCash=await execute('agent-b','cancelOrExpireNote',[cancelB.D,1n,0n],{...bookValues(bookB,saltB,zeroCashSalt),...noteValues(cancelB)},{branch:true,time:Number(qc.expiry)});
   assert.equal(noCash.privateState.notes[hex(cancelB.D)].meta.cashRefundOwed,false);
@@ -207,6 +209,8 @@ export async function runPrivateSignedFixture({compiledDir,onInitialize,onAccept
   time=Number(qc.expiry);await invoke('attacker','cancelOrExpireNote',[cancelB.D,0n,0n]);
   let refundSalt=bytes();await invoke('issuer','cancelOrExpireNote',[cancelB.D,1n,0n],{...bookValues(bookB,saltB,refundSalt),...noteValues(cancelB)});
   bookB=advance(bookB,0n);saltB=refundSalt;assert(view().books.findPathForLeaf(commit(bookB,saltB)));
+  await reject('refund-issuer-only','agent-b','cancelOrExpireNote',[cancelB.D,2n,BigInt(time+1000)],
+   {...noteValues(cancelB),salt:refundSalt,repayAmount:52n,paymentRef:bytes()});
   await invoke('issuer','cancelOrExpireNote',[cancelB.D,2n,BigInt(time+1000)],{...noteValues(cancelB),salt:refundSalt,repayAmount:52n,paymentRef:bytes()});
   await reject('compensation-replay','issuer','cancelOrExpireNote',[cancelB.D,1n,0n],{...bookValues(bookB,saltB),...noteValues(cancelB)});
   refundSalt=bytes();await invoke('agent-a','cancelOrExpireNote',[oldA.D,1n,0n],{...bookValues(bookA,saltA,refundSalt),...noteValues(oldA)});

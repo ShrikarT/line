@@ -62,6 +62,9 @@ jobs:
       - name: Compiled private-finance signed-role experiment
         run: npm run privacy:spike
 
+      - name: Compiled private merchant-membership experiment
+        run: npm run merchant:spike
+
       - name: Fail-closed network receipt metadata checks
         run: npm run network:receipts:test
 

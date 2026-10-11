@@ -418,6 +418,15 @@ export circuit cancelOrExpireNote(noteCommitPublic: Bytes<32>, action: Uint<8>, 
   const D = disclose(noteCommitPublic); const mode = disclose(action); assert(mode <= 2, "compensation action");
   const meta = readNote(D); const r = readReserve(); assert(!meta.redeemed, "note redeemed");
   const cost = ((meta.amount + meta.fee) as Uint<64>);
+  const caller = rolePublicKey(); const callerIdentity = agentId(caller); const callerIssuer = issuerPublicKey(caller);
+  const b = mode == 1 ? readBook() : default<Book>;
+  const amount = mode == 2 ? repayAmount() : 0;
+  const ref = mode == 2 ? paymentRef() : default<Bytes<32>>;
+  const body = mode == 1 ? persistentHash<Vector<5, Bytes<32>>>([D, encodeU64(mode as Uint<64>), bookCommit(b, salt()), newSalt(), encodeU64(receiptExpiry)])
+    : mode == 2 ? persistentHash<Vector<5, Bytes<32>>>([D, encodeU64(mode as Uint<64>), encodeU64(receiptExpiry), encodeU64(amount), ref]) : D;
+  // One unconditional curve verification avoids invalid inactive point inputs.
+  // Expiry accepts any signing key; allocation/refund keep their role checks.
+  requireApproval(approvalMessage(10, body));
   if (mode == 0) {
     const expired = !kernel.blockTimeLessThan(disclose(meta.expiry));
     assert(!meta.cancelled && expired, "note not expired or already cancelled");
@@ -434,10 +443,8 @@ export circuit cancelOrExpireNote(noteCommitPublic: Bytes<32>, action: Uint<8>, 
       quoteCommit: noteQuoteCommit(), merchantPk: quoteMerchantPk(), amount: meta.amount, fee: meta.fee,
       noteNonce: noteNonce(), expiry: meta.expiry };
     assert(disclose(noteCommit(p, noteSalt())) == D, "compensation note opening");
-    const caller = rolePublicKey(); const callerIdentity = agentId(caller); const callerIssuer = issuerPublicKey(caller);
     assert(callerIssuer == issuer || callerIdentity == owner, "compensation authority");
-    const b = readBook(); assert(b.identity == owner && generation <= b.generation, "compensation book owner/generation");
-    requireApproval(approvalMessage(10, persistentHash<Vector<5, Bytes<32>>>([D, encodeU64(mode as Uint<64>), bookCommit(b, salt()), newSalt(), encodeU64(receiptExpiry)])));
+    assert(b.identity == owner && generation <= b.generation, "compensation book owner/generation");
     const same = generation == b.generation; const refundAmount = same ? cashRefundAmount(b.outstanding, cost) : cost;
     const cashOwed = refundAmount > 0;
     const newE = meta.cancelled ? r.encumberedReserve : ((r.encumberedReserve - meta.amount) as Uint<64>);
@@ -453,11 +460,11 @@ export circuit cancelOrExpireNote(noteCommitPublic: Bytes<32>, action: Uint<8>, 
   } else {
     assert(meta.cancelled && meta.compensationAllocated && meta.cashRefundOwed && !meta.refundAcknowledged, "refund obligation");
     assert(kernel.blockTimeLessThan(disclose(receiptExpiry)), "refund receipt expiry");
-    const amount = repayAmount(); assert(amount > 0 && amount <= cost, "refund amount");
+    assert(amount > 0 && amount <= cost, "refund amount");
     const rp = RefundPreimage { domain: contractDomain, lineGeneration: noteGeneration(), identity: noteIdentity(), noteCommit: D, amount: amount };
     assert(refundCommit(rp, salt()) == meta.refundCommitment, "refund opening");
-    const ref = paymentRef(); assert(ref != default<Bytes<32>>, "empty payment reference");
-    requireIssuer(approvalMessage(10, persistentHash<Vector<5, Bytes<32>>>([D, encodeU64(mode as Uint<64>), encodeU64(receiptExpiry), encodeU64(amount), ref])));
+    assert(ref != default<Bytes<32>>, "empty payment reference");
+    assert(callerIssuer == issuer, "not issuer");
     const P = disclose(paymentNullifier(stableNullifierKey(), ref)); assert(!nullifiers.member(P), "payment used"); nullifiers.insert(P);
     writeNote(D, NoteMeta { amount: meta.amount, fee: meta.fee, redeemed: false, cancelled: true, expiry: meta.expiry,
       compensationAllocated: true, refundCommitment: meta.refundCommitment, cashRefundOwed: true,

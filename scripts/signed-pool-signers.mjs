@@ -53,7 +53,7 @@ export function actionBody(pk,{name,args,values:v,domain,feeReserve,privateFinan
   case 'redeemDraw': return [9,hash([args[0],u64(args[1]),u64(v.redeemAmount)])];
   case 'cancelOrExpireNote': {
    const [D,mode,expiry]=args;
-   if(mode===0n)return null;
+   if(mode===0n)return privateFinance?[10,D]:null;
    return [10,mode===1n?hash([D,u64(mode),old(),v.newSalt,u64(expiry)]):hash([D,u64(mode),u64(expiry),u64(v.repayAmount),v.paymentRef])];
   }
   case 'acknowledgeRepayment': return [11,hash([old(),u64(v.repayAmount),u64(args[0]),v.paymentRef,v.receiptNonce,v.newSalt])];
