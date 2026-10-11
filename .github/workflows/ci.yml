@@ -53,6 +53,9 @@ jobs:
       - name: Compiled independent-key opening experiment
         run: npm run custody:spike
 
+      - name: Compiled private-book population experiment
+        run: npm run pool:spike
+
       - name: Typecheck
         run: npm run typecheck
 

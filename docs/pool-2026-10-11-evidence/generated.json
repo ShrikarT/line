@@ -1,0 +1,923 @@
+{
+  "schema": "line-private-pool-feasibility/v1",
+  "createdAt": "2026-10-11T03:31:56.978Z",
+  "artifactFingerprints": {
+    "contract/index.js": "f49ccdd905f3f6e3a79b73e31b49a29819a25b3356575e59b84d8cbb5a2e5817",
+    "compiler/contract-info.json": "975d1543375339712d1a9fff8108f8f453b4771d08037494d9c7103c643d1363"
+  },
+  "sourceSha256": "cea2dcddbc49ea0c09301020891d298179517ba99ad8b516fa441a5d423f99b8",
+  "compiler": "0.31.1",
+  "language": "0.23.0",
+  "runtime": "0.16.0",
+  "canonicalModified": false,
+  "exportedCircuits": [
+    "registerMerchant",
+    "disableMerchant",
+    "fundReserve",
+    "withdrawUnencumberedReserve",
+    "withdrawFees",
+    "openLine",
+    "postQuote",
+    "draw",
+    "redeemDraw",
+    "cancelOrExpireNote",
+    "acknowledgeRepayment",
+    "setStatus"
+  ],
+  "independentKeyProcesses": 6,
+  "coordinatorTrusted": true,
+  "privateBooksSharedWithTrustedCoordinator": true,
+  "canonicalCustodyIntegrated": false,
+  "legalBorrowerAuthorityEstablished": false,
+  "selectedInputLeafNotRedisclosed": true,
+  "singletonPublicBookFieldsAbsent": true,
+  "historicRootsAndBookNullifiersExercised": true,
+  "fullHistoryPrivacyPassed": false,
+  "syntheticLedgerTime": true,
+  "fullProvingArtifactsGenerated": false,
+  "cryptographicProofsGenerated": false,
+  "networkSubmitted": false,
+  "assetTransfers": false,
+  "authenticatedCashSettlement": false,
+  "lowPopulationCounterexample": {
+    "separateGeneratedExecution": true,
+    "knownZeroSingleBorrower": true,
+    "publicPrincipal": "15",
+    "publicFee": "1",
+    "reconstructedDebt": "16"
+  },
+  "rootAgeCounterexample": {
+    "separateGeneratedExecution": true,
+    "currentBorrowers": "2",
+    "chosenRootBorrowers": "1",
+    "singletonHistoricRootAccepted": true,
+    "oldMembershipRootPubliclyRecognizable": true
+  },
+  "residualDisclosureRisks": [
+    "historic root choice narrows the borrower population",
+    "public line expiry narrows candidate books",
+    "known-zero low population or all-other-borrower knowledge",
+    "unique fees/amounts/merchant/timing and sender/prover metadata",
+    "public close/compensation bounds"
+  ],
+  "traces": [
+    {
+      "actor": "issuer",
+      "circuit": "registerMerchant",
+      "signingWitnesses": [
+        "callerSecret"
+      ],
+      "bookLeaves": "0",
+      "spentBooks": "0",
+      "T": "0",
+      "E": "0",
+      "R": "0",
+      "F": "0",
+      "P": "0",
+      "U": "0",
+      "X": "0"
+    },
+    {
+      "actor": "issuer",
+      "circuit": "fundReserve",
+      "signingWitnesses": [
+        "callerSecret"
+      ],
+      "bookLeaves": "0",
+      "spentBooks": "0",
+      "T": "200",
+      "E": "0",
+      "R": "0",
+      "F": "0",
+      "P": "0",
+      "U": "0",
+      "X": "0"
+    },
+    {
+      "actor": "agent-a",
+      "circuit": "openLine",
+      "signingWitnesses": [
+        "agentSecret"
+      ],
+      "bookLeaves": "0",
+      "spentBooks": "0",
+      "T": "200",
+      "E": "0",
+      "R": "0",
+      "F": "0",
+      "P": "0",
+      "U": "0",
+      "X": "0"
+    },
+    {
+      "actor": "issuer",
+      "circuit": "openLine",
+      "signingWitnesses": [
+        "callerSecret",
+        "callerSecret"
+      ],
+      "bookLeaves": "1",
+      "spentBooks": "0",
+      "T": "200",
+      "E": "0",
+      "R": "0",
+      "F": "0",
+      "P": "0",
+      "U": "0",
+      "X": "0"
+    },
+    {
+      "actor": "agent-b",
+      "circuit": "openLine",
+      "signingWitnesses": [
+        "agentSecret"
+      ],
+      "bookLeaves": "1",
+      "spentBooks": "0",
+      "T": "200",
+      "E": "0",
+      "R": "0",
+      "F": "0",
+      "P": "0",
+      "U": "0",
+      "X": "0"
+    },
+    {
+      "actor": "issuer",
+      "circuit": "openLine",
+      "signingWitnesses": [
+        "callerSecret",
+        "callerSecret"
+      ],
+      "bookLeaves": "2",
+      "spentBooks": "0",
+      "T": "200",
+      "E": "0",
+      "R": "0",
+      "F": "0",
+      "P": "0",
+      "U": "0",
+      "X": "0"
+    },
+    {
+      "actor": "merchant-a",
+      "circuit": "postQuote",
+      "signingWitnesses": [
+        "callerSecret"
+      ],
+      "bookLeaves": "2",
+      "spentBooks": "0",
+      "T": "200",
+      "E": "0",
+      "R": "0",
+      "F": "0",
+      "P": "0",
+      "U": "0",
+      "X": "0"
+    },
+    {
+      "actor": "merchant-b",
+      "circuit": "postQuote",
+      "signingWitnesses": [
+        "callerSecret"
+      ],
+      "bookLeaves": "2",
+      "spentBooks": "0",
+      "T": "200",
+      "E": "0",
+      "R": "0",
+      "F": "0",
+      "P": "0",
+      "U": "0",
+      "X": "0"
+    },
+    {
+      "actor": "merchant-a",
+      "circuit": "postQuote",
+      "signingWitnesses": [
+        "callerSecret"
+      ],
+      "bookLeaves": "2",
+      "spentBooks": "0",
+      "T": "200",
+      "E": "0",
+      "R": "0",
+      "F": "0",
+      "P": "0",
+      "U": "0",
+      "X": "0"
+    },
+    {
+      "actor": "agent-a",
+      "circuit": "draw",
+      "signingWitnesses": [
+        "agentSecret"
+      ],
+      "bookLeaves": "3",
+      "spentBooks": "1",
+      "T": "200",
+      "E": "15",
+      "R": "0",
+      "F": "0",
+      "P": "1",
+      "U": "0",
+      "X": "0"
+    },
+    {
+      "actor": "agent-b",
+      "circuit": "draw",
+      "signingWitnesses": [
+        "agentSecret"
+      ],
+      "bookLeaves": "4",
+      "spentBooks": "2",
+      "T": "200",
+      "E": "35",
+      "R": "0",
+      "F": "0",
+      "P": "2",
+      "U": "0",
+      "X": "0"
+    },
+    {
+      "actor": "merchant-a",
+      "circuit": "postQuote",
+      "signingWitnesses": [
+        "callerSecret"
+      ],
+      "bookLeaves": "4",
+      "spentBooks": "2",
+      "T": "200",
+      "E": "35",
+      "R": "0",
+      "F": "0",
+      "P": "2",
+      "U": "0",
+      "X": "0"
+    },
+    {
+      "actor": "merchant-a",
+      "circuit": "redeemDraw",
+      "signingWitnesses": [
+        "callerSecret",
+        "callerSecret"
+      ],
+      "bookLeaves": "4",
+      "spentBooks": "2",
+      "T": "200",
+      "E": "20",
+      "R": "15",
+      "F": "1",
+      "P": "1",
+      "U": "0",
+      "X": "0"
+    },
+    {
+      "actor": "issuer",
+      "circuit": "acknowledgeRepayment",
+      "signingWitnesses": [
+        "callerSecret",
+        "callerSecret"
+      ],
+      "bookLeaves": "5",
+      "spentBooks": "3",
+      "T": "200",
+      "E": "20",
+      "R": "15",
+      "F": "1",
+      "P": "1",
+      "U": "0",
+      "X": "0"
+    },
+    {
+      "actor": "issuer",
+      "circuit": "setStatus",
+      "signingWitnesses": [
+        "callerSecret"
+      ],
+      "bookLeaves": "6",
+      "spentBooks": "4",
+      "T": "200",
+      "E": "20",
+      "R": "15",
+      "F": "1",
+      "P": "1",
+      "U": "0",
+      "X": "0"
+    },
+    {
+      "actor": "issuer",
+      "circuit": "setStatus",
+      "signingWitnesses": [
+        "callerSecret"
+      ],
+      "bookLeaves": "7",
+      "spentBooks": "5",
+      "T": "200",
+      "E": "20",
+      "R": "15",
+      "F": "1",
+      "P": "1",
+      "U": "0",
+      "X": "0"
+    },
+    {
+      "actor": "agent-a",
+      "circuit": "draw",
+      "signingWitnesses": [
+        "agentSecret"
+      ],
+      "bookLeaves": "8",
+      "spentBooks": "6",
+      "T": "200",
+      "E": "25",
+      "R": "15",
+      "F": "1",
+      "P": "2",
+      "U": "0",
+      "X": "0"
+    },
+    {
+      "actor": "issuer",
+      "circuit": "acknowledgeRepayment",
+      "signingWitnesses": [
+        "callerSecret",
+        "callerSecret"
+      ],
+      "bookLeaves": "9",
+      "spentBooks": "7",
+      "T": "200",
+      "E": "25",
+      "R": "15",
+      "F": "1",
+      "P": "2",
+      "U": "0",
+      "X": "0"
+    },
+    {
+      "actor": "issuer",
+      "circuit": "setStatus",
+      "signingWitnesses": [
+        "callerSecret"
+      ],
+      "bookLeaves": "10",
+      "spentBooks": "8",
+      "T": "200",
+      "E": "25",
+      "R": "15",
+      "F": "1",
+      "P": "2",
+      "U": "0",
+      "X": "0"
+    },
+    {
+      "actor": "agent-a",
+      "circuit": "openLine",
+      "signingWitnesses": [
+        "agentSecret"
+      ],
+      "bookLeaves": "10",
+      "spentBooks": "8",
+      "T": "200",
+      "E": "25",
+      "R": "15",
+      "F": "1",
+      "P": "2",
+      "U": "0",
+      "X": "0"
+    },
+    {
+      "actor": "issuer",
+      "circuit": "openLine",
+      "signingWitnesses": [
+        "callerSecret"
+      ],
+      "bookLeaves": "11",
+      "spentBooks": "9",
+      "T": "200",
+      "E": "25",
+      "R": "15",
+      "F": "1",
+      "P": "2",
+      "U": "0",
+      "X": "0"
+    },
+    {
+      "actor": "merchant-a",
+      "circuit": "postQuote",
+      "signingWitnesses": [
+        "callerSecret"
+      ],
+      "bookLeaves": "11",
+      "spentBooks": "9",
+      "T": "200",
+      "E": "25",
+      "R": "15",
+      "F": "1",
+      "P": "2",
+      "U": "0",
+      "X": "0"
+    },
+    {
+      "actor": "agent-a",
+      "circuit": "draw",
+      "signingWitnesses": [
+        "agentSecret"
+      ],
+      "bookLeaves": "12",
+      "spentBooks": "10",
+      "T": "200",
+      "E": "35",
+      "R": "15",
+      "F": "1",
+      "P": "3",
+      "U": "0",
+      "X": "0"
+    },
+    {
+      "actor": "merchant-b",
+      "circuit": "postQuote",
+      "signingWitnesses": [
+        "callerSecret"
+      ],
+      "bookLeaves": "12",
+      "spentBooks": "10",
+      "T": "200",
+      "E": "35",
+      "R": "15",
+      "F": "1",
+      "P": "3",
+      "U": "0",
+      "X": "0"
+    },
+    {
+      "actor": "agent-b",
+      "circuit": "draw",
+      "signingWitnesses": [
+        "agentSecret"
+      ],
+      "bookLeaves": "13",
+      "spentBooks": "11",
+      "T": "200",
+      "E": "43",
+      "R": "15",
+      "F": "1",
+      "P": "4",
+      "U": "0",
+      "X": "0"
+    },
+    {
+      "actor": "issuer",
+      "circuit": "acknowledgeRepayment",
+      "signingWitnesses": [
+        "callerSecret",
+        "callerSecret"
+      ],
+      "bookLeaves": "14",
+      "spentBooks": "12",
+      "T": "200",
+      "E": "43",
+      "R": "15",
+      "F": "1",
+      "P": "4",
+      "U": "0",
+      "X": "0"
+    },
+    {
+      "actor": "unauthorized-agent",
+      "circuit": "cancelOrExpireNote",
+      "signingWitnesses": [],
+      "bookLeaves": "14",
+      "spentBooks": "12",
+      "T": "200",
+      "E": "35",
+      "R": "15",
+      "F": "1",
+      "P": "3",
+      "U": "9",
+      "X": "0"
+    },
+    {
+      "actor": "issuer",
+      "circuit": "cancelOrExpireNote",
+      "signingWitnesses": [
+        "callerSecret"
+      ],
+      "bookLeaves": "15",
+      "spentBooks": "13",
+      "T": "200",
+      "E": "35",
+      "R": "15",
+      "F": "1",
+      "P": "3",
+      "U": "9",
+      "X": "0"
+    },
+    {
+      "actor": "issuer",
+      "circuit": "cancelOrExpireNote",
+      "signingWitnesses": [
+        "callerSecret",
+        "callerSecret"
+      ],
+      "bookLeaves": "15",
+      "spentBooks": "13",
+      "T": "200",
+      "E": "35",
+      "R": "15",
+      "F": "1",
+      "P": "3",
+      "U": "0",
+      "X": "9"
+    },
+    {
+      "actor": "agent-a",
+      "circuit": "cancelOrExpireNote",
+      "signingWitnesses": [
+        "callerSecret"
+      ],
+      "bookLeaves": "16",
+      "spentBooks": "14",
+      "T": "200",
+      "E": "30",
+      "R": "15",
+      "F": "1",
+      "P": "2",
+      "U": "6",
+      "X": "9"
+    },
+    {
+      "actor": "issuer",
+      "circuit": "cancelOrExpireNote",
+      "signingWitnesses": [
+        "callerSecret",
+        "callerSecret"
+      ],
+      "bookLeaves": "16",
+      "spentBooks": "14",
+      "T": "200",
+      "E": "30",
+      "R": "15",
+      "F": "1",
+      "P": "2",
+      "U": "0",
+      "X": "15"
+    },
+    {
+      "actor": "issuer",
+      "circuit": "disableMerchant",
+      "signingWitnesses": [
+        "callerSecret"
+      ],
+      "bookLeaves": "16",
+      "spentBooks": "14",
+      "T": "200",
+      "E": "30",
+      "R": "15",
+      "F": "1",
+      "P": "2",
+      "U": "0",
+      "X": "15"
+    },
+    {
+      "actor": "merchant-b",
+      "circuit": "redeemDraw",
+      "signingWitnesses": [
+        "callerSecret",
+        "callerSecret"
+      ],
+      "bookLeaves": "16",
+      "spentBooks": "14",
+      "T": "200",
+      "E": "10",
+      "R": "35",
+      "F": "2",
+      "P": "1",
+      "U": "0",
+      "X": "15"
+    },
+    {
+      "actor": "merchant-a",
+      "circuit": "redeemDraw",
+      "signingWitnesses": [
+        "callerSecret",
+        "callerSecret"
+      ],
+      "bookLeaves": "16",
+      "spentBooks": "14",
+      "T": "200",
+      "E": "0",
+      "R": "45",
+      "F": "3",
+      "P": "0",
+      "U": "0",
+      "X": "15"
+    },
+    {
+      "actor": "issuer",
+      "circuit": "withdrawFees",
+      "signingWitnesses": [
+        "callerSecret"
+      ],
+      "bookLeaves": "16",
+      "spentBooks": "14",
+      "T": "197",
+      "E": "0",
+      "R": "45",
+      "F": "0",
+      "P": "0",
+      "U": "0",
+      "X": "15"
+    },
+    {
+      "actor": "issuer",
+      "circuit": "withdrawUnencumberedReserve",
+      "signingWitnesses": [
+        "callerSecret"
+      ],
+      "bookLeaves": "16",
+      "spentBooks": "14",
+      "T": "187",
+      "E": "0",
+      "R": "45",
+      "F": "0",
+      "P": "0",
+      "U": "0",
+      "X": "15"
+    },
+    {
+      "actor": "issuer",
+      "circuit": "acknowledgeRepayment",
+      "signingWitnesses": [
+        "callerSecret",
+        "callerSecret"
+      ],
+      "bookLeaves": "17",
+      "spentBooks": "15",
+      "T": "187",
+      "E": "0",
+      "R": "45",
+      "F": "0",
+      "P": "0",
+      "U": "0",
+      "X": "15"
+    },
+    {
+      "actor": "issuer",
+      "circuit": "setStatus",
+      "signingWitnesses": [
+        "callerSecret"
+      ],
+      "bookLeaves": "18",
+      "spentBooks": "16",
+      "T": "187",
+      "E": "0",
+      "R": "45",
+      "F": "0",
+      "P": "0",
+      "U": "0",
+      "X": "15"
+    },
+    {
+      "actor": "issuer",
+      "circuit": "setStatus",
+      "signingWitnesses": [
+        "callerSecret"
+      ],
+      "bookLeaves": "19",
+      "spentBooks": "17",
+      "T": "187",
+      "E": "0",
+      "R": "45",
+      "F": "0",
+      "P": "0",
+      "U": "0",
+      "X": "15"
+    }
+  ],
+  "negativeChecks": [
+    {
+      "check": "agent-cannot-fund",
+      "rejected": true
+    },
+    {
+      "check": "reserve-overflow",
+      "rejected": true
+    },
+    {
+      "check": "accept-without-agent-consent",
+      "rejected": true
+    },
+    {
+      "check": "agent-cannot-accept-as-issuer",
+      "rejected": true
+    },
+    {
+      "check": "changed-limit-consent",
+      "rejected": true
+    },
+    {
+      "check": "changed-agent-identity-consent",
+      "rejected": true
+    },
+    {
+      "check": "changed-fee-consent",
+      "rejected": true
+    },
+    {
+      "check": "changed-terms-consent",
+      "rejected": true
+    },
+    {
+      "check": "enrollment-replay",
+      "rejected": true
+    },
+    {
+      "check": "accept-without-agent-consent",
+      "rejected": true
+    },
+    {
+      "check": "agent-cannot-accept-as-issuer",
+      "rejected": true
+    },
+    {
+      "check": "changed-limit-consent",
+      "rejected": true
+    },
+    {
+      "check": "changed-agent-identity-consent",
+      "rejected": true
+    },
+    {
+      "check": "changed-fee-consent",
+      "rejected": true
+    },
+    {
+      "check": "changed-terms-consent",
+      "rejected": true
+    },
+    {
+      "check": "enrollment-replay",
+      "rejected": true
+    },
+    {
+      "check": "issuer-cannot-draw-agent-a-book",
+      "rejected": true
+    },
+    {
+      "check": "merchant-a-cannot-draw-agent-a-book",
+      "rejected": true
+    },
+    {
+      "check": "unauthorized-agent-cannot-draw-agent-a-book",
+      "rejected": true
+    },
+    {
+      "check": "agent-b-cannot-draw-agent-a-book",
+      "rejected": true
+    },
+    {
+      "check": "different-borrower-cannot-steal-quote-into-own-book",
+      "rejected": true
+    },
+    {
+      "check": "forged-private-limit",
+      "rejected": true
+    },
+    {
+      "check": "other-book-path",
+      "rejected": true
+    },
+    {
+      "check": "forged-membership-path",
+      "rejected": true
+    },
+    {
+      "check": "same-book-competing-quote-double-spend",
+      "rejected": true
+    },
+    {
+      "check": "draw-replay",
+      "rejected": true
+    },
+    {
+      "check": "over-limit-draw",
+      "rejected": true
+    },
+    {
+      "check": "wrong-merchant-redemption",
+      "rejected": true
+    },
+    {
+      "check": "redemption-replay",
+      "rejected": true
+    },
+    {
+      "check": "agent-cannot-acknowledge-repayment",
+      "rejected": true
+    },
+    {
+      "check": "stable-payment-reference-replay",
+      "rejected": true
+    },
+    {
+      "check": "default-blocks-draw",
+      "rejected": true
+    },
+    {
+      "check": "debt-cannot-be-closed-away",
+      "rejected": true
+    },
+    {
+      "check": "accept-without-agent-consent",
+      "rejected": true
+    },
+    {
+      "check": "agent-cannot-accept-as-issuer",
+      "rejected": true
+    },
+    {
+      "check": "changed-limit-consent",
+      "rejected": true
+    },
+    {
+      "check": "changed-agent-identity-consent",
+      "rejected": true
+    },
+    {
+      "check": "changed-fee-consent",
+      "rejected": true
+    },
+    {
+      "check": "changed-terms-consent",
+      "rejected": true
+    },
+    {
+      "check": "enrollment-replay",
+      "rejected": true
+    },
+    {
+      "check": "premature-expiry",
+      "rejected": true
+    },
+    {
+      "check": "compensation-replay",
+      "rejected": true
+    },
+    {
+      "check": "disabled-merchant-new-quote",
+      "rejected": true
+    },
+    {
+      "check": "cannot-withdraw-claim-or-refund-backing",
+      "rejected": true
+    }
+  ],
+  "drawDisclosureChecks": [
+    {
+      "circuit": "draw",
+      "borrowerIdentityRedisclosed": false,
+      "selectedInputLeafRedisclosed": false,
+      "inputSaltDisclosed": false,
+      "publicPrincipal": "15",
+      "publicFee": "1",
+      "privacyCertified": false
+    },
+    {
+      "circuit": "draw",
+      "borrowerIdentityRedisclosed": false,
+      "selectedInputLeafRedisclosed": false,
+      "inputSaltDisclosed": false,
+      "publicPrincipal": "20",
+      "publicFee": "1",
+      "privacyCertified": false
+    },
+    {
+      "circuit": "draw",
+      "borrowerIdentityRedisclosed": false,
+      "selectedInputLeafRedisclosed": false,
+      "inputSaltDisclosed": false,
+      "publicPrincipal": "5",
+      "publicFee": "1",
+      "privacyCertified": false
+    },
+    {
+      "circuit": "draw",
+      "borrowerIdentityRedisclosed": false,
+      "selectedInputLeafRedisclosed": false,
+      "inputSaltDisclosed": false,
+      "publicPrincipal": "10",
+      "publicFee": "1",
+      "privacyCertified": false
+    },
+    {
+      "circuit": "draw",
+      "borrowerIdentityRedisclosed": false,
+      "selectedInputLeafRedisclosed": false,
+      "inputSaltDisclosed": false,
+      "publicPrincipal": "8",
+      "publicFee": "1",
+      "privacyCertified": false
+    }
+  ]
+}

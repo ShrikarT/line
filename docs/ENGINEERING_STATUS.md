@@ -2,6 +2,14 @@
 
 Updated **11 October 2026**. Canonical contract: `contracts/line.compact`; managed bindings: `contracts/managed/line/`. Product version `0.3.0`. This replaces older completion checklists that incorrectly described domain binding, history privacy, runtime execution and production readiness.
 
+## Private-book pool and disclosure redesign - 11 October 2026
+
+- The [complete twelve-circuit pool experiment](PRIVATE_POOL_2026-10-11.md) compiles and passes 39 generated operations plus 44 rejection controls in six independently keyed processes. It exercises private membership, consent, competing draws, two merchants, reopening and compensation. Canonical Compact/bindings/runtime are unchanged; trusted coordinator access to private books and same-host administration remain.
+- Full experimental proving artifacts were generated, but real pool proof coverage is incomplete. A common-prover run verified both two-phase openings before timing out at its first draw. An isolated-prover run verified agent preparation before issuer acceptance timed out. Checkpoints and failures are recorded separately from the canonical all-twelve-circuit proof result below. No real pool draw or invalid-proof-control pass is claimed yet.
+- Full-history privacy still fails: known-zero singleton principal 15 plus fee 1 reveals debt 16. A recognizable historic root with one borrower remains usable after a second enrollment, reducing the effective candidate population. Structural absence of the selected identity/leaf/salt from inspected draw queries is not privacy certification.
+- The owner explicitly authorized redesign of public amounts and reserve deltas. [The versioned redesign](PRIVACY_REDESIGN_2026-10-11.md) supersedes that fixed-disclosure constraint for the next candidate, preserves all twelve roles/exact accounting/eighteen requirements, and identifies private reserve custody/proving and current-root serialization as unresolved decisions. It does not change the canonical disclosure inventory or establish a migration/privacy pass.
+- The accepted lead customer hypothesis is enterprise teams letting agents buy APIs and compute. There are no existing contacts, interviews, supplier commitments or pilots; discovery remains unvalidated.
+
 ## Independent proof verification and audit integration - 11 October 2026
 
 - [Current audit update](AUDIT_UPDATE_2026-10-11.md) incorporates the newer `main` branding and simulator-mode persistence. Audit integration is isolated in `fix/audit-integration` because concurrent commits `9d86b67` and `9f97664` replaced resolved UI files during verification. The isolated changes retain pixel branding while restoring network configuration, vault/recovery controls, confirmed note status/deadlines and accurate roadmap/privacy/settlement copy. Homepage withdrawal accounting includes fee/refund holds; simulator actions are not labeled proven transactions and unmeasured latency/100% privacy claims are removed.

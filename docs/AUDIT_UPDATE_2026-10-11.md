@@ -16,6 +16,12 @@ This updates the [full product/code audit](FULL_AUDIT_2026-10-07.md), using the 
 | High | **Proof-verification flags can create false confidence.** Installed ledger WASM accepted decodable corrupted proofs despite requested verification flags. | Require the supported Rust verifier in the local proof command. Check valid proofs and invalid-proof controls. Keep simulator execution, proof generation, cryptographic verification and network finality as separate evidence. [Actual results and reproduction](LOCAL_PROOF_VERIFICATION_2026-10-11.md). |
 | High | **Merging the newer UI regressed safety and claims.** Older network setup, recovery controls, confirmed note status and roadmap copy returned. The homepage claimed 100% privacy, an unmeasured 80 ms prover, and simulator actions as proven transactions. | Retain the pixel branding while restoring tested runtime/configuration/recovery behavior. Display actual claim status and deadlines. Count fee/refund holds in withdrawable reserve; describe public-history leakage and accounting-only settlement. This integration is isolated from concurrent edits to the primary workspace. |
 
+## New architecture findings and authorized direction change
+
+The [twelve-circuit private-book pool](PRIVATE_POOL_2026-10-11.md) passes 39 generated operations and 44 rejection controls with six independently keyed actor processes. It does not pass historical privacy: a public 15-unit purchase plus 1-unit fee reveals a known-zero sole borrower's 16-unit debt, and a recognizable one-borrower historic membership root remains usable after another borrower joins. Full experimental proving artifacts exist, but the common-prover first draw and isolated-prover issuer acceptance timed out; partial real-proof checkpoints are explicitly incomplete. Canonical all-twelve proof results below do not establish experimental pool coverage.
+
+The owner authorized redesign of public amounts and reserve deltas on 11 October. [The concrete next-version mapping](PRIVACY_REDESIGN_2026-10-11.md) preserves exact accounting, independent roles and all eighteen requirements. It requires a supported private reserve/prover boundary, current-root concurrency/recovery and explicit migration; it is not a privacy pass or canonical change. Enterprise teams whose agents buy APIs/compute are the accepted lead customer hypothesis, with no existing contacts or demand evidence.
+
 ## Repairs and new evidence
 
 - Linux CI exposed an exact-source fingerprint failure caused by Windows CRLF versus Git LF. Compact, managed output and compiler-wrapper checkout rules now force LF; recovery provenance and public verifier fixtures were regenerated from a freshly validated full release. The pushed `a5cc4f8` run [passed CI](https://github.com/ShrikarT/line/actions/runs/38077327909). This was a portability bug, not a semantic contract change.
@@ -40,6 +46,10 @@ The browser runner accepts an explicit loopback port and starts Vite directly, a
 Published integration commit `ad7939b` passed [GitHub CI](https://github.com/ShrikarT/line/actions/runs/38105545515), including fresh compilation/zero managed drift, generated and reference tests, the custody experiment, typecheck, scans, production build and browser tests. The audit/proof tooling is on `fix/audit-integration`; no merge to `main` is claimed.
 
 ## Execution order
+
+Midnight's [official event page](https://midnight.network/hackathon/buildathon), checked 11 October, lists Wave 2 building September 27–October 17 and judging October 17–27. It emphasizes iterative progress across waves. The exact AKINDO cutoff time/timezone and detailed scoring rubric were not available from the public page extraction; these dates are not a verified submission timestamp. Freeze the submitted commit, reproduce the demo and attach evidence for each claimed capability.
+
+The primary [Mandate repository](https://github.com/tomiin/midnight-mandate) explicitly targets Wave 2 agent spending authorization. It documents public caps, running totals, amounts and linkable pseudonyms, and reports a Preprod demo; this audit has not independently verified its network receipts. This is direct thematic overlap. Line's proposed credit, merchant claims and complete settlement distinction must be demonstrated; calling the category novel or adding more console polish will not establish it. This is a strategic inference, not a verified judging outcome.
 
 1. Prove and integrate the compatible privacy/custody architecture. Establish the actual observer model and borrower authority before presenting a confidential credit product.
 2. Complete fee-funded network proving, submission, finality and recovery with reproducible receipts. Keep local proof evidence clearly labeled.

@@ -5,7 +5,7 @@ import * as RT from "@midnight-ntwrk/compact-runtime";
 import { CheckoutEvaluation, CheckoutError } from "./checkout-engine.ts";
 import { checkoutMiddleware } from "./checkout-http.ts";
 import { call, blankPrivate, readLedger, type Session, type CircuitCall, type PrivateState } from "../src/lib/line/compact-harness.ts";
-import { agentId, canonicalPaymentReferenceBytes, paymentNullifier, toHex } from "../src/lib/line/encoding.ts";
+import { agentId, BYTES32, canonicalPaymentReferenceBytes, paymentNullifier, toHex } from "../src/lib/line/encoding.ts";
 import { encodeVaultJson, decodeVaultJson } from "../src/lib/security/vault-codec.ts";
 
 describe("generated Compact product checkout", () => {
@@ -18,13 +18,22 @@ describe("generated Compact product checkout", () => {
     const access = engine as unknown as { transition(ps: PrivateState, op: CircuitCall): Promise<unknown> }, transition = access.transition.bind(engine);
     access.transition = async (ps, op) => { if (op.name === "redeemDraw") throw new CheckoutError(503, "Merchant unavailable"); return transition(ps, op); };
     await assert.rejects(engine.purchase("text-analysis", "bound refund receipt", "bound-refund-order"), /Merchant unavailable/);
-    const incoming = "bound-incoming-receipt", outgoing = "bound-outgoing-receipt";
+    const incoming = "bound-incoming-receipt";
     await engine.acknowledge(10, incoming); now += 600;
     assert.equal((await engine.purchase("text-analysis", "bound refund receipt", "bound-refund-order")).outcome, "compensated");
     const allocated = copy(saved), D = allocated.orders[0][1].D as Uint8Array;
     const domain = Buffer.from(engine.publicView().domain, "hex");
     const incomingNullifier = paymentNullifier(saved.issuerKey, canonicalPaymentReferenceBytes(incoming), domain);
-    const outgoingNullifier = paymentNullifier(saved.issuerKey, canonicalPaymentReferenceBytes(outgoing), domain);
+    // Exercise normalized ledger keys deterministically: raw Cells trim trailing
+    // zero bytes even though the Compact key type is Bytes<32>.
+    let outgoing = "";
+    let outgoingNullifier: Uint8Array = new Uint8Array(32);
+    for (let attempt = 0; attempt < 65536; attempt++) {
+      outgoing = `bound-outgoing-receipt-${attempt}`;
+      outgoingNullifier = paymentNullifier(saved.issuerKey, canonicalPaymentReferenceBytes(outgoing), domain);
+      if (outgoingNullifier[31] === 0) break;
+    }
+    assert.equal(outgoingNullifier[31], 0, "Exercise the trailing-zero key boundary");
     // Corrupt actual serialized ledger state, rather than mocked recovery evidence.
     const editMapEntry = (snapshot: any, key: Uint8Array, edit: (value: RT.StateValue) => RT.StateValue | null) => {
       const state = RT.ContractState.deserialize(snapshot.state); let changed = 0;
@@ -36,7 +45,7 @@ describe("generated Compact product checkout", () => {
         let next = new RT.StateMap();
         for (const entry of map.keys()) {
           const child = map.get(entry)!;
-          if (entry.value.length === 1 && toHex(entry.value[0]) === toHex(key)) {
+          if (entry.value.length === 1 && toHex(BYTES32.fromValue([...entry.value])) === toHex(key)) {
             changed += 1; const replacement = edit(child); if (replacement) next = next.insert(entry, replacement);
           } else next = next.insert(entry, rewrite(child));
         }
