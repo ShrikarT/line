@@ -27,7 +27,7 @@ Circuit authorization controls do not show that an independently owned signer re
 
 ## Durable software prototype
 
-[The new prototype](DURABLE_APPROVAL_SIGNER_2026-10-11.md) passes fifteen targeted tests, including a child process that commits an approval and exits before returning it. It uses the existing exact Compact action hashing and Jubjub approval semantics, encrypted storage, explicit role/domain policy binding and conservative persisted authorization budgets. It has no authenticated remote transport, independently controlled deployment, rollback-resistant store, native-fixture integration, key rotation or funded execution. Software encryption is not hardware-contained signing.
+[The new prototype](DURABLE_APPROVAL_SIGNER_2026-10-11.md) passes seventeen targeted tests, including a child process that commits an approval and exits before returning it. It uses the existing exact Compact action hashing and Jubjub approval semantics, encrypted storage, explicit role/domain policy binding and conservative persisted authorization budgets. It has no authenticated remote transport, independently controlled deployment, rollback-resistant store, native-fixture integration, key rotation or funded execution. Software encryption is not hardware-contained signing.
 
 ## Next implementation boundary
 

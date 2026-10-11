@@ -13,7 +13,21 @@
         "transactionSha256": "dc539c229f752f883e907bafdc2185c6d2df20be4a4ab0413ad520f1ac1e6f7a",
         "bytes": 6433
       },
-      "transactionSizesEqual": true
+      "transactionSizesEqual": true,
+      "standaloneSerializedComponents": {
+        "alternate": {
+          "proofBytes": 4860,
+          "intentBytes": [
+            6323
+          ]
+        },
+        "normal": {
+          "proofBytes": 4860,
+          "intentBytes": [
+            6323
+          ]
+        }
+      }
     },
     {
       "circuit": "cancelOrExpireNote",
@@ -25,7 +39,21 @@
         "transactionSha256": "f956080774511ab52c040efcbfce017c05fb9d40fb187137df9802ac3a1b1f74",
         "bytes": 6256
       },
-      "transactionSizesEqual": true
+      "transactionSizesEqual": true,
+      "standaloneSerializedComponents": {
+        "alternate": {
+          "proofBytes": 4860,
+          "intentBytes": [
+            6145
+          ]
+        },
+        "normal": {
+          "proofBytes": 4860,
+          "intentBytes": [
+            6145
+          ]
+        }
+      }
     },
     {
       "circuit": "cancelOrExpireNote",
@@ -37,7 +65,21 @@
         "transactionSha256": "beaec88c85f7fa51ebf4adcc7578c4e8ff66dff5f5d42186a091906edfdf001e",
         "bytes": 6724
       },
-      "transactionSizesEqual": true
+      "transactionSizesEqual": true,
+      "standaloneSerializedComponents": {
+        "alternate": {
+          "proofBytes": 4860,
+          "intentBytes": [
+            6614
+          ]
+        },
+        "normal": {
+          "proofBytes": 4860,
+          "intentBytes": [
+            6614
+          ]
+        }
+      }
     },
     {
       "circuit": "cancelOrExpireNote",
@@ -49,7 +91,21 @@
         "transactionSha256": "25319a2637f55ce60123bfb11877f8f08840c00c790de145787c6ce890b81e89",
         "bytes": 6467
       },
-      "transactionSizesEqual": false
+      "transactionSizesEqual": false,
+      "standaloneSerializedComponents": {
+        "alternate": {
+          "proofBytes": 4860,
+          "intentBytes": [
+            6358
+          ]
+        },
+        "normal": {
+          "proofBytes": 4860,
+          "intentBytes": [
+            6358
+          ]
+        }
+      }
     }
   ],
   "nativeProofsVerified": true,
@@ -57,5 +113,6 @@
   "feeBalancingEnabled": false,
   "networkExecuted": false,
   "fullHistoryPrivacyPassed": false,
-  "evidenceScope": "Serialized valid local transaction sizes for this finite native counterfactual pair only; no proof of distributional equivalence, network metadata privacy or asset-rail privacy."
+  "evidenceScope": "Serialized valid local transaction sizes for this finite native counterfactual pair only; no proof of distributional equivalence, network metadata privacy or asset-rail privacy.",
+  "componentReviewScope": "The public SDK deserializes each source-bound proven transaction. Standalone proof and intent serialization lengths match within all four pairs; the full acknowledgment transactions still differ by one byte. These component observations do not establish the cause, embedded-format equivalence or distributional privacy."
 }

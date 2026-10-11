@@ -68,6 +68,9 @@ jobs:
       - name: Reachable refund public transcript comparison
         run: npm run merchant:history
 
+      - name: Compiled private enrollment and duplicate-generation controls
+        run: npm run enrollment:spike
+
       - name: Fail-closed network receipt metadata checks
         run: npm run network:receipts:test
 

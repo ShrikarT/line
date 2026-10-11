@@ -3,3 +3,5 @@
 *.compact text eol=lf
 contracts/managed/** text eol=lf
 scripts/compile-compact.mjs text eol=lf
+*.mjs text eol=lf
+src/lib/line/encoding.ts text eol=lf

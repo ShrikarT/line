@@ -1,5 +1,7 @@
 # Privacy observer model and acceptance cases — 11 October 2026
 
+Latest separate [enrollment experiment](PRIVATE_ENROLLMENT_2026-10-11.md): private predecessor selection, uniform query counts, generation-specific issuance nullifiers and fresh 39/13/66 generated controls. Native verification and full observer privacy remain unproven for this source.
+
 This defines the verification target for experimental merchant source `afb75b1`, not an achieved guarantee or a change to the deployed canonical contract. The canonical inventory remains in [PRIVACY.md](PRIVACY.md). Implementation and existing generated controls are in [the merchant report](PRIVATE_MERCHANT_2026-10-11.md).
 
 ## Protected information and authorized readers
