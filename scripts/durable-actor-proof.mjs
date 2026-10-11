@@ -65,7 +65,7 @@ async function main(){
  }
  const native=resolve('.compact-keys/native-proof-target/debug',process.platform==='win32'?'line-native-proof-verifier.exe':'line-native-proof-verifier');
  assert(existsSync(native),'Build the native verifier first.');
- const scriptFingerprints=Object.fromEntries(['scripts/durable-actor-proof.mjs','scripts/private-pool-provers.mjs','scripts/durable-actor-compact.mjs','scripts/durable-approval-actor.mjs','scripts/durable-approval-signer.mjs','src/lib/security/vault-codec.ts','scripts/signed-pool-signers.mjs',
+ const scriptFingerprints=Object.fromEntries(['scripts/durable-actor-proof.mjs','scripts/private-pool-provers.mjs','scripts/durable-actor-compact.mjs','scripts/durable-approval-actor.mjs','scripts/durable-approval-signer.mjs','scripts/private-offer-encoding.mjs','src/lib/security/vault-codec.ts','scripts/signed-pool-signers.mjs',
   'scripts/private-pool-spike.mjs','src/lib/line/encoding.ts'].map(file=>[file,digest(readFileSync(file))]));
  mkdirSync('.compact-keys',{recursive:true});const work=mkdtempSync(resolve('.compact-keys/durable-actor-proof-'));
  const traces=[],negativeChecks=[],verifiedStates=new Map();

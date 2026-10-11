@@ -71,15 +71,21 @@ async function actorMain(){
 /** Test-owner launcher only: its explicit key is synthetic configuration.
  * A production coordinator must not receive the owner's storage key/profile.
  */
-export function startDurableApprovalActor({directory,encryptionKey,custodyId,config,create=false,syntheticUnixSeconds}){
+export function startDurableApprovalActor({directory,encryptionKey,custodyId,config,create=false,syntheticUnixSeconds,startupTimeoutMs=60_000}){
  assert(encryptionKey instanceof Uint8Array&&encryptionKey.length===32);
+ assert(Number.isSafeInteger(startupTimeoutMs)&&startupTimeoutMs>0&&startupTimeoutMs<=60_000);
  const profile={directory:resolve(directory),custodyId,role:'agent',config,create,syntheticUnixSeconds};
  const child=fork(self,['--fixture-actor'],{execArgv:['--experimental-strip-types'],stdio:['ignore','ignore','pipe','ipc'],
   env:{PATH:process.env.PATH,SystemRoot:process.env.SystemRoot,
    LINE_APPROVAL_ACTOR_TEST_KEY_HEX:Buffer.from(encryptionKey).toString('hex'),LINE_APPROVAL_ACTOR_TEST_PROFILE:wire(profile)}});
- let readyResolve,readyReject,next=0,stopping=false,stopPromise;
+ let readyResolve,readyReject,next=0,stopping=false,startupFailed=false,stopPromise;
  const pending=new Map(),ready=new Promise((yes,no)=>{readyResolve=yes;readyReject=no;});
- const timer=setTimeout(()=>readyReject(Error('Durable fixture actor startup timed out.')),60_000);
+ const timer=setTimeout(()=>{
+  startupFailed=true;readyReject(Error('Durable fixture actor startup timed out.'));
+  // This launcher owns the child. Do not leave an unreachable signer alive
+  // after readiness fails; a later owner may reclaim only its confirmed-dead lease.
+  child.kill();
+ },startupTimeoutMs);
  child.on('error',error=>{clearTimeout(timer);readyReject(error);});
  child.on('exit',()=>{
   clearTimeout(timer);readyReject(Error('Durable fixture actor stopped before readiness.'));
@@ -93,19 +99,20 @@ export function startDurableApprovalActor({directory,encryptionKey,custodyId,con
  });
  return {child,ready,
   approve(request){
-   if(stopping)return Promise.reject(Error('Durable fixture actor is stopping.'));
+   if(stopping||startupFailed||!child.connected)return Promise.reject(Error('Durable fixture actor is unavailable.'));
    let body;try{body=wire(request);}catch{return Promise.reject(Error('Approval could not be authorized.'));}
    return new Promise((resolve,reject)=>{
     const id=++next,timer=setTimeout(()=>{pending.delete(id);reject(Error('Durable fixture actor response is uncertain.'));},60_000);
     pending.set(id,{resolve,reject,timer});
-    child.send({kind:'approve',id,body},error=>{if(error){clearTimeout(timer);pending.delete(id);reject(error);}});
+    try{child.send({kind:'approve',id,body},error=>{if(error){clearTimeout(timer);pending.delete(id);reject(error);}});}
+    catch(error){clearTimeout(timer);pending.delete(id);reject(error);}
    });
   },
   async stop(){
    if(stopping)return stopPromise;stopping=true;
    if(child.exitCode!==null||child.signalCode!==null)return;
-   stopPromise=new Promise((yes,no)=>{child.once('error',no);child.once('exit',code=>code===0?yes():no(Error('Durable fixture actor did not stop cleanly.')));});
-   if(child.connected)child.send({kind:'stop'});await stopPromise;
+   stopPromise=new Promise((yes,no)=>{child.once('error',no);child.once('exit',code=>startupFailed||code===0?yes():no(Error('Durable fixture actor did not stop cleanly.')));});
+   if(startupFailed)child.kill();else if(child.connected)child.send({kind:'stop'});await stopPromise;
   }
  };
 }
