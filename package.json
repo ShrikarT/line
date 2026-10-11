@@ -31,7 +31,11 @@
     "compact:release:validate": "node scripts/contract-artifacts.mjs validate",
     "custody:spike": "node --experimental-strip-types scripts/custody-spike.mjs",
     "proof:native:build": "cargo build --locked --manifest-path scripts/native-proof-verifier/Cargo.toml --target-dir .compact-keys/native-proof-target",
-    "proof:local": "node --experimental-strip-types scripts/local-proof-verification.mjs"
+    "proof:local": "node --experimental-strip-types scripts/local-proof-verification.mjs",
+    "pool:spike": "node --experimental-strip-types scripts/private-pool-spike.mjs",
+    "proof:pool": "node --experimental-strip-types scripts/private-pool-proof.mjs",
+    "pool:provers:start": "node scripts/private-pool-provers.mjs start",
+    "pool:provers:stop": "node scripts/private-pool-provers.mjs stop"
   },
   "compact": {
     "compiler": "0.31.1",

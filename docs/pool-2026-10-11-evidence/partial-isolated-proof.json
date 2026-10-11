@@ -1,0 +1,38 @@
+{
+  "schema": "line-private-pool-proof-progress/v1",
+  "complete": false,
+  "sourceSha256": "cea2dcddbc49ea0c09301020891d298179517ba99ad8b516fa441a5d423f99b8",
+  "proofServerVersion": "8.1.3",
+  "commonProverUsed": false,
+  "feeBalancingEnabled": false,
+  "networkSubmitted": false,
+  "assetTransfers": false,
+  "fullHistoryPrivacyPassed": false,
+  "traces": [
+    {
+      "circuit": "syntheticDeployment",
+      "proofVerifiedInSeparateRustProcess": true,
+      "transactionSha256": "0a6d82e9ab3add33ef7ad1bae1f84263c64b7773f73261aa6d6b9bc7f1b8bc8f",
+      "bytes": 27508
+    },
+    {
+      "circuit": "registerMerchant",
+      "proofVerifiedInSeparateRustProcess": true,
+      "transactionSha256": "85c880e7ad47dba5354fb2fa6303fb26138f76aba083e8d59490d3fd223e6f42",
+      "bytes": 5204
+    },
+    {
+      "circuit": "fundReserve",
+      "proofVerifiedInSeparateRustProcess": true,
+      "transactionSha256": "70c0f4376a463c737c6a342a8c4dfa76321181ac1739223a3e847de01d6f14bb",
+      "bytes": 5155
+    },
+    {
+      "circuit": "openLine",
+      "proofVerifiedInSeparateRustProcess": true,
+      "transactionSha256": "090316854ee1de30bb0dcac835f42425e7af60b5272ec2f99c65bc7d3648c64d",
+      "bytes": 5308
+    }
+  ],
+  "negativeChecks": []
+}
