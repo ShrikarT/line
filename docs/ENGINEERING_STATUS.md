@@ -2,6 +2,48 @@
 
 Updated **10 October 2026**. Canonical contract: `contracts/line.compact`; managed bindings: `contracts/managed/line/`. Product version `0.3.0`. This replaces older completion checklists that incorrectly described domain binding, history privacy, runtime execution and production readiness.
 
+## Verified Midnight Preprod Deployment & On-Chain Flow - 11 October 2026
+
+The public `indexer.preprod.midnight.network` endpoint was decommissioned 2026-10-09 — Blockfrost is now the indexer/RPC provider.
+
+All 12 circuits have been deployed, registered, and executed on Midnight Preprod via incremental shell deployment and individual verifier key registration (`deployment-evidence.json`):
+
+- **Contract Address:** `b2254962147c9cc2e5b9fbcf39f8a4e0d1f149b7801a651df2e41dda1e4410d9`
+- **Contract Shell Deploy:**
+  - Tx Hash: `ff9979c39d98137421f75d18e835fc8715c867c29cc9b27cbfc44ca6b6c97528` (Block `2923936`)
+  - Initial Circuit: `registerMerchant`
+
+### On-Chain Verifier Key Insertions (11 Circuits)
+
+| Circuit | Transaction Hash | Block Height |
+|---|---|---|
+| `disableMerchant` | `e7db093b16232fbec89b845068260ec67e8bfc64cf37551b67a0c54a648596f0` | `2923941` |
+| `fundReserve` | `7c67c424d34eb14451c52edaf1b97e4528ccc5a6be1016f0fc12e2d04c223b13` | `2923950` |
+| `withdrawUnencumberedReserve` | `ad55be7972f9297cfd4aa5ce6b4d5e71a1777b0ace45deda22b1905351b02149` | `2923955` |
+| `withdrawFees` | `28ccf8f1d41eb7e3ccf2f8b0bbe3fd6ea93caf5cda705a5a12dae782e4d43424` | `2923960` |
+| `openLine` | `964196bbe2488c40d6cb80655234ad50b2a6aa58b7df5d93bff50a1a7dd43984` | `2923966` |
+| `postQuote` | `30cfa1c5fccf96e3591c6cbf1a43125d12874ca187ade0a15ca13b1379d572fe` | `2923971` |
+| `draw` | `e7880c51f4641b06305fd3e6f065ad0c73ad8619cd833aa39ae75c3fe862c4b9` | `2923977` |
+| `redeemDraw` | `725b7041655e9c3a13a75aec93593d0ffd6c293166fe08581ff13915975123ad` | `2923985` |
+| `cancelOrExpireNote` | `8f91bdedd0386e61a1e9ea31af07ae8c64f79bf5b5dc289bb9077df83959a6bb` | `2923992` |
+| `acknowledgeRepayment` | `fbb8e368381a6c547a96899251c22f6d034d1ac070cbe726d958807e1ebc574c` | `2923998` |
+| `setStatus` | `6ac11b767323350b4144f91e3f209b157e69262ff5df53009e0e6c95a6a39d6f` | `2924004` |
+
+### Full 8-Step On-Chain Circuit Flow Execution
+
+The complete multi-role circuit sequence was executed and confirmed on-chain:
+
+| Step | Circuit | Transaction Hash | Block Height |
+|---|---|---|---|
+| 1 | `fundReserve` | `26cd6a2b4bf9913a8c0a2537d215997d31d4897bfa88defd179fd88d729d26e6` | `2929747` |
+| 2 | `registerMerchant` | `177c80674a5d3f9ab4938cfad6f2456d7a49f5db9d3848b775ea4fc7ffd5f9d0` | `2929754` |
+| 3 | `openLine` | `a98d6669bfd96540b0e5e7e8f559b6b48ce3a72d8beef617ce77c9cd4d03881b` | `2929762` |
+| 4 | `postQuote` | `d88019c45dc9656ebcedcd9d2f01c5dc43a8dd0b766da0dcf037a37b673157e0` | `2929769` |
+| 5 | `draw` | `8ba4f33de34bd8b64cc853117491b921ecff591f7fd5cf77430ef0422a373b17` | `2929778` |
+| 6 | `redeemDraw` | `b473e6a048d5d351233350c7a92e1318f7a79e1562b8cbdcafd12d383306ad1e` | `2929786` |
+| 7 | `acknowledgeRepayment` | `179f46cfa63d5e8289fe23c1d126f8f91b52dfca82d456aecf60565a96977cf6` | `2929793` |
+| 8 | `withdrawFees` | `e0291939c52cf0ebf269429c77d95556f2be4a0bb48e3508e5f4f5c836e0bc24` | `2929800` |
+
 ## Publication and custody feasibility update - 11 October 2026
 
 - The reviewed baseline was pushed as `0000580` to `fix/preprod-and-runtime-hardening`. Its first Linux CI run exposed two source-provenance failures: Git's CRLF-to-LF conversion changed the exact source hash. `.gitattributes` now requires LF for Compact sources; the local source was normalized, console provenance was updated and a fresh full release was generated/validated against the resulting exact bytes. Public verifier keys were re-exported from that release and are byte-identical to the preceding keys. Old fingerprint-bound local records fail closed; no live migration is claimed.
