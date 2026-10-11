@@ -35,7 +35,7 @@ async function main(){
  const dir=resolve(process.argv[2]),checkedDir=resolve(checkedPath);
  const info=readJson(join(dir,'compiler/contract-info.json')),checked=readJson(join(dirname(checkedDir),'evidence.json'));
  const sourceSha256=digest(readFileSync(source));
- assert.equal(checked.schema,'line-private-signed-feasibility/v1');
+ assert.equal(checked.schema,'line-private-merchant-feasibility/v1','Expected fresh merchant feasibility evidence.');
  assert.equal(checked.sourceSha256,sourceSha256);assert.equal(checked.freshCompilation,true);
  assert.equal(checked.sourceBindingVerifiedByThisRun,true);assert.equal(info['compiler-version'],'0.31.1');
  assert.equal(info['runtime-version'],'0.16.0');
