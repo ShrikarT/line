@@ -8,10 +8,10 @@ import {startDurableApprovalActor} from '../scripts/durable-approval-actor.mjs';
 import {roleHash,ORDER,RADIX,actionBody,approvalMessage,challenge} from '../scripts/signed-pool-signers.mjs';
 
 const NOW=1_800_000_000,bytes=()=>new Uint8Array(randomBytes(32));
-async function setup(){
+async function setup(approvalABI='line-private-enrollment/v1'){
  mkdirSync('.compact-keys',{recursive:true});
  const directory=mkdtempSync(resolve('.compact-keys/durable-actor-test-')),domain=bytes(),merchant=bytes(),acceptedTerms=bytes();
- const options={directory,encryptionKey:bytes(),custodyId:'actor-agent-evaluation',syntheticUnixSeconds:NOW,
+ const options={directory,encryptionKey:bytes(),custodyId:'actor-agent-evaluation',syntheticUnixSeconds:NOW,approvalABI,
   config:{domain,maxAuthorizedCost:50n,maxLineLimit:100n,maxFee:2n,maxBasisPoints:0n,maxDrawAmount:30n,
    validBefore:BigInt(NOW+1000),allowedMerchants:[merchant],acceptedTerms}};
  const actor=startDurableApprovalActor({...options,create:true}),point=await actor.ready;
@@ -78,4 +78,16 @@ test('failed readiness stops the owned child and does not leave an approval chan
  const recovered=startDurableApprovalActor({...x.options,create:false});
  try{assert.deepEqual((await recovered.ready).pk,x.point.pk);verify(await recovered.approve(x.request),x.descriptor);}
  finally{await recovered.stop();}
+});
+
+test('owner-selected offer profile survives child restart and rejects a legacy reopen',async()=>{
+ const x=await setup('line-private-offer/v1');let actor=x.actor;
+ try{
+  const response=await actor.approve(x.request);verify(response,x.descriptor);await actor.stop();
+  actor=startDurableApprovalActor({...x.options,approvalABI:'line-private-enrollment/v1',create:false});
+  await assert.rejects(actor.ready,/stopped before readiness/);await actor.stop();
+  actor=startDurableApprovalActor({...x.options,create:false});const restored=await actor.ready;
+  assert.deepEqual(restored.pk,x.point.pk);assert.deepEqual(await actor.approve(x.request),response);
+  await assert.rejects(actor.approve({...x.request,descriptor:{...x.descriptor,approvalABI:'line-private-enrollment/v1'}}),/could not be authorized/);
+ }finally{await actor.stop();}
 });

@@ -23,6 +23,8 @@ Latest fetched `main`: `a0e51ee1486511e60b0f5a7bc2099a1f8b161aa0`, merging deplo
 
 Each local proof report pins source, executable, key and harness fingerprints. Public evidence retains exact versions and finite differences. An old report is not relabeled as verification of a later script. [Engineering status](ENGINEERING_STATUS.md) is the current verification ledger.
 
+Subsequent integration combines the private-offer source with a durable owner-policy agent: fresh generated execution passes six calls, two real restarts, four policy controls and one replay rejection. The current full sequenced suite passes 487 tests / 60 suites; an invalid concurrent compile/test run is retained in engineering status. Its combined native run and new remote CI remain pending. Same-host administration, ephemeral issuer/supplier actors and volatile financial openings remain explicit. [Combined fixture and scope](DURABLE_PRIVATE_OFFER_2026-10-11.md).
+
 ## Priority findings
 
 | Priority | Current issue | Consequence | Required outcome |

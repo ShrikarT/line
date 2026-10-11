@@ -48,7 +48,7 @@ async function actorMain(){
   assert(profile.role==='agent'&&typeof profile.create==='boolean');
   assert(Number.isSafeInteger(profile.syntheticUnixSeconds)&&profile.syntheticUnixSeconds>=0);
   signer=new DurableApprovalSigner({directory:profile.directory,encryptionKey:Buffer.from(key,'hex'),custodyId:profile.custodyId,
-   role:profile.role,create:profile.create,authorize:fixtureAgentPolicy,clock:()=>profile.syntheticUnixSeconds});
+   role:profile.role,create:profile.create,approvalABI:profile.approvalABI,authorize:fixtureAgentPolicy,clock:()=>profile.syntheticUnixSeconds});
   signer.bindPolicy(profile.config);
   // Remove our references from the environment; this is not heap zeroization.
   delete process.env.LINE_APPROVAL_ACTOR_TEST_KEY_HEX;delete process.env.LINE_APPROVAL_ACTOR_TEST_PROFILE;
@@ -71,10 +71,11 @@ async function actorMain(){
 /** Test-owner launcher only: its explicit key is synthetic configuration.
  * A production coordinator must not receive the owner's storage key/profile.
  */
-export function startDurableApprovalActor({directory,encryptionKey,custodyId,config,create=false,syntheticUnixSeconds,startupTimeoutMs=60_000}){
+export function startDurableApprovalActor({directory,encryptionKey,custodyId,config,create=false,syntheticUnixSeconds,startupTimeoutMs=60_000,approvalABI='line-private-enrollment/v1'}){
  assert(encryptionKey instanceof Uint8Array&&encryptionKey.length===32);
  assert(Number.isSafeInteger(startupTimeoutMs)&&startupTimeoutMs>0&&startupTimeoutMs<=60_000);
- const profile={directory:resolve(directory),custodyId,role:'agent',config,create,syntheticUnixSeconds};
+ assert(['line-private-enrollment/v1','line-private-offer/v1'].includes(approvalABI));
+ const profile={directory:resolve(directory),custodyId,role:'agent',config,create,syntheticUnixSeconds,approvalABI};
  const child=fork(self,['--fixture-actor'],{execArgv:['--experimental-strip-types'],stdio:['ignore','ignore','pipe','ipc'],
   env:{PATH:process.env.PATH,SystemRoot:process.env.SystemRoot,
    LINE_APPROVAL_ACTOR_TEST_KEY_HEX:Buffer.from(encryptionKey).toString('hex'),LINE_APPROVAL_ACTOR_TEST_PROFILE:wire(profile)}});

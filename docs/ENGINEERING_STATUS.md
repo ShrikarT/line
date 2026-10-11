@@ -4,6 +4,8 @@ Updated **11 October 2026**. Canonical contract: `contracts/line.compact`; manag
 
 ## Latest verified private-offer, enrollment and durable-agent evidence — 11 October 2026
 
+The next combined [durable-agent/private-offer fixture](DURABLE_PRIVATE_OFFER_2026-10-11.md) passes fresh generated execution for six lifecycle calls, two real agent restarts, four owner-policy denials and one Compact replay rejection. The child now accepts an owner-selected, storage-authenticated offer profile; a fifth actor test rejects cross-profile reopening and approval-caller profile selection. The current sequenced full regression passes **487 tests / 60 suites**; targeted actor/profile checks pass eight tests, and fixture/credential scans and canonical zero drift pass. Combined native verification is active and fresh remote CI is pending. One intervening 478/487 run overlapped canonical compilation with tests reading generated files, causing incomplete artifact reads and a checkpoint compatibility rejection. It is retained as invalid concurrent validation; compilation finished with zero drift before the passing sequenced rerun.
+
 Publication `d2cd6f6` passed [push CI](https://github.com/ShrikarT/line/actions/runs/38159847866) and [PR CI](https://github.com/ShrikarT/line/actions/runs/38159850952): **486 tests / 60 suites and 20 browser checks**, fresh private-offer and durable-agent generated execution, typecheck/build/scans and zero canonical drift.
 
 - Publication `4c9de8c` passed [push CI](https://github.com/ShrikarT/line/actions/runs/38154420058) and [PR CI](https://github.com/ShrikarT/line/actions/runs/38154423586): 482 tests / 60 suites, 20 browser tests, fresh durable-agent integration and existing Compact fixtures, build/typecheck/scans and zero canonical drift.
