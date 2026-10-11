@@ -19,7 +19,10 @@ const self=fileURLToPath(import.meta.url), COIN='0'.repeat(64), NOW=1_800_000_00
 const bytes=()=>new Uint8Array(randomBytes(32));
 const hex=value=>Buffer.from(value).toString('hex');
 const wire=encodeVaultJson, unwire=decodeVaultJson;
-const publicJson=value=>JSON.stringify(value,(_key,value)=>typeof value==='bigint'?value.toString():value instanceof Uint8Array?hex(value):value);
+// Ledger scalar words may omit trailing zero bytes. Normalize only public
+// words for absence checks; never inspect or emit the private transcript.
+const publicJson=value=>JSON.stringify(value,(_key,value)=>typeof value==='bigint'?value.toString():value instanceof Uint8Array?
+ hex(value.length<=32?BYTES32.fromValue([value]):value):value);
 const STATUS=new RT.CompactTypeEnum(3,1);
 const bookFields=[['domain',BYTES32],['identity',BYTES32],...['limit','outstanding','epoch','generation','expiry','flatFee','basisPoints'].map(key=>[key,UINT64]),['status',STATUS]];
 const BOOK_TYPE={alignment:()=>bookFields.flatMap(([,type])=>type.alignment()),
