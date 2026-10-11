@@ -76,6 +76,8 @@ jobs:
 
       - name: Durable agent approvals in freshly compiled Compact
         run: npm run custody:compact
+      - name: Durable agent approvals with private supplier offers
+        run: npm run custody:offer:compact
 
       - name: Fail-closed network receipt metadata checks
         run: npm run network:receipts:test

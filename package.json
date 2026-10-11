@@ -52,7 +52,9 @@
     "proof:custody": "node --experimental-strip-types scripts/durable-actor-proof.mjs",
     "offer:spike": "node --experimental-strip-types scripts/private-offer-spike.mjs",
     "proof:offer": "node --experimental-strip-types scripts/private-offer-proof.mjs",
-    "custody:offer:test": "node --experimental-strip-types --test tests/durable-private-offer.test.mjs"
+    "custody:offer:test": "node --experimental-strip-types --test tests/durable-private-offer.test.mjs",
+    "custody:offer:compact": "node --experimental-strip-types scripts/durable-offer-compact.mjs",
+    "proof:custody:offer": "node --experimental-strip-types scripts/durable-offer-proof.mjs"
   },
   "compact": {
     "compiler": "0.31.1",
