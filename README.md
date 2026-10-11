@@ -8,6 +8,8 @@ The executable starting point is [`/checkout`](docs/PRODUCT_WALKTHROUGH.md): a d
 
 ## Try the procurement evaluation
 
+The [11 October audit update](docs/AUDIT_UPDATE_2026-10-11.md) reviews the newer code and branding. A separate [local proof experiment](docs/LOCAL_PROOF_VERIFICATION_2026-10-11.md) generates and cryptographically verifies 19 contract proofs across all twelve circuits, with invalid-proof controls. It uses synthetic ledger state with fee balancing disabled; it establishes no network finality, independent canonical custody, historical privacy or asset payment. The checkout and consoles remain separate execution paths.
+
 Use **Node.js 22.18 or later** for native TypeScript stripping; the evaluated environment uses Node 26.7.0. A Compact compiler is needed to regenerate the contract, but the checked-in managed JavaScript supports the local evaluation.
 
 ```bash
