@@ -28,6 +28,8 @@ The fresh generated fixture passes **39 accepted calls and 55 rejection controls
 
 Generated execution is not proof generation. No proving keys or native proof pass for this source are claimed here. The isolated last-second draw, no-cash compensation/acknowledgment and alternate repayment history do not advance the normal lifecycle. The fixture uses six same-host signer children, synthetic approval policy and a trusted financial coordinator. It has no durable custody, network finality, authentic settlement or validated customer. The base signed-finance source now passes five real cancellation constraint checks after uniform preparation; its full native run is pending. Those checks do not cover this separate merchant source. This derivative has not generated or natively verified proofs for that path.
 
+The merchant proof driver now receives all accepted branches through the fixture hook before private checkpoints are published. An isolated proof must start from a previously native-verified public ledger snapshot; its result is verified separately and does not advance the normal lifecycle. A complete run requires 39 lifecycle calls, seven isolated branch calls and six rejected corrupted draw proofs. This is an implemented verification path, not a passing result. All twelve merchant textual IRs differ from the base candidate, so this source requires twelve fresh key pairs rather than that candidate's exact-IR cache.
+
 ## Remaining privacy work
 
 The [observer model and acceptance cases](PRIVACY_OBSERVER_MODEL_2026-10-11.md) distinguish public readers, each merchant, borrowers, the trusted coordinator, relayers and settlement operators. It defines which facts must remain fixed across a valid comparison and the arithmetic limits of confidentiality when all debits and a zero baseline are already known.
@@ -44,3 +46,11 @@ git diff --exit-code contracts/line.compact contracts/managed/
 ```
 
 The command compiles fresh into a new ignored directory and writes source-bound evidence there. `--compiled-dir` is diagnostic only and is explicitly marked cached. CI runs fresh generated execution. Neither mode submits a transaction, funds a wallet, changes canonical bindings or asserts a complete privacy pass.
+
+After building the native verifier, compiling this source with full key generation into a separate directory, and running a fresh merchant fixture, the planned native verification command is:
+
+```bash
+npm run proof:merchant -- <full-merchant-managed-dir> --compiled-check <fresh-merchant-fixture-managed-dir> --recycle-prover
+```
+
+It exclusively owns its labeled loopback prover and refuses an existing server. It fingerprints source, generated executable, all proving artifacts and harness scripts. Real proofs still use synthetic ledger/time with fee balancing disabled; they establish no network submission, asset settlement or complete privacy guarantee.
