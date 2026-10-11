@@ -124,8 +124,11 @@ async function main(){
    const tx=L.Transaction.deserialize('signature','proof','binding',result.provenTx);
    if(name==='draw'){
     const raw=Buffer.from(result.provenTx),oldC=commit(values.bookOpening,values.salt);
+    const publicData=result.publicTranscript+result.publicInput+result.publicOutput;
+    assert(!publicData.includes(hex(values.bookOpening.identity)),'Borrower identity must not be re-disclosed in normalized public words.');
+    assert(!publicData.includes(hex(values.salt)),'Input salt must not be re-disclosed in normalized public words.');
     assert(!raw.includes(Buffer.from(values.bookOpening.identity)),'Borrower identity must not appear in the proven public draw.');
-    assert(!(result.publicTranscript+result.publicInput+result.publicOutput).includes(hex(oldC)),'Selected old leaf must not be re-disclosed by the circuit.');
+    assert(!publicData.includes(hex(oldC)),'Selected old leaf must not be re-disclosed by the circuit.');
     assert(!raw.includes(Buffer.from(values.salt)),'Private book salt must not appear in the proven public draw.');
     const proof=[...tx.intents.values()].flatMap(intent=>intent.actions).find(action=>action.entryPoint==='draw').proof.serialize();
     const block=Buffer.from(proof.slice(Math.floor(proof.length/2),Math.floor(proof.length/2)+32)),offset=raw.indexOf(block);

@@ -12,6 +12,8 @@ The latest [generated-execution evidence](pool-2026-10-11-evidence/generated.jso
 
 The two synthetic enrollments are not evidence of two independently accountable borrower organizations or an enterprise fleet's shared borrower exposure. Those legal and aggregate-delegation requirements remain open.
 
+Public scalar words are normalized through the pinned `Bytes<32>` decoder before structural absence checks, so trimmed trailing zeros cannot hide a disclosed identity/leaf/salt from the test. A fresh pinned compile and generated run passed all 39 operations and 44 controls after this change. These checks remain falsification tools, not a privacy proof.
+
 Checks include altered consent/identity/fees/terms; wrong signing roles; forged limit/path; competing quotes spending the same old book; quote theft and replay; over-limit draw; wrong merchant and repeated redemption; stable repayment-reference replay; default/resume; zero-debt closure; reopening; exact expiry cutoff; debt/cash compensation; old-generation compensation preserving new debt; refund reports; merchant disable with outstanding-claim redemption; reserve overflow and locked-backing withdrawal. Final synthetic accounting is `T=187`, `R=45`, `X=15`, with `E=P=F=U=0`. These are counters, not deposits or paid claims.
 
 ## Privacy findings that the experiment does not fix
