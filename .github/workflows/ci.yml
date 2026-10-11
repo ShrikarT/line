@@ -65,6 +65,9 @@ jobs:
       - name: Compiled private merchant-membership experiment
         run: npm run merchant:spike
 
+      - name: Reachable refund public transcript comparison
+        run: npm run merchant:history
+
       - name: Fail-closed network receipt metadata checks
         run: npm run network:receipts:test
 

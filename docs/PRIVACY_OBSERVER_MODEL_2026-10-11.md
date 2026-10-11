@@ -39,7 +39,7 @@ Commitment bytes from different histories need not be identical. Their hiding re
 | Fees and settlement | Fee-funded submission, deposits, payouts, repayment and refunds preserve the declared privacy boundary | Synthetic proof runs disable balancing. No asset-rail integration or equivalent zero/nonzero settlement behavior is established |
 | Recovery | Restart, retry and stale-path recovery neither publish openings nor duplicate liabilities | Canonical local recovery tests are separate. Candidate durable financial state, signers and uncertain network confirmation are not integrated |
 
-The refund fixture's same action names and acknowledgment inputs/outputs are one narrow check. It explicitly does not show that full public histories are equivalent. Runtime policy must schedule both cash and no-cash acknowledgments consistently if this is part of the guarantee. Paid cash versus no payment can remain distinguishable on an asset rail even if their Compact calls have the same shape.
+The [fresh refund query review](private-signed-2026-10-11-evidence/merchant-history-review.json) extends the original argument-only check to four continuous generated transitions from the same predecessor. Inputs/outputs, observation times and query counts match; it records 7/4/10/8 differing public leaves across repayment/expiry/allocation/acknowledgment. Their values require semantic and cryptographic analysis, and are never equated by the review. This does not show full public histories are indistinguishable. Runtime policy must schedule both cash and no-cash acknowledgments consistently if this is part of the guarantee. Paid cash versus no payment can remain distinguishable on an asset rail even if their Compact calls have the same shape.
 
 ## Evidence gate
 
