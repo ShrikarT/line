@@ -5,7 +5,8 @@ Updated **11 October 2026**. Canonical contract: `contracts/line.compact`; manag
 ## Private-book pool and disclosure redesign - 11 October 2026
 
 - [Signed/private-finance candidates](SIGNED_PRIVATE_FINANCE_2026-10-11.md) now compile with 0.31.1 and execute all twelve names. The private-finance lifecycle passes 38 accepted calls and 38 rejection controls, including eight signature controls. Reserve and note/quote-state metadata are committed; financial arguments became witnesses after generated-input checks exposed a leak; current-root membership rejects the historic-singleton attack. Six signer processes retain their scalars, and reserve openings are excluded from their IPC. The trusted prover still sees financial books, and signer fixtures are synthetic. Full-history privacy, real candidate proofs, durable institutional custody, migration and settlement are unproven.
-- The original workspace and newer `main` now contain deployment commit `babc507` and eight reported Preprod call receipts. These are new evidence requiring independent transaction/state/key checks. Verifier registration for twelve names is not twelve circuit executions; the new deployment document overstates that coverage. These receipts do not deploy either experimental candidate or establish payouts/privacy/custody. Integration and read-only receipt verification are pending.
+- Publication `cd61619` passed [push CI](https://github.com/ShrikarT/line/actions/runs/38116902324) and [draft-PR CI](https://github.com/ShrikarT/line/actions/runs/38116905358). Both include fresh canonical compilation/zero drift, both fresh signed candidates, the earlier experiments, regression tests, scans/build/typecheck and 20 browser tests. Full proving-key generation for the private-finance source is running separately; key generation is not proof verification or network execution.
+- Deployment commit `babc507` and its eight reported Preprod call receipts have been integrated from newer `main`. Independent transaction/state/key checks are pending. Verifier registration for twelve names is not twelve circuit executions. These receipts do not deploy either experimental candidate or establish payouts/privacy/custody. The incremental script's saved-metadata watcher, hash-only step journal, regenerated private openings and blind retries require recovery repair.
 
 - The [complete twelve-circuit pool experiment](PRIVATE_POOL_2026-10-11.md) compiles and passes 39 generated operations plus 44 rejection controls in six independently keyed processes. It exercises private membership, consent, competing draws, two merchants, reopening and compensation. Canonical Compact/bindings/runtime are unchanged; trusted coordinator access to private books and same-host administration remain.
 - Full experimental proving artifacts were generated, but real pool proof coverage is incomplete. Earlier common/isolated prover attempts timed out. A sequential, ephemeral-role run verified eight contract calls across five circuit names, including both borrowers' two-phase openings and the first draw; Rust rejected a decodable corrupted draw proof. It then ended on a Docker cleanup timeout. The second draw, repayment, closure and the additional five non-core circuit names still need real pool coverage. Partial checkpoints and failures are separate from the canonical all-twelve-circuit proof result below.
@@ -21,11 +22,13 @@ Updated **11 October 2026**. Canonical contract: `contracts/line.compact`; manag
 - These transactions use synthetic public ledger state with **fee balancing disabled**. No wallet funding, submission, network finality or asset movement is established. Canonical opening still uses both issuer and agent secrets in one process; the local prover receives private preimages. The separate consent/key-separation experiment has not been integrated into canonical ABI/runtime/custody. Historical privacy and all customer/settlement gates remain open.
 - Source and managed bindings are unchanged by the proof/UI work. The source-bound full release remains `0.31.1-35ebd14e19ce-7a2ec7ab-5deb-4fb9-9886-d079b782c788`. The isolated integration passes **462 tests / 60 suites**, **20 browser tests without retries**, build/typecheck, the 16-file fresh-output check, zero managed Git diff and production-key/secret scans. Browser verification uses a separate loopback port; the homepage checkout link's decorative arrow is hidden from its accessible name. Desktop (1280 px) and mobile (390 px) layouts were inspected; status cards stack on narrow screens, navigation stays scrollable and mobile document overflow is absent. CI now includes the browser suite. The `a5cc4f8` publication passed [Linux CI](https://github.com/ShrikarT/line/actions/runs/38077327909); integration commit `ad7939b` passed [GitHub CI](https://github.com/ShrikarT/line/actions/runs/38105545515), including fresh compilation, the custody experiment and all browser checks. No merge to `main` is claimed.
 
-## Verified Midnight Preprod Deployment & On-Chain Flow - 11 October 2026
+## Reported Midnight Preprod deployment and eight-call flow - 11 October 2026
 
 The public `indexer.preprod.midnight.network` endpoint was decommissioned 2026-10-09 — Blockfrost is now the indexer/RPC provider.
 
-All 12 circuits have been deployed, registered, and executed on Midnight Preprod via incremental shell deployment and individual verifier key registration (`deployment-evidence.json`):
+`deployment-evidence.json` reports shell deployment, eleven additional verifier-key registrations and eight canonical circuit calls. Twelve registered names do not mean twelve executions. Independent raw-transaction, finality, state and verifier-key checks are pending; the receipt file alone is not a verification result.
+
+[The read-only verifier and script audit](NETWORK_RECEIPT_AUDIT_2026-10-11.md) preserve that scope. Eleven metadata rejection tests pass. The authenticated run is pending a Preprod token; no wallet/seed/proving/submission API is loaded by the verifier. Existing deployment-script recovery gaps are documented, not yet repaired.
 
 - **Contract Address:** `b2254962147c9cc2e5b9fbcf39f8a4e0d1f149b7801a651df2e41dda1e4410d9`
 - **Contract Shell Deploy:**
@@ -50,7 +53,7 @@ All 12 circuits have been deployed, registered, and executed on Midnight Preprod
 
 ### Full 8-Step On-Chain Circuit Flow Execution
 
-The complete multi-role circuit sequence was executed and confirmed on-chain:
+The deployment script recorded the following eight reported confirmations. Its signing keys are derived in one process from the same mnemonic, and reserve/redemption accounting does not transfer assets:
 
 | Step | Circuit | Transaction Hash | Block Height |
 |---|---|---|---|

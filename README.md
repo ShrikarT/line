@@ -8,6 +8,10 @@ The executable starting point is [`/checkout`](docs/PRODUCT_WALKTHROUGH.md): a d
 
 The [private-book pool experiment](docs/PRIVATE_POOL_2026-10-11.md) adds compiled two-borrower/key-separated feasibility checks. It still fails historical privacy and its real proof coverage is incomplete. The owner has authorized [a versioned amount/reserve disclosure redesign](docs/PRIVACY_REDESIGN_2026-10-11.md); neither the canonical contract nor checkout has migrated.
 
+The [signed private-finance candidate](docs/SIGNED_PRIVATE_FINANCE_2026-10-11.md) now compiles and exercises all twelve names with committed reserve/note/quote state and external role approvals. Signing scalars stay in child signers; reserve openings stay with the trusted prover. The private lifecycle passes 38 accepted calls and 38 rejection controls. Full-history privacy, real candidate proofs, durable institutional custody and migration remain unproven.
+
+New `main` reports a canonical Preprod deployment and eight circuit calls. [Independent receipt checks and recovery findings](docs/NETWORK_RECEIPT_AUDIT_2026-10-11.md) distinguish those reported calls from twelve verifier registrations and actual asset settlement. The read-only live check is pending a Preprod project token.
+
 ## Try the procurement evaluation
 
 The [11 October audit update](docs/AUDIT_UPDATE_2026-10-11.md) reviews the newer code and branding. A separate [local proof experiment](docs/LOCAL_PROOF_VERIFICATION_2026-10-11.md) generates and cryptographically verifies 19 contract proofs across all twelve circuits, with invalid-proof controls. It uses synthetic ledger state with fee balancing disabled; it establishes no network finality, independent canonical custody, historical privacy or asset payment. The checkout and consoles remain separate execution paths.
