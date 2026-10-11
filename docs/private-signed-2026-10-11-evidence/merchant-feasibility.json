@@ -1,9 +1,9 @@
 {
   "schema": "line-private-merchant-feasibility/v1",
-  "createdAt": "2026-10-11T07:48:02.278Z",
-  "sourceSha256": "1601682473abccaaa9eb3790434f1673ded41d34e22c057688bca687e04c4b6e",
+  "createdAt": "2026-10-11T09:38:45.955Z",
+  "sourceSha256": "afb75b1bf6156500e63e75fb2d7a69bc002bf84daf15736c4aa2fbd99cb9a4b7",
   "artifactFingerprints": {
-    "contract/index.js": "bea9d2eb223bd8db1d70f1f1ec57ccf841727d35bdeaa5bba3268ea2653c8880",
+    "contract/index.js": "db00d5035da207badfe34662d8662797c8a15edf51539e60d072d54a23bfd570",
     "compiler/contract-info.json": "7a374b77b08691daa30251ee7486b60fe726811f6853204fb7b25995277559c2"
   },
   "compiler": "0.31.1",
@@ -30,6 +30,8 @@
   "signingScalarsInCoordinatorOrCircuitWitnesses": false,
   "reserveOpeningsSentToSigners": false,
   "privateBooksHeldByTrustedCoordinator": true,
+  "expirySignerFinancialOpenings": false,
+  "refundSignerBookOrReserveOpenings": false,
   "syntheticSignerPolicy": true,
   "durableInstitutionalCustody": false,
   "currentRootOnly": true,
@@ -40,6 +42,35 @@
   "authenticAssetSettlement": false,
   "customerDemandValidated": false,
   "selectedMerchantAbsentFromQuoteAndDrawView": true,
+  "noSeparateFacilityExpiryQueryInDraw": true,
+  "zeroObligationAcknowledgmentSupported": true,
+  "uniformAcknowledgmentSchedulingImplemented": false,
+  "isolatedGeneratedBranches": [
+    "last-second-draw",
+    "zero-cash-compensation",
+    "zero-obligation-acknowledgment",
+    "alternate-repayment-expiry-allocation-acknowledgment-history"
+  ],
+  "refundCounterfactual": {
+    "privateRepayments": [
+      "100",
+      "600"
+    ],
+    "privatePostAllocationDebts": [
+      "448",
+      "0"
+    ],
+    "privateCashAmounts": [
+      "0",
+      "52"
+    ],
+    "samePublicActionNames": true,
+    "acknowledgmentInputsExactlyEqual": true,
+    "acknowledgmentOutputsExactlyEqual": true,
+    "cashAmountWordAbsent": true,
+    "completeObserverEquivalence": false,
+    "nativeProofsGenerated": false
+  },
   "residualRisks": [
     "public registry, finite merchant sets and fixed-price catalogs",
     "deadlines, public action shapes and timing",
@@ -92,6 +123,12 @@
     },
     {
       "actor": "merchant-b",
+      "circuit": "postQuote",
+      "signingScalarWitnesses": 0,
+      "reserveEpoch": "1"
+    },
+    {
+      "actor": "merchant-a",
       "circuit": "postQuote",
       "signingScalarWitnesses": 0,
       "reserveEpoch": "1"
@@ -343,6 +380,14 @@
       "rejectedByGeneratedCompact": true
     },
     {
+      "check": "claim-cannot-outlive-facility",
+      "rejectedByGeneratedCompact": true
+    },
+    {
+      "check": "note-deadline-exact-cutoff",
+      "rejectedByGeneratedCompact": true
+    },
+    {
       "check": "stale-registered-merchant-root",
       "rejectedByGeneratedCompact": true
     },
@@ -416,6 +461,26 @@
     },
     {
       "check": "allocation-owner-or-issuer-only",
+      "rejectedByGeneratedCompact": true
+    },
+    {
+      "check": "zero-obligation-ack-issuer-only",
+      "rejectedByGeneratedCompact": true
+    },
+    {
+      "check": "no-obligation-positive-report",
+      "rejectedByGeneratedCompact": true
+    },
+    {
+      "check": "zero-obligation-ack-replay",
+      "rejectedByGeneratedCompact": true
+    },
+    {
+      "check": "cash-obligation-zero-report",
+      "rejectedByGeneratedCompact": true
+    },
+    {
+      "check": "cash-obligation-wrong-amount",
       "rejectedByGeneratedCompact": true
     },
     {
@@ -509,6 +574,7 @@
     {
       "circuit": "draw",
       "selectedIdentityOrInputBookOrSaltRedisclosed": false,
+      "separateFacilityExpiryQuery": false,
       "publicPrincipalField": false,
       "publicReserveTotals": false,
       "completePrivacyCertified": false
@@ -516,6 +582,7 @@
     {
       "circuit": "draw",
       "selectedIdentityOrInputBookOrSaltRedisclosed": false,
+      "separateFacilityExpiryQuery": false,
       "publicPrincipalField": false,
       "publicReserveTotals": false,
       "completePrivacyCertified": false
@@ -523,6 +590,7 @@
     {
       "circuit": "draw",
       "selectedIdentityOrInputBookOrSaltRedisclosed": false,
+      "separateFacilityExpiryQuery": false,
       "publicPrincipalField": false,
       "publicReserveTotals": false,
       "completePrivacyCertified": false
@@ -530,6 +598,7 @@
     {
       "circuit": "draw",
       "selectedIdentityOrInputBookOrSaltRedisclosed": false,
+      "separateFacilityExpiryQuery": false,
       "publicPrincipalField": false,
       "publicReserveTotals": false,
       "completePrivacyCertified": false
@@ -537,6 +606,7 @@
     {
       "circuit": "draw",
       "selectedIdentityOrInputBookOrSaltRedisclosed": false,
+      "separateFacilityExpiryQuery": false,
       "publicPrincipalField": false,
       "publicReserveTotals": false,
       "completePrivacyCertified": false

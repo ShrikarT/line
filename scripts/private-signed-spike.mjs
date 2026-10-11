@@ -88,12 +88,20 @@ export async function runPrivateSignedFixture({compiledDir,onInitialize,onAccept
    const full={nullifierKey,reserveOpening:ps.reserve.book,reserveSalt:ps.reserve.salt,newReserveSalt:bytes(),newNoteMetaSalt:bytes(),newQuoteMetaSalt:bytes(),
     ...(noteRecord?{noteMetaOpening:noteRecord.meta,noteMetaSalt:noteRecord.salt}:{}),
     ...(quoteRecord?{quoteMetaOpening:quoteRecord.meta,quoteMetaSalt:quoteRecord.salt}:{}),...values};
+   if(name==='cancelOrExpireNote'){
+    const dummy={domain,identity:roleHash('agent',points[roles.indexOf(role)].pk,domain),limit:0n,outstanding:0n,epoch:0n,generation:0n,expiry:0n,flatFee:0n,basisPoints:0n,status:0};
+    const defaults={bookOpening:dummy,bookPath:v.books.findPathForLeaf(commit(bookA,saltA)),salt:bytes(),newSalt:bytes(),repayAmount:0n,paymentRef:new Uint8Array(32),
+     noteIdentity:dummy.identity,noteGeneration:0n,noteQuoteCommit:args[0],quoteMerchantPk:mA,noteNonce:bytes(),noteSalt:bytes()};
+    for(const [key,value]of Object.entries(defaults))if(!(key in full))full[key]=value;
+   }
    let circuitArgs=args;
    if(name==='fundReserve'||name==='withdrawUnencumberedReserve'){full.reserveAmount=args[0];circuitArgs=[];}
    if(name==='draw'){full.drawFee=args[2];circuitArgs=args.slice(0,2);}
    if(name==='openLine'){full.lineFlatFee=args[2];full.lineBasisPoints=args[3];circuitArgs=args.slice(0,2);}
    if(name==='setStatus'){full.requestedStatus=args[0];circuitArgs=[];}
-   const {reserveOpening,reserveSalt,newReserveSalt,nullifierKey:ignoredKey,...selected}=full;
+   const {reserveOpening,reserveSalt,newReserveSalt,nullifierKey:ignoredKey,...selectedValues}=full;
+   const selected=name==='cancelOrExpireNote'&&args[1]===0n?{}:
+    name==='cancelOrExpireNote'&&args[1]===2n?{repayAmount:full.repayAmount,paymentRef:full.paymentRef}:selectedValues;
    let approval;
    try{approval=await actors[role].approve({name,args,values:selected,domain,privateFinance:true,reserveCommit:v.reserveCommit,
     feeReserve:role==='issuer'?ps.reserve.book.feeReserve:undefined});}
@@ -246,6 +254,7 @@ export async function runPrivateSignedFixture({compiledDir,onInitialize,onAccept
    compiler:info['compiler-version'],runtime:info['runtime-version'],freshCompilation:!cached,cachedGeneratedBindings:cached,sourceBindingVerifiedByThisRun:!cached,
    exportedCircuits:info.circuits.map(c=>c.name),canonicalModified:false,independentSignerProcesses:6,
    signingScalarsInCoordinatorOrCircuitWitnesses:false,reserveOpeningsSentToSigners:false,privateBooksHeldByTrustedCoordinator:true,
+   expirySignerFinancialOpenings:false,refundSignerBookOrReserveOpenings:false,
    syntheticSignerPolicy:true,durableInstitutionalCustody:false,currentRootOnly:true,publicAmountsAndReserveTotalsAbsent:true,
    fullHistoryPrivacyPassed:false,cryptographicProofsGenerated:false,networkSubmitted:false,authenticAssetSettlement:false,customerDemandValidated:false,
    residualRisks:['selected merchant and fixed-price catalogs','deadlines, public action shapes and timing','sender, DUST and prover metadata','trusted book/reserve prover and synthetic signer policy','finite population and side information'],

@@ -175,7 +175,8 @@ async function main(){
    // Only diagnostic categories from this synthetic run; never retain payloads
    // or log raw witness/preimage bytes in the public evidence report.
    const lines=(diagnostic.stdout+'\n'+diagnostic.stderr).split('\n').filter(line=>/panicked|ERROR|check.*failed|invalid|constraint/i.test(line));
-   failure.proverDiagnostic=lines.map(line=>line.replace(/[0-9a-fA-F]{32,}/g,'[redacted bytes]').replace(/\b\d{8,}\b/g,'[redacted number]').slice(0,400)).slice(-6);
+   failure.proverDiagnostic=lines.map(line=>line.replace(/\(inputs:.*alignment:/,'(inputs: [redacted], alignment:')
+    .replace(/[0-9a-fA-F]{32,}/g,'[redacted bytes]').replace(/\b\d{8,}\b/g,'[redacted number]').slice(0,400)).slice(-6);
   }
   checkpoint();throw error;
  }

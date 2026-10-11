@@ -91,6 +91,12 @@ export async function runPrivateMerchantFixture({compiledDir,onInitialize,onAcce
    const full={nullifierKey,reserveOpening:ps.reserve.book,reserveSalt:ps.reserve.salt,newReserveSalt:bytes(),newNoteMetaSalt:bytes(),newQuoteMetaSalt:bytes(),
     ...(noteRecord?{noteMetaOpening:noteRecord.meta,noteMetaSalt:noteRecord.salt}:{}),
     ...(quoteRecord?{quoteMetaOpening:quoteRecord.meta,quoteMetaSalt:quoteRecord.salt}:{}),...values};
+   if(name==='cancelOrExpireNote'){
+    const dummy={domain,identity:roleHash('agent',points[roles.indexOf(role)].pk,domain),limit:0n,outstanding:0n,epoch:0n,generation:0n,expiry:0n,flatFee:0n,basisPoints:0n,status:0};
+    const defaults={bookOpening:dummy,bookPath:v.books.findPathForLeaf(commit(bookA,saltA)),salt:bytes(),newSalt:bytes(),repayAmount:0n,paymentRef:new Uint8Array(32),
+     noteIdentity:dummy.identity,noteGeneration:0n,noteQuoteCommit:args[0],quoteMerchantPk:mA,noteNonce:bytes(),noteSalt:bytes()};
+    for(const [key,value]of Object.entries(defaults))if(!(key in full))full[key]=value;
+   }
    if(name==='postQuote'||name==='draw'){
     const m=name==='postQuote'?roleHash('merchant',points[roles.indexOf(role)].pk):full.quoteMerchantPk;
     const enabled=v.enabledMerchantTree.findPathForLeaf(m);
@@ -104,7 +110,9 @@ export async function runPrivateMerchantFixture({compiledDir,onInitialize,onAcce
    if(name==='draw'){full.drawFee=args[2];circuitArgs=args.slice(0,2);}
    if(name==='openLine'){full.lineFlatFee=args[2];full.lineBasisPoints=args[3];circuitArgs=args.slice(0,2);}
    if(name==='setStatus'){full.requestedStatus=args[0];circuitArgs=[];}
-   const {reserveOpening,reserveSalt,newReserveSalt,nullifierKey:ignoredKey,...selected}=full;
+   const {reserveOpening,reserveSalt,newReserveSalt,nullifierKey:ignoredKey,...selectedValues}=full;
+   const selected=name==='cancelOrExpireNote'&&args[1]===0n?{}:
+    name==='cancelOrExpireNote'&&args[1]===2n?{repayAmount:full.repayAmount,paymentRef:full.paymentRef}:selectedValues;
    let approval;
    try{approval=await actors[role].approve({name,args,values:selected,domain,privateFinance:true,reserveCommit:v.reserveCommit,
     feeReserve:role==='issuer'?ps.reserve.book.feeReserve:undefined});}
@@ -169,9 +177,10 @@ export async function runPrivateMerchantFixture({compiledDir,onInitialize,onAcce
    const next=advance(book,book.outstanding+q.amount+book.flatFee);assert(current.books.findPathForLeaf(commit(next,values.newSalt)));
    const publicData=result.public.transcript+result.public.input+result.public.output;
    for(const selected of [book.identity,commit(book,salt),salt])assert(!publicData.includes(hex(selected)));
+   if(q.expiry!==book.expiry)assert(!publicData.includes(hex(RT.convertFieldToBytes(32,book.expiry,'private facility expiry'))),'A draw must not repeat its selected facility expiry.');
    // Distinctive amount words exceed this fixture's public action/count values.
    if(q.amount>100n)assert(!publicData.includes(hex(RT.convertFieldToBytes(32,q.amount,'privacy amount fixture'))));
-   disclosureChecks.push({circuit:'draw',selectedIdentityOrInputBookOrSaltRedisclosed:false,publicPrincipalField:false,publicReserveTotals:false,completePrivacyCertified:false});
+   disclosureChecks.push({circuit:'draw',selectedIdentityOrInputBookOrSaltRedisclosed:false,separateFacilityExpiryQuery:false,publicPrincipalField:false,publicReserveTotals:false,completePrivacyCertified:false});
    return {book:next,salt:values.newSalt,values,D,q,state:result.state};
   }
   const noteValues=drawn=>({noteGeneration:drawn.book.generation,noteIdentity:drawn.book.identity,noteQuoteCommit:drawn.q.Q,
@@ -197,6 +206,13 @@ export async function runPrivateMerchantFixture({compiledDir,onInitialize,onAcce
   await open('agent-b',bId,bookB,saltB);
   const qa=await quote('merchant-a',bookA,317n),qb=await quote('merchant-b',bookB,541n),racing=await quote('merchant-a',bookA,113n,BigInt(NOW+100));
   const drawValues={...bookValues(bookA,saltA),invoiceId:qa.invoiceId,quoteNonce:qa.quoteNonce,drawAmount:qa.amount,quoteMerchantPk:mA,noteNonce:bytes(),noteSalt:bytes()};
+  const lateQuote=await quote('merchant-a',bookA,31n,bookA.expiry+100n);
+  await reject('claim-cannot-outlive-facility','agent-a','draw',[lateQuote.Q,lateQuote.expiry,7n],
+   {...drawValues,invoiceId:lateQuote.invoiceId,quoteNonce:lateQuote.quoteNonce,drawAmount:lateQuote.amount});
+  await reject('note-deadline-exact-cutoff','agent-a','draw',[qa.Q,qa.expiry,7n],drawValues,{time:Number(qa.expiry)});
+  const beforeBoundary=state;
+  await execute('agent-a','draw',[qa.Q,qa.expiry,7n],drawValues,{branch:true,time:Number(qa.expiry)-1});
+  assert.equal(state,beforeBoundary,'The isolated deadline control must not advance the lifecycle.');
   await reject('stale-registered-merchant-root','agent-a','draw',[qa.Q,qa.expiry,7n],{...drawValues,registeredMerchantPath:initialRegisteredPath});
   await reject('wrong-registered-merchant-leaf','agent-a','draw',[qa.Q,qa.expiry,7n],{...drawValues,registeredMerchantPath:view().registeredMerchantTree.findPathForLeaf(mB)});
   await reject('historic-singleton-root-rejected','agent-a','draw',[qa.Q,qa.expiry,7n],{...drawValues,bookPath:singletonPath});
@@ -229,13 +245,50 @@ export async function runPrivateMerchantFixture({compiledDir,onInitialize,onAcce
   const noCash=await execute('agent-b','cancelOrExpireNote',[cancelB.D,1n,0n],{...bookValues(bookB,saltB,zeroCashSalt),...noteValues(cancelB)},{branch:true,time:Number(qc.expiry)});
   assert.equal(noCash.privateState.notes[hex(cancelB.D)].meta.cashRefundOwed,false);
   assert.equal(noCash.privateState.reserve.book.refundReserve,0n);assert.equal(state,beforeRepayment);
+  const zeroAckValues={...noteValues(cancelB),salt:zeroCashSalt,repayAmount:0n,paymentRef:bytes()};
+  const zeroAckArgs=[cancelB.D,2n,qc.expiry+1000n];
+  await reject('zero-obligation-ack-issuer-only','agent-b','cancelOrExpireNote',zeroAckArgs,zeroAckValues,
+   {state:noCash.state,time:Number(qc.expiry)});
+  await reject('no-obligation-positive-report','issuer','cancelOrExpireNote',zeroAckArgs,{...zeroAckValues,repayAmount:1n},
+   {state:noCash.state,time:Number(qc.expiry)});
+  const zeroAck=await execute('issuer','cancelOrExpireNote',zeroAckArgs,zeroAckValues,{branch:true,state:noCash.state,time:Number(qc.expiry)});
+  assert.equal(zeroAck.privateState.notes[hex(cancelB.D)].meta.refundAcknowledged,true);
+  for(const field of reserveFields.filter(field=>field!=='epoch'))assert.equal(zeroAck.privateState.reserve.book[field],noCash.privateState.reserve.book[field]);
+  await reject('zero-obligation-ack-replay','issuer','cancelOrExpireNote',zeroAckArgs,{...zeroAckValues,paymentRef:bytes()},
+   {state:zeroAck.state,time:Number(qc.expiry)});
+  // Two reachable histories use the same public action sequence but different
+  // private repayment amounts and post-allocation debts. Proof/network views
+  // are still outside this generated-execution control's scope.
+  const shadowRepaySalt=bytes();
+  const shadowPaid=await execute('issuer','acknowledgeRepayment',[BigInt(NOW+86400)],
+   {...bookValues(bookB,saltB,shadowRepaySalt),repayAmount:100n,paymentRef:bytes(),receiptNonce:bytes()},{branch:true});
+  const shadowBook=advance(bookB,bookB.outstanding-100n);
+  const shadowExpired=await execute('attacker','cancelOrExpireNote',[cancelB.D,0n,0n],{},
+   {branch:true,state:shadowPaid.state,time:Number(qc.expiry)});
+  const shadowAllocSalt=bytes();
+  const shadowAllocated=await execute('issuer','cancelOrExpireNote',[cancelB.D,1n,0n],
+   {...bookValues(shadowBook,shadowRepaySalt,shadowAllocSalt,view(shadowExpired.state).books.findPathForLeaf(commit(shadowBook,shadowRepaySalt))),...noteValues(cancelB)},
+   {branch:true,state:shadowExpired.state,time:Number(qc.expiry)});
+  assert.equal(shadowAllocated.privateState.notes[hex(cancelB.D)].meta.cashRefundOwed,false);
+  const shadowRemaining=advance(shadowBook,shadowBook.outstanding-78n);
+  assert(view(shadowAllocated.state).books.findPathForLeaf(commit(shadowRemaining,shadowAllocSalt)));
+  const shadowAck=await execute('issuer','cancelOrExpireNote',zeroAckArgs,
+   {...noteValues(cancelB),salt:shadowAllocSalt,repayAmount:0n,paymentRef:bytes()},
+   {branch:true,state:shadowAllocated.state,time:Number(qc.expiry)});
   paid=await repay(bookB,saltB,600n);bookB=paid.book;saltB=paid.salt;
   time=Number(qc.expiry);await invoke('attacker','cancelOrExpireNote',[cancelB.D,0n,0n]);
   let refundSalt=bytes();await invoke('issuer','cancelOrExpireNote',[cancelB.D,1n,0n],{...bookValues(bookB,saltB,refundSalt),...noteValues(cancelB)});
   bookB=advance(bookB,0n);saltB=refundSalt;assert(view().books.findPathForLeaf(commit(bookB,saltB)));
+  await reject('cash-obligation-zero-report','issuer','cancelOrExpireNote',[cancelB.D,2n,BigInt(time+1000)],
+   {...noteValues(cancelB),salt:refundSalt,repayAmount:0n,paymentRef:bytes()});
+  await reject('cash-obligation-wrong-amount','issuer','cancelOrExpireNote',[cancelB.D,2n,BigInt(time+1000)],
+   {...noteValues(cancelB),salt:refundSalt,repayAmount:51n,paymentRef:bytes()});
   await reject('refund-issuer-only','agent-b','cancelOrExpireNote',[cancelB.D,2n,BigInt(time+1000)],
    {...noteValues(cancelB),salt:refundSalt,repayAmount:52n,paymentRef:bytes()});
-  await invoke('issuer','cancelOrExpireNote',[cancelB.D,2n,BigInt(time+1000)],{...noteValues(cancelB),salt:refundSalt,repayAmount:52n,paymentRef:bytes()});
+  const cashAck=await invoke('issuer','cancelOrExpireNote',[cancelB.D,2n,BigInt(time+1000)],{...noteValues(cancelB),salt:refundSalt,repayAmount:52n,paymentRef:bytes()});
+  assert.equal(shadowAck.public.input,cashAck.public.input,'Cash and zero-obligation acknowledgment inputs must match in this fixture.');
+  assert.equal(shadowAck.public.output,cashAck.public.output);
+  for(const observed of [shadowAck.public,cashAck.public])assert(!(observed.transcript+observed.input+observed.output).includes(hex(RT.convertFieldToBytes(32,52n,'private cash amount'))));
   await reject('compensation-replay','issuer','cancelOrExpireNote',[cancelB.D,1n,0n],{...bookValues(bookB,saltB),...noteValues(cancelB)});
   refundSalt=bytes();await invoke('agent-a','cancelOrExpireNote',[oldA.D,1n,0n],{...bookValues(bookA,saltA,refundSalt),...noteValues(oldA)});
   bookA=advance(bookA,96n);saltA=refundSalt;assert(view().books.findPathForLeaf(commit(bookA,saltA)));
@@ -271,9 +324,15 @@ export async function runPrivateMerchantFixture({compiledDir,onInitialize,onAcce
    compiler:info['compiler-version'],runtime:info['runtime-version'],freshCompilation:!cached,cachedGeneratedBindings:cached,sourceBindingVerifiedByThisRun:!cached,
    exportedCircuits:info.circuits.map(c=>c.name),canonicalModified:false,independentSignerProcesses:6,
    signingScalarsInCoordinatorOrCircuitWitnesses:false,reserveOpeningsSentToSigners:false,privateBooksHeldByTrustedCoordinator:true,
+   expirySignerFinancialOpenings:false,refundSignerBookOrReserveOpenings:false,
    syntheticSignerPolicy:true,durableInstitutionalCustody:false,currentRootOnly:true,publicAmountsAndReserveTotalsAbsent:true,
    fullHistoryPrivacyPassed:false,cryptographicProofsGenerated:false,networkSubmitted:false,authenticAssetSettlement:false,customerDemandValidated:false,
-   selectedMerchantAbsentFromQuoteAndDrawView:true,
+   selectedMerchantAbsentFromQuoteAndDrawView:true,noSeparateFacilityExpiryQueryInDraw:true,
+   zeroObligationAcknowledgmentSupported:true,uniformAcknowledgmentSchedulingImplemented:false,
+   isolatedGeneratedBranches:['last-second-draw','zero-cash-compensation','zero-obligation-acknowledgment','alternate-repayment-expiry-allocation-acknowledgment-history'],
+   refundCounterfactual:{privateRepayments:['100','600'],privatePostAllocationDebts:[shadowRemaining.outstanding.toString(),bookB.outstanding.toString()],
+    privateCashAmounts:['0','52'],samePublicActionNames:true,acknowledgmentInputsExactlyEqual:true,acknowledgmentOutputsExactlyEqual:true,
+    cashAmountWordAbsent:true,completeObserverEquivalence:false,nativeProofsGenerated:false},
    residualRisks:['public registry, finite merchant sets and fixed-price catalogs','deadlines, public action shapes and timing','sender, DUST and prover metadata','trusted book/reserve prover and synthetic signer policy','finite population and side information'],
    traces,negativeChecks,signatureChecks,disclosureChecks,syntheticFinalAccounting:{T:r.totalReserve.toString(),R:r.redeemedReserve.toString(),X:r.reportedRefundReserve.toString()}};
   writeFileSync(join(work,'evidence.json'),JSON.stringify(report,null,2)+'\n');

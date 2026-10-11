@@ -1,9 +1,9 @@
 {
   "schema": "line-private-signed-feasibility/v1",
-  "createdAt": "2026-10-11T07:35:22.761Z",
-  "sourceSha256": "cb5a869f460d7a9bbb4703f36290fb792597f9c5d3ced0c894d352d62264c307",
+  "createdAt": "2026-10-11T09:38:42.711Z",
+  "sourceSha256": "a8d14adf0ba44b70cf5f9551d63f60cd887720797664950d7b5d82a661b6ebcc",
   "artifactFingerprints": {
-    "contract/index.js": "fda71901f20d77f5acac0c0fa38588e989f2e840d052afa437be6d12f7078bde",
+    "contract/index.js": "de90231c9011b48b5d5702e9ce20191f0ce301e87432bd279791e30f25a4617f",
     "compiler/contract-info.json": "cbfcc2802b409ef2b68b3f6ef4d8bd90d9f033277ba72e83d38960ece49711ca"
   },
   "compiler": "0.31.1",
@@ -30,6 +30,8 @@
   "signingScalarsInCoordinatorOrCircuitWitnesses": false,
   "reserveOpeningsSentToSigners": false,
   "privateBooksHeldByTrustedCoordinator": true,
+  "expirySignerFinancialOpenings": false,
+  "refundSignerBookOrReserveOpenings": false,
   "syntheticSignerPolicy": true,
   "durableInstitutionalCustody": false,
   "currentRootOnly": true,

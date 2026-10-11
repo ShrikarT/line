@@ -419,59 +419,70 @@ export circuit cancelOrExpireNote(noteCommitPublic: Bytes<32>, action: Uint<8>, 
   const meta = readNote(D); const r = readReserve(); assert(!meta.redeemed, "note redeemed");
   const cost = ((meta.amount + meta.fee) as Uint<64>);
   const caller = rolePublicKey(); const callerIdentity = agentId(caller); const callerIssuer = issuerPublicKey(caller);
-  const b = mode == 1 ? readBook() : default<Book>;
-  const amount = mode == 2 ? repayAmount() : 0;
-  const ref = mode == 2 ? paymentRef() : default<Bytes<32>>;
-  const body = mode == 1 ? persistentHash<Vector<5, Bytes<32>>>([D, encodeU64(mode as Uint<64>), bookCommit(b, salt()), newSalt(), encodeU64(receiptExpiry)])
-    : mode == 2 ? persistentHash<Vector<5, Bytes<32>>>([D, encodeU64(mode as Uint<64>), encodeU64(receiptExpiry), encodeU64(amount), ref]) : D;
-  // One unconditional curve verification avoids invalid inactive point inputs.
-  // Expiry accepts any signing key; allocation/refund keep their role checks.
+  // Prepare every typed preimage before action selection. Only allocation
+  // validates/spends a book; unused inputs in other actions may be dummies.
+  const b = bookOpening(); const bSalt = salt(); const nextSalt = newSalt(); const path = bookPath();
+  const inputBook = bookCommit(b, bSalt); const inputRoot = merkleTreePathRoot<20, Bytes<32>>(path);
+  const N = persistentHash<Vector<4, Bytes<32>>>([pad(32, "line:pool:book-spend"), contractDomain, inputBook, bSalt]);
+  const owner = noteIdentity(); const generation = noteGeneration();
+  const p = DrawNotePreimage { domain: contractDomain, lineGeneration: generation, identity: owner,
+    quoteCommit: noteQuoteCommit(), merchantPk: quoteMerchantPk(), amount: meta.amount, fee: meta.fee,
+    noteNonce: noteNonce(), expiry: meta.expiry };
+  const originalNote = noteCommit(p, noteSalt());
+  const same = generation == b.generation;
+  const refundAmount = same ? cashRefundAmount(b.outstanding, cost) : cost;
+  const cashOwed = refundAmount > 0;
+  const balance = mode == 1 ? (same ? debtAfterCredit(b.outstanding, cost) : b.outstanding) : b.outstanding;
+  const next = Book { domain: b.domain, identity: b.identity, limit: b.limit, outstanding: balance,
+    epoch: ((b.epoch + (mode == 1 ? 1 : 0)) as Uint<64>), generation: b.generation, expiry: b.expiry,
+    flatFee: b.flatFee, basisPoints: b.basisPoints, status: b.status };
+  const nextBook = bookCommit(next, nextSalt);
+  const allocatedRp = RefundPreimage { domain: contractDomain, lineGeneration: generation, identity: owner, noteCommit: D, amount: refundAmount };
+  const allocatedRefund = refundCommit(allocatedRp, nextSalt);
+  const amount = repayAmount(); const ref = paymentRef();
+  const reportRp = RefundPreimage { domain: contractDomain, lineGeneration: generation, identity: owner, noteCommit: D, amount: amount };
+  const reportedRefund = refundCommit(reportRp, bSalt);
+  const P = paymentNullifier(stableNullifierKey(), ref);
+  const allocationBody = persistentHash<Vector<5, Bytes<32>>>([D, encodeU64(mode as Uint<64>), inputBook, nextSalt, encodeU64(receiptExpiry)]);
+  const refundBody = persistentHash<Vector<5, Bytes<32>>>([D, encodeU64(mode as Uint<64>), encodeU64(receiptExpiry), encodeU64(amount), ref]);
+  const body = mode == 1 ? allocationBody : mode == 2 ? refundBody : D;
   requireApproval(approvalMessage(10, body));
   if (mode == 0) {
     const expired = !kernel.blockTimeLessThan(disclose(meta.expiry));
     assert(!meta.cancelled && expired, "note not expired or already cancelled");
-    writeNote(D, NoteMeta { amount: meta.amount, fee: meta.fee, redeemed: false, cancelled: true, expiry: meta.expiry,
-      compensationAllocated: false, refundCommitment: default<Bytes<32>>, cashRefundOwed: false,
-      refundAcknowledged: false, refundPaymentNullifier: default<Bytes<32>> });
-    rotateReserve(r, r.totalReserve, ((r.encumberedReserve - meta.amount) as Uint<64>), r.redeemedReserve, r.feeReserve,
-      ((r.pendingFeeReserve - meta.fee) as Uint<64>), ((r.refundReserve + cost) as Uint<64>), r.reportedRefundReserve);
   } else if (mode == 1) {
     assert(!meta.compensationAllocated, "compensation replay");
     const expired = !kernel.blockTimeLessThan(disclose(meta.expiry)); assert(meta.cancelled || expired, "note not expired");
-    const owner = noteIdentity(); const generation = noteGeneration();
-    const p = DrawNotePreimage { domain: contractDomain, lineGeneration: generation, identity: owner,
-      quoteCommit: noteQuoteCommit(), merchantPk: quoteMerchantPk(), amount: meta.amount, fee: meta.fee,
-      noteNonce: noteNonce(), expiry: meta.expiry };
-    assert(disclose(noteCommit(p, noteSalt())) == D, "compensation note opening");
+    assert(disclose(originalNote) == D, "compensation note opening");
     assert(callerIssuer == issuer || callerIdentity == owner, "compensation authority");
+    assert(b.domain == contractDomain && path.leaf == inputBook, "compensation book opening");
+    assert(books.checkRoot(disclose(inputRoot)), "book current root");
     assert(b.identity == owner && generation <= b.generation, "compensation book owner/generation");
-    const same = generation == b.generation; const refundAmount = same ? cashRefundAmount(b.outstanding, cost) : cost;
-    const cashOwed = refundAmount > 0;
-    const newE = meta.cancelled ? r.encumberedReserve : ((r.encumberedReserve - meta.amount) as Uint<64>);
-    const newP = meta.cancelled ? r.pendingFeeReserve : ((r.pendingFeeReserve - meta.fee) as Uint<64>);
-    const held = meta.cancelled ? r.refundReserve : ((r.refundReserve + cost) as Uint<64>);
-    const newU = cashOwed ? held : ((held - cost) as Uint<64>);
-    rotateReserve(r, r.totalReserve, newE, r.redeemedReserve, r.feeReserve, newP, newU, r.reportedRefundReserve);
-    rotateBook(b, same ? debtAfterCredit(b.outstanding, cost) : b.outstanding, b.status);
-    const rp = RefundPreimage { domain: contractDomain, lineGeneration: generation, identity: owner, noteCommit: D, amount: refundAmount };
-    writeNote(D, NoteMeta { amount: meta.amount, fee: meta.fee, redeemed: false, cancelled: true, expiry: meta.expiry,
-      compensationAllocated: true, refundCommitment: refundCommit(rp, newSalt()), cashRefundOwed: cashOwed,
-      refundAcknowledged: false, refundPaymentNullifier: default<Bytes<32>> });
+    assert(!spentBooks.member(disclose(N)), "book spent");
+    assert(balance <= b.limit && b.epoch < 18446744073709551615, "compensation book capacity/epoch");
+    spentBooks.insert(disclose(N)); books.insert(disclose(nextBook));
   } else {
     assert(meta.cancelled && meta.compensationAllocated && meta.cashRefundOwed && !meta.refundAcknowledged, "refund obligation");
     assert(kernel.blockTimeLessThan(disclose(receiptExpiry)), "refund receipt expiry");
     assert(amount > 0 && amount <= cost, "refund amount");
-    const rp = RefundPreimage { domain: contractDomain, lineGeneration: noteGeneration(), identity: noteIdentity(), noteCommit: D, amount: amount };
-    assert(refundCommit(rp, salt()) == meta.refundCommitment, "refund opening");
-    assert(ref != default<Bytes<32>>, "empty payment reference");
-    assert(callerIssuer == issuer, "not issuer");
-    const P = disclose(paymentNullifier(stableNullifierKey(), ref)); assert(!nullifiers.member(P), "payment used"); nullifiers.insert(P);
-    writeNote(D, NoteMeta { amount: meta.amount, fee: meta.fee, redeemed: false, cancelled: true, expiry: meta.expiry,
-      compensationAllocated: true, refundCommitment: meta.refundCommitment, cashRefundOwed: true,
-      refundAcknowledged: true, refundPaymentNullifier: P });
-    rotateReserve(r, r.totalReserve, r.encumberedReserve, r.redeemedReserve, r.feeReserve, r.pendingFeeReserve,
-      ((r.refundReserve - cost) as Uint<64>), ((r.reportedRefundReserve + cost) as Uint<64>));
+    assert(reportedRefund == meta.refundCommitment, "refund opening");
+    assert(ref != default<Bytes<32>>, "empty payment reference"); assert(callerIssuer == issuer, "not issuer");
+    assert(!nullifiers.member(disclose(P)), "payment used"); nullifiers.insert(disclose(P));
   }
+  const expiryMove = mode == 0 || (mode == 1 && !meta.cancelled);
+  const releasedPrincipal = expiryMove ? meta.amount : 0; const releasedFee = expiryMove ? meta.fee : 0;
+  const expiredHold = expiryMove ? cost : 0;
+  const allocationRelease = mode == 1 && !cashOwed ? cost : 0;
+  const reportedHold = mode == 2 ? cost : 0;
+  // Zero-obligation acknowledgment moves no holds. All actions use the same
+  // typed reserve/note commitment helpers after their authorization checks.
+  rotateReserve(r, r.totalReserve, ((r.encumberedReserve - releasedPrincipal) as Uint<64>), r.redeemedReserve,
+    r.feeReserve, ((r.pendingFeeReserve - releasedFee) as Uint<64>),
+    ((r.refundReserve + expiredHold - allocationRelease - reportedHold) as Uint<64>), ((r.reportedRefundReserve + reportedHold) as Uint<64>));
+  writeNote(D, NoteMeta { amount: meta.amount, fee: meta.fee, redeemed: false, cancelled: true, expiry: meta.expiry,
+    compensationAllocated: mode != 0, refundCommitment: mode == 1 ? allocatedRefund : mode == 2 ? meta.refundCommitment : default<Bytes<32>>,
+    cashRefundOwed: mode == 1 ? cashOwed : mode == 2 ? meta.cashRefundOwed : false,
+    refundAcknowledged: mode == 2, refundPaymentNullifier: mode == 2 ? P : default<Bytes<32>> });
   actionClock.increment(1);
 }
 export circuit acknowledgeRepayment(receiptExpiry: Uint<64>): [] {
