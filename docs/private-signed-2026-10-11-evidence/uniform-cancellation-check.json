@@ -1,0 +1,45 @@
+{
+  "schema": "line-cancellation-check-only/v1",
+  "sourceSha256": "a8d14adf0ba44b70cf5f9551d63f60cd887720797664950d7b5d82a661b6ebcc",
+  "complete": true,
+  "checks": [
+    {
+      "circuit": "cancelOrExpireNote",
+      "actor": "attacker",
+      "constraintCheckPassed": true,
+      "proofGenerated": false
+    },
+    {
+      "circuit": "cancelOrExpireNote",
+      "actor": "issuer",
+      "constraintCheckPassed": true,
+      "proofGenerated": false
+    },
+    {
+      "circuit": "cancelOrExpireNote",
+      "actor": "issuer",
+      "constraintCheckPassed": true,
+      "proofGenerated": false
+    },
+    {
+      "circuit": "cancelOrExpireNote",
+      "actor": "agent-a",
+      "constraintCheckPassed": true,
+      "proofGenerated": false
+    },
+    {
+      "circuit": "cancelOrExpireNote",
+      "actor": "issuer",
+      "constraintCheckPassed": true,
+      "proofGenerated": false
+    }
+  ],
+  "generatedSetupCalls": 33,
+  "setupCallsCryptographicallyVerified": false,
+  "proofsGenerated": false,
+  "nativeVerification": false,
+  "networkSubmitted": false,
+  "authenticAssetSettlement": false,
+  "fullHistoryPrivacyPassed": false,
+  "scope": "Source-bound generated setup followed by real loopback constraint checks only. No /prove request or cryptographic proof verification."
+}
