@@ -10,7 +10,9 @@ Updated: 11 October 2026. This guide separates the executable local checkout, re
 | Canonical Preprod contract | Deployment evidence records twelve registered verifier keys and eight executed calls at `b2254962147c9cc2e5b9fbcf39f8a4e0d1f149b7801a651df2e41dda1e4410d9` | [Independent receipt reconciliation](NETWORK_RECEIPT_AUDIT_2026-10-11.md) awaits authenticated access; registrations are not twelve executions or payouts |
 | Canonical local proofs | Nineteen native-verified calls across all twelve names, with corrupted-proof controls | [Synthetic ledger with fee balancing disabled](LOCAL_PROOF_VERIFICATION_2026-10-11.md); separate from the checkout and network |
 | Private-finance source `a8d14adf` | Thirty-eight native-verified calls across all twelve names; five corrupted draws rejected | [Separate experimental ABI](SIGNED_PRIVATE_FINANCE_2026-10-11.md); no deployment, full-history privacy or institutional custody claim |
-| Merchant source `afb75b1` | Thirty-nine generated lifecycle calls / 55 rejection controls and seven isolated generated branches | [Merchant membership/privacy prototype](PRIVATE_MERCHANT_2026-10-11.md); twelve fresh key pairs complete, native verification underway |
+| Merchant source `afb75b1` | Thirty-nine lifecycle plus seven isolated native-verified calls across all twelve names; six corrupted draws rejected; 55 generated rejection controls | [Merchant membership/privacy prototype](PRIVATE_MERCHANT_2026-10-11.md); separate experimental ABI, synthetic ledger, no deployment or full-history privacy claim |
+
+The paired refund histories have valid native proofs, but their final acknowledgments differ by one serialized byte (6468 versus 6467). This remains unresolved. The [durable software signer](DURABLE_APPROVAL_SIGNER_2026-10-11.md) has separate persistence/crash controls and is not the signer used by this native run.
 
 Show the exact source/commit and matching receipt for each path. A deployment screenshot must not be presented as evidence that the privacy candidate or browser checkout executes on chain. Funding/redemption/refund counters do not establish asset transfers.
 

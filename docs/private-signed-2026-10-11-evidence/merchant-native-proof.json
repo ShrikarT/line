@@ -1,0 +1,1014 @@
+{
+  "schema": "line-private-merchant-proof/v1",
+  "createdAt": "2026-10-11T12:11:08.945Z",
+  "complete": true,
+  "sourceSha256": "afb75b1bf6156500e63e75fb2d7a69bc002bf84daf15736c4aa2fbd99cb9a4b7",
+  "artifacts": {
+    "contract/index.js": {
+      "sha256": "db00d5035da207badfe34662d8662797c8a15edf51539e60d072d54a23bfd570",
+      "bytes": 586808
+    },
+    "compiler/contract-info.json": {
+      "sha256": "7a374b77b08691daa30251ee7486b60fe726811f6853204fb7b25995277559c2",
+      "bytes": 33594
+    },
+    "keys/registerMerchant.prover": {
+      "sha256": "24d2ccfe5dd9f52071434ba2c41cda936b5f72626821d032c55e6908e2afd6ec",
+      "bytes": 11071610
+    },
+    "keys/registerMerchant.verifier": {
+      "sha256": "9ee96d535017addc7ddf4926f00dd105539de5b34d1b07c73f4645767a6f2eac",
+      "bytes": 2311
+    },
+    "zkir/registerMerchant.bzkir": {
+      "sha256": "a7aa1db823f3d581ff0f31d004a55d8d95403503f141717e5defa685ed44edc1",
+      "bytes": 1851
+    },
+    "keys/disableMerchant.prover": {
+      "sha256": "c14833df580128835c9e18ea45704d65fc39f7d529284b5ed41e5bc421eceb36",
+      "bytes": 11063993
+    },
+    "keys/disableMerchant.verifier": {
+      "sha256": "d7d14acd45b7ba1506671a0ca94dddcbabec0dafec38e0bdf87d3771d079302d",
+      "bytes": 2311
+    },
+    "zkir/disableMerchant.bzkir": {
+      "sha256": "45afdf2993ec41de3654b97d8fa5b1b630f8a2b7f6a422c4e77a6b466f9a52ae",
+      "bytes": 1502
+    },
+    "keys/fundReserve.prover": {
+      "sha256": "fb1cced00945bb4834355c7996d7d1609970d281271942ede03c68b7a4fc21ab",
+      "bytes": 21655313
+    },
+    "keys/fundReserve.verifier": {
+      "sha256": "2dcb8ffc1c28d3bd7156b7087d19070855845291738a3a6f6f14e569031cb0de",
+      "bytes": 2311
+    },
+    "zkir/fundReserve.bzkir": {
+      "sha256": "52994d1208c81d72e3922c5dd5d693949ddebebfb8469d07619cd4a97f5818ca",
+      "bytes": 1643
+    },
+    "keys/withdrawUnencumberedReserve.prover": {
+      "sha256": "4de081a97246a10d7d36200327607daf490d0a1a71b7328f6a83b4aa5eed5377",
+      "bytes": 21655416
+    },
+    "keys/withdrawUnencumberedReserve.verifier": {
+      "sha256": "4784474ebd40f680d8af041f633ccc0ba274853bbe44a7cd7f2de23cc7222dc2",
+      "bytes": 2311
+    },
+    "zkir/withdrawUnencumberedReserve.bzkir": {
+      "sha256": "28c0c3043826e6ebcf66d187a104aabc7ab089a8820e9997ddd9c4c01fea97cf",
+      "bytes": 1683
+    },
+    "keys/withdrawFees.prover": {
+      "sha256": "a6d66372cf23098a61da047236c1fead6e1c15e025034356ab2cf2860c751df0",
+      "bytes": 21655141
+    },
+    "keys/withdrawFees.verifier": {
+      "sha256": "cd5a405f3f18779f34d0e15962dd4b10b5223406735f52fa5087e384fe870af0",
+      "bytes": 2311
+    },
+    "zkir/withdrawFees.bzkir": {
+      "sha256": "1510843aea7598d1ae63cbdfb2e51aa9587bbe5e77a7803d59e30f93cacdbd5c",
+      "bytes": 1634
+    },
+    "keys/openLine.prover": {
+      "sha256": "06ac609e5aef400b14c8a14eb0f2211d1815ad200c8ec8624be2b1e9dc4151a2",
+      "bytes": 42871407
+    },
+    "keys/openLine.verifier": {
+      "sha256": "31a6f2fd271db33b932b64212cf484454587b16d717929b49793713ea0af28d2",
+      "bytes": 2311
+    },
+    "zkir/openLine.bzkir": {
+      "sha256": "aebe822d64b84213571a32d8802e5d65bb0360bb43254e7f9fb3c1a8a7bf2a1a",
+      "bytes": 5276
+    },
+    "keys/postQuote.prover": {
+      "sha256": "fc61cf45896a66b7d9f405f9b82a7da631f4a7062bcbe362c0ed49f17ece394e",
+      "bytes": 21663982
+    },
+    "keys/postQuote.verifier": {
+      "sha256": "346eeffe05dc6c661466fe4c3eb6acb234d54740d56bb910d2393becd91de155",
+      "bytes": 2311
+    },
+    "zkir/postQuote.bzkir": {
+      "sha256": "90bdb7b167c9d7d3201d487f77a5969aefe698dd9ce49048167bee139b289ed4",
+      "bytes": 2280
+    },
+    "keys/draw.prover": {
+      "sha256": "cbca693ddb33094ef5b605819e8947bbae6193cc15e962bdb212115fa6650c1b",
+      "bytes": 85082451
+    },
+    "keys/draw.verifier": {
+      "sha256": "f5d7b93a4a27599c8b96136400bc6abaf0aad4afb8b75a42ac7177c28b938dc7",
+      "bytes": 2311
+    },
+    "zkir/draw.bzkir": {
+      "sha256": "c831397ae02eb6e67d2db63ec09ec33e5e0fe94bab408f8aea3fb13daed997ac",
+      "bytes": 5645
+    },
+    "keys/redeemDraw.prover": {
+      "sha256": "f26e0f10288df5e7c41892eaefef8e4054fe38a398953923193eae23dd0d96e2",
+      "bytes": 42785493
+    },
+    "keys/redeemDraw.verifier": {
+      "sha256": "09a36d65ed7fc1face9281e2a0c86205be0f2b7ec844126646f8be0c76565253",
+      "bytes": 2311
+    },
+    "zkir/redeemDraw.bzkir": {
+      "sha256": "636a87da9a66043384f19b7edb123c92c6b926b6152ce70c4548c017a43fddaa",
+      "bytes": 2594
+    },
+    "keys/cancelOrExpireNote.prover": {
+      "sha256": "0bc34d0f4e14ff6077e5d791689c88f40b74af85636179c3141970e7acf9990a",
+      "bytes": 42931919
+    },
+    "keys/cancelOrExpireNote.verifier": {
+      "sha256": "19b55a89a64834144bab02d44378754de6ece352ee6a19842b30bce2751528e6",
+      "bytes": 2311
+    },
+    "zkir/cancelOrExpireNote.bzkir": {
+      "sha256": "e4a710f1be8a714c6de26e52112016226888097c2068e32c5dd0254fa6395eae",
+      "bytes": 6095
+    },
+    "keys/acknowledgeRepayment.prover": {
+      "sha256": "adb45332efc2b5ef0ed74544e8aa686b0cb6306c2c06c7f4847c09fc6bbd2b30",
+      "bytes": 42856937
+    },
+    "keys/acknowledgeRepayment.verifier": {
+      "sha256": "ac94dce6a129a5f6bb3d9352a16868605bed7a7fa5a6129265c82225dd41497b",
+      "bytes": 2311
+    },
+    "zkir/acknowledgeRepayment.bzkir": {
+      "sha256": "3a935f6d88adc3d4045de7685f1874ee160c8dddafbb1b01359776a87240291a",
+      "bytes": 3617
+    },
+    "keys/setStatus.prover": {
+      "sha256": "871b3ec1af94ee45bfd461dd93cca07483c5a12f3100b5305fcd4c2c215d8892",
+      "bytes": 42798984
+    },
+    "keys/setStatus.verifier": {
+      "sha256": "e1e5e469711cc7ca465f08d1117dc547ccf26d0e042cc8d89e6c579d0b518a0d",
+      "bytes": 2311
+    },
+    "zkir/setStatus.bzkir": {
+      "sha256": "69412bb86a516de1c0c6be62434d4897ace0e065f11c75f6a8d857e4d6e9173d",
+      "bytes": 2846
+    }
+  },
+  "scriptFingerprints": {
+    "scripts/private-merchant-proof.mjs": "ccd62a547a752df3f77303071ecc3e56df98a6aa43d198409df1d14f5a549f5a",
+    "scripts/private-pool-provers.mjs": "9ca9fbddb3a18b82c14fca9f92ff1abf412813423d581c653b33b6b94ab3e5a4",
+    "scripts/private-merchant-spike.mjs": "8a4b63f0586e49118c399d2baf15fd8c58b24d64e530479b14df44dcebbc9df4",
+    "scripts/signed-pool-signers.mjs": "df077892d65f2736322be3e627e6ec9f1bcfa422f9369dcb2016d203ca5831a3",
+    "scripts/private-pool-spike.mjs": "be5b8a3e2f85a3bb3e45fabfaafe55b45f414f6999b3931a6fb4c33f01a04397",
+    "src/lib/line/encoding.ts": "fb2af647156d2a744c6fb031fe084aee25708a379a7db6412782ca9c2e232b5b"
+  },
+  "nativeVerifierSha256": "a1906a9cec364a736c4b76ee0e46b1fd06160a7cbda8b59d9f2c80277fb4380c",
+  "proofServerVersion": "8.1.3",
+  "sourceBoundGeneratedExecutable": true,
+  "keyGeneration": {
+    "schema": "line-experimental-key-cache/v1",
+    "sourceSha256": "afb75b1bf6156500e63e75fb2d7a69bc002bf84daf15736c4aa2fbd99cb9a4b7",
+    "compiler": "0.31.1",
+    "complete": true,
+    "fullFreshKeyGeneration": true,
+    "cachedKeySourceSha256": null,
+    "cacheRequirement": "No key cache: all twelve key pairs generated from source-bound fresh textual ZKIR.",
+    "circuits": [
+      {
+        "name": "registerMerchant",
+        "zkirSha256": "77cc420f6f5feecf4f0480c55ef0872b780692f5faa31a5678771c6f00742e05",
+        "cachedFromIdenticalSourceBoundIR": false,
+        "generatedByThisRun": true,
+        "artifacts": {
+          "keys/registerMerchant.prover": {
+            "sha256": "24d2ccfe5dd9f52071434ba2c41cda936b5f72626821d032c55e6908e2afd6ec",
+            "bytes": 11071610
+          },
+          "keys/registerMerchant.verifier": {
+            "sha256": "9ee96d535017addc7ddf4926f00dd105539de5b34d1b07c73f4645767a6f2eac",
+            "bytes": 2311
+          },
+          "zkir/registerMerchant.bzkir": {
+            "sha256": "a7aa1db823f3d581ff0f31d004a55d8d95403503f141717e5defa685ed44edc1",
+            "bytes": 1851
+          }
+        }
+      },
+      {
+        "name": "disableMerchant",
+        "zkirSha256": "61544d6a0687e49c6c199145299dc081dd46bd45b2ce51338ff4276b243dff30",
+        "cachedFromIdenticalSourceBoundIR": false,
+        "generatedByThisRun": true,
+        "artifacts": {
+          "keys/disableMerchant.prover": {
+            "sha256": "c14833df580128835c9e18ea45704d65fc39f7d529284b5ed41e5bc421eceb36",
+            "bytes": 11063993
+          },
+          "keys/disableMerchant.verifier": {
+            "sha256": "d7d14acd45b7ba1506671a0ca94dddcbabec0dafec38e0bdf87d3771d079302d",
+            "bytes": 2311
+          },
+          "zkir/disableMerchant.bzkir": {
+            "sha256": "45afdf2993ec41de3654b97d8fa5b1b630f8a2b7f6a422c4e77a6b466f9a52ae",
+            "bytes": 1502
+          }
+        }
+      },
+      {
+        "name": "fundReserve",
+        "zkirSha256": "b5ee52b5ded47e4dd969bbebb9e80330f3c96b524beefe5e5eb94f728f375aed",
+        "cachedFromIdenticalSourceBoundIR": false,
+        "generatedByThisRun": true,
+        "artifacts": {
+          "keys/fundReserve.prover": {
+            "sha256": "fb1cced00945bb4834355c7996d7d1609970d281271942ede03c68b7a4fc21ab",
+            "bytes": 21655313
+          },
+          "keys/fundReserve.verifier": {
+            "sha256": "2dcb8ffc1c28d3bd7156b7087d19070855845291738a3a6f6f14e569031cb0de",
+            "bytes": 2311
+          },
+          "zkir/fundReserve.bzkir": {
+            "sha256": "52994d1208c81d72e3922c5dd5d693949ddebebfb8469d07619cd4a97f5818ca",
+            "bytes": 1643
+          }
+        }
+      },
+      {
+        "name": "withdrawUnencumberedReserve",
+        "zkirSha256": "625454386bd83270d6bd79633f93159bba57abf8a16c99ee0e83ebbc16a28166",
+        "cachedFromIdenticalSourceBoundIR": false,
+        "generatedByThisRun": true,
+        "artifacts": {
+          "keys/withdrawUnencumberedReserve.prover": {
+            "sha256": "4de081a97246a10d7d36200327607daf490d0a1a71b7328f6a83b4aa5eed5377",
+            "bytes": 21655416
+          },
+          "keys/withdrawUnencumberedReserve.verifier": {
+            "sha256": "4784474ebd40f680d8af041f633ccc0ba274853bbe44a7cd7f2de23cc7222dc2",
+            "bytes": 2311
+          },
+          "zkir/withdrawUnencumberedReserve.bzkir": {
+            "sha256": "28c0c3043826e6ebcf66d187a104aabc7ab089a8820e9997ddd9c4c01fea97cf",
+            "bytes": 1683
+          }
+        }
+      },
+      {
+        "name": "withdrawFees",
+        "zkirSha256": "51020853421a0ad7e2d51d0eda1e5a42048f32185802daacef62bb314746ebde",
+        "cachedFromIdenticalSourceBoundIR": false,
+        "generatedByThisRun": true,
+        "artifacts": {
+          "keys/withdrawFees.prover": {
+            "sha256": "a6d66372cf23098a61da047236c1fead6e1c15e025034356ab2cf2860c751df0",
+            "bytes": 21655141
+          },
+          "keys/withdrawFees.verifier": {
+            "sha256": "cd5a405f3f18779f34d0e15962dd4b10b5223406735f52fa5087e384fe870af0",
+            "bytes": 2311
+          },
+          "zkir/withdrawFees.bzkir": {
+            "sha256": "1510843aea7598d1ae63cbdfb2e51aa9587bbe5e77a7803d59e30f93cacdbd5c",
+            "bytes": 1634
+          }
+        }
+      },
+      {
+        "name": "openLine",
+        "zkirSha256": "139eb3fc343ae4af0d76da28cb2fba6d245d6df94d32b1ff6fb8e0982aa5e17f",
+        "cachedFromIdenticalSourceBoundIR": false,
+        "generatedByThisRun": true,
+        "artifacts": {
+          "keys/openLine.prover": {
+            "sha256": "06ac609e5aef400b14c8a14eb0f2211d1815ad200c8ec8624be2b1e9dc4151a2",
+            "bytes": 42871407
+          },
+          "keys/openLine.verifier": {
+            "sha256": "31a6f2fd271db33b932b64212cf484454587b16d717929b49793713ea0af28d2",
+            "bytes": 2311
+          },
+          "zkir/openLine.bzkir": {
+            "sha256": "aebe822d64b84213571a32d8802e5d65bb0360bb43254e7f9fb3c1a8a7bf2a1a",
+            "bytes": 5276
+          }
+        }
+      },
+      {
+        "name": "postQuote",
+        "zkirSha256": "111553503bd1bb6d9adf80945894d2abbb81b1bee1a33de388270ee911cde25a",
+        "cachedFromIdenticalSourceBoundIR": false,
+        "generatedByThisRun": true,
+        "artifacts": {
+          "keys/postQuote.prover": {
+            "sha256": "fc61cf45896a66b7d9f405f9b82a7da631f4a7062bcbe362c0ed49f17ece394e",
+            "bytes": 21663982
+          },
+          "keys/postQuote.verifier": {
+            "sha256": "346eeffe05dc6c661466fe4c3eb6acb234d54740d56bb910d2393becd91de155",
+            "bytes": 2311
+          },
+          "zkir/postQuote.bzkir": {
+            "sha256": "90bdb7b167c9d7d3201d487f77a5969aefe698dd9ce49048167bee139b289ed4",
+            "bytes": 2280
+          }
+        }
+      },
+      {
+        "name": "draw",
+        "zkirSha256": "73dc38ca9ea0ea42994dc173677da3a7ebff38db0d4a057952c2abc3f09aa497",
+        "cachedFromIdenticalSourceBoundIR": false,
+        "generatedByThisRun": true,
+        "artifacts": {
+          "keys/draw.prover": {
+            "sha256": "cbca693ddb33094ef5b605819e8947bbae6193cc15e962bdb212115fa6650c1b",
+            "bytes": 85082451
+          },
+          "keys/draw.verifier": {
+            "sha256": "f5d7b93a4a27599c8b96136400bc6abaf0aad4afb8b75a42ac7177c28b938dc7",
+            "bytes": 2311
+          },
+          "zkir/draw.bzkir": {
+            "sha256": "c831397ae02eb6e67d2db63ec09ec33e5e0fe94bab408f8aea3fb13daed997ac",
+            "bytes": 5645
+          }
+        }
+      },
+      {
+        "name": "redeemDraw",
+        "zkirSha256": "c2cea0ea0a47e920ceb0ca0654dfe84e1881135c08d0c12026ca753adb5fbd93",
+        "cachedFromIdenticalSourceBoundIR": false,
+        "generatedByThisRun": true,
+        "artifacts": {
+          "keys/redeemDraw.prover": {
+            "sha256": "f26e0f10288df5e7c41892eaefef8e4054fe38a398953923193eae23dd0d96e2",
+            "bytes": 42785493
+          },
+          "keys/redeemDraw.verifier": {
+            "sha256": "09a36d65ed7fc1face9281e2a0c86205be0f2b7ec844126646f8be0c76565253",
+            "bytes": 2311
+          },
+          "zkir/redeemDraw.bzkir": {
+            "sha256": "636a87da9a66043384f19b7edb123c92c6b926b6152ce70c4548c017a43fddaa",
+            "bytes": 2594
+          }
+        }
+      },
+      {
+        "name": "cancelOrExpireNote",
+        "zkirSha256": "1d7a2217e6db547cd6cffef40e1417a9457b35ba16c661a8200ac874cf306c70",
+        "cachedFromIdenticalSourceBoundIR": false,
+        "generatedByThisRun": true,
+        "artifacts": {
+          "keys/cancelOrExpireNote.prover": {
+            "sha256": "0bc34d0f4e14ff6077e5d791689c88f40b74af85636179c3141970e7acf9990a",
+            "bytes": 42931919
+          },
+          "keys/cancelOrExpireNote.verifier": {
+            "sha256": "19b55a89a64834144bab02d44378754de6ece352ee6a19842b30bce2751528e6",
+            "bytes": 2311
+          },
+          "zkir/cancelOrExpireNote.bzkir": {
+            "sha256": "e4a710f1be8a714c6de26e52112016226888097c2068e32c5dd0254fa6395eae",
+            "bytes": 6095
+          }
+        }
+      },
+      {
+        "name": "acknowledgeRepayment",
+        "zkirSha256": "5b95f629e7351feec496b7b60163276814dbfae028667dfc450af595183da60b",
+        "cachedFromIdenticalSourceBoundIR": false,
+        "generatedByThisRun": true,
+        "artifacts": {
+          "keys/acknowledgeRepayment.prover": {
+            "sha256": "adb45332efc2b5ef0ed74544e8aa686b0cb6306c2c06c7f4847c09fc6bbd2b30",
+            "bytes": 42856937
+          },
+          "keys/acknowledgeRepayment.verifier": {
+            "sha256": "ac94dce6a129a5f6bb3d9352a16868605bed7a7fa5a6129265c82225dd41497b",
+            "bytes": 2311
+          },
+          "zkir/acknowledgeRepayment.bzkir": {
+            "sha256": "3a935f6d88adc3d4045de7685f1874ee160c8dddafbb1b01359776a87240291a",
+            "bytes": 3617
+          }
+        }
+      },
+      {
+        "name": "setStatus",
+        "zkirSha256": "022d813a49105e48b8deadeb8459882eed466a2561b54993900a2366f4ac74ca",
+        "cachedFromIdenticalSourceBoundIR": false,
+        "generatedByThisRun": true,
+        "artifacts": {
+          "keys/setStatus.prover": {
+            "sha256": "871b3ec1af94ee45bfd461dd93cca07483c5a12f3100b5305fcd4c2c215d8892",
+            "bytes": 42798984
+          },
+          "keys/setStatus.verifier": {
+            "sha256": "e1e5e469711cc7ca465f08d1117dc547ccf26d0e042cc8d89e6c579d0b518a0d",
+            "bytes": 2311
+          },
+          "zkir/setStatus.bzkir": {
+            "sha256": "69412bb86a516de1c0c6be62434d4897ace0e065f11c75f6a8d857e4d6e9173d",
+            "bytes": 2846
+          }
+        }
+      }
+    ]
+  },
+  "syntheticLedger": true,
+  "syntheticTime": true,
+  "feeBalancingEnabled": false,
+  "networkSubmitted": false,
+  "authenticAssetSettlement": false,
+  "trustedCoordinatorAndProver": true,
+  "roleSigningScalarsInProverWitnesses": false,
+  "institutionalSignerPolicy": false,
+  "recycleProverOnCircuitChange": true,
+  "recycleProverEveryCall": true,
+  "proverRestarts": 45,
+  "durableInstitutionalCustody": false,
+  "fullHistoryPrivacyPassed": false,
+  "exportedCircuits": [
+    "registerMerchant",
+    "disableMerchant",
+    "fundReserve",
+    "withdrawUnencumberedReserve",
+    "withdrawFees",
+    "openLine",
+    "postQuote",
+    "draw",
+    "redeemDraw",
+    "cancelOrExpireNote",
+    "acknowledgeRepayment",
+    "setStatus"
+  ],
+  "provedCircuits": [
+    "registerMerchant",
+    "fundReserve",
+    "openLine",
+    "postQuote",
+    "draw",
+    "redeemDraw",
+    "acknowledgeRepayment",
+    "setStatus",
+    "cancelOrExpireNote",
+    "disableMerchant",
+    "withdrawFees",
+    "withdrawUnencumberedReserve"
+  ],
+  "traces": [
+    {
+      "circuit": "syntheticDeployment",
+      "actor": "fixture",
+      "syntheticUnixSeconds": 1800000000,
+      "proofVerifiedInSeparateRustProcess": true,
+      "transactionSha256": "1d885c507953aa8add2b340d8b78a523e4053a9e8eb2c2128a0f84d302b0902f",
+      "bytes": 30630
+    },
+    {
+      "circuit": "registerMerchant",
+      "actor": "issuer",
+      "syntheticUnixSeconds": 1800000000,
+      "proofVerifiedInSeparateRustProcess": true,
+      "transactionSha256": "86fedb2a296d135be41f14cbe63640cc7e29ab5430049f52c3829dfec0e220f9",
+      "bytes": 6266,
+      "provingDurationMs": 16639,
+      "verificationAndApplyDurationMs": 473,
+      "isolatedBranch": false
+    },
+    {
+      "circuit": "fundReserve",
+      "actor": "issuer",
+      "syntheticUnixSeconds": 1800000000,
+      "proofVerifiedInSeparateRustProcess": true,
+      "transactionSha256": "859474e1954debeacbab0089e8ee49f223a99487ca48f6620f25601fb7fd3101",
+      "bytes": 5816,
+      "provingDurationMs": 27203,
+      "verificationAndApplyDurationMs": 296,
+      "isolatedBranch": false
+    },
+    {
+      "circuit": "openLine",
+      "actor": "agent-a",
+      "syntheticUnixSeconds": 1800000000,
+      "proofVerifiedInSeparateRustProcess": true,
+      "transactionSha256": "5bb9ec42b591bf156198260f5baffdc902f1737786cd61b2fabcf67e0d9aca86",
+      "bytes": 5813,
+      "provingDurationMs": 51496,
+      "verificationAndApplyDurationMs": 365,
+      "isolatedBranch": false
+    },
+    {
+      "circuit": "openLine",
+      "actor": "issuer",
+      "syntheticUnixSeconds": 1800000000,
+      "proofVerifiedInSeparateRustProcess": true,
+      "transactionSha256": "2265214181f2310a8c26c84a0f0dd9c60c50f87148b4b9ef496654862a2046ee",
+      "bytes": 6362,
+      "provingDurationMs": 46211,
+      "verificationAndApplyDurationMs": 397,
+      "isolatedBranch": false
+    },
+    {
+      "circuit": "openLine",
+      "actor": "agent-b",
+      "syntheticUnixSeconds": 1800000000,
+      "proofVerifiedInSeparateRustProcess": true,
+      "transactionSha256": "132f810ae02c2eb9befe262cdc2a7114dcfc66b1e29389c328ab9ab204cf416f",
+      "bytes": 5813,
+      "provingDurationMs": 44730,
+      "verificationAndApplyDurationMs": 395,
+      "isolatedBranch": false
+    },
+    {
+      "circuit": "openLine",
+      "actor": "issuer",
+      "syntheticUnixSeconds": 1800000000,
+      "proofVerifiedInSeparateRustProcess": true,
+      "transactionSha256": "6d68621846f681724b99f1e0f28909eadf73def6183a7cf6a343033b2cd9bd7d",
+      "bytes": 6362,
+      "provingDurationMs": 44907,
+      "verificationAndApplyDurationMs": 410,
+      "isolatedBranch": false
+    },
+    {
+      "circuit": "postQuote",
+      "actor": "merchant-a",
+      "syntheticUnixSeconds": 1800000000,
+      "proofVerifiedInSeparateRustProcess": true,
+      "transactionSha256": "897e1d5887f6ce9905aa89f9a5a3f1dab139406915ed1b05dbbcc8fcf5872d7e",
+      "bytes": 5939,
+      "provingDurationMs": 21903,
+      "verificationAndApplyDurationMs": 351,
+      "isolatedBranch": false
+    },
+    {
+      "circuit": "postQuote",
+      "actor": "merchant-b",
+      "syntheticUnixSeconds": 1800000000,
+      "proofVerifiedInSeparateRustProcess": true,
+      "transactionSha256": "b1d969388c131ef732ce6d362ab340650d115f984f7ca86ccad06a8c93ae67f6",
+      "bytes": 5939,
+      "provingDurationMs": 22448,
+      "verificationAndApplyDurationMs": 372,
+      "isolatedBranch": false
+    },
+    {
+      "circuit": "postQuote",
+      "actor": "merchant-a",
+      "syntheticUnixSeconds": 1800000000,
+      "proofVerifiedInSeparateRustProcess": true,
+      "transactionSha256": "68794c1b04af5c628258ba5c2b44d4ad1051bd17cf0c382b215a6e5ff7b036d2",
+      "bytes": 5939,
+      "provingDurationMs": 21710,
+      "verificationAndApplyDurationMs": 411,
+      "isolatedBranch": false
+    },
+    {
+      "circuit": "postQuote",
+      "actor": "merchant-a",
+      "syntheticUnixSeconds": 1800000000,
+      "proofVerifiedInSeparateRustProcess": true,
+      "transactionSha256": "6745550281e40999876ab408295a434ff7340abb9f35d27a4855465261c81bb8",
+      "bytes": 5939,
+      "provingDurationMs": 21094,
+      "verificationAndApplyDurationMs": 370,
+      "isolatedBranch": false
+    },
+    {
+      "circuit": "draw",
+      "actor": "agent-a",
+      "syntheticUnixSeconds": 1800000499,
+      "proofVerifiedInSeparateRustProcess": true,
+      "transactionSha256": "3289e35b0e0f539b2a8475585f62c54de6dc814d177f9484684e51bbb5a2fc08",
+      "bytes": 6975,
+      "provingDurationMs": 134544,
+      "verificationAndApplyDurationMs": 635,
+      "isolatedBranch": true
+    },
+    {
+      "circuit": "draw",
+      "actor": "agent-a",
+      "syntheticUnixSeconds": 1800000000,
+      "proofVerifiedInSeparateRustProcess": true,
+      "transactionSha256": "054ce7ca75a614aeda833ae4420d1318d5b66380318619dcc9c122f07e0462da",
+      "bytes": 6973,
+      "provingDurationMs": 125387,
+      "verificationAndApplyDurationMs": 611,
+      "isolatedBranch": false
+    },
+    {
+      "circuit": "draw",
+      "actor": "agent-b",
+      "syntheticUnixSeconds": 1800000000,
+      "proofVerifiedInSeparateRustProcess": true,
+      "transactionSha256": "48e846f4bc26c69ab7b13febcbd721d9f8dc3e6113b968106c1fa1af3a61cd21",
+      "bytes": 6975,
+      "provingDurationMs": 156483,
+      "verificationAndApplyDurationMs": 495,
+      "isolatedBranch": false
+    },
+    {
+      "circuit": "redeemDraw",
+      "actor": "merchant-a",
+      "syntheticUnixSeconds": 1800000000,
+      "proofVerifiedInSeparateRustProcess": true,
+      "transactionSha256": "ea5a6782f1fa5eb05826e26a2754ff24581b3abf07cd4434c3a1df07d4a5d9f6",
+      "bytes": 6274,
+      "provingDurationMs": 52842,
+      "verificationAndApplyDurationMs": 771,
+      "isolatedBranch": false
+    },
+    {
+      "circuit": "acknowledgeRepayment",
+      "actor": "issuer",
+      "syntheticUnixSeconds": 1800000000,
+      "proofVerifiedInSeparateRustProcess": true,
+      "transactionSha256": "a6e94af2657e45340233be1656709d14ee1d22e03ccd6586ea8a227d46628724",
+      "bytes": 6433,
+      "provingDurationMs": 47499,
+      "verificationAndApplyDurationMs": 525,
+      "isolatedBranch": false
+    },
+    {
+      "circuit": "setStatus",
+      "actor": "issuer",
+      "syntheticUnixSeconds": 1800000000,
+      "proofVerifiedInSeparateRustProcess": true,
+      "transactionSha256": "140a7ce176072ba8befc00d5104510d2ae0da2ed8274e1c4103648d018836b46",
+      "bytes": 6076,
+      "provingDurationMs": 50622,
+      "verificationAndApplyDurationMs": 465,
+      "isolatedBranch": false
+    },
+    {
+      "circuit": "setStatus",
+      "actor": "issuer",
+      "syntheticUnixSeconds": 1800000000,
+      "proofVerifiedInSeparateRustProcess": true,
+      "transactionSha256": "9b4cfb836c7e3fa887a89801a32800f42b8f51f70f2758dd28e40a81e52677ef",
+      "bytes": 6075,
+      "provingDurationMs": 47501,
+      "verificationAndApplyDurationMs": 443,
+      "isolatedBranch": false
+    },
+    {
+      "circuit": "draw",
+      "actor": "agent-a",
+      "syntheticUnixSeconds": 1800000000,
+      "proofVerifiedInSeparateRustProcess": true,
+      "transactionSha256": "d1f98875e3d189078b7f1132760639e7525d991e654e28f1a2d8daf66e439015",
+      "bytes": 6973,
+      "provingDurationMs": 115546,
+      "verificationAndApplyDurationMs": 586,
+      "isolatedBranch": false
+    },
+    {
+      "circuit": "acknowledgeRepayment",
+      "actor": "issuer",
+      "syntheticUnixSeconds": 1800000000,
+      "proofVerifiedInSeparateRustProcess": true,
+      "transactionSha256": "c038111a3ef35a5708e866d7618382b0c0fe9413e35e317976fa089f01afdcdf",
+      "bytes": 6433,
+      "provingDurationMs": 47351,
+      "verificationAndApplyDurationMs": 516,
+      "isolatedBranch": false
+    },
+    {
+      "circuit": "setStatus",
+      "actor": "issuer",
+      "syntheticUnixSeconds": 1800000000,
+      "proofVerifiedInSeparateRustProcess": true,
+      "transactionSha256": "77150294d4eb7c18b15bf4f3e67fdbb54dba738e772cc2dac09791adb9d316cb",
+      "bytes": 6076,
+      "provingDurationMs": 43780,
+      "verificationAndApplyDurationMs": 501,
+      "isolatedBranch": false
+    },
+    {
+      "circuit": "openLine",
+      "actor": "agent-a",
+      "syntheticUnixSeconds": 1800000000,
+      "proofVerifiedInSeparateRustProcess": true,
+      "transactionSha256": "7a6d8e2cc427535055e304add1658680e9301201f4a9cbd8cc3f2c7a0ca8320e",
+      "bytes": 6054,
+      "provingDurationMs": 44486,
+      "verificationAndApplyDurationMs": 469,
+      "isolatedBranch": false
+    },
+    {
+      "circuit": "openLine",
+      "actor": "issuer",
+      "syntheticUnixSeconds": 1800000000,
+      "proofVerifiedInSeparateRustProcess": true,
+      "transactionSha256": "b3026bec15a5e1814c2b4cde53bde922cdd819d9989d96670f682a268e59a7a4",
+      "bytes": 6402,
+      "provingDurationMs": 48308,
+      "verificationAndApplyDurationMs": 545,
+      "isolatedBranch": false
+    },
+    {
+      "circuit": "postQuote",
+      "actor": "merchant-a",
+      "syntheticUnixSeconds": 1800000000,
+      "proofVerifiedInSeparateRustProcess": true,
+      "transactionSha256": "7226909ee312db13bf955e3679dbe83b5f0e6a539a2ec28f19c00812f76d9a5e",
+      "bytes": 5937,
+      "provingDurationMs": 25316,
+      "verificationAndApplyDurationMs": 510,
+      "isolatedBranch": false
+    },
+    {
+      "circuit": "draw",
+      "actor": "agent-a",
+      "syntheticUnixSeconds": 1800000000,
+      "proofVerifiedInSeparateRustProcess": true,
+      "transactionSha256": "e3ca3716abec4794d8738dc97471245326d9c6af2187a1d15cb8f457722ce0f8",
+      "bytes": 6972,
+      "provingDurationMs": 113111,
+      "verificationAndApplyDurationMs": 662,
+      "isolatedBranch": false
+    },
+    {
+      "circuit": "postQuote",
+      "actor": "merchant-b",
+      "syntheticUnixSeconds": 1800000000,
+      "proofVerifiedInSeparateRustProcess": true,
+      "transactionSha256": "52ff72b8a509f26e6331fd3046d58ac0d5c1e329bb1ed802ef414f697c05c27d",
+      "bytes": 5939,
+      "provingDurationMs": 23191,
+      "verificationAndApplyDurationMs": 683,
+      "isolatedBranch": false
+    },
+    {
+      "circuit": "draw",
+      "actor": "agent-b",
+      "syntheticUnixSeconds": 1800000000,
+      "proofVerifiedInSeparateRustProcess": true,
+      "transactionSha256": "83551f24e4d3b0efa248be4aa53237d411e332a1eca01c9f4c2b2bc7bed4a72a",
+      "bytes": 6975,
+      "provingDurationMs": 105465,
+      "verificationAndApplyDurationMs": 671,
+      "isolatedBranch": false
+    },
+    {
+      "circuit": "cancelOrExpireNote",
+      "actor": "agent-b",
+      "syntheticUnixSeconds": 1800000100,
+      "proofVerifiedInSeparateRustProcess": true,
+      "transactionSha256": "8b479f0c505ff3dff769ea4a7ef76b7563ab5f4a13eb04cdd527c7e9f9056f0d",
+      "bytes": 6724,
+      "provingDurationMs": 52747,
+      "verificationAndApplyDurationMs": 627,
+      "isolatedBranch": true
+    },
+    {
+      "circuit": "cancelOrExpireNote",
+      "actor": "issuer",
+      "syntheticUnixSeconds": 1800000100,
+      "proofVerifiedInSeparateRustProcess": true,
+      "transactionSha256": "c12449519d075ae54dad4e13c6776ca1a51668e7ad81883efdb24d0cb88a418d",
+      "bytes": 6468,
+      "provingDurationMs": 53606,
+      "verificationAndApplyDurationMs": 597,
+      "isolatedBranch": true
+    },
+    {
+      "circuit": "acknowledgeRepayment",
+      "actor": "issuer",
+      "syntheticUnixSeconds": 1800000000,
+      "proofVerifiedInSeparateRustProcess": true,
+      "transactionSha256": "40a58e968a6f1c460570e8a46d4570d61f5a4c303a36f5d5b7927a87c632300b",
+      "bytes": 6433,
+      "provingDurationMs": 47426,
+      "verificationAndApplyDurationMs": 577,
+      "isolatedBranch": true
+    },
+    {
+      "circuit": "cancelOrExpireNote",
+      "actor": "attacker",
+      "syntheticUnixSeconds": 1800000100,
+      "proofVerifiedInSeparateRustProcess": true,
+      "transactionSha256": "6554fc6b4ee4948bab524cb285c64e13a6e306f9325d4c75fcb244751c1b0201",
+      "bytes": 6256,
+      "provingDurationMs": 47153,
+      "verificationAndApplyDurationMs": 603,
+      "isolatedBranch": true
+    },
+    {
+      "circuit": "cancelOrExpireNote",
+      "actor": "issuer",
+      "syntheticUnixSeconds": 1800000100,
+      "proofVerifiedInSeparateRustProcess": true,
+      "transactionSha256": "3fa998267a0a59389030dde7893664116a7c67e960a82bddc05b2c4d2a68388a",
+      "bytes": 6724,
+      "provingDurationMs": 47534,
+      "verificationAndApplyDurationMs": 603,
+      "isolatedBranch": true
+    },
+    {
+      "circuit": "cancelOrExpireNote",
+      "actor": "issuer",
+      "syntheticUnixSeconds": 1800000100,
+      "proofVerifiedInSeparateRustProcess": true,
+      "transactionSha256": "ec3eca4d364c414b0449404ad05157865c6bb4f27bc615877388a55b18733251",
+      "bytes": 6468,
+      "provingDurationMs": 44600,
+      "verificationAndApplyDurationMs": 618,
+      "isolatedBranch": true
+    },
+    {
+      "circuit": "acknowledgeRepayment",
+      "actor": "issuer",
+      "syntheticUnixSeconds": 1800000000,
+      "proofVerifiedInSeparateRustProcess": true,
+      "transactionSha256": "dc539c229f752f883e907bafdc2185c6d2df20be4a4ab0413ad520f1ac1e6f7a",
+      "bytes": 6433,
+      "provingDurationMs": 48120,
+      "verificationAndApplyDurationMs": 608,
+      "isolatedBranch": false
+    },
+    {
+      "circuit": "cancelOrExpireNote",
+      "actor": "attacker",
+      "syntheticUnixSeconds": 1800000100,
+      "proofVerifiedInSeparateRustProcess": true,
+      "transactionSha256": "f956080774511ab52c040efcbfce017c05fb9d40fb187137df9802ac3a1b1f74",
+      "bytes": 6256,
+      "provingDurationMs": 52447,
+      "verificationAndApplyDurationMs": 562,
+      "isolatedBranch": false
+    },
+    {
+      "circuit": "cancelOrExpireNote",
+      "actor": "issuer",
+      "syntheticUnixSeconds": 1800000100,
+      "proofVerifiedInSeparateRustProcess": true,
+      "transactionSha256": "beaec88c85f7fa51ebf4adcc7578c4e8ff66dff5f5d42186a091906edfdf001e",
+      "bytes": 6724,
+      "provingDurationMs": 49752,
+      "verificationAndApplyDurationMs": 589,
+      "isolatedBranch": false
+    },
+    {
+      "circuit": "cancelOrExpireNote",
+      "actor": "issuer",
+      "syntheticUnixSeconds": 1800000100,
+      "proofVerifiedInSeparateRustProcess": true,
+      "transactionSha256": "25319a2637f55ce60123bfb11877f8f08840c00c790de145787c6ce890b81e89",
+      "bytes": 6467,
+      "provingDurationMs": 49119,
+      "verificationAndApplyDurationMs": 657,
+      "isolatedBranch": false
+    },
+    {
+      "circuit": "cancelOrExpireNote",
+      "actor": "agent-a",
+      "syntheticUnixSeconds": 1800000100,
+      "proofVerifiedInSeparateRustProcess": true,
+      "transactionSha256": "d49b5cad9c0650d31096b6b8838117f4d040cea1d7f08cfc5bd5557de215485f",
+      "bytes": 6724,
+      "provingDurationMs": 50456,
+      "verificationAndApplyDurationMs": 732,
+      "isolatedBranch": false
+    },
+    {
+      "circuit": "cancelOrExpireNote",
+      "actor": "issuer",
+      "syntheticUnixSeconds": 1800000100,
+      "proofVerifiedInSeparateRustProcess": true,
+      "transactionSha256": "27b9317d16c65c8833362c5a15e2c7368bad216fc88171eeb5f2362a25ee3e3f",
+      "bytes": 6468,
+      "provingDurationMs": 82720,
+      "verificationAndApplyDurationMs": 868,
+      "isolatedBranch": false
+    },
+    {
+      "circuit": "disableMerchant",
+      "actor": "issuer",
+      "syntheticUnixSeconds": 1800000100,
+      "proofVerifiedInSeparateRustProcess": true,
+      "transactionSha256": "8773e4e065d64f4ec760512dd924dd07abca008f0ac07875fcefe860ef63ed6f",
+      "bytes": 6175,
+      "provingDurationMs": 13816,
+      "verificationAndApplyDurationMs": 761,
+      "isolatedBranch": false
+    },
+    {
+      "circuit": "redeemDraw",
+      "actor": "merchant-b",
+      "syntheticUnixSeconds": 1800000100,
+      "proofVerifiedInSeparateRustProcess": true,
+      "transactionSha256": "ad37337f59a84e1e778ea1e09958baea439231978417cb84102646f1025b8e29",
+      "bytes": 6278,
+      "provingDurationMs": 56259,
+      "verificationAndApplyDurationMs": 983,
+      "isolatedBranch": false
+    },
+    {
+      "circuit": "redeemDraw",
+      "actor": "merchant-a",
+      "syntheticUnixSeconds": 1800000100,
+      "proofVerifiedInSeparateRustProcess": true,
+      "transactionSha256": "2fad548fb4c23349300259ccc8d895a7e44d57e99cc92732ca7d2149dec80f09",
+      "bytes": 6278,
+      "provingDurationMs": 545063,
+      "verificationAndApplyDurationMs": 35671,
+      "isolatedBranch": false
+    },
+    {
+      "circuit": "withdrawFees",
+      "actor": "issuer",
+      "syntheticUnixSeconds": 1800000100,
+      "proofVerifiedInSeparateRustProcess": true,
+      "transactionSha256": "0f58df8339ac5bd4ff40d7134b3a02c8cce608bfb10af8d7157fef0cc61fffba",
+      "bytes": 5818,
+      "provingDurationMs": 37461,
+      "verificationAndApplyDurationMs": 1683,
+      "isolatedBranch": false
+    },
+    {
+      "circuit": "withdrawUnencumberedReserve",
+      "actor": "issuer",
+      "syntheticUnixSeconds": 1800000100,
+      "proofVerifiedInSeparateRustProcess": true,
+      "transactionSha256": "186c59073c83acb366770374cadd7e2470617d5d6c7104ae816ca2c4c173cf12",
+      "bytes": 5833,
+      "provingDurationMs": 22237,
+      "verificationAndApplyDurationMs": 718,
+      "isolatedBranch": false
+    },
+    {
+      "circuit": "acknowledgeRepayment",
+      "actor": "issuer",
+      "syntheticUnixSeconds": 1800000100,
+      "proofVerifiedInSeparateRustProcess": true,
+      "transactionSha256": "e3fda275d62a1da096da56178fcff796ff1934b54091553dec09fed329b85c6e",
+      "bytes": 6433,
+      "provingDurationMs": 43763,
+      "verificationAndApplyDurationMs": 657,
+      "isolatedBranch": false
+    },
+    {
+      "circuit": "setStatus",
+      "actor": "issuer",
+      "syntheticUnixSeconds": 1800000100,
+      "proofVerifiedInSeparateRustProcess": true,
+      "transactionSha256": "b33171244eb3b75e2c0d5bbe7d12dd93eadd9d9471f1aacb0a7b2a0ed9326078",
+      "bytes": 6076,
+      "provingDurationMs": 43174,
+      "verificationAndApplyDurationMs": 605,
+      "isolatedBranch": false
+    },
+    {
+      "circuit": "setStatus",
+      "actor": "issuer",
+      "syntheticUnixSeconds": 1800000100,
+      "proofVerifiedInSeparateRustProcess": true,
+      "transactionSha256": "1aed22a1be66177874f354973f93d10ab60a899eeeb56246dd65e505805a0f25",
+      "bytes": 6076,
+      "provingDurationMs": 45542,
+      "verificationAndApplyDurationMs": 697,
+      "isolatedBranch": false
+    }
+  ],
+  "negativeChecks": [
+    {
+      "circuit": "draw",
+      "decodableProofCorruption": true,
+      "rejectedByNativeCryptographicVerifier": true
+    },
+    {
+      "circuit": "draw",
+      "decodableProofCorruption": true,
+      "rejectedByNativeCryptographicVerifier": true
+    },
+    {
+      "circuit": "draw",
+      "decodableProofCorruption": true,
+      "rejectedByNativeCryptographicVerifier": true
+    },
+    {
+      "circuit": "draw",
+      "decodableProofCorruption": true,
+      "rejectedByNativeCryptographicVerifier": true
+    },
+    {
+      "circuit": "draw",
+      "decodableProofCorruption": true,
+      "rejectedByNativeCryptographicVerifier": true
+    },
+    {
+      "circuit": "draw",
+      "decodableProofCorruption": true,
+      "rejectedByNativeCryptographicVerifier": true
+    }
+  ],
+  "verifiedIsolatedBranchCalls": 7,
+  "generatedFixtureChecks": 55,
+  "evidenceScope": "Native Rust real proof verification against a synthetic public ledger. No network finality, token payouts, custody certification or complete privacy claim."
+}
