@@ -1,6 +1,20 @@
 # Line Wave 2 demonstration
 
-Updated: 9 October 2026. This guide separates the executable local checkout from contract/reference-model tests and the required production acceptance. It does not certify a live deployment or token payout. Product requirements remain in [PRODUCT_DIRECTION.md](PRODUCT_DIRECTION.md).
+Updated: 11 October 2026. This guide separates the executable local checkout, reported canonical Preprod deployment, source-bound proof experiments and required production acceptance. Product requirements remain in [PRODUCT_DIRECTION.md](PRODUCT_DIRECTION.md).
+
+## Current evidence to show accurately
+
+| Evidence path | Verified or reported result | Boundary |
+|---|---|---|
+| Local `/checkout` | Generated Compact execution and deterministic services; tested role capabilities, retry and recovery | This browser path does not submit proofs or transfer assets |
+| Canonical Preprod contract | Deployment evidence records twelve registered verifier keys and eight executed calls at `b2254962147c9cc2e5b9fbcf39f8a4e0d1f149b7801a651df2e41dda1e4410d9` | [Independent receipt reconciliation](NETWORK_RECEIPT_AUDIT_2026-10-11.md) awaits authenticated access; registrations are not twelve executions or payouts |
+| Canonical local proofs | Nineteen native-verified calls across all twelve names, with corrupted-proof controls | [Synthetic ledger with fee balancing disabled](LOCAL_PROOF_VERIFICATION_2026-10-11.md); separate from the checkout and network |
+| Private-finance source `a8d14adf` | Thirty-eight native-verified calls across all twelve names; five corrupted draws rejected | [Separate experimental ABI](SIGNED_PRIVATE_FINANCE_2026-10-11.md); no deployment, full-history privacy or institutional custody claim |
+| Merchant source `afb75b1` | Thirty-nine generated lifecycle calls / 55 rejection controls and seven isolated generated branches | [Merchant membership/privacy prototype](PRIVATE_MERCHANT_2026-10-11.md); fresh keys underway, no native proof result yet |
+
+Show the exact source/commit and matching receipt for each path. A deployment screenshot must not be presented as evidence that the privacy candidate or browser checkout executes on chain. Funding/redemption/refund counters do not establish asset transfers.
+
+Midnight's current official schedule lists Wave 2 build **Sep 27–Oct 17** and judging **Oct 17–Oct 27**, and describes progress and iteration across connected waves. Exact cutoff time/timezone, entrant eligibility, submission artifacts and the Wave-specific rubric still require the entrant dashboard; the public AKINDO text extraction exposes only navigation. [Official schedule](https://midnight.network/hackathon/buildathon), [event page](https://app.akindo.io/wave-hacks/jaMZjqPOBsLXvjdG). Rechecked 11 October 2026.
 
 ## Start the executable procurement evaluation
 
