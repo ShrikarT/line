@@ -64,3 +64,18 @@ test('owner-approved facility terms are checked before agent consent',async()=>{
   }
  }finally{await x.actor.stop();}
 });
+
+test('failed readiness stops the owned child and does not leave an approval channel',async()=>{
+ const x=await setup();await x.actor.stop();
+ const actor=startDurableApprovalActor({...x.options,create:false,startupTimeoutMs:1});
+ const exited=new Promise(resolve=>actor.child.once('exit',resolve));
+ await assert.rejects(actor.ready,/startup timed out/);
+ await exited;
+ assert(actor.child.exitCode!==null||actor.child.signalCode!==null);
+ await assert.rejects(actor.approve(x.request),/unavailable/);
+ await actor.stop();
+ // The same owner can still recover its original identity after this failure.
+ const recovered=startDurableApprovalActor({...x.options,create:false});
+ try{assert.deepEqual((await recovered.ready).pk,x.point.pk);verify(await recovered.approve(x.request),x.descriptor);}
+ finally{await recovered.stop();}
+});

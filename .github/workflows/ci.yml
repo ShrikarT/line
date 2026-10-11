@@ -71,6 +71,9 @@ jobs:
       - name: Compiled private enrollment and duplicate-generation controls
         run: npm run enrollment:spike
 
+      - name: Private supplier offers and financial binding controls
+        run: npm run offer:spike
+
       - name: Durable agent approvals in freshly compiled Compact
         run: npm run custody:compact
 

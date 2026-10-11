@@ -1,5 +1,7 @@
 # Privacy observer model and acceptance cases — 11 October 2026
 
+The newer [private supplier offer source](PRIVATE_OFFER_2026-10-11.md) removes borrower identity, numeric generation, fee policy and binding salt from supplier approval requests. Its finite generated comparison permits debts 16/17 under identical supplier quote values when fees remain confidential. Native verification is active; full public histories, distributional privacy and externally known fees remain separate gates. The supplier disclosure counterexample below still applies to the deployed canonical and earlier enrollment paths.
+
 Latest separate [enrollment experiment](PRIVATE_ENROLLMENT_2026-10-11.md): private predecessor selection, uniform query counts, generation-specific issuance nullifiers and fresh 39/13/66 generated controls. Native verification now completes 52 contract calls across all twelve names, including thirteen isolated calls, with six corrupted-proof rejections. Full observer privacy remains unproven. Finite serialized-size differences are retained in the source-bound report.
 
 The current merchant quote request contains borrower identity, numeric generation and fee policy. A supplier knowing a zero balance can infer debt from its price plus the disclosed fee; a new generation can also disclose a closed predecessor. This off-chain request remains a privacy gap even after enrollment ledger queries are made uniform. The [durable-agent integration](DURABLE_ACTOR_2026-10-11.md) deliberately records this counterexample rather than declaring a privacy pass.

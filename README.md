@@ -16,7 +16,7 @@ New `main` reports a canonical Preprod deployment and eight circuit calls. [Inde
 
 ## Try the procurement evaluation
 
-The [11 October audit update](docs/AUDIT_UPDATE_2026-10-11.md) reviews the newer code and branding. A separate [local proof experiment](docs/LOCAL_PROOF_VERIFICATION_2026-10-11.md) generates and cryptographically verifies 19 contract proofs across all twelve circuits, with invalid-proof controls. It uses synthetic ledger state with fee balancing disabled; it establishes no network finality, independent canonical custody, historical privacy or asset payment. The checkout and consoles remain separate execution paths.
+The [consolidated 11 October audit](docs/FULL_AUDIT_2026-10-11.md) covers the latest deployment, product direction, code, privacy, custody, settlement and submission readiness. The [detailed update](docs/AUDIT_UPDATE_2026-10-11.md) retains current findings. A separate [local proof experiment](docs/LOCAL_PROOF_VERIFICATION_2026-10-11.md) generates and cryptographically verifies 19 contract proofs across all twelve circuits, with invalid-proof controls. It uses synthetic ledger state with fee balancing disabled; it establishes no network finality, independent canonical custody, historical privacy or asset payment. The checkout and consoles remain separate execution paths.
 
 Use **Node.js 22.18 or later** for native TypeScript stripping; the evaluated environment uses Node 26.7.0. A Compact compiler is needed to regenerate the contract, but the checked-in managed JavaScript supports the local evaluation.
 
@@ -111,10 +111,10 @@ Compact is the source of truth. Canonical code is [contracts/line.compact](contr
 | `/checkout` and `server/checkout-engine.ts` | Compiler-generated Compact circuits via the harness, with local service results |
 | `LocalDevelopmentRuntime` | TypeScript reference model in `src/lib/line/protocol.ts`, not generated Compact |
 | `InMemoryTestRuntime` | Isolated reference-model runtime for tests |
-| `MidnightNetworkRuntime` | Network integration code; working deploy/write lifecycle remains unconfirmed and audit-tracked |
+| `MidnightNetworkRuntime` | Browser network integration; its live lifecycle remains independently unverified. Separate canonical CLI deployment/call receipts are recorded in the audit |
 | `/lab` and scripted demo | Development/reference-model fixtures and attack illustrations |
 
-Existing `/issuer`, `/agent`, `/merchant`, `/explorer` and `/circuits` desks expose technical workflows. The shared store's role/session/recovery defects remain audit-tracked; choosing a page does not establish independent custody. The executable `/checkout` capability scopes are a separate evaluation path, not a claim that every legacy console defect is fixed.
+Existing `/issuer`, `/agent`, `/merchant`, `/explorer` and `/circuits` desks expose technical workflows. Runtime/session/recovery controls have regression coverage; choosing a page does not establish independent custody. The executable `/checkout` capability scopes remain a separate evaluation path with the limits recorded in the audit.
 
 ## Development checks
 
@@ -143,7 +143,7 @@ Do not reuse older generated artifacts or the historical 0.34 proving-key size/c
 
 `npm run mcp` and `npm run mcp:dev` currently invoke the local JSON-RPC simulator in `mcp/line-mcp.mjs`. Its demo tools include fixture seeding and issuer operations, and its state file can contain plaintext development private data. It is **not** a production role-isolated agent payment server. Use it only as development evidence; the intended agent integration must expose bounded purchasing capabilities and exclude issuer repayment/funding/status tools. [MCP reference](docs/MCP.md).
 
-Deployment/join/smoke scripts exist, but no confirmed public-network deployment or token payout is established here. The deployment script can attempt funded-wallet actions; **`npm run contract:deploy` is not a dry run**. Acceptance still requires compatible release assets, provider configuration, canonical role-key derivation, secure recoverable state and a confirmed receipt. Consult [the audit](docs/FULL_AUDIT_2026-10-07.md) alongside [deployment guidance](docs/DEPLOYMENT.md).
+The repository records canonical Preprod deployment, twelve registered verifier keys and eight circuit call receipts. Independent authenticated receipt/state/key reconciliation remains pending; these records do not deploy the experimental privacy candidates or prove token payouts. The deployment script can attempt funded-wallet actions; **`npm run contract:deploy` is not a dry run**. Acceptance still requires compatible release assets, provider configuration, canonical role-key derivation, secure recoverable state and receipt reconciliation. Consult [the current audit](docs/FULL_AUDIT_2026-10-11.md) alongside [deployment guidance](docs/DEPLOYMENT.md).
 
 As announced on 9 October, Midnight-hosted Preprod RPC/indexer endpoints shut down from **03:30 IST on 10 October 2026**. Use the configured Blockfrost Preprod endpoints and a matching project token; Preview has unchanged public endpoints. CLI/browser defaults and token handling must agree before network use. [Official endpoints and migration notice](https://docs.midnight.network/relnotes/network).
 
@@ -155,7 +155,7 @@ As announced on 9 October, Midnight-hosted Preprod RPC/indexer endpoints shut do
 - [Executable walkthrough](docs/PRODUCT_WALKTHROUGH.md) and [Wave demonstration](docs/WAVE2_DEMO.md)
 - [Pitch and evidence checklist](docs/PITCH.md)
 - [Architecture](docs/PRODUCT_ARCHITECTURE.md), [protocol](docs/PROTOCOL.md), [privacy](docs/PRIVACY.md), [security](docs/SECURITY.md)
-- [Full audit and reproductions](docs/FULL_AUDIT_2026-10-07.md), [engineering status](docs/ENGINEERING_STATUS.md)
+- [Current full audit](docs/FULL_AUDIT_2026-10-11.md), [historical reproductions](docs/FULL_AUDIT_2026-10-07.md), [engineering status](docs/ENGINEERING_STATUS.md)
 - [Development](docs/DEVELOPMENT.md), [deployment](docs/DEPLOYMENT.md), [MCP](docs/MCP.md)
 
 The [AKINDO Midnight wave](https://app.akindo.io/wave-hacks/jaMZjqPOBsLXvjdG) evaluates incremental evidence. Full requirements remain in scope beyond interim demonstrations: independent merchants/custody, durable checkout/recovery, correct repayment/refunds/expiry, history privacy, actual settlement, fleets/policies, risk/default economics, syndication/underwriting credentials and additional rails. No deadline substitutes for those acceptance gates.

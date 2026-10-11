@@ -10,9 +10,20 @@ import { closeSync, existsSync, fsyncSync, lstatSync, mkdirSync, openSync, readF
 import { join, resolve } from 'node:path';
 import * as RT from '@midnight-ntwrk/compact-runtime';
 import { encodeVaultJson, decodeVaultJson } from '../src/lib/security/vault-codec.ts';
-import { ORDER, words, actionBody, approvalMessage, challenge } from './signed-pool-signers.mjs';
+import { ORDER, words, actionBody, approvalMessage, challenge, roleHash } from './signed-pool-signers.mjs';
+import {offerCommit} from './private-offer-encoding.mjs';
 
 const FORMAT='line:software-approval-store/v1';
+const LEGACY_ABI='line-private-enrollment/v1',OFFER_ABI='line-private-offer/v1';
+const byte32=v=>v instanceof Uint8Array&&v.length===32;
+const uint64=v=>typeof v==='bigint'&&v>=0n&&v<=18446744073709551615n;
+const status=v=>Number.isInteger(v)&&v>=0&&v<=3;
+// These are the complete signer action tuples, including private finance
+// arguments that Compact receives as witnesses rather than public inputs.
+const ARG_TYPES={registerMerchant:[byte32],disableMerchant:[byte32],fundReserve:[uint64],withdrawUnencumberedReserve:[uint64],withdrawFees:[],
+ openLine:[uint64,uint64,uint64,uint64],postQuote:[uint64],draw:[byte32,uint64,uint64],redeemDraw:[byte32,uint64],
+ cancelOrExpireNote:[byte32,uint64,uint64],acknowledgeRepayment:[uint64],setStatus:[status]};
+const UINT_VALUES=new Set(['lineLimit','quoteAmount','quoteGeneration','quoteFlatFee','quoteBasisPoints','drawAmount','redeemAmount','repayAmount']);
 const MAX_FILE_BYTES=4*1024*1024,MAX_OPERATIONS=256;
 const OPERATIONS=new Set(['registerMerchant','disableMerchant','fundReserve','withdrawUnencumberedReserve','withdrawFees','openLine',
  'postQuote','draw','redeemDraw','cancelOrExpireNote','acknowledgeRepayment','setStatus']);
@@ -35,16 +46,20 @@ function scalar(){for(;;){const value=BigInt('0x'+randomBytes(32).toString('hex'
 const reject=()=>{throw Error('Approval could not be authorized.');};
 
 export class DurableApprovalSigner {
- #directory;#file;#lock;#lease;#key;#aad;#state;#authorize;#clock;#uncertain=false;#closed=false;
- constructor({directory,encryptionKey,custodyId,role,authorize,create=false,clock=()=>Math.floor(Date.now()/1000)}){
+ #directory;#file;#lock;#lease;#key;#aad;#state;#authorize;#clock;#approvalABI;#uncertain=false;#closed=false;
+ constructor({directory,encryptionKey,custodyId,role,authorize,create=false,clock=()=>Math.floor(Date.now()/1000),approvalABI=LEGACY_ABI}){
   assert(['issuer','agent','merchant','permissionless'].includes(role));
+  assert([LEGACY_ABI,OFFER_ABI].includes(approvalABI),'Unsupported owner-selected approval ABI.');
+  this.#approvalABI=approvalABI;
   assert(encryptionKey instanceof Uint8Array&&encryptionKey.length===32);
   assert(typeof custodyId==='string'&&/^[a-zA-Z0-9][a-zA-Z0-9:._-]{0,127}$/.test(custodyId));
   assert.equal(typeof authorize,'function');assert.equal(typeof clock,'function');
   this.#directory=resolve(directory);mkdirSync(this.#directory,{recursive:true,mode:0o700});
   assert(!lstatSync(this.#directory).isSymbolicLink(),'Signer directory must not be a symlink.');
   this.#file=join(this.#directory,'signer.enc.json');this.#lock=join(this.#directory,'signer.lock');
-  this.#key=Buffer.from(encryptionKey);this.#aad=Buffer.from(`${FORMAT}:${role}:${custodyId}`);
+  // Preserve the existing enrollment journal namespace. The offer profile has
+  // separate authenticated storage and cannot reopen a legacy identity silently.
+  this.#key=Buffer.from(encryptionKey);this.#aad=Buffer.from(`${FORMAT}:${role}:${custodyId}${approvalABI===LEGACY_ABI?'':':'+approvalABI}`);
   this.#authorize=authorize;this.#clock=clock;
   try{
    this.#lease=openSync(this.#lock,'wx',0o600);writeFileSync(this.#lease,JSON.stringify({format:FORMAT,pid:process.pid}));fsyncSync(this.#lease);
@@ -74,15 +89,29 @@ export class DurableApprovalSigner {
    !Array.isArray(request.args)||!isRecord(request.values)||
    request.authorizationNonce!==undefined||request.challengeLiftForTest!==undefined)reject();
   if(forbidden.some(key=>Object.hasOwn(request.values,key)))reject();
+  if(request.args.length!==ARG_TYPES[request.name].length||request.args.some((v,i)=>!ARG_TYPES[request.name][i](v)))reject();
+  if(Object.hasOwn(request,'reserveCommit')&&!byte32(request.reserveCommit))reject();
+  if(Object.hasOwn(request,'feeReserve')&&!uint64(request.feeReserve))reject();
   const topFields=new Set(['name','args','domain','privateFinance','values']);
   if(['fundReserve','withdrawUnencumberedReserve','withdrawFees'].includes(request.name))topFields.add('reserveCommit');
   if(request.name==='withdrawFees')topFields.add('feeReserve');
   if(Object.keys(request).some(key=>!topFields.has(key)))reject();
-  const allowedValues=new Set(request.name==='cancelOrExpireNote'?
+  const allowedValues=new Set(request.name==='postQuote'&&this.#approvalABI===OFFER_ABI?
+   ['quoteFacilityBinding','invoiceId','quoteAmount','quoteNonce']:request.name==='cancelOrExpireNote'?
    request.args[1]===0n?[]:request.args[1]===1n?['bookOpening','salt','newSalt']:['repayAmount','paymentRef']:VALUE_FIELDS[request.name]);
   if(Object.keys(request.values).some(key=>!allowedValues.has(key)))reject();
+  for(const [key,value]of Object.entries(request.values)){
+   if(key==='bookOpening')continue;
+   if(key==='hasPreviousBook'){if(typeof value!=='boolean')reject();}
+   else if(UINT_VALUES.has(key)){if(!uint64(value))reject();}
+   else if(!byte32(value))reject();
+  }
   if(Object.hasOwn(request.values,'bookOpening')&&(!isRecord(request.values.bookOpening)||
    Object.keys(request.values.bookOpening).some(key=>!BOOK_FIELDS.has(key))))reject();
+  if(Object.hasOwn(request.values,'bookOpening'))for(const key of BOOK_FIELDS){
+   const value=request.values.bookOpening[key];
+   if(!(key==='domain'||key==='identity'?byte32(value):key==='status'?status(value):uint64(value)))reject();
+  }
   if(!ROLE_OPERATIONS[this.#state.role].has(request.name))reject();
   if(request.name==='openLine'&&((this.#state.role==='issuer'&&request.args[0]!==1n)||(this.#state.role==='agent'&&request.args[0]!==0n)))reject();
   if(request.name==='cancelOrExpireNote'&&(request.args[1]!==0n&&
@@ -98,7 +127,10 @@ export class DurableApprovalSigner {
     decision.reservationCost!==request.values.drawAmount+request.args[2]))reject();
   if(saved)return clone(saved.response);
   if(Object.keys(this.#state.operations).length>=MAX_OPERATIONS||this.#state.approvedCost+decision.reservationCost>config.maxAuthorizedCost)reject();
-  let operation;try{operation=actionBody(this.publicKey,request);}catch{reject();}if(!operation)reject();
+  let operation;try{operation=request.name==='postQuote'&&this.#approvalABI===OFFER_ABI?
+   [7,offerCommit({merchant:roleHash('merchant',this.publicKey),binding:request.values.quoteFacilityBinding,
+    invoice:request.values.invoiceId,amount:request.values.quoteAmount,expiry:request.args[0],nonce:request.values.quoteNonce,domain:request.domain})]:
+   actionBody(this.publicKey,request);}catch{reject();}if(!operation)reject();
   const [op,body]=operation,nonce=new Uint8Array(randomBytes(32)),message=approvalMessage(request.domain,op,body,nonce);
   const r=scalar(),announcement=RT.ecMulGenerator(r),h=challenge(message,this.publicKey,announcement),remainder=h%ORDER,quotient=h/ORDER;
   const response={rolePublicKey:this.publicKey,roleApproval:{announcement,response:words((r+remainder*this.#state.scalar)%ORDER)},

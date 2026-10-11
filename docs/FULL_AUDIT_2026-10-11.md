@@ -1,0 +1,81 @@
+# Line: consolidated product, code and Wave 2 audit
+
+Audit snapshot: 11 October 2026. This consolidates the [original detailed audit and reproductions](FULL_AUDIT_2026-10-07.md), [current finding updates](AUDIT_UPDATE_2026-10-11.md), latest reported deployment and subsequent privacy/custody work. Earlier findings are historical unless identified as still open here. This is a systematic implementation and execution review, not a formal proof that every possible bug has been excluded.
+
+**Verdict:** Line has substantial Compact accounting, adversarial tests, a working local checkout and real local cryptographic proof evidence. The repository reports canonical Preprod deployment and eight calls. Its proposed private credit product still has unresolved privacy, independent custody, network reconciliation, asset settlement and demand gates. The internal privacy-demo gate is unmet. A compiling contract satisfies a technical event requirement; it does not establish the full product or a guaranteed judging result.
+
+## Scope and exact evidence
+
+The review covers the product/customer hypothesis, capital and settlement model, all twelve circuit families, encoding and generated bindings, role authorization, complete-history leakage, proof tooling, browser/network adapters, multi-role consoles, checkout/MCP boundaries, encrypted state and operation recovery, deployment evidence, tests/CI, dependency/toolchain compatibility and submission claims. Reproductions and precise source-level findings remain linked below rather than replacing historical evidence.
+
+Latest fetched `main`: `a0e51ee1486511e60b0f5a7bc2099a1f8b161aa0`, merging deployment work `babc507`. Published audit fixes: `4c9de8cac59273664e40ab1701cfca28a69d2237`, [draft PR #10](https://github.com/ShrikarT/line/pull/10). New private-offer work and a startup-cleanup fix are a separate working revision at this snapshot. Canonical Compact SHA-256 remains `35ebd14e19ce682230b685f6f3729923a9c56b0719eb17a684e44e4a39c73eff`.
+
+| Evidence lane | Established | Limits |
+|---|---|---|
+| Published audit CI, `4c9de8c` | [Push](https://github.com/ShrikarT/line/actions/runs/38154420058) and [PR](https://github.com/ShrikarT/line/actions/runs/38154423586): 482 tests / 60 suites, 20 browser checks, fresh Compact experiments, typecheck/build, credential scans and zero canonical drift | CI does not submit transactions, transfer assets or prove historical privacy |
+| Canonical local proofs | 19 contract calls across all twelve circuit names; three decodable corrupted draws reject in a separate Rust verifier | Synthetic ledger; shared custody; not proof of a deployed private redesign |
+| Owner-reported canonical Preprod | Contract `b2254962147c9cc2e5b9fbcf39f8a4e0d1f149b7801a651df2e41dda1e4410d9`, deployment/key-registration metadata and eight call receipts | Independent authenticated transaction/state/key reconciliation remains pending; twelve registered keys are not twelve executed circuits |
+| Merchant candidate, `afb75b1` | 46 native-verified contract calls: 39 normal and seven isolated; all twelve names; six corrupted-proof rejections | Local synthetic state/time; fee balancing disabled; financial prover is trusted |
+| Enrollment candidate, `27759dbf` | 52 native-verified contract calls: 39 normal and thirteen isolated; all twelve names; six corrupted-proof rejections | Uniform query counts do not certify distributions or full observer privacy; finite size differences remain |
+| Durable agent on enrollment source | Six native-verified calls through two real process restarts; stable identity/committed approvals; one corrupted-proof rejection | Five circuit names, one durable actor, same administrative host and launcher-known synthetic encryption key; financial openings remain volatile |
+| New private offer, `ae970672` | Fresh generated 39 normal / 26 isolated calls, 72 Compact rejections, five supplier request controls; identical supplier quotes with different debt/capacity | Native run active, not complete at this snapshot; confidential fees are an explicit assumption; no deployment or settlement |
+| Latest local regression | Complete bounded-concurrency run passes 486 tests / 60 suites; fresh six-call durable-agent generated integration and 24 targeted custody checks pass | An earlier concurrent key-generation run passed 481/482 with one actor startup timeout; its root cause is not established. Earlier native actor evidence pins its earlier harness |
+
+Each local proof report pins source, executable, key and harness fingerprints. Public evidence retains exact versions and finite differences. An old report is not relabeled as verification of a later script. [Engineering status](ENGINEERING_STATUS.md) is the current verification ledger.
+
+## Priority findings
+
+| Priority | Current issue | Consequence | Required outcome |
+|---|---|---|---|
+| P0 | Canonical public amounts, fees, reserve deltas and linked history reconstruct known-zero debt | The deployed baseline cannot support a complete historical-credit-privacy claim | Integrate a supported redesigned disclosure boundary and test the actual public/prover/network view over complete histories |
+| P0 | Canonical opening requires issuer and agent secrets; checkout has all role keys in one executor | UI/API roles do not establish independent key ownership | Separate independently controlled signers, bounded actor policies, authorized financial prover access, durable identity/state and recovery |
+| P0 | Preprod receipts have not been independently reconciled; the reported flow has unsafe restart assumptions | Uncertain submissions can be repeated or incorrectly skipped; private openings can be lost | Verify raw receipts and post-state, persist candidates before submission, resolve uncertainty and recover without recharging |
+| P0 | Reserve and payment operations authenticate accounting rather than asset transfers | Merchant redemption is not payout; repayment/refund references do not prove money moved | Select an accountable asset rail and reconcile deposits, payouts, repayments and refunds against authenticated receipts |
+| P1 | No customer contacts, interviews, pilots, supplier commitments or demand | The lead segment and differentiation may be wrong despite technical progress | Validate an actual recent purchase workflow, budget owner, pain, incumbent comparison and willingness to integrate/pay |
+| P1 | Custom Jubjub approval scheme lacks independent security review and demonstrated managed hardware signing | Correct equations and accepted proofs are insufficient for institutional signature/custody assurances | Review construction, key validation, nonce/challenge semantics and implementation; demonstrate a supported custody backend |
+| P1 | Proof-provider, sender, DUST, catalogs, timing, public action shapes and chosen-price probes remain outside a complete privacy pass | Hidden fields alone can leave attribution and inference channels | Specify observer knowledge and permitted disclosures, then assess the actual integrated execution path |
+| P1 | Latest deployment version, runtime, demo, deck and video have not been frozen into one submission | Judges may see incompatible paths or unsupported claims | Pin one commit/release and supply reproducible evidence for each capability shown |
+| P1 | Official deadline/rubric sources conflict | Planning against one date may miss the controlling requirement | Obtain the organizer's controlling cutoff/rules and finish the artifact package promptly |
+| P2 | Software journal has no external anti-rollback anchor, power-loss guarantee, key-loss migration or tested OS ownership policy | Encrypted storage can still be rolled back or administered by the wrong party | Add documented backup/restore, monotonic reconciliation, administration and failure procedures |
+| P2 | Candidate books and authorization roots require fresh paths and concurrency handling | Parallel actors can work from stale state or lose private candidates | Durable staged operations, serialized/optimistic coordination, safe retries and verified-current-root recovery |
+
+## What has been repaired
+
+The earlier audit identified real accounting, authorization, interface and recovery defects. The published branch includes stable payment-reference nullifiers, authenticated zero-debt closure, contract-time expiry, exact issuer-approved fee computation, pending/earned fee accounting, note-bound compensation, locked refund budgets, domain-bound books and encrypted operation journals. It exercises lost responses and process-death recovery rather than relying on success stubs alone.
+
+Runtime work aligns the pinned Compact/runtime/ledger/connector stack, fixes SDK contract/provider interfaces, checks wallet/network capabilities and preserves distinct local/network status. UI integration restores tested network settings, recovery actions, claim status/deadlines and fee/refund-aware reserve views while removing unsupported privacy/performance/proven-transaction claims. Fixture/credential scans inspect the production graph. Precise acceptance and residual limits are in [the update](AUDIT_UPDATE_2026-10-11.md), [local proof report](LOCAL_PROOF_VERIFICATION_2026-10-11.md), [operation recovery](OPERATION_RECOVERY_2026-10-10.md) and [checkout durability](CHECKOUT_DURABILITY_2026-10-10.md).
+
+Real proving found backend failures that generated execution did not: opening curve checks and cancellation alignment. Unconditional signature verification and uniform typed preparation resolved the observed failures in separately fingerprinted sources. Separate Rust rejection controls are required because the installed ledger WASM accepted decodable corrupted proofs despite verification flags.
+
+The latest actor fix stops its owned child after readiness timeout and prevents later approvals through that failed channel. Its timeout/recovery test verifies process exit and restored identity. The extra failing regression is recorded; the complete later rerun passes 486 tests / 60 suites using two test workers. The durable signer also supports an owner-selected private-offer profile and authenticates it in storage. Strict tuple/value types now prevent extra arguments or malformed invoice/amount fields from carrying unrelated private books to policy. These profile and denial checks are included in the full suite; the current six-call generated integration passes, while the older native actor evidence is retained at its original exact version.
+
+## Privacy redesign assessment
+
+The progression is substantive: private population books, external signed approvals, committed reserve/note amounts, current-root merchant membership, privately selected opening predecessors and uniform enrollment queries. These preserve exact accounting and twelve entry points. They also make the financial coordinator an explicitly trusted holder of authorized private openings. Migration and production integration remain necessary.
+
+The new [private offer](PRIVATE_OFFER_2026-10-11.md) addresses an off-chain leakage defect: earlier supplier requests exposed borrower identity, generation and fee terms. Suppliers now sign an opaque salted facility binding and their invoice/price/deadline. Draw opens the binding against the private book and enforces its fee. Supplier redemption approval receives the opaque claim and principal, while the trusted financial prover retains note metadata. Wrong borrower, generation, domain, salt and fee controls reject.
+
+The comparison shows a concrete improvement: a supplier can receive exactly the same quote for two valid books that leave debts 16/17 and capacities 84/93. This establishes one finite counterexample to exact inference when fees are confidential. It does not establish full-history indistinguishability. An observer who knows every starting balance, purchase and fee can still derive deterministic debt; privacy cannot conceal a logical consequence of known inputs. Commitment distributions, complete histories, outside knowledge and the actual fee-funded/asset path still require review.
+
+The finite native refund/enrollment reports retain differing transaction lengths and public leaves. Their causes and distributions are not certified as harmless noise. There is no borrower-anonymity or full-history pass. [Observer model](PRIVACY_OBSERVER_MODEL_2026-10-11.md), [enrollment evidence](PRIVATE_ENROLLMENT_2026-10-11.md), [custody feasibility](CUSTODY_FEASIBILITY_2026-10-11.md).
+
+## Product direction and economics
+
+Keep the full destination: organization-level purchasing credit, independent capital, a protected wider credit book, multiple suppliers and actual reconciliation to service and payment. The accepted first-customer hypothesis is enterprise teams whose agents buy APIs and compute. It is unvalidated; no contacts or outreach results are invented.
+
+The decisive product question is whether a buyer needs private credit clearance and supplier acceptance enough to adopt Line over ordinary enterprise billing, prepaid policy wallets or existing paid-API protocols. Agent spending controls, private agent budgets and deferred merchant claims have precedents. Line must demonstrate a specific additional outcome. A speculative market-size figure, more dashboards or proof counts do not establish that outcome. [Primary competitor references and validation plan](PRODUCT_VALIDATION.md).
+
+Name the liable borrower, capital provider, merchant, settlement operator, asset owner and loss bearer before an actual pilot. Separate credit repayment from reserve replenishment; a repayment counter does not create spendable cash. Measure proof/finality latency, integration cost, service delivery, liquidity, collection and expected loss against supplier/buyer economics. Keep unknown inputs blank and compare the strongest viable incumbent. [Complete product requirements and economics](PRODUCT_DIRECTION.md).
+
+## Wave 2 readiness and recommended order
+
+The live event API and rules PDF describe Engineering 40%, QA 15%, Product 15%, UX 15%, Communication 10% and Business 5%; a linked judging document differs. The live wave cutoff is October 19 at 20:30:34 IST, the overview says October 17 and the linked rules PDF says October 3. No controlling amendment is established. These conflicts and repository/deck/video, license, registration and personal-entry requirements are documented in [the primary-source requirement review](WAVE2_REQUIREMENTS_2026-10-11.md). Entrant eligibility and submission are not certified.
+
+1. Finish the source-bound native private-offer checks and complete sequenced regression verification. Publish both successes and failures with exact scope.
+2. Integrate one versioned candidate through independently owned signers, durable financial state, the browser/runtime and merchant verification. Preserve the twelve circuits, generic decline text and exact accounting.
+3. Independently reconcile the reported canonical network receipts; then exercise the selected candidate with funded finalized transactions, uncertain-submission recovery and authenticated test-asset settlement.
+4. Validate the enterprise API/compute workflow with actual buyer/supplier evidence. Keep this alongside engineering rather than substituting research for demand.
+5. Freeze the submission commit and show one clear task: two suppliers, approved and declined purchases, stolen/replayed claim rejection, recovery, repayment and the actual privacy view. Distinguish generated checkout, local proofs, reported network receipts and paid settlement.
+6. Complete a concise deck/video with the Wave 1-to-2 change, concrete Midnight contribution, evidence links and remaining limits. The entrant completes the entry and resolves organizer requirements.
+
+The strongest credible submission is one whose demonstrated behavior matches its claims. Current engineering evidence is strong enough to explain meaningful progress, but full privacy, independent institutions, authentic settlement and commercial demand remain work to complete.

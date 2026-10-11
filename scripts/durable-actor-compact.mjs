@@ -29,7 +29,7 @@ export async function runDurableActorCompact({compiledDir,onInitialize,onAccepte
  const dir=compiledDir?resolve(compiledDir):index>=0?resolve(process.argv[index+1]):join(work,'managed');
  const sourceHash=fingerprint(readFileSync(SOURCE));
  const scriptFingerprints=Object.fromEntries(['scripts/durable-actor-compact.mjs','scripts/durable-approval-actor.mjs','scripts/durable-approval-signer.mjs',
-  'scripts/signed-pool-signers.mjs','scripts/private-pool-spike.mjs','src/lib/line/encoding.ts','src/lib/security/vault-codec.ts'].map(p=>[p,fingerprint(readFileSync(p))]));
+  'scripts/private-offer-encoding.mjs','scripts/signed-pool-signers.mjs','scripts/private-pool-spike.mjs','src/lib/line/encoding.ts','src/lib/security/vault-codec.ts'].map(p=>[p,fingerprint(readFileSync(p))]));
  if(!cached)await new Promise((yes,no)=>{
   const child=spawn(process.execPath,['scripts/compile-compact.mjs','--skip-zk',SOURCE,relative(process.cwd(),dir).split(sep).join('/')],{stdio:'inherit'});
   child.on('error',no);child.on('close',code=>code===0?yes():no(Error('Durable actor Compact compilation failed.')));
