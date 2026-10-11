@@ -56,6 +56,12 @@ jobs:
       - name: Compiled private-book population experiment
         run: npm run pool:spike
 
+      - name: Compiled signed-role approval controls
+        run: npm run signed:spike
+
+      - name: Compiled private-finance signed-role experiment
+        run: npm run privacy:spike
+
       - name: Typecheck
         run: npm run typecheck
 

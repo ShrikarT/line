@@ -35,7 +35,9 @@
     "pool:spike": "node --experimental-strip-types scripts/private-pool-spike.mjs",
     "proof:pool": "node --experimental-strip-types scripts/private-pool-proof.mjs",
     "pool:provers:start": "node scripts/private-pool-provers.mjs start",
-    "pool:provers:stop": "node scripts/private-pool-provers.mjs stop"
+    "pool:provers:stop": "node scripts/private-pool-provers.mjs stop",
+    "signed:spike": "node --experimental-strip-types scripts/signed-pool-spike.mjs",
+    "privacy:spike": "node --experimental-strip-types scripts/private-signed-spike.mjs"
   },
   "compact": {
     "compiler": "0.31.1",
