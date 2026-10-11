@@ -1,5 +1,7 @@
 # Custody compatibility and operational acceptance — 11 October 2026
 
+Latest evidence: [enrollment](PRIVATE_ENROLLMENT_2026-10-11.md) verifies 52 local contract calls across all twelve names; [durable agent integration](DURABLE_ACTOR_2026-10-11.md) verifies six calls through two process restarts. These distinct synthetic runs are not the deployed canonical contract, independent institutional custody, complete financial recovery, full-history privacy or asset settlement.
+
 The signed candidates demonstrate that Compact can verify external approvals without receiving role signing scalars. This closes a specific feasibility question, not independent institutional custody. Source `a8d14adf` has complete local native coverage; the separate merchant source `afb75b1` completes 39 lifecycle plus seven isolated native calls. Both use a trusted financial coordinator/prover that receives book and reserve openings.
 
 ## Hardware compatibility is unresolved

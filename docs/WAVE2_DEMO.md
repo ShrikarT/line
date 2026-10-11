@@ -1,5 +1,7 @@
 # Line Wave 2 demonstration
 
+Latest evidence: [enrollment](PRIVATE_ENROLLMENT_2026-10-11.md) verifies 52 local contract calls across all twelve names; [durable agent integration](DURABLE_ACTOR_2026-10-11.md) verifies six calls through two process restarts. These distinct synthetic runs are not the deployed canonical contract, independent institutional custody, complete financial recovery, full-history privacy or asset settlement.
+
 Updated: 11 October 2026. This guide separates the executable local checkout, reported canonical Preprod deployment, source-bound proof experiments and required production acceptance. Product requirements remain in [PRODUCT_DIRECTION.md](PRODUCT_DIRECTION.md).
 
 ## Current evidence to show accurately

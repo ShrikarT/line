@@ -2,6 +2,14 @@
 
 Updated **11 October 2026**. Canonical contract: `contracts/line.compact`; managed bindings: `contracts/managed/line/`. Product version `0.3.0`. This replaces older completion checklists that incorrectly described domain binding, history privacy, runtime execution and production readiness.
 
+## Latest verified enrollment and durable-agent evidence — 11 October 2026
+
+- Publication `1c025b3` passed [push CI](https://github.com/ShrikarT/line/actions/runs/38149240276) and [PR CI](https://github.com/ShrikarT/line/actions/runs/38149243783): 479 regression tests / 60 suites, 20 browser tests, fresh Compact fixtures, build/typecheck/scans and zero canonical drift.
+- Enrollment source `27759dbf` completes **52 native-verified contract calls across all twelve names**, including thirteen isolated calls, plus a synthetic deployment. Six decodable corrupted draw proofs reject in a separate Rust verifier. [Enrollment scope and finite size differences](PRIVATE_ENROLLMENT_2026-10-11.md).
+- A durable software agent completes six native-verified lifecycle calls through two actual process restarts, preserving identity and committed approvals. Four policy controls, one Compact replay control and one corrupted-proof rejection pass. Three additional actor tests are now included in the default suite. [Exact integration scope](DURABLE_ACTOR_2026-10-11.md).
+- The merchant quote request still discloses borrower identity, generation and fee policy to the supplier. Known-zero debt remains inferable from purchase plus fee. Full historical privacy, independent administrative custody, durable financial recovery, candidate network execution, asset settlement and customer demand remain open.
+- Current local validation passes **482 tests / 60 suites**, fresh durable-agent generated integration, canonical compilation with zero managed drift, build/typecheck and fixture-key/secret scans. Fresh remote CI for this publication remains pending. Earlier running/pending statements below are historical checkpoints superseded by these exact source-bound results.
+
 ## Private-book pool and disclosure redesign - 11 October 2026
 
 - Publication `5447f27` passed [push CI](https://github.com/ShrikarT/line/actions/runs/38140488782) and [draft-PR CI](https://github.com/ShrikarT/line/actions/runs/38140493359): all 477 regression tests, 20 browser tests, fresh Compact fixtures, build/typecheck/scans and zero canonical drift.
