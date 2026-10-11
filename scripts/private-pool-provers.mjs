@@ -9,7 +9,7 @@ export const proverRoles=['issuer','agent-a','agent-b','merchant-a','merchant-b'
 export const proverUrls=Object.fromEntries(proverRoles.map((role,index)=>[role,`http://127.0.0.1:${6301+index}`]));
 function docker(args){const result=spawnSync('docker',args,{encoding:'utf8',timeout:120_000});if(result.error)throw result.error;return result;}
 async function main(){
- const action=process.argv[2];assert(action==='start'||action==='stop','Use start or stop.');
+ const action=process.argv[2];assert(['start','stop','kill'].includes(action),'Use start, stop, or kill (only after the owning proof run has ended).');
  const selected=process.argv[3];assert(!selected||proverRoles.includes(selected),'Unknown role.');
  for(const [index,role] of proverRoles.entries()){
   if(selected&&role!==selected)continue;
@@ -23,8 +23,8 @@ async function main(){
    const binding=existing.HostConfig.PortBindings?.['6300/tcp']?.[0];
    assert(binding?.HostIp==='127.0.0.1'&&binding.HostPort===String(6301+index),'Refusing different port bindings.');
   }else assert.match(inspected.stderr,/No such (object|container)/i,'Docker inspection must succeed before managing a container.');
-  if(action==='stop'){
-   if(existing){const stopped=docker(['stop',existing.Id]);assert.equal(stopped.status,0,stopped.stderr);}
+  if(action==='stop'||action==='kill'){
+   if(existing){const stopped=docker(action==='kill'?['kill',existing.Id]:['stop','--time','10',existing.Id]);assert.equal(stopped.status,0,stopped.stderr);}
   }else{
    if(!existing){const started=docker(['run','--detach','--rm','--name',name,'--label',`${label}=${role}`,
     '--publish',`127.0.0.1:${6301+index}:6300`,'--cpus','2','--env','RAYON_NUM_THREADS=2',image,'midnight-proof-server','-v']);

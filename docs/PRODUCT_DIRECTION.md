@@ -2,7 +2,7 @@
 
 Updated: 11 October 2026. This is the product decision record for [the full audit, section 4](FULL_AUDIT_2026-10-07.md#4-product-direction-what-to-keep-and-change). Requirements below describe the intended product. A requirement stays open until its acceptance evidence exists; a roadmap entry, attractive console or passing reference-model test does not establish delivery. The owner-authorized public amount/reserve disclosure redesign is recorded in [the next-version design](PRIVACY_REDESIGN_2026-10-11.md); the canonical disclosure inventory remains unchanged.
 
-**Direction review status:** ready to execute as a reviewed hypothesis, decision and requirements plan. Final independent cross-document reviews found no material direction-plan contradiction. The complete destination remains in scope. This completes the direction-document review; it does not close technical feasibility, customer validation, funded operation or the Wave 2 privacy-demo gate.
+**Direction review status:** the 10 October plan passed independent cross-document review. The owner-authorized 11 October disclosure redesign is a new design hypothesis that still needs implementation and independent review. The complete destination remains in scope; neither document review nor authorization closes technical feasibility, customer validation, funded operation or the Wave 2 privacy-demo gate.
 
 ## Product decision
 
