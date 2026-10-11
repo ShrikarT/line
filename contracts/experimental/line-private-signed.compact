@@ -313,7 +313,8 @@ export circuit openLine(action: Uint<8>, expiry: Uint<64>): [] {
   const flatFee = lineFlatFee(); const basisPoints = lineBasisPoints();
   const mode = disclose(action); assert(mode <= 1, "enrollment action");
   const previous = disclose(hasPreviousBook());
-  const identity = mode == 0 ? agentId(rolePublicKey()) : enrollmentIdentity();
+  const caller = rolePublicKey();
+  const identity = mode == 0 ? agentId(caller) : enrollmentIdentity();
   assert(identity != default<Bytes<32>>, "enrollment identity");
   const limit = lineLimit(); assert(limit > 0, "limit");
   assert(kernel.blockTimeLessThan(disclose(expiry)), "expiry");
@@ -330,11 +331,13 @@ export circuit openLine(action: Uint<8>, expiry: Uint<64>): [] {
   const predecessor = previous ? bookCommit(prior, salt()) : default<Bytes<32>>;
   const request = disclose(persistentHash<Vector<5, Bytes<32>>>([pad(32, "line:pool:enroll"), contractDomain, C0, predecessor, acceptedTerms()]));
   const message = approvalMessage(6, persistentHash<Vector<2, Bytes<32>>>([request, encodeU64(mode as Uint<64>)]));
+  // Keep the point/scalar gadgets outside conditional branches. Backend checks
+  // can otherwise evaluate inactive curve inputs even when JS execution passes.
+  requireApproval(message);
   if (mode == 0) {
-    requireApproval(message);
     assert(!enrollments.member(request), "enrollment exists"); enrollments.insert(request, false);
   } else {
-    requireIssuer(message);
+    assert(issuer == issuerPublicKey(caller), "not issuer");
     assert(enrollments.member(request) && !enrollments.lookup(request), "agent consent missing or used");
     if (previous) { consumeBook(prior); }
     else {

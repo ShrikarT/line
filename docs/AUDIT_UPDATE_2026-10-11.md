@@ -4,6 +4,8 @@ This updates the [full product/code audit](FULL_AUDIT_2026-10-07.md), using the 
 
 **Verdict:** Line has a substantial, tested Compact accounting and authorization implementation. Real local proofs work for all twelve canonical circuits and pass separate cryptographic verification. The latest repository also reports eight Preprod calls; independent verification of those receipts is pending. The new private-finance/signature candidate compiles and exercises all twelve names, but complete privacy, independent institutional custody, candidate proofs/network execution, authentic settlement and customer demand remain unproven. The Wave 2 privacy-demo gate remains unmet.
 
+Real candidate proving now exposed a failure that generated execution missed: opening caused a curve-check backend panic. Moving signature verification outside its branches resolved the observed panic; both borrowers' consent and issuer acceptance pass the separate Rust verifier. Registration, funding and quotes also pass. Full lifecycle proof coverage is still running. The [signed-finance report](SIGNED_PRIVATE_FINANCE_2026-10-11.md) distinguishes the failed predecessor, changed source, freshly generated opening keys and eleven exact-IR cache hits. These experimental results are separate from the newly reported canonical deployment.
+
 ## Highest-priority findings
 
 | Priority | Finding and evidence | Required change and acceptance |
