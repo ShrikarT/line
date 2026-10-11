@@ -51,7 +51,7 @@ Steps involving actual money, public network or full historical privacy remain o
 
 ## Slide 5 — Evidence and adversarial checks
 
-Use the [demo evidence table](WAVE2_DEMO.md): generated browser checkout, reported canonical Preprod calls, canonical local native proofs, complete base experimental proofs, and incomplete merchant experimental proofs are separate paths. The first merchant native run verified twelve calls, including one isolated boundary draw, before a later proof request timed out. Its retry is not a completed lifecycle result. Neither deployment registration nor local proof validity establishes a cash payout or an observer privacy guarantee.
+Use the [demo evidence table](WAVE2_DEMO.md): generated browser checkout, reported canonical Preprod calls, canonical local native proofs, complete base experimental proofs, and complete merchant experimental proofs are separate paths. The merchant retry verifies 39 lifecycle calls plus all seven isolated branches across all twelve names, and rejects six corrupted draws in a separate Rust verifier. Its paired refund acknowledgments differ by one serialized byte; historical privacy remains unproven. Neither deployment registration nor local proof validity establishes a cash payout or an observer privacy guarantee. The separate encrypted software signer is not yet integrated into this native lifecycle.
 
 Show source commit, compiler/runtime/environment compatibility, the twelve circuit names, generated drift result, authorization/replay/compensation/recovery checks, deployed address if confirmed and payout receipt if paid. Keep raw evidence linked outside slides.
 

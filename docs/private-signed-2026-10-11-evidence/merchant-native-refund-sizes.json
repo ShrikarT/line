@@ -1,0 +1,61 @@
+{
+  "schema": "line-private-merchant-native-refund-size-review/v1",
+  "sourceSha256": "afb75b1bf6156500e63e75fb2d7a69bc002bf84daf15736c4aa2fbd99cb9a4b7",
+  "proofReport": "merchant-native-proof.json",
+  "pairs": [
+    {
+      "circuit": "acknowledgeRepayment",
+      "alternate": {
+        "transactionSha256": "40a58e968a6f1c460570e8a46d4570d61f5a4c303a36f5d5b7927a87c632300b",
+        "bytes": 6433
+      },
+      "normal": {
+        "transactionSha256": "dc539c229f752f883e907bafdc2185c6d2df20be4a4ab0413ad520f1ac1e6f7a",
+        "bytes": 6433
+      },
+      "transactionSizesEqual": true
+    },
+    {
+      "circuit": "cancelOrExpireNote",
+      "alternate": {
+        "transactionSha256": "6554fc6b4ee4948bab524cb285c64e13a6e306f9325d4c75fcb244751c1b0201",
+        "bytes": 6256
+      },
+      "normal": {
+        "transactionSha256": "f956080774511ab52c040efcbfce017c05fb9d40fb187137df9802ac3a1b1f74",
+        "bytes": 6256
+      },
+      "transactionSizesEqual": true
+    },
+    {
+      "circuit": "cancelOrExpireNote",
+      "alternate": {
+        "transactionSha256": "3fa998267a0a59389030dde7893664116a7c67e960a82bddc05b2c4d2a68388a",
+        "bytes": 6724
+      },
+      "normal": {
+        "transactionSha256": "beaec88c85f7fa51ebf4adcc7578c4e8ff66dff5f5d42186a091906edfdf001e",
+        "bytes": 6724
+      },
+      "transactionSizesEqual": true
+    },
+    {
+      "circuit": "cancelOrExpireNote",
+      "alternate": {
+        "transactionSha256": "ec3eca4d364c414b0449404ad05157865c6bb4f27bc615877388a55b18733251",
+        "bytes": 6468
+      },
+      "normal": {
+        "transactionSha256": "25319a2637f55ce60123bfb11877f8f08840c00c790de145787c6ce890b81e89",
+        "bytes": 6467
+      },
+      "transactionSizesEqual": false
+    }
+  ],
+  "nativeProofsVerified": true,
+  "syntheticLedger": true,
+  "feeBalancingEnabled": false,
+  "networkExecuted": false,
+  "fullHistoryPrivacyPassed": false,
+  "evidenceScope": "Serialized valid local transaction sizes for this finite native counterfactual pair only; no proof of distributional equivalence, network metadata privacy or asset-rail privacy."
+}

@@ -63,7 +63,7 @@ The first private-finance draft removed public ledger totals but retained fundin
 
 These checks close particular disclosure paths. They do **not** prove complete observer indistinguishability. Selected merchant lookup, quote/note identifiers, expiry/time bounds, action shape, participant side information, fixed-price catalogs, sender/DUST metadata and proving infrastructure remain observable or unresolved. A catalog and known fee/zero baseline can still imply a purchase debt even when numeric fields are committed. Neither additional agents nor hidden field names are a privacy certificate.
 
-Next: remove selected-merchant query linkage with a supported revocable membership construction; specify complete authorized/public views and test counterfactual histories; generate all twelve candidate proving artifacts and verify actual/corrupted proofs natively; integrate durable signer/prover state and recovery; then reconcile a versioned migration. Existing public histories cannot be erased. Authentic deposits, fulfillment, payouts, repayment/refunds and customer demand remain separate gates.
+The separate [merchant derivative](PRIVATE_MERCHANT_2026-10-11.md) implements revocable membership and now verifies 39 lifecycle calls plus seven isolated branches natively, with six corrupted-draw rejections. This base source and that derivative have distinct evidence. Next: resolve remaining enrollment/lifecycle, catalog and metadata disclosures; establish the complete observer argument; integrate durable signer/prover state and recovery; then reconcile a versioned migration. Existing public histories cannot be erased. Authentic deposits, fulfillment, payouts, repayment/refunds and customer demand remain separate gates.
 
 ## Reproduction
 
