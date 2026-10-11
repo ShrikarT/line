@@ -1,9 +1,9 @@
 {
   "schema": "line-private-signed-feasibility/v1",
-  "createdAt": "2026-10-11T06:38:03.311Z",
-  "sourceSha256": "237b641549ce1649c24864b95c9133b882601403a2f8a76ef95ea0cf1285bb03",
+  "createdAt": "2026-10-11T07:35:22.761Z",
+  "sourceSha256": "cb5a869f460d7a9bbb4703f36290fb792597f9c5d3ced0c894d352d62264c307",
   "artifactFingerprints": {
-    "contract/index.js": "b0d72ce6600e98fb90e98fd6fb235cdcebbb523b621b9d13aa7e36e404aec3a2",
+    "contract/index.js": "fda71901f20d77f5acac0c0fa38588e989f2e840d052afa437be6d12f7078bde",
     "compiler/contract-info.json": "cbfcc2802b409ef2b68b3f6ef4d8bd90d9f033277ba72e83d38960ece49711ca"
   },
   "compiler": "0.31.1",
@@ -383,6 +383,14 @@
     },
     {
       "check": "premature-expiry",
+      "rejectedByGeneratedCompact": true
+    },
+    {
+      "check": "allocation-owner-or-issuer-only",
+      "rejectedByGeneratedCompact": true
+    },
+    {
+      "check": "refund-issuer-only",
       "rejectedByGeneratedCompact": true
     },
     {

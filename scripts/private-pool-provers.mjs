@@ -8,6 +8,17 @@ const image='midnightntwrk/proof-server:8.1.3',label='io.line.private-pool-exper
 export const proverRoles=['issuer','agent-a','agent-b','merchant-a','merchant-b'];
 export const proverUrls=Object.fromEntries(proverRoles.map((role,index)=>[role,`http://127.0.0.1:${6301+index}`]));
 function docker(args){const result=spawnSync('docker',args,{encoding:'utf8',timeout:120_000});if(result.error)throw result.error;return result;}
+async function waitForRemoval(id){
+ // Docker stop can return before --rm has finished deleting the container.
+ // Wait for that exact ID; never remove or adopt another container by name.
+ for(let attempt=0;attempt<60;attempt++){
+  const inspected=docker(['inspect',id]);
+  if(inspected.status!==0){assert.match(inspected.stderr,/No such (object|container)/i,'Docker inspection failed during owned cleanup.');return;}
+  assert.equal(JSON.parse(inspected.stdout)[0].Id,id,'Cleanup observed a different container.');
+  await new Promise(resolve=>setTimeout(resolve,500));
+ }
+ throw Error('Owned prover removal did not finish; do not restart it until inspected.');
+}
 async function main(){
  const action=process.argv[2];assert(['start','stop','kill'].includes(action),'Use start, stop, or kill (only after the owning proof run has ended).');
  const selected=process.argv[3];assert(!selected||proverRoles.includes(selected),'Unknown role.');
@@ -19,12 +30,13 @@ async function main(){
    assert.equal(existing.Config.Labels?.[label],role,`Refusing to manage an unowned container: ${name}`);
    assert.equal(existing.Config.Image,image,'Refusing a different image.');
    assert.equal(existing.HostConfig.NanoCpus,2_000_000_000,'Refusing different CPU limits.');
+   assert.equal(existing.HostConfig.AutoRemove,true,'Refusing a container without automatic removal.');
    assert(existing.Config.Env?.includes('RAYON_NUM_THREADS=2'),'Refusing different prover worker configuration.');
    const binding=existing.HostConfig.PortBindings?.['6300/tcp']?.[0];
    assert(binding?.HostIp==='127.0.0.1'&&binding.HostPort===String(6301+index),'Refusing different port bindings.');
   }else assert.match(inspected.stderr,/No such (object|container)/i,'Docker inspection must succeed before managing a container.');
   if(action==='stop'||action==='kill'){
-   if(existing){const stopped=docker(action==='kill'?['kill',existing.Id]:['stop','--time','10',existing.Id]);assert.equal(stopped.status,0,stopped.stderr);}
+   if(existing){const stopped=docker(action==='kill'?['kill',existing.Id]:['stop','--time','10',existing.Id]);assert.equal(stopped.status,0,stopped.stderr);await waitForRemoval(existing.Id);}
   }else{
    if(!existing){const started=docker(['run','--detach','--rm','--name',name,'--label',`${label}=${role}`,
     '--publish',`127.0.0.1:${6301+index}:6300`,'--cpus','2','--env','RAYON_NUM_THREADS=2',image,'midnight-proof-server','-v']);

@@ -61,7 +61,7 @@ async function main(){
  }
  const native=resolve('.compact-keys/native-proof-target/debug',process.platform==='win32'?'line-native-proof-verifier.exe':'line-native-proof-verifier');
  assert(existsSync(native),'Build the native verifier first.');
- const scriptFingerprints=Object.fromEntries(['scripts/private-signed-proof.mjs','scripts/private-signed-spike.mjs','scripts/signed-pool-signers.mjs',
+ const scriptFingerprints=Object.fromEntries(['scripts/private-signed-proof.mjs','scripts/private-pool-provers.mjs','scripts/private-signed-spike.mjs','scripts/signed-pool-signers.mjs',
   'scripts/private-pool-spike.mjs','src/lib/line/encoding.ts'].map(file=>[file,digest(readFileSync(file))]));
  mkdirSync('.compact-keys',{recursive:true});const work=mkdtempSync(resolve('.compact-keys/private-signed-proof-'));
  const traces=[],negativeChecks=[];
