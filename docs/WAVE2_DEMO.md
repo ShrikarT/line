@@ -14,7 +14,7 @@ Updated: 11 October 2026. This guide separates the executable local checkout, re
 
 Show the exact source/commit and matching receipt for each path. A deployment screenshot must not be presented as evidence that the privacy candidate or browser checkout executes on chain. Funding/redemption/refund counters do not establish asset transfers.
 
-Midnight's current official schedule lists Wave 2 build **Sep 27–Oct 17** and judging **Oct 17–Oct 27**, and describes progress and iteration across connected waves. Exact cutoff time/timezone, entrant eligibility, submission artifacts and the Wave-specific rubric still require the entrant dashboard; the public AKINDO text extraction exposes only navigation. [Official schedule](https://midnight.network/hackathon/buildathon), [event page](https://app.akindo.io/wave-hacks/jaMZjqPOBsLXvjdG). Rechecked 11 October 2026.
+Public event requirements and rubric are now retrieved, but the deadlines conflict: live AKINDO Wave 2 metadata gives **19 October 2026, 15:00:34 UTC / 20:30:34 IST**, the Midnight overview gives **17 October**, and the linked official rules PDF gives **3 October**. The PDF and live event agree on 40/15/15/15/10/5 judging weights; the linked judging document uses a different allocation. See [current requirements, sources and unresolved authority](WAVE2_REQUIREMENTS_2026-10-11.md). Do not treat any one cutoff as confirmed for this entrant. The entrant must obtain organizer clarification and submit personally; prepare the required repository, deck and video now.
 
 ## Start the executable procurement evaluation
 

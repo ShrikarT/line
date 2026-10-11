@@ -1,10 +1,10 @@
 # Line pitch and demonstration evidence
 
-Updated: 10 October 2026. [PRODUCT_DIRECTION.md](PRODUCT_DIRECTION.md) owns product decisions and readiness. This is a pitch specification with explicit present/target boundaries, not proof that planned features shipped.
+Updated: 11 October 2026. [PRODUCT_DIRECTION.md](PRODUCT_DIRECTION.md) owns product decisions and readiness. This is a pitch specification with explicit present/target boundaries, not proof that planned features shipped. Required artifacts and conflicting event dates are documented in [the current Wave 2 requirements review](WAVE2_REQUIREMENTS_2026-10-11.md).
 
 ## Opening
 
-**Line is a local protocol prototype exploring issuer-authorized purchasing for autonomous agents. Its destination is private credit clearance with merchant claims reconciled to service and payment evidence. No public deployment is verified. The current build proves local Compact accounting and single-use claims; it does not prove full purchase privacy, independent custody, service delivery, or asset settlement.**
+**Line lets an organization authorize an agent to buy services against credit and gives each supplier a single-use merchant claim. Its destination is private credit clearance with claims reconciled to service and payment evidence. The owner reports canonical Preprod deployment and eight executed calls; independent receipt reconciliation is pending. Local native verification covers all twelve canonical circuits and the separate private-finance candidate. Full historical privacy, independent institutional custody and authentic asset settlement remain open.**
 
 **Hypothetical buyer task, not customer evidence:** an enterprise agent buys data or compute to complete a task. Treasury controls exposure; the agent needs purchasing authority; each merchant needs valid authorization, reliable delivery/payment reconciliation and protection against repeated claims. The intended product takes this workflow through actual settlement and recovery. No observed buyer workflow is established yet.
 
@@ -12,7 +12,7 @@ Updated: 10 October 2026. [PRODUCT_DIRECTION.md](PRODUCT_DIRECTION.md) owns prod
 
 Enterprise platform teams can already use prepaid APIs, policy-controlled wallets or conventional billing. These are real controls and the baseline to beat.
 
-The customer segment is not selected. Compare production agent-platform operators buying for their own workflow, enterprise teams operating agents internally, and platforms integrating for a named customer-buyer. The enterprise-team segment remains an explicit hypothesis. No buyer evidence is established; use a clearly labeled hypothetical scenario unless a real workflow and buyer-owned harm are supported by consented evidence. A prior Midnight hackathon report describes the Latch project as implementing private AI-agent budgets, so Line's proposed distinction must be organization-level shared credit and accepted merchant settlement, not agent spending privacy alone. This is a published project description, not independently reproduced evidence. The current ledger exposes amounts and history, so do not promise full-book privacy today. No customer contacts or validation are established.
+The accepted initial customer hypothesis is enterprise teams whose agents buy APIs and compute. No buyer evidence is established; use a clearly labeled hypothetical scenario unless a real workflow and buyer-owned harm are supported by consented evidence. Compare policy wallets and conventional billing in customer discovery. A prior Midnight hackathon report describes the Latch project as implementing private AI-agent budgets, so Line's proposed distinction must be organization-level shared credit and accepted merchant settlement, not agent spending privacy alone. This is a published project description, not independently reproduced evidence. The deployed canonical ledger exposes amounts and history, so do not promise full-book privacy today. No customer contacts or validation are established.
 
 ## Slide 2 — The clearance and merchant claim
 
@@ -50,6 +50,8 @@ The full-product acceptance target (not the current Wave 2 demo script) is:
 Steps involving actual money, public network or full historical privacy remain open until independently evidenced. Fixture amounts are test credit units unless an asset/currency and scale are established. Do not present a scripted snapshot as a live funded purchase.
 
 ## Slide 5 — Evidence and adversarial checks
+
+Use the [demo evidence table](WAVE2_DEMO.md): generated browser checkout, reported canonical Preprod calls, canonical local native proofs, complete base experimental proofs, and incomplete merchant experimental proofs are separate paths. The first merchant native run verified twelve calls, including one isolated boundary draw, before a later proof request timed out. Its retry is not a completed lifecycle result. Neither deployment registration nor local proof validity establishes a cash payout or an observer privacy guarantee.
 
 Show source commit, compiler/runtime/environment compatibility, the twelve circuit names, generated drift result, authorization/replay/compensation/recovery checks, deployed address if confirmed and payout receipt if paid. Keep raw evidence linked outside slides.
 

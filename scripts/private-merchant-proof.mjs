@@ -28,6 +28,7 @@ const manage=action=>new Promise((yes,no)=>{
 
 async function main(){
  const recycleProver=process.argv.includes('--recycle-prover');
+ const recycleEveryCall=process.argv.includes('--recycle-each-call');
  assert(process.argv[2],'Provide the full compiled managed directory.');
  const checkedIndex=process.argv.indexOf('--compiled-check');
  const checkedPath=checkedIndex>=0?process.argv[checkedIndex+1]:process.argv[3];
@@ -76,7 +77,7 @@ async function main(){
   ...(keyGeneration?{keyGeneration}:{}),
   syntheticLedger:true,syntheticTime:true,feeBalancingEnabled:false,networkSubmitted:false,authenticAssetSettlement:false,
   trustedCoordinatorAndProver:true,roleSigningScalarsInProverWitnesses:false,institutionalSignerPolicy:false,
-  recycleProverOnCircuitChange:recycleProver,proverRestarts,
+  recycleProverOnCircuitChange:recycleProver,recycleProverEveryCall:recycleEveryCall,proverRestarts,
   durableInstitutionalCustody:false,fullHistoryPrivacyPassed:false,
   exportedCircuits:info.circuits.map(c=>c.name),provedCircuits:[...new Set(traces.map(t=>t.circuit).filter(n=>n!=='syntheticDeployment'))],
   traces,negativeChecks,verifiedIsolatedBranchCalls:traces.filter(t=>t.isolatedBranch).length,...(fixtureReport?{generatedFixtureChecks:fixtureReport.negativeChecks.length}:{}),
@@ -131,7 +132,7 @@ async function main(){
      local=L.LedgerState.deserialize(verifiedStates.get(digest(input)));
     }
     try{
-    if(recycleProver&&lastProvenCircuit&&lastProvenCircuit!==name){
+    if(lastProvenCircuit&&(recycleEveryCall||(recycleProver&&lastProvenCircuit!==name))){
      stage=`${name}:recycle-prover`;await manage('stop');await manage('start');proverRestarts++;
      const restarted=(await (await fetch(`${endpoint}/version`,{signal:AbortSignal.timeout(5000)})).text()).trim().replace(/^"|"$/g,'');
      assert.equal(restarted,'8.1.3');checkpoint();
