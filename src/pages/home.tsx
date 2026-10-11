@@ -1,14 +1,13 @@
-import { useState } from "react";
 import { Shell } from "@/components/line/shell";
 import { ExplorerPanel } from "@/components/line/explorer";
-import { Button, FlashBar, Mono, Panel, PixelDivider, Stat } from "@/components/line/ui";
+import { FlashBar, Mono, PixelDivider } from "@/components/line/ui";
 import { useAppStore } from "@/app/store.ts";
 
 export function Home() {
   const flash = useAppStore((s) => s.flash);
   const ledger = useAppStore((s) => s.ledger);
 
-  const lockedReserve = (ledger.encumberedReserve ?? 0) + (ledger.redeemedReserve ?? 0);
+  const lockedReserve = (ledger.encumberedReserve ?? 0) + (ledger.redeemedReserve ?? 0) + (ledger.feeReserve ?? 0) + (ledger.pendingFeeReserve ?? 0) + (ledger.refundReserve ?? 0) + (ledger.reportedRefundReserve ?? 0);
   const withdrawableReserve = Math.max(0, (ledger.totalReserve ?? 0) - lockedReserve);
 
   return (
@@ -21,28 +20,27 @@ export function Home() {
             {/* Live Spec Badge */}
             <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs font-mono text-pink">
               <span className="size-2 bg-accent" />
-              <span>LIVE PROTOCOL SPECIFICATION · MIDNIGHT COMPACT DOMAIN</span>
+              <span>COMPACT PROTOTYPE · LOCAL EVALUATION</span>
             </div>
 
             {/* Main Headline */}
             <h1 className="font-display text-4xl font-semibold leading-[1.1] tracking-tight text-cream sm:text-5xl lg:text-6xl">
-              Private revolving credit and reserve settlement for autonomous agents.
+              Test issuer-authorized purchases for autonomous agents.
             </h1>
 
             {/* Subhead */}
             <p className="max-w-2xl text-base leading-relaxed text-cream/80 sm:text-lg">
-              An autonomous agent proves that a purchase fits its issuer-backed credit line without exposing its
-              private credit book, outstanding debt, or counterparty identity.
+              Line explores shared credit and merchant-bound claims for API and compute procurement. Local checkout runs generated Compact and two local services; it submits no proof or transaction and transfers no assets. Public amounts and history can reveal debt and counterparties.
             </p>
 
             {/* Primary Desks Action Cluster */}
             <div className="flex flex-wrap items-center gap-3 pt-2">
               <a
-                href="/issuer"
+                href="/checkout"
                 className="inline-flex min-h-11 items-center justify-center rounded-md bg-accent px-5 text-sm font-semibold text-accent-fg transition-transform duration-[var(--motion-quick)] hover:opacity-90 active:scale-[0.98]"
               >
-                Issuer Desk
-                <span className="ml-2 font-mono text-xs opacity-75">→</span>
+                Try API checkout
+                <span aria-hidden="true" className="ml-2 font-mono text-xs opacity-75">→</span>
               </a>
               <a
                 href="/merchant"
@@ -67,9 +65,9 @@ export function Home() {
             {/* Real-time Verification Snippet */}
             <div className="pt-2">
               <div className="inline-flex flex-wrap items-center gap-3 rounded-lg border border-white/10 bg-black/20 px-4 py-2 font-mono text-xs text-cream/80">
-                <span className="text-ok font-semibold">✓ zk-proof::verify(commitment_root, C)</span>
+                <span className="text-ok font-semibold">Local contract state</span>
                 <span className="text-pink">→</span>
-                <span className="font-medium text-cream">DOMAIN VALID ({ledger.actionClock} TXS PROVEN)</span>
+                <span className="font-medium text-cream">SIMULATOR ACTIONS: {ledger.actionClock}</span>
                 <span className="rounded bg-accent px-1.5 py-0.5 text-[10px] text-accent-fg">
                   Status: {ledger.status.toUpperCase()}
                 </span>
@@ -88,12 +86,12 @@ export function Home() {
             <div className="flex items-center gap-3">
               <span className="h-2 w-2 rounded-full bg-accent" />
               <span className="font-mono text-xs font-semibold uppercase tracking-wider text-muted">
-                ZK Settlement Pipeline // 10 Compact Circuits
+                Authorization &amp; accounting // 12 Compact circuits
               </span>
             </div>
             <div className="flex items-center gap-4 text-xs font-mono text-muted">
-              <span>Prover Latency: <strong className="text-fg">&lt;80ms</strong></span>
-              <span className="hidden sm:inline border-l border-border pl-4 text-ok">Halo2 Native</span>
+              <span>Network finality: <strong className="text-fg">Unconfirmed</strong></span>
+              <span className="hidden sm:inline border-l border-border pl-4 text-ok">Local evaluation</span>
             </div>
           </div>
 
@@ -107,7 +105,7 @@ export function Home() {
                 </div>
                 <h3 className="font-display text-sm font-semibold text-fg mb-1">Underwrite &amp; Reserve</h3>
                 <p className="text-xs text-muted leading-relaxed mb-3">
-                  Records settlement capacity in the reserve pool and commits confidential line commitment C0 in ZK.
+                  Records reserve counters and a private book commitment. Canonical opening still needs the agent-secret witness; it verifies no deposit.
                 </p>
               </div>
               <div className="font-mono text-[10px] bg-elevated p-2 rounded border border-border text-muted">
@@ -125,11 +123,11 @@ export function Home() {
                 </div>
                 <h3 className="font-display text-sm font-semibold text-fg mb-1">Post Quote Commitment</h3>
                 <p className="text-xs text-muted leading-relaxed mb-3">
-                  Merchant publishes opaque commitment Q binding amount, expiry, and domain without tracking customers.
+                  Merchant authenticates a quote binding amount, expiry, domain and fee policy. Public queries and history can link its pseudonym.
                 </p>
               </div>
               <div className="font-mono text-[10px] bg-elevated p-2 rounded border border-border text-muted">
-                <span className="text-navy">Quotes Bound:</span> {"quoteCount" in ledger ? (ledger as any).quoteCount : Array.isArray((ledger as any).quotes) ? (ledger as any).quotes.length : 0}<br />
+                <span className="text-navy">Quotes Bound:</span> {ledger.quoteCount}<br />
                 <span className="text-subtle">Replay Guard:</span> Nonce &amp; Expiry
               </div>
             </div>
@@ -143,12 +141,12 @@ export function Home() {
                 </div>
                 <h3 className="font-display text-sm font-semibold text-fg mb-1">ZK Witness &amp; Draw Note</h3>
                 <p className="text-xs text-muted leading-relaxed mb-3">
-                  Proves B + A ≤ L in zero-knowledge. Rotates commitment C → C' and issues merchant-bound claim note D.
+                  Compact checks B + amount + fee ≤ L, rotates the book commitment and issues a merchant-bound claim. Local consoles simulate this; checkout executes generated Compact.
                 </p>
               </div>
               <div className="font-mono text-[10px] bg-elevated p-2 rounded border border-border text-muted">
                 <span className="text-navy">Agent Capacity:</span> Encrypted (Private State)<br />
-                <span className="text-subtle">Public Ledger:</span> Books Hidden (100%)
+                <span className="text-subtle">Public Ledger:</span> History reveals debt
               </div>
             </div>
 
@@ -161,7 +159,7 @@ export function Home() {
                 </div>
                 <h3 className="font-display text-sm font-semibold text-fg mb-1">Single-Redemption Nullifier</h3>
                 <p className="text-xs text-muted leading-relaxed mb-3">
-                  Designated merchant redeems D against reserve pool. Nullifier prevents double-redemption.
+                  Only the designated merchant redeems D once. Reserve counters track the claim; redemption confirms no payout or fulfillment.
                 </p>
               </div>
               <div className="font-mono text-[10px] bg-elevated p-2 rounded border border-border text-muted">
@@ -189,25 +187,25 @@ export function Home() {
         <PixelDivider />
 
         {/* 3. Protocol Metrics Band */}
-        <section className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <div className="rounded-lg border border-border bg-elevated p-5 space-y-1">
-            <span className="text-xs font-mono uppercase text-muted">Settlement Capacity</span>
+            <span className="text-xs font-mono uppercase text-muted">Reserve Accounting</span>
             <div className="font-display text-3xl font-bold text-fg tracking-tight">
               {ledger.totalReserve ?? 0} <span className="text-sm font-mono text-muted font-normal">units</span>
             </div>
-            <p className="text-xs text-subtle">Issuer-allocated reserve backing</p>
+            <p className="text-xs text-subtle">Counter only; funded assets unverified</p>
           </div>
 
           <div className="rounded-lg border border-border bg-elevated p-5 space-y-1">
-            <span className="text-xs font-mono uppercase text-muted">Proving Overhead</span>
-            <div className="font-display text-3xl font-bold text-navy tracking-tight">&lt; 80ms</div>
-            <p className="text-xs text-subtle">Client-side Halo2 recursive SNARKs</p>
+            <span className="text-xs font-mono uppercase text-muted">Proof Performance</span>
+            <div className="font-display text-3xl font-bold text-navy tracking-tight">Unmeasured</div>
+            <p className="text-xs text-subtle">No production performance benchmark</p>
           </div>
 
           <div className="rounded-lg border border-border bg-elevated p-5 space-y-1">
             <span className="text-xs font-mono uppercase text-muted">Credit Book Privacy</span>
-            <div className="font-display text-3xl font-bold text-fg tracking-tight">100%</div>
-            <p className="text-xs text-subtle">L, B, and capacity zero-leakage</p>
+            <div className="font-display text-3xl font-bold text-fg tracking-tight">Incomplete</div>
+            <p className="text-xs text-subtle">Public history can reconstruct debt</p>
           </div>
 
           <div className="rounded-lg border border-border bg-elevated p-5 space-y-1">
@@ -227,7 +225,7 @@ export function Home() {
               Engineered for Issuers, Merchants, and Autonomous Fleets
             </h2>
             <p className="text-sm text-muted leading-relaxed">
-              Autonomous economic agents require confidential lines of credit to transact autonomously without broadcasting balance sheets.
+              Enterprise API and compute teams are an unvalidated buyer hypothesis. Shared organizational credit, independent suppliers and confidential books remain the product destination.
             </p>
           </div>
 
@@ -243,17 +241,17 @@ export function Home() {
                   <h3 className="font-display text-lg font-bold text-fg mt-1">Private Underwriting &amp; Reserves</h3>
                 </div>
                 <p className="text-sm text-muted leading-relaxed">
-                  Underwrite autonomous fleets without exposing balance sheets, credit limits, or counterparty portfolios to public ledgers.
+                  Evaluate issuer authority and committed credit books. Full-history confidentiality, independent capital and an accountable borrower are not established.
                 </p>
                 <ul className="space-y-2 text-xs text-muted">
                   <li className="flex items-center gap-2">
-                    <span className="size-2 shrink-0 bg-navy" /> Confidential revolving credit line commitments (C0)
+                    <span className="size-2 shrink-0 bg-navy" /> Domain-bound private book commitments (C0)
                   </li>
                   <li className="flex items-center gap-2">
-                    <span className="size-2 shrink-0 bg-navy" /> Mathematical solvency: Encumbered + Redeemed ≤ Total
+                    <span className="size-2 shrink-0 bg-navy" /> Reserve accounting includes principal, fees and refunds
                   </li>
                   <li className="flex items-center gap-2">
-                    <span className="size-2 shrink-0 bg-navy" /> Anti-rug reserve protection with withdrawable bounds
+                    <span className="size-2 shrink-0 bg-navy" /> Withdrawable-counter bounds; external custody unverified
                   </li>
                   <li className="flex items-center gap-2">
                     <span className="size-2 shrink-0 bg-navy" /> Issuer-confirmed repayment acknowledgement
@@ -279,20 +277,20 @@ export function Home() {
                   <h3 className="font-display text-lg font-bold text-fg mt-1">Zero-Knowledge Checkout &amp; Claims</h3>
                 </div>
                 <p className="text-sm text-muted leading-relaxed">
-                  Accept autonomous agent payments backed by institutional cryptographic commitments with instant fraud elimination.
+                  Evaluate merchant-bound claims, ownership checks and single redemption. Actual merchant payment and fulfillment authenticity remain unverified.
                 </p>
                 <ul className="space-y-2 text-xs text-muted">
                   <li className="flex items-center gap-2">
                     <span className="size-2 shrink-0 bg-navy" /> Multi-merchant support (Merchant A &amp; Merchant B)
                   </li>
                   <li className="flex items-center gap-2">
-                    <span className="size-2 shrink-0 bg-navy" /> Private merchant-bound claim notes (Note D)
+                    <span className="size-2 shrink-0 bg-navy" /> Merchant-bound notes with public principal and fee
                   </li>
                   <li className="flex items-center gap-2">
-                    <span className="size-2 shrink-0 bg-navy" /> Single-redemption nullifier eliminates double-claims
+                    <span className="size-2 shrink-0 bg-navy" /> Single-redemption nullifier prevents claim replay
                   </li>
                   <li className="flex items-center gap-2">
-                    <span className="size-2 shrink-0 bg-navy" /> Direct redemption against issuer settlement reserves
+                    <span className="size-2 shrink-0 bg-navy" /> Reserve accounting on redemption; payout unverified
                   </li>
                 </ul>
               </div>
@@ -315,17 +313,17 @@ export function Home() {
                   <h3 className="font-display text-lg font-bold text-fg mt-1">Sovereign Proofs &amp; Procurement</h3>
                 </div>
                 <p className="text-sm text-muted leading-relaxed">
-                  Equip autonomous AI pipelines with non-custodial purchasing credentials validated strictly via zero-knowledge proofs.
+                  Evaluate bounded purchasing authority and encrypted recovery. All checkout signing keys share one server process; independent custody remains open.
                 </p>
                 <ul className="space-y-2 text-xs text-muted">
                   <li className="flex items-center gap-2">
                     <span className="size-2 shrink-0 bg-navy" /> Client-side WebCrypto AES-GCM encrypted vault
                   </li>
                   <li className="flex items-center gap-2">
-                    <span className="size-2 shrink-0 bg-navy" /> Zero plaintext credit book or secret key leakage
+                    <span className="size-2 shrink-0 bg-navy" /> Public responses omit plaintext private books
                   </li>
                   <li className="flex items-center gap-2">
-                    <span className="size-2 shrink-0 bg-navy" /> Prove clearance B + A ≤ L without revealing L or B
+                    <span className="size-2 shrink-0 bg-navy" /> Private witnesses check capacity; public history leaks debt
                   </li>
                   <li className="flex items-center gap-2">
                     <span className="size-2 shrink-0 bg-navy" /> Model Context Protocol (MCP) server integration
@@ -348,7 +346,7 @@ export function Home() {
         <section className="space-y-6">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
-              <p className="text-xs font-mono uppercase tracking-wider text-accent">Live Public State</p>
+              <p className="text-xs font-mono uppercase tracking-wider text-accent">Current Evaluation State</p>
               <h2 className="font-display text-2xl font-bold tracking-tight text-fg">Public Ledger Explorer</h2>
             </div>
             <a href="/explorer" className="font-mono text-xs text-accent hover:underline">
@@ -393,4 +391,3 @@ export function Home() {
     </Shell>
   );
 }
-

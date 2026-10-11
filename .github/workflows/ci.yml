@@ -67,3 +67,9 @@ jobs:
 
       - name: Frontend build
         run: npm run build
+
+      - name: Install browser for role and recovery verification
+        run: npx playwright install --with-deps chromium
+
+      - name: Browser checkout, custody and recovery tests
+        run: npm run test:e2e

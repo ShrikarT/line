@@ -6,6 +6,7 @@ import { VaultBar } from "./vault-bar";
 
 const NAV = [
   { to: "/", label: "Overview" },
+  { to: "/checkout", label: "API checkout" },
   { to: "/issuer", label: "Issuer" },
   { to: "/merchant", label: "Merchant" },
   { to: "/agent", label: "Agent" },
@@ -15,7 +16,7 @@ const NAV = [
   { to: "/roadmap", label: "Roadmap" },
 ];
 
-export function Shell({ children, evaluation }: { children: React.ReactNode; evaluation?: boolean }) {
+export function Shell({ children, evaluation = false }: { children: React.ReactNode; evaluation?: boolean }) {
   const pathname = typeof window !== "undefined" ? window.location.pathname : "/";
   const [showNetworkSetup, setShowNetworkSetup] = useState(false);
   const runtime = getRuntime();
@@ -40,19 +41,20 @@ export function Shell({ children, evaluation }: { children: React.ReactNode; eva
           <div className="flex items-center gap-3">
             <a href="/" className="flex items-center gap-2.5">
               <img src="/brand/logo-pixel.svg" alt="" className="h-7 w-auto" />
-              <span className="font-display text-lg font-semibold lowercase tracking-tight text-fg">
-                line
+              <span className="font-display text-lg tracking-tight">Line</span>
+              <span className="hidden text-xs text-muted sm:inline">
+                Agent purchasing prototype
               </span>
             </a>
 
-            <button
+            {evaluation ? <span className="border border-border px-2.5 py-1 text-xs text-muted">Generated Compact · local evaluation</span> : <button
               onClick={() => (isNetwork ? setShowNetworkSetup(!showNetworkSetup) : handleToggleMode())}
               className={cn(
                 "inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-mono transition-colors border",
                 isNetwork
                   ? isConnected && contractAddr
                     ? "border-ok/30 bg-ok/10 text-ok"
-                    : "border-red/40 bg-red/10 text-red"
+                    : "border-amber-500/40 bg-amber-500/10 text-amber-400"
                   : "border-border bg-elevated text-muted hover:text-fg"
               )}
               title="Click to configure runtime / wallet"
@@ -63,22 +65,22 @@ export function Shell({ children, evaluation }: { children: React.ReactNode; eva
                   isNetwork
                     ? isConnected && contractAddr
                       ? "bg-ok"
-                      : "bg-red"
+                      : "bg-amber-400"
                     : "bg-muted"
                 )}
               />
               {isNetwork ? "Midnight Network" : "Local Simulator"}
-            </button>
+            </button>}
           </div>
 
-          <nav className="-mx-1 flex max-w-full gap-1 overflow-x-auto px-1">
+          <nav className="flex w-full min-w-0 gap-1 overflow-x-auto sm:w-auto">
             {NAV.map((item) => (
               <a
                 key={item.to}
                 href={item.to}
                 className={cn(
-                  "shrink-0 whitespace-nowrap border-b-2 border-transparent px-3 py-2 text-sm text-muted transition-colors duration-[var(--motion-quick)] hover:text-fg",
-                  pathname === item.to && "border-accent text-fg",
+                  "shrink-0 whitespace-nowrap rounded-sm px-3 py-2 text-sm text-muted transition-colors duration-[var(--motion-quick)] hover:text-fg",
+                  pathname === item.to && "bg-elevated text-fg",
                 )}
               >
                 {item.label}
@@ -88,10 +90,10 @@ export function Shell({ children, evaluation }: { children: React.ReactNode; eva
         </div>
       </header>
 
-      <VaultBar />
+      {!evaluation && <VaultBar />}
 
       {/* Network Setup screen if toggled or if in unconfigured network mode */}
-      {showNetworkSetup && (
+      {!evaluation && showNetworkSetup && (
         <div className="border-b border-border bg-elevated/40 px-4 py-4">
           <div className="mx-auto max-w-6xl flex justify-end pb-2">
             <button
@@ -112,7 +114,7 @@ export function Shell({ children, evaluation }: { children: React.ReactNode; eva
       )}
 
       {/* Network warning banner when in network mode without active wallet connection */}
-      {isNetwork && (!isConnected || !contractAddr) && !showNetworkSetup && (
+      {!evaluation && isNetwork && (!isConnected || !contractAddr) && !showNetworkSetup && (
         <div className="border-b border-red/30 bg-red/10 px-4 py-2 text-xs text-red">
           <div className="mx-auto flex max-w-6xl items-center justify-between gap-2">
             <span>
@@ -121,14 +123,14 @@ export function Shell({ children, evaluation }: { children: React.ReactNode; eva
             <div className="flex gap-2">
               <button
                 onClick={() => setShowNetworkSetup(true)}
-                className="underline hover:text-fg"
+                className="underline hover:text-amber-200"
               >
                 Configure Connection
               </button>
               <span>·</span>
               <button
                 onClick={handleToggleMode}
-                className="underline hover:text-fg"
+                className="underline hover:text-amber-200"
               >
                 Switch to Simulator
               </button>
