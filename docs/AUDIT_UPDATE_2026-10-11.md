@@ -37,6 +37,8 @@ This updates the [full product/code audit](FULL_AUDIT_2026-10-07.md), using the 
 
 The browser runner accepts an explicit loopback port and starts Vite directly, avoiding duplicate port arguments and reuse of the primary workspace's server during isolated verification. CI now runs the browser suite. The native proof experiment is separately reproducible and is not automatically run by CI.
 
+Published integration commit `ad7939b` passed [GitHub CI](https://github.com/ShrikarT/line/actions/runs/38105545515), including fresh compilation/zero managed drift, generated and reference tests, the custody experiment, typecheck, scans, production build and browser tests. The audit/proof tooling is on `fix/audit-integration`; no merge to `main` is claimed.
+
 ## Execution order
 
 1. Prove and integrate the compatible privacy/custody architecture. Establish the actual observer model and borrower authority before presenting a confidential credit product.
