@@ -129,7 +129,7 @@ export async function runPrivateMerchantFixture({compiledDir,onInitialize,onAcce
     const pub={transcript:publicJson(result.proofData.publicTranscript),input:publicJson(result.proofData.input),output:publicJson(result.proofData.output)};
     if(name==='fundReserve'||name==='withdrawUnencumberedReserve'||name==='setStatus')assert.equal(result.proofData.input.value.length,0,'Private values must not remain in exported circuit input.');
     if(name==='draw'||name==='openLine')assert(!pub.input.includes(hex(RT.convertFieldToBytes(32,7n,'private fee'))),'Fee/price policy must be absent from exported input.');
-    if(name==='draw'||name==='postQuote'){
+    if(name==='draw'||name==='postQuote'||name==='redeemDraw'){
      const observed=pub.transcript+pub.input+pub.output;
      for(const m of [mA,mB])assert(!observed.includes(hex(m)),'Selected merchant must be absent from this public call.');
     }
@@ -327,7 +327,7 @@ export async function runPrivateMerchantFixture({compiledDir,onInitialize,onAcce
    expirySignerFinancialOpenings:false,refundSignerBookOrReserveOpenings:false,
    syntheticSignerPolicy:true,durableInstitutionalCustody:false,currentRootOnly:true,publicAmountsAndReserveTotalsAbsent:true,
    fullHistoryPrivacyPassed:false,cryptographicProofsGenerated:false,networkSubmitted:false,authenticAssetSettlement:false,customerDemandValidated:false,
-   selectedMerchantAbsentFromQuoteAndDrawView:true,noSeparateFacilityExpiryQueryInDraw:true,
+   selectedMerchantAbsentFromQuoteAndDrawView:true,selectedMerchantAbsentFromRedemptionView:true,noSeparateFacilityExpiryQueryInDraw:true,
    zeroObligationAcknowledgmentSupported:true,uniformAcknowledgmentSchedulingImplemented:false,
    isolatedGeneratedBranches:['last-second-draw','zero-cash-compensation','zero-obligation-acknowledgment','alternate-repayment-expiry-allocation-acknowledgment-history'],
    refundCounterfactual:{privateRepayments:['100','600'],privatePostAllocationDebts:[shadowRemaining.outstanding.toString(),bookB.outstanding.toString()],

@@ -28,6 +28,8 @@ Hiding an amount field also does not hide an amount implied by a public fixed-pr
 
 ## Verification and migration gates
 
+The [observer model and acceptance cases](PRIVACY_OBSERVER_MODEL_2026-10-11.md) make the public and authorized-reader boundaries explicit. This is a verification target, not a privacy certificate.
+
 1. Write the precise observer and authorized-information model: issuer, legal borrower, each merchant, public reader, fee payer/relayer, prover and settlement operator. A merchant necessarily knows its own purchase; it must not learn unrelated book facts through shared openings or metadata.
 2. Compile the full twelve-circuit candidate with the pinned compiler. Regenerate its own managed assets and fingerprints; never reuse baseline verifier keys. Run lifecycle, arithmetic, role, concurrency, expiry, compensation and recovery attacks.
 3. Inspect actual public call inputs/outputs, operation transcripts and ledger diffs. Compare known-zero solo worlds with different protected debts but equivalent authorized public outputs. Test amount dictionaries, fee/deadline fingerprints, root choice, sender/DUST metadata and counterparties' side information. Finite tests cannot certify computational indistinguishability.
