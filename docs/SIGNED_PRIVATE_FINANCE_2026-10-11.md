@@ -37,6 +37,8 @@ The [merchant-membership experiment](PRIVATE_MERCHANT_2026-10-11.md) extends thi
 
 ## Signing-key and reserve-opening boundary
 
+The [custody compatibility review](CUSTODY_FEASIBILITY_2026-10-11.md) distinguishes scalar separation from authenticated policy, durable independent ownership and hardware signing. Documented AWS/Azure signing APIs are not established as compatible with this Jubjub construction; encrypted storage differs from non-extractable signing.
+
 Six child processes generate their own random Jubjub signing scalars. They compute action-specific approval messages and return points, signatures and reduction witnesses. The trusted Compact executor/prover never receives those scalars. Its ABI has no `callerSecret` or `agentSecret` witness. Instance domain, operation, relevant commitments, exact action terms and one-use authorization nonce bind approvals. Stable enrollment/payment nullifiers use a separately committed non-signing key.
 
 The challenge shape follows the [Midnight verifiable-credentials proof semantics](https://github.com/midnightntwrk/midnight-verifiable-credentials/blob/main/spec/proof-semantics.md). This is a custom compatibility implementation for the pinned older toolchain, not an assertion that the newer runtime's Schnorr API exists in 0.16.0 or that the construction is independently approved.
