@@ -137,7 +137,7 @@ export async function runPrivateMerchantFixture({compiledDir,onInitialize,onAcce
     assert(!calls.includes('callerSecret')&&!calls.includes('agentSecret'));
     // Proving/finality hooks must accept the derived public transition before
     // publishing the corresponding private opening checkpoint.
-    if(!options.branch)await onAccepted?.({role,name,seconds,input,nextState,result,initialQueryContext,publicData:pub});
+    await onAccepted?.({role,name,seconds,input,nextState,result,initialQueryContext,publicData:pub,isolatedBranch:Boolean(options.branch)});
     records.set(fingerprint(nextState),nextPrivate);
     if(!options.branch){state=nextState;traces.push({actor:role,circuit:name,signingScalarWitnesses:0,reserveEpoch:nextPrivate.reserve.book.epoch.toString()});}
     return {state:nextState,privateState:nextPrivate,public:pub,approval};

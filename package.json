@@ -40,6 +40,7 @@
     "privacy:spike": "node --experimental-strip-types scripts/private-signed-spike.mjs",
     "merchant:spike": "node --experimental-strip-types scripts/private-merchant-spike.mjs",
     "proof:privacy": "node --experimental-strip-types scripts/private-signed-proof.mjs",
+    "proof:merchant": "node --experimental-strip-types scripts/private-merchant-proof.mjs",
     "network:receipts": "node --experimental-strip-types scripts/verify-preprod-receipts.mjs",
     "network:receipts:test": "node --experimental-strip-types --test tests/preprod-receipts.test.mjs"
   },

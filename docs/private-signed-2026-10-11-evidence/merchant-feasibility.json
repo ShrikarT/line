@@ -1,6 +1,6 @@
 {
   "schema": "line-private-merchant-feasibility/v1",
-  "createdAt": "2026-10-11T10:03:55.769Z",
+  "createdAt": "2026-10-11T10:17:08.980Z",
   "sourceSha256": "afb75b1bf6156500e63e75fb2d7a69bc002bf84daf15736c4aa2fbd99cb9a4b7",
   "artifactFingerprints": {
     "contract/index.js": "db00d5035da207badfe34662d8662797c8a15edf51539e60d072d54a23bfd570",
