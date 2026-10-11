@@ -10,7 +10,7 @@ import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve, join, relative, sep } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import * as RT from '@midnight-ntwrk/compact-runtime';
 import { BYTES32, UINT64 } from '../src/lib/line/encoding.ts';
 import { commit } from './private-pool-spike.mjs';
@@ -34,11 +34,12 @@ const publicJson=value=>JSON.stringify(value,(_key,value)=>typeof value==='bigin
  hex(value.length<=32?BYTES32.fromValue([value]):value):value);
 const locked=r=>r.encumberedReserve+r.redeemedReserve+r.feeReserve+r.pendingFeeReserve+r.refundReserve+r.reportedRefundReserve;
 
-async function main(){
+export async function runPrivateSignedFixture({compiledDir,onInitialize,onAccepted,onComplete}={}){
  mkdirSync('.compact-keys',{recursive:true});const work=mkdtempSync(resolve('.compact-keys/private-signed-spike-'));
- const cachedIndex=process.argv.indexOf('--compiled-dir'),dir=cachedIndex<0?join(work,'managed'):resolve(process.argv[cachedIndex+1]);
+ const cachedIndex=process.argv.indexOf('--compiled-dir'),cached=Boolean(compiledDir)||cachedIndex>=0;
+ const dir=compiledDir?resolve(compiledDir):cachedIndex<0?join(work,'managed'):resolve(process.argv[cachedIndex+1]);
  const source='contracts/experimental/line-private-signed.compact',sourceHash=fingerprint(readFileSync(source));
- if(cachedIndex<0)await new Promise((yes,no)=>{
+ if(!cached)await new Promise((yes,no)=>{
   const portable=relative(process.cwd(),dir).split(sep).join('/');
   const child=spawn(process.execPath,['scripts/compile-compact.mjs','--skip-zk',source,portable],{stdio:'inherit'});
   child.on('error',no);child.on('close',code=>code===0?yes():no(Error(`Private signed compilation failed: ${code}`)));
@@ -66,6 +67,8 @@ async function main(){
   }]));
   const contract=new Contract(witnesses);activeValues={reserveSalt:initialReserveSalt};
   const initial=contract.initialState(RT.createConstructorContext({notes:{},quotes:{}},COIN),issuerPk,mA,bytes(),stableKeyCommit);
+  const execution=await onInitialize?.({dir,info,initial,sourceHash,now:NOW});
+  const contractAddress=execution?.contractAddress??RT.dummyContractAddress();
   let state=stateBytes(initial.currentContractState.data),time=NOW;records.set(fingerprint(state),initial.currentPrivateState);
   const view=(s=state)=>ledger(RT.ContractState.deserialize(s).data);
   const privateView=(s=state)=>records.get(fingerprint(s));
@@ -98,15 +101,21 @@ async function main(){
    activeValues={...full,...approval,...options.approvalOverride};calls=[];
    let completedCircuit=false;
    try{
-    const context=RT.createCircuitContext(RT.dummyContractAddress(),COIN,RT.ContractState.deserialize(input).data,structuredClone(ps),undefined,undefined,options.time??time);
+    const seconds=options.time??time;
+    const context=RT.createCircuitContext(contractAddress,COIN,RT.ContractState.deserialize(input).data,structuredClone(ps),undefined,undefined,seconds);
+    const initialQueryContext=context.currentQueryContext;
     const result=contract.circuits[name](context,...circuitArgs),nextState=stateBytes(result.context.currentQueryContext.state),nextPrivate=result.context.currentPrivateState;
     completedCircuit=true;
-    validate(nextState,nextPrivate);records.set(fingerprint(nextState),nextPrivate);
+    validate(nextState,nextPrivate);
     const pub={transcript:publicJson(result.proofData.publicTranscript),input:publicJson(result.proofData.input),output:publicJson(result.proofData.output)};
     if(name==='fundReserve'||name==='withdrawUnencumberedReserve'||name==='setStatus')assert.equal(result.proofData.input.value.length,0,'Private values must not remain in exported circuit input.');
     if(name==='draw'||name==='openLine')assert(!pub.input.includes(hex(RT.convertFieldToBytes(32,7n,'private fee'))),'Fee/price policy must be absent from exported input.');
     if(options.expected===false)throw Error(`Unexpected acceptance: ${options.label}`);
     assert(!calls.includes('callerSecret')&&!calls.includes('agentSecret'));
+    // Proving/finality hooks must accept the derived public transition before
+    // publishing the corresponding private opening checkpoint.
+    if(!options.branch)await onAccepted?.({role,name,seconds,input,nextState,result,initialQueryContext,publicData:pub});
+    records.set(fingerprint(nextState),nextPrivate);
     if(!options.branch){state=nextState;traces.push({actor:role,circuit:name,signingScalarWitnesses:0,reserveEpoch:nextPrivate.reserve.book.epoch.toString()});}
     return {state:nextState,privateState:nextPrivate,public:pub,approval};
    }catch(error){
@@ -230,7 +239,7 @@ async function main(){
   }
   const artifactFingerprints=Object.fromEntries(['contract/index.js','compiler/contract-info.json'].map(file=>[file,fingerprint(readFileSync(join(dir,file)))]));
   const report={schema:'line-private-signed-feasibility/v1',createdAt:new Date().toISOString(),sourceSha256:sourceHash,artifactFingerprints,
-   compiler:info['compiler-version'],runtime:info['runtime-version'],freshCompilation:cachedIndex<0,cachedGeneratedBindings:cachedIndex>=0,sourceBindingVerifiedByThisRun:cachedIndex<0,
+   compiler:info['compiler-version'],runtime:info['runtime-version'],freshCompilation:!cached,cachedGeneratedBindings:cached,sourceBindingVerifiedByThisRun:!cached,
    exportedCircuits:info.circuits.map(c=>c.name),canonicalModified:false,independentSignerProcesses:6,
    signingScalarsInCoordinatorOrCircuitWitnesses:false,reserveOpeningsSentToSigners:false,privateBooksHeldByTrustedCoordinator:true,
    syntheticSignerPolicy:true,durableInstitutionalCustody:false,currentRootOnly:true,publicAmountsAndReserveTotalsAbsent:true,
@@ -238,7 +247,10 @@ async function main(){
    residualRisks:['selected merchant and fixed-price catalogs','deadlines, public action shapes and timing','sender, DUST and prover metadata','trusted book/reserve prover and synthetic signer policy','finite population and side information'],
    traces,negativeChecks,signatureChecks,disclosureChecks,syntheticFinalAccounting:{T:r.totalReserve.toString(),R:r.redeemedReserve.toString(),X:r.reportedRefundReserve.toString()}};
   writeFileSync(join(work,'evidence.json'),JSON.stringify(report,null,2)+'\n');
+  await onComplete?.(report);
   console.log(JSON.stringify({result:'TWELVE-CIRCUIT PRIVATE-FINANCE SIGNATURE COMPATIBILITY PASS; COMPLETE PRIVACY UNPROVEN',evidence:join(work,'evidence.json')}));
+  return report;
  }finally{for(const signer of signers)signer.child.kill();}
 }
-main().catch(error=>{console.error(error.message);process.exitCode=1;});
+if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url))
+ runPrivateSignedFixture().catch(error=>{console.error(error.message);process.exitCode=1;});
