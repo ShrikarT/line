@@ -182,7 +182,7 @@ async function main(){
   assert.equal(negativeChecks.length,6,'Five lifecycle draws and the isolated deadline draw must reject corrupted proofs.');assert.equal(digest(readFileSync(source)),sourceSha256);
   for(const [file,pinned]of Object.entries(scriptFingerprints))assert.equal(digest(readFileSync(file)),pinned,'Proof harness changed during execution.');
   complete=true;checkpoint();
-  console.log(JSON.stringify({result:'ALL TWELVE MERCHANT CIRCUITS AND SEVEN ISOLATED BRANCHES VERIFIED LOCALLY; COMPLETE PRIVACY UNPROVEN',evidence:join(work,'verification.json')}));
+  console.log(JSON.stringify({result:'ALL TWELVE ENROLLMENT CIRCUITS AND THIRTEEN ISOLATED BRANCHES VERIFIED LOCALLY; COMPLETE PRIVACY UNPROVEN',evidence:join(work,'verification.json')}));
  }catch(error){
   const httpStatus=String(error.message).match(/Failed Proof Server response: url="http:\/\/127\.0\.0\.1:6301\/[^"\s]+", code="(\d+)"/);
   failure={stage,isolatedBranch:currentIsolatedBranch,errorClass:error.name,...(httpStatus?{loopbackProverHttpStatus:Number(httpStatus[1])}:{}),
@@ -202,4 +202,4 @@ async function main(){
   if(ownedProver){try{await manage('stop');}catch(error){console.error(`Owned prover cleanup failed (${error.name}).`);if(!failure)throw error;}}
  }
 }
-main().catch(error=>{console.error(`Private-merchant proof run failed (${error.name}).`);process.exitCode=1;});
+main().catch(error=>{console.error(`Private-enrollment proof run failed (${error.name}).`);process.exitCode=1;});

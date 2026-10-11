@@ -1,5 +1,7 @@
 # Line pitch and demonstration evidence
 
+Latest evidence: [enrollment](PRIVATE_ENROLLMENT_2026-10-11.md) verifies 52 local contract calls across all twelve names; [durable agent integration](DURABLE_ACTOR_2026-10-11.md) verifies six calls through two process restarts. These distinct synthetic runs are not the deployed canonical contract, independent institutional custody, complete financial recovery, full-history privacy or asset settlement.
+
 Updated: 11 October 2026. [PRODUCT_DIRECTION.md](PRODUCT_DIRECTION.md) owns product decisions and readiness. This is a pitch specification with explicit present/target boundaries, not proof that planned features shipped. Required artifacts and conflicting event dates are documented in [the current Wave 2 requirements review](WAVE2_REQUIREMENTS_2026-10-11.md).
 
 ## Opening

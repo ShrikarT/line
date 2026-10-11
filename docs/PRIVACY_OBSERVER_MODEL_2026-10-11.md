@@ -1,6 +1,8 @@
 # Privacy observer model and acceptance cases — 11 October 2026
 
-Latest separate [enrollment experiment](PRIVATE_ENROLLMENT_2026-10-11.md): private predecessor selection, uniform query counts, generation-specific issuance nullifiers and fresh 39/13/66 generated controls. Native verification and full observer privacy remain unproven for this source.
+Latest separate [enrollment experiment](PRIVATE_ENROLLMENT_2026-10-11.md): private predecessor selection, uniform query counts, generation-specific issuance nullifiers and fresh 39/13/66 generated controls. Native verification now completes 52 contract calls across all twelve names, including thirteen isolated calls, with six corrupted-proof rejections. Full observer privacy remains unproven. Finite serialized-size differences are retained in the source-bound report.
+
+The current merchant quote request contains borrower identity, numeric generation and fee policy. A supplier knowing a zero balance can infer debt from its price plus the disclosed fee; a new generation can also disclose a closed predecessor. This off-chain request remains a privacy gap even after enrollment ledger queries are made uniform. The [durable-agent integration](DURABLE_ACTOR_2026-10-11.md) deliberately records this counterexample rather than declaring a privacy pass.
 
 This defines the verification target for experimental merchant source `afb75b1`, not an achieved guarantee or a change to the deployed canonical contract. The canonical inventory remains in [PRIVACY.md](PRIVACY.md). Implementation and existing generated controls are in [the merchant report](PRIVATE_MERCHANT_2026-10-11.md).
 

@@ -71,6 +71,9 @@ jobs:
       - name: Compiled private enrollment and duplicate-generation controls
         run: npm run enrollment:spike
 
+      - name: Durable agent approvals in freshly compiled Compact
+        run: npm run custody:compact
+
       - name: Fail-closed network receipt metadata checks
         run: npm run network:receipts:test
 
