@@ -1,5 +1,7 @@
 # Line — Wave 2 Design Document: Private Credit Settlement Prototype
 
+> **Archive notice (10 October 2026):** Historical Wave 2 design snapshot, not a current contract specification or acceptance claim. In particular, the statements below that public observers never learn note amounts or merchant identities are obsolete: current note amounts, reserve deltas and the selected merchant key at draw are public; public linked history can reveal debt from a known-zero opening; `identityCommit` is cross-instance linkable when an agent reuses its secret. The current line commitment is domain-bound, but this does not cure those disclosures. Current direction and evidence: [PRODUCT_DIRECTION.md](PRODUCT_DIRECTION.md), [PRIVACY.md](PRIVACY.md), and [ENGINEERING_STATUS.md](ENGINEERING_STATUS.md).
+
 - **Repository:** https://github.com/ShrikarT/line
 - **Wave 1 Tag & Commit:** `wave1-final` at commit [`ed45ca4`](https://github.com/ShrikarT/line/commit/ed45ca4)
 - **Wave 1 Contract Preserved:** `contracts/v1/line.compact`

@@ -4,29 +4,34 @@
  * Queries indexer public data provider to discover and validate a deployed Line contract.
  */
 import { indexerPublicDataProvider } from "@midnight-ntwrk/midnight-js-indexer-public-data-provider";
+import { resolveMidnightEndpoints, assertEndpointCredentials, redactEndpoint, sanitizeServiceError } from "../src/lib/runtime/endpoints.ts";
+import { setNetworkId } from "@midnight-ntwrk/midnight-js-network-id";
 import { ledger } from "../contracts/managed/line/contract/index.js";
 
 async function main() {
-  const address = process.argv[2] ?? process.env.MIDNIGHT_CONTRACT_ADDRESS;
+  let address = process.argv[2] ?? process.env.MIDNIGHT_CONTRACT_ADDRESS;
   if (!address || address.trim().length === 0) {
     console.error("Usage: node scripts/contract-join.mjs <CONTRACT_ADDRESS>");
     console.error("Or set MIDNIGHT_CONTRACT_ADDRESS in environment.");
     process.exit(1);
   }
 
-  const networkId = process.env.MIDNIGHT_NETWORK_ID ?? "midnight-preprod";
-  let indexerUri = process.env.MIDNIGHT_INDEXER_URI ?? "https://indexer.preprod.midnight.network/api/v4/graphql";
-  if (indexerUri.includes("indexer.preprod.midnight.network") && (indexerUri.endsWith("/v1/graphql") || !indexerUri.includes("/graphql"))) {
-    indexerUri = "https://indexer.preprod.midnight.network/api/v4/graphql";
-  }
-  const indexerWsUri = process.env.MIDNIGHT_INDEXER_WS_URI ?? "wss://indexer.preprod.midnight.network/api/v4/graphql/ws";
+  address = address.trim().replace(/^0x/, "");
+  if (!/^[0-9a-fA-F]{64}$/.test(address)) throw new Error("Contract address must contain exactly 32 hex bytes.");
+  const endpoints = resolveMidnightEndpoints({ networkId: process.env.MIDNIGHT_NETWORK_ID,
+    blockfrostProjectId: process.env.MIDNIGHT_BLOCKFROST_PROJECT_ID,
+    indexerUri: process.env.MIDNIGHT_INDEXER_URI, indexerWsUri: process.env.MIDNIGHT_INDEXER_WS_URI,
+    nodeUri: process.env.MIDNIGHT_NODE_URI });
+  assertEndpointCredentials(endpoints);
+  const { networkId, indexerUri, indexerWsUri } = endpoints;
+  setNetworkId(networkId);
 
   console.log("=================================================");
   console.log(" Line — Midnight Contract Connection");
   console.log("=================================================");
   console.log(`Target Address:  ${address}`);
   console.log(`Network ID:      ${networkId}`);
-  console.log(`Indexer URI:     ${indexerUri}`);
+  console.log(`Indexer URI:     ${redactEndpoint(indexerUri)}`);
 
   console.log("\nQuerying contract state from Midnight Indexer...");
   const provider = indexerPublicDataProvider(indexerUri, indexerWsUri);
@@ -35,7 +40,7 @@ async function main() {
   try {
     state = await provider.queryContractState(address);
   } catch (err) {
-    console.error(`\n✗ Failed to reach indexer at ${indexerUri}:`, err instanceof Error ? err.message : String(err));
+    console.error(`\n✗ Failed to reach indexer at ${redactEndpoint(indexerUri)}:`, sanitizeServiceError(err instanceof Error ? err.message : String(err)));
     process.exit(1);
   }
 
@@ -55,12 +60,14 @@ async function main() {
   }
 
   const toHex = (u) => (u ? Buffer.from(u).toString("hex") : "0x0");
-  const total = Number(l.totalReserve);
-  const enc = Number(l.encumberedReserve);
-  const red = Number(l.redeemedReserve);
-  const withdrawable = Math.max(0, total - (enc + red));
+  const total = l.totalReserve;
+  const enc = l.encumberedReserve;
+  const red = l.redeemedReserve;
+  const fees = l.feeReserve;
+  const available = total - enc - red - fees - l.pendingFeeReserve - l.refundReserve - l.reportedRefundReserve;
+  const withdrawable = available > 0n ? available : 0n;
 
-  console.log("\n--- Verified Line Contract State ---");
+  console.log("\n--- Decoded Line Contract State ---");
   console.log(`Contract Domain:    0x${toHex(l.contractDomain)}`);
   console.log(`Issuer Public Key:  0x${toHex(l.issuer)}`);
   console.log(`Status:             ${l.status === 1 ? "OPEN" : l.status === 2 ? "DEFAULTED" : l.status === 3 ? "CLOSED" : "NONE"}`);
@@ -69,6 +76,11 @@ async function main() {
   console.log(`Total Reserve:      ${total}`);
   console.log(`Encumbered Reserve: ${enc}`);
   console.log(`Redeemed Reserve:   ${red}`);
+  console.log(`Fee Reserve:        ${fees}`);
+  console.log(`Pending Fees:       ${l.pendingFeeReserve}`);
+  console.log(`Refund Budgets:     ${l.refundReserve}`);
+  console.log(`Reported Budgets:   ${l.reportedRefundReserve}`);
+  console.log(`Fee policy:         ${l.feeFlat} + ceil(amount * ${l.feeBps} / 10000)`);
   console.log(`Withdrawable:       ${withdrawable}`);
   console.log(`Quotes in registry: ${l.quotes?.size?.() ?? 0}`);
   console.log(`Notes in registry:  ${l.notes?.size?.() ?? 0}`);
@@ -77,10 +89,10 @@ async function main() {
   console.log("To use this contract in the Line console, set:");
   console.log(`  export VITE_MIDNIGHT_CONTRACT_ADDRESS="${address}"`);
   console.log(`  export MIDNIGHT_CONTRACT_ADDRESS="${address}"\n`);
-  console.log("✓ Contract joined and verified successfully.");
+  console.log("✓ Public state decoded. Binding verifier-key validation occurs before circuit operations.");
 }
 
 main().catch((err) => {
-  console.error("Join failed:", err);
+  console.error("Join failed:", sanitizeServiceError(err instanceof Error ? err.message : String(err)));
   process.exit(1);
 });

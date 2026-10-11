@@ -11,6 +11,10 @@ import {
   quoteCommit as encodeQuoteCommit,
   redeemNullifier as encodeRedeemNullifier,
   repayNullifier as encodeRepayNullifier,
+  paymentNullifier as encodePaymentNullifier,
+  canonicalPaymentReferenceBytes,
+  requiredDrawFee,
+  refundCommit,
   randomBytes32,
   toHex,
 } from "./encoding.ts";
@@ -33,6 +37,7 @@ import {
   type QuotePreimage,
   type RedeemWitness,
   type RepayWitness,
+  type RefundAllocation,
 } from "./types.ts";
 
 export const FAIL = {
@@ -81,6 +86,15 @@ export const FAIL = {
 
 const UINT64_MAX = 18446744073709551615n;
 
+/** Execution environment, never public ledger data or caller-supplied witness. */
+const executionClocks = new WeakMap<Ledger, () => number>();
+const systemUnixSeconds = () => Math.floor(Date.now() / 1_000);
+function executionUnixSeconds(ledger: Ledger): number {
+  const now = (executionClocks.get(ledger) ?? systemUnixSeconds)();
+  if (!Number.isSafeInteger(now) || now < 0) throw new RangeError("Invalid trusted model Unix-seconds clock");
+  return now;
+}
+
 function fail(code: string, reason: string, message = GENERIC_DRAW_FAIL): CircuitResult<never> {
   return { ok: false, code, reason, message };
 }
@@ -95,6 +109,10 @@ export function asBytes32(input?: string | Uint8Array | null): Uint8Array {
 
 function getCaller(input: { caller?: string; callerSk?: string }): string {
   return input.callerSk ?? input.caller ?? "";
+}
+
+function lockedReserve(ledger: Ledger): number {
+  return ledger.encumberedReserve + ledger.redeemedReserve + ledger.feeReserve + ledger.pendingFeeReserve + ledger.refundReserve + ledger.reportedRefundReserve;
 }
 
 /**
@@ -133,6 +151,7 @@ export function lineCommitment(w: LineWitness): string {
   return toHex(
     lineStateCommit(
       {
+        domain: asBytes32(w.domain),
         identity: asBytes32(w.I),
         limit: u64(w.L),
         outstanding: u64(w.B),
@@ -152,6 +171,8 @@ export function quoteCommitment(q: QuotePreimage, domain: string): string {
       expiry: u64(q.expiry),
       nonce: asBytes32(q.nonce),
       generation: u64(q.generation),
+      feeFlat: u64(q.feeFlat),
+      feeBps: u64(q.feeBps),
       domain: asBytes32(domain),
     }),
   );
@@ -167,12 +188,17 @@ export function drawNoteCommitment(np: DrawNotePreimage, salt: string): string {
         quoteCommit: asBytes32(np.quoteCommit),
         merchantPk: asBytes32(np.merchantPk),
         amount: u64(np.amount),
+        fee: u64(np.fee),
         noteNonce: asBytes32(np.noteNonce),
         expiry: u64(np.expiry),
       },
       asBytes32(salt),
     ),
   );
+}
+
+export function refundCommitment(preimage: Pick<RefundAllocation, "domain" | "lineGeneration" | "identity" | "noteCommit" | "amount">, salt: string): string {
+  return toHex(refundCommit({ domain: asBytes32(preimage.domain), lineGeneration: u64(preimage.lineGeneration), identity: asBytes32(preimage.identity), noteCommit: asBytes32(preimage.noteCommit), amount: u64(preimage.amount) }, asBytes32(salt)));
 }
 
 export function drawNullifier(agentSecret: string, Q: string, domain: string): string {
@@ -197,7 +223,7 @@ export function repayNullifier(
       identity: asBytes32(I),
       currentC: asBytes32(currentC),
       amount: u64(amount),
-      paymentRef: asBytes32(paymentRef),
+      paymentRef: canonicalPaymentReferenceBytes(paymentRef),
       domain: asBytes32(domain),
     }),
   );
@@ -214,6 +240,8 @@ export function createLedger(params?: {
   instanceNonce?: string;
   issuerPubKey?: string;
   merchantPubKey?: string;
+  /** Trusted model execution clock; deadlines are absolute Unix seconds. */
+  clock?: () => number;
 }): Ledger {
   const issuerPk = params?.issuerPubKey
     ? asBytes32(params.issuerPubKey)
@@ -231,7 +259,7 @@ export function createLedger(params?: {
   const domain = toHex(contractDomain(issuerPk, merchantPk, nonce));
   const merchantHex = toHex(merchantPk);
 
-  return {
+  const ledger: Ledger = {
     contractDomain: domain,
     issuerPubKey: toHex(issuerPk),
     initialMerchantPubKey: merchantHex,
@@ -241,6 +269,11 @@ export function createLedger(params?: {
     encumberedReserve: 0,
     redeemedReserve: 0,
     feeReserve: 0,
+    pendingFeeReserve: 0,
+    refundReserve: 0,
+    reportedRefundReserve: 0,
+    feeFlat: 0,
+    feeBps: 0,
     identityCommitment: null,
     lineCommitment: null,
     lineExpiry: 0,
@@ -252,10 +285,13 @@ export function createLedger(params?: {
     events: [],
     actionClock: 0,
   };
+  if (params?.clock !== undefined && typeof params.clock !== "function") throw new TypeError("Model clock must be a function");
+  executionClocks.set(ledger, params?.clock ?? systemUnixSeconds);
+  return ledger;
 }
 
 export function cloneLedger(ledger: Ledger): Ledger {
-  return {
+  const cloned: Ledger = {
     ...ledger,
     registeredMerchants: { ...ledger.registeredMerchants },
     quotes: ledger.quotes.map((q) => ({ ...q })),
@@ -263,6 +299,8 @@ export function cloneLedger(ledger: Ledger): Ledger {
     nullifiers: [...ledger.nullifiers],
     events: ledger.events.map((e) => ({ ...e })),
   };
+  executionClocks.set(cloned, executionClocks.get(ledger) ?? systemUnixSeconds);
+  return cloned;
 }
 
 function isIssuer(ledger: Ledger, callerSecret: string) {
@@ -357,7 +395,7 @@ export function withdrawUnencumberedReserve(
   if (!assertSafeUint(input.amount) || input.amount <= 0) return fail("ZERO", FAIL.ZERO);
 
   // FEE_SPEC §3: accrued fees are locked — only withdrawFees releases them.
-  const locked = next.encumberedReserve + next.redeemedReserve + next.feeReserve;
+  const locked = lockedReserve(next);
   const withdrawable = next.totalReserve - locked;
   if (input.amount > withdrawable) {
     return fail("RESERVE_WITHDRAW", FAIL.RESERVE_WITHDRAW);
@@ -386,7 +424,7 @@ export function withdrawFees(
   if (!isIssuer(next, input.caller)) return fail("AUTH_ISSUER", FAIL.AUTH_ISSUER);
   const f = next.feeReserve;
   if (f <= 0) return fail("NO_FEES", FAIL.NO_FEES);
-  const locked = next.encumberedReserve + next.redeemedReserve + next.feeReserve;
+  const locked = lockedReserve(next);
   if (next.totalReserve < locked) return fail("RESERVE_DEFICIT", FAIL.RESERVE_DEFICIT);
   next.totalReserve -= f;
   next.feeReserve = 0;
@@ -400,12 +438,12 @@ export function withdrawFees(
 }
 
 /**
- * Mirror of the Compact `openLine(expiry)` circuit.
+ * Mirror of Compact `openLine(expiry, flatFee, basisPoints)`.
  *
  * Public circuit parameters travel in `input`; the credit limit is a PRIVATE
  * witness (lineLimit()) supplied in `witness` — it is never a public
- * parameter, never logged, and never lands on the public ledger. Only the
- * identity commitment I and the line-state commitment C0 are disclosed.
+ * parameter, never logged, and never lands on the public ledger. Identity I,
+ * line commitment C0, expiry and issuer-approved pricing are public.
  */
 export function openLine(
   ledger: Ledger,
@@ -416,6 +454,8 @@ export function openLine(
     limit?: number;
     salt?: string;
     expiry: number;
+    feeFlat?: number;
+    feeBps?: number;
   },
   witness?: OpenLineWitness,
 ): CircuitResult<{ ledger: Ledger; agent: AgentStore }> {
@@ -424,15 +464,15 @@ export function openLine(
   if (!isIssuer(next, caller)) return fail("AUTH_ISSUER", FAIL.AUTH_ISSUER);
   const limit = witness?.limit ?? input.limit ?? 0;
   if (!assertSafeUint(limit) || limit <= 0) return fail("LIMIT", FAIL.LIMIT);
-  // Headroom-2 rule (audit L3), mirroring the circuit: this circuit ends with
-  // actionClock.increment(1), so expiry = clock+1 would pass yet open an
-  // immediately-unusable line. Require expiry > clock+1 (i.e. >= clock+2).
-  if (!assertSafeUint(input.expiry) || input.expiry <= next.actionClock + 1) {
+  // Mirror blockTimeLt(expiry): action count cannot advance this deadline.
+  if (!assertSafeUint(input.expiry) || input.expiry <= executionUnixSeconds(next)) {
     return fail("EXPIRY", FAIL.EXPIRY);
   }
   if (next.status !== "none" && next.status !== "closed") {
     return fail("LINE_EXISTS", FAIL.LINE_EXISTS);
   }
+  const feeFlat = input.feeFlat === undefined ? 0 : input.feeFlat, feeBps = input.feeBps === undefined ? 0 : input.feeBps;
+  if (!assertSafeUint(feeFlat) || !assertSafeUint(feeBps) || feeBps > 10_000) return fail("FEE_POLICY", "invalid issuer fee policy");
 
   const saltStr = input.salt ?? toHex(randomBytes32());
   const I = identityCommitment(input.agentSecret);
@@ -448,6 +488,8 @@ export function openLine(
   next.identityCommitment = I;
   next.lineCommitment = C;
   next.lineExpiry = input.expiry;
+  next.feeFlat = feeFlat;
+  next.feeBps = feeBps;
   next.status = "open";
   next.lineGeneration += 1;
   pushEvent(next, {
@@ -499,11 +541,10 @@ export function postQuote(
   if (next.status !== "open") return fail("STATUS", FAIL.STATUS);
   const amount = witness?.amount ?? input.amount ?? 0;
   if (!assertSafeUint(amount) || amount <= 0) return fail("ZERO", FAIL.ZERO);
-  // Headroom-2 rule (audit L3), mirroring the circuit: expiry must be >
-  // clock+1 so the quote is still drawable after this circuit's clock tick.
-  if (!assertSafeUint(input.expiry) || input.expiry <= next.actionClock + 1) {
+  if (!assertSafeUint(input.expiry) || input.expiry <= executionUnixSeconds(next)) {
     return fail("EXPIRY", FAIL.EXPIRY);
   }
+  if (!assertSafeUint(next.feeFlat) || !assertSafeUint(next.feeBps) || next.feeBps > 10_000) return fail("FEE_POLICY", "missing or invalid issuer fee policy");
 
   const nonce = input.nonce ?? toHex(randomBytes32());
   const preimage: QuotePreimage = {
@@ -513,6 +554,8 @@ export function postQuote(
     expiry: input.expiry,
     nonce: toHex(asBytes32(nonce)),
     generation: next.lineGeneration,
+    feeFlat: next.feeFlat,
+    feeBps: next.feeBps,
   };
   const Q = quoteCommitment(preimage, next.contractDomain);
   if (next.quotes.some((q) => q.commitment === Q)) {
@@ -575,9 +618,10 @@ export function draw(
   witness?: DrawWitness,
 ): CircuitResult<{ ledger: Ledger; agent: AgentStore; note: DrawNote }> {
   const next = cloneLedger(ledger);
+  const now = executionUnixSeconds(next);
   if (next.status !== "open") return fail("STATUS", FAIL.STATUS);
   if (!next.lineCommitment) return fail("NO_LINE", FAIL.NO_LINE);
-  if (next.lineExpiry <= next.actionClock) return fail("LINE_EXPIRED", FAIL.LINE_EXPIRED);
+  if (next.lineExpiry <= now) return fail("LINE_EXPIRED", FAIL.LINE_EXPIRED);
 
   const secret = input.agentSecret ?? input.agent?.secret ?? input.callerSk ?? input.caller;
   if (!secret) return fail("AUTH_AGENT", FAIL.AUTH_AGENT);
@@ -589,19 +633,20 @@ export function draw(
   if (I !== books.I || I !== next.identityCommitment) {
     return fail("AUTH_AGENT", FAIL.AUTH_AGENT);
   }
-  // Stale check over the WITNESS books: lineStateCommit({I,L,B,e}, s) == lineCommit.
+  // Stale check includes this contract's domain: lineStateCommit({D,I,L,B,e}, s) == lineCommit.
   if (!opens(books, next.lineCommitment)) {
     return fail("STALE", FAIL.STALE);
   }
 
   const wq = witness?.quote ?? input.quote ?? input.invoice?.preimage;
   if (!wq) return fail("QUOTE", FAIL.QUOTE);
+  if (!assertSafeUint(next.feeFlat) || !assertSafeUint(next.feeBps) || next.feeBps > 10_000) return fail("FEE_POLICY", "missing or invalid issuer fee policy");
 
   const Q = input.quoteCommit ?? quoteCommitment(wq, next.contractDomain);
   const live = next.quotes.find((q) => q.commitment === Q);
   if (!live) return fail("QUOTE", FAIL.QUOTE);
   if (live.used) return fail("QUOTE_USED", FAIL.QUOTE_USED);
-  if (live.expiry <= next.actionClock) return fail("QUOTE_EXPIRED", FAIL.QUOTE_EXPIRED);
+  if (live.expiry <= now) return fail("QUOTE_EXPIRED", FAIL.QUOTE_EXPIRED);
   if (live.lineGeneration !== next.lineGeneration) {
     return fail("QUOTE_GEN", FAIL.QUOTE_GEN);
   }
@@ -625,6 +670,8 @@ export function draw(
       expiry: live.expiry,
       nonce: toHex(asBytes32(wq.nonce)),
       generation: live.lineGeneration,
+      feeFlat: next.feeFlat,
+      feeBps: next.feeBps,
     },
     next.contractDomain,
   );
@@ -638,9 +685,14 @@ export function draw(
   const { L, B, e } = books;
   // FEE_SPEC §3: cost = amount + fee is charged to the agent's outstanding;
   // the settlement note encumbers ONLY the invoice amount, the fee accrues to
-  // the issuer's feeReserve. fee = 0 reproduces pre-fee behavior exactly.
+  // pendingFeeReserve until the merchant redeems. This is not cash collection.
   const f = input.fee ?? 0;
   if (!assertSafeUint(f)) return fail("AMOUNT", "fee must be a non-negative integer");
+  let expectedFee: bigint;
+  try { expectedFee = requiredDrawFee(u64(A), u64(next.feeFlat), u64(next.feeBps)); }
+  catch { return fail("OVERFLOW", FAIL.OVERFLOW); }
+  if (expectedFee > BigInt(Number.MAX_SAFE_INTEGER)) return fail("OVERFLOW", FAIL.OVERFLOW);
+  if (u64(f) !== expectedFee) return fail("FEE_POLICY", "fee does not match issuer policy");
   const cost = A + f;
   if (cost < A || !assertSafeUint(cost)) return fail("OVERFLOW", FAIL.OVERFLOW); // "fee overflow" guard
   const nextB = B + cost;
@@ -648,18 +700,16 @@ export function draw(
   if (nextB > L) return fail("CAPACITY", FAIL.CAPACITY);
 
   // Reserve capacity check: fee counts toward solvency.
-  const locked = next.encumberedReserve + next.redeemedReserve + next.feeReserve;
+  const locked = lockedReserve(next);
   if (next.totalReserve < locked) return fail("RESERVE_DEFICIT", FAIL.RESERVE_DEFICIT);
   const free = next.totalReserve - locked; // == unencumberedReserve
   if (cost > free) {
     return fail("RESERVE_CAPACITY", FAIL.RESERVE_CAPACITY);
   }
 
-  // Headroom-2 rule (audit L3), mirroring the circuit: this circuit ends with
-  // actionClock.increment(1), so noteExpiry = clock+1 would pass yet be
-  // immediately unredeemable. Require noteExpiry > clock+1 (i.e. >= clock+2).
   const noteExp = input.noteExpiry ?? live.expiry;
-  if (!assertSafeUint(noteExp) || noteExp <= next.actionClock + 1) {
+  if (noteExp !== live.expiry) return fail("NOTE_EXPIRY", "note expiry must match authenticated quote deadline");
+  if (!assertSafeUint(noteExp) || noteExp <= now) {
     return fail("NOTE_EXPIRED", FAIL.NOTE_EXPIRED);
   }
 
@@ -678,6 +728,7 @@ export function draw(
     quoteCommit: Q,
     merchantPk: wMerchantPk,
     amount: A,
+    fee: f,
     noteNonce,
     expiry: noteExp,
   };
@@ -700,16 +751,22 @@ export function draw(
   next.lineCommitment = C2;
   next.nullifiers.push(N);
   next.encumberedReserve += A; // note encumbers ONLY the invoice amount (FEE_SPEC §3)
-  next.feeReserve += f; // fee accrues to the issuer
+  next.pendingFeeReserve += f;
   // Settled amounts ARE public escrow accounting (honest boundary): the note
   // amount and the reserve-counter deltas stay public by design.
   next.notes.push({
     commitment: D,
     amount: A,
+    fee: f,
     redeemed: false,
     cancelled: false,
     expiry: noteExp,
     lineGeneration: next.lineGeneration,
+    compensationAllocated: false,
+    refundCommitment: toHex(new Uint8Array(32)),
+    cashRefundOwed: false,
+    refundAcknowledged: false,
+    refundPaymentNullifier: toHex(new Uint8Array(32)),
   });
 
   pushEvent(next, {
@@ -770,7 +827,7 @@ export function redeemDraw(
   if (!live) return fail("NOTE_NOT_FOUND", FAIL.NOTE_NOT_FOUND);
   if (live.redeemed) return fail("NOTE_USED", FAIL.NOTE_USED);
   if (live.cancelled) return fail("NOTE_CANCELLED", FAIL.NOTE_CANCELLED);
-  if (live.expiry <= next.actionClock) return fail("NOTE_EXPIRED", FAIL.NOTE_EXPIRED);
+  if (live.expiry <= executionUnixSeconds(next)) return fail("NOTE_EXPIRED", FAIL.NOTE_EXPIRED);
   if (!preimage) return fail("NOTE_AUTH", FAIL.NOTE_AUTH);
 
   // Merchant proof of ownership: the caller secret derives the merchantPk
@@ -799,6 +856,7 @@ export function redeemDraw(
       quoteCommit: toHex(asBytes32(preimage.quoteCommit)),
       merchantPk: mPk,
       amount: preimage.amount,
+      fee: live.fee,
       noteNonce: toHex(asBytes32(preimage.noteNonce)),
       expiry: noteExp,
     },
@@ -818,6 +876,8 @@ export function redeemDraw(
   next.nullifiers.push(N);
   next.encumberedReserve -= live.amount;
   next.redeemedReserve += live.amount;
+  next.pendingFeeReserve -= live.fee;
+  next.feeReserve += live.fee;
 
   pushEvent(next, {
     circuit: "redeemDraw",
@@ -835,29 +895,105 @@ export function cancelOrExpireNote(
   input: {
     caller?: string;
     callerSk?: string;
+    agentSecret?: string;
     noteCommitment?: string;
     note?: DrawNote;
+    action?: 0 | 1 | 2;
+    receiptExpiry?: number;
+    compensation?: { note: DrawNotePreimage; noteSalt: string; newSalt: string; books?: LineWitness };
+    refundAck?: { identity: string; amount: number; salt: string; paymentRef: string; receiptExpiry: number };
   },
-): CircuitResult<{ ledger: Ledger }> {
+): CircuitResult<{ ledger: Ledger; witness?: LineWitness; refund?: RefundAllocation }> {
   const next = cloneLedger(ledger);
   const commitment = input.noteCommitment ?? input.note?.D ?? "";
+  const mode = input.action === undefined ? 0 : input.action;
+  if (mode !== 0 && mode !== 1 && mode !== 2) return fail("COMPENSATION_ACTION", "unsupported compensation action");
   const live = next.notes.find((n) => n.commitment === commitment);
   if (!live) return fail("NOTE_NOT_FOUND", FAIL.NOTE_NOT_FOUND);
   if (live.redeemed) return fail("NOTE_USED", FAIL.NOTE_USED);
-  if (live.cancelled) return fail("NOTE_CANCELLED", FAIL.NOTE_CANCELLED);
-  if (live.expiry > next.actionClock) return fail("NOTE_NOT_EXPIRED", FAIL.NOTE_NOT_EXPIRED);
-
-  live.cancelled = true;
-  next.encumberedReserve -= live.amount;
-
+  if (!assertSafeUint(live.amount) || !assertSafeUint(live.fee) || !assertSafeUint(live.amount + live.fee)) return fail("OVERFLOW", FAIL.OVERFLOW);
+  const cost = live.amount + live.fee;
+  const caller = input.callerSk ?? input.caller ?? input.agentSecret ?? "";
+  let updatedWitness: LineWitness | undefined;
+  let allocation: RefundAllocation | undefined;
+  let publicNote: string;
+  if (mode === 0 || mode === 1) {
+    if (mode === 0 && live.cancelled) return fail("NOTE_CANCELLED", FAIL.NOTE_CANCELLED);
+    if (mode === 1 && live.compensationAllocated) return fail("COMPENSATION_USED", "compensation already allocated");
+    if (!live.cancelled) {
+      if (live.expiry > executionUnixSeconds(next)) return fail("NOTE_NOT_EXPIRED", FAIL.NOTE_NOT_EXPIRED);
+      live.cancelled = true;
+      next.encumberedReserve -= live.amount;
+      next.pendingFeeReserve -= live.fee;
+      next.refundReserve += cost;
+    }
+    if (mode === 0) {
+      publicNote = "Expired note cancelled; full purchase budget locked for compensation.";
+    } else {
+      const proof = input.compensation;
+      if (!proof) return fail("COMPENSATION_OPENING", "missing compensation note opening");
+      const owner = toHex(asBytes32(proof.note.identity));
+      let computedD: string;
+      try {
+        computedD = drawNoteCommitment({ ...proof.note, domain: next.contractDomain, lineGeneration: live.lineGeneration, identity: owner, amount: live.amount, fee: live.fee, expiry: live.expiry }, proof.noteSalt);
+      } catch { return fail("COMPENSATION_OPENING", "invalid compensation note opening"); }
+      if (computedD !== commitment) return fail("COMPENSATION_OPENING", "invalid compensation note opening");
+      if (!isIssuer(next, caller) && identityCommitment(caller) !== owner) return fail("COMPENSATION_AUTH", "caller does not own compensation authority");
+      let owed = cost, credited = 0;
+      if (live.lineGeneration === next.lineGeneration) {
+        if (owner !== next.identityCommitment) return fail("COMPENSATION_IDENTITY", "compensation identity mismatch");
+        const books = proof.books;
+        if (!books || books.I !== owner || !opens(books, next.lineCommitment)) return fail("STALE", "stale compensation book");
+        if (!assertSafeUint(books.B) || !assertSafeUint(books.e + 1)) return fail("OVERFLOW", FAIL.OVERFLOW);
+        credited = Math.min(books.B, cost);
+        owed = cost - credited;
+        updatedWitness = { ...books, domain: next.contractDomain, B: books.B - credited, e: books.e + 1, s: toHex(asBytes32(proof.newSalt)) };
+        next.lineCommitment = lineCommitment(updatedWitness);
+        if (owed === 0) next.refundReserve -= cost;
+      } else if (live.lineGeneration >= next.lineGeneration) {
+        return fail("COMPENSATION_GENERATION", "compensation generation mismatch");
+      }
+      allocation = { domain: next.contractDomain, lineGeneration: live.lineGeneration, identity: owner, noteCommit: commitment, amount: owed, allocatedCredit: credited, salt: toHex(asBytes32(proof.newSalt)), commitment: "" };
+      allocation.commitment = refundCommitment(allocation, allocation.salt);
+      live.compensationAllocated = true;
+      live.refundCommitment = allocation.commitment;
+      live.cashRefundOwed = owed > 0;
+      live.refundAcknowledged = false;
+      live.refundPaymentNullifier = toHex(new Uint8Array(32));
+      publicNote = "Compensation allocated once; cash obligations remain private and unpaid.";
+    }
+  } else {
+    if (!isIssuer(next, caller)) return fail("AUTH_ISSUER", FAIL.AUTH_ISSUER);
+    if (!live.cancelled || !live.compensationAllocated || !live.cashRefundOwed) return fail("NO_REFUND", "no cash refund obligation");
+    if (live.refundAcknowledged) return fail("REFUND_USED", "refund already acknowledged");
+    const ack = input.refundAck;
+    if (!ack) return fail("REFUND_OPENING", "missing refund opening");
+    const expiry = input.receiptExpiry ?? ack.receiptExpiry;
+    if (!assertSafeUint(expiry) || expiry <= executionUnixSeconds(next)) return fail("EXPIRY", "refund receipt expired");
+    if (!assertSafeUint(ack.amount) || ack.amount === 0 || ack.amount > cost) return fail("REFUND_AMOUNT", "refund amount is outside the note cost");
+    let computedRefund: string, referenceBytes: Uint8Array;
+    try {
+      computedRefund = refundCommitment({ domain: next.contractDomain, lineGeneration: live.lineGeneration, identity: ack.identity, noteCommit: commitment, amount: ack.amount }, ack.salt);
+      referenceBytes = canonicalPaymentReferenceBytes(ack.paymentRef);
+    } catch { return fail("REFUND_OPENING", "invalid refund opening or payment reference"); }
+    if (computedRefund !== live.refundCommitment) return fail("REFUND_OPENING", "refund opening does not match obligation");
+    const paymentN = toHex(encodePaymentNullifier(asBytes32(caller), referenceBytes, asBytes32(next.contractDomain)));
+    if (next.nullifiers.includes(paymentN)) return fail("RECEIPT_USED", FAIL.RECEIPT_USED);
+    next.nullifiers.push(paymentN);
+    live.refundAcknowledged = true;
+    live.refundPaymentNullifier = paymentN;
+    next.refundReserve -= cost;
+    next.reportedRefundReserve += cost;
+    publicNote = "Issuer reported cash refund; full original-cost budget remains conservatively locked.";
+  }
   pushEvent(next, {
     circuit: "cancelOrExpireNote",
     ok: true,
-    publicNote: "Expired note cancelled and encumbered reserve released.",
+    publicNote,
     note: commitment,
+    ...(updatedWitness ? { commitment: next.lineCommitment! } : {}),
   });
-
-  return { ok: true, ledger: next };
+  return { ok: true, ledger: next, ...(updatedWitness ? { witness: updatedWitness } : {}), ...(allocation ? { refund: allocation } : {}) };
 }
 
 /**
@@ -893,7 +1029,7 @@ export function acknowledgeRepayment(
 
   const books = witness?.books ?? input.witness ?? input.agent?.witness;
   if (!books) return fail("STALE", FAIL.STALE);
-  // Stale check over the WITNESS books: lineStateCommit({I,L,B,e}, s) == C.
+  // Stale check includes this contract's domain: lineStateCommit({D,I,L,B,e}, s) == C.
   if (!opens(books, next.lineCommitment)) return fail("STALE", FAIL.STALE);
 
   const r = witness?.receipt ?? input.receipt;
@@ -904,8 +1040,8 @@ export function acknowledgeRepayment(
   }
   if (r.currentC !== next.lineCommitment) return fail("RECEIPT_STALE", FAIL.RECEIPT_STALE);
   const receiptExpiry = input.receiptExpiry ?? r.expiry;
-  // The circuit checks the PUBLIC receiptExpiry parameter (> actionClock).
-  if (!assertSafeUint(receiptExpiry) || receiptExpiry <= next.actionClock) {
+  // The circuit checks the PUBLIC absolute Unix-seconds deadline.
+  if (!assertSafeUint(receiptExpiry) || receiptExpiry <= executionUnixSeconds(next)) {
     return fail("EXPIRY", FAIL.EXPIRY);
   }
 
@@ -914,7 +1050,12 @@ export function acknowledgeRepayment(
   const { B, L, I, e } = books;
   if (!assertSafeUint(R) || R <= 0 || R > B) return fail("RECEIPT_RANGE", FAIL.RECEIPT_RANGE);
 
+  let referenceBytes: Uint8Array;
+  try { referenceBytes = canonicalPaymentReferenceBytes(r.paymentRef); }
+  catch { return fail("RECEIPT", FAIL.RECEIPT); }
   const N = repayNullifier(r.nonce, I, next.lineCommitment, R, r.paymentRef, next.contractDomain);
+  const paymentN = toHex(encodePaymentNullifier(asBytes32(caller), referenceBytes, asBytes32(next.contractDomain)));
+  if (next.nullifiers.includes(paymentN)) return fail("RECEIPT_USED", FAIL.RECEIPT_USED);
   if (next.nullifiers.includes(N)) return fail("RECEIPT_USED", FAIL.RECEIPT_USED);
 
   const newSalt = input.newSalt ?? toHex(randomBytes32());
@@ -929,6 +1070,7 @@ export function acknowledgeRepayment(
   const C2 = lineCommitment(nextWitness);
   next.lineCommitment = C2;
   next.nullifiers.push(N);
+  next.nullifiers.push(paymentN);
   pushEvent(next, {
     circuit: "acknowledgeRepayment",
     ok: true,
@@ -944,7 +1086,7 @@ export function acknowledgeRepayment(
 
 export function setStatus(
   ledger: Ledger,
-  input: { caller?: string; callerSk?: string; status: Exclude<LineStatus, "none"> },
+  input: { caller?: string; callerSk?: string; status: Exclude<LineStatus, "none">; witness?: LineWitness },
 ): CircuitResult<{ ledger: Ledger }> {
   const next = cloneLedger(ledger);
   const caller = getCaller(input);
@@ -954,6 +1096,11 @@ export function setStatus(
   if (next.status === "closed") return fail("CLOSED", FAIL.CLOSED);
   if (input.status === "open" && next.status !== "open" && next.status !== "defaulted") {
     return fail("BAD_STATUS", FAIL.BAD_STATUS);
+  }
+  if (input.status === "closed") {
+    const books = input.witness;
+    if (!books || books.I !== next.identityCommitment || !opens(books, next.lineCommitment)) return fail("STALE", "stale closing book");
+    if (books.B !== 0) return fail("OUTSTANDING_DEBT", "outstanding debt");
   }
   next.status = input.status;
   pushEvent(next, {
@@ -1020,6 +1167,11 @@ export function publicLedgerView(ledger: Ledger): Pick<
   | "encumberedReserve"
   | "redeemedReserve"
   | "feeReserve"
+  | "pendingFeeReserve"
+  | "refundReserve"
+  | "reportedRefundReserve"
+  | "feeFlat"
+  | "feeBps"
   | "actionClock"
   | "events"
 > {
@@ -1046,16 +1198,27 @@ export function publicLedgerView(ledger: Ledger): Pick<
     notes: ledger.notes.map((n) => ({
       commitment: n.commitment,
       amount: n.amount,
+      fee: n.fee,
       redeemed: n.redeemed,
       cancelled: n.cancelled,
       expiry: n.expiry,
       lineGeneration: n.lineGeneration,
+      compensationAllocated: n.compensationAllocated,
+      refundCommitment: n.refundCommitment,
+      cashRefundOwed: n.cashRefundOwed,
+      refundAcknowledged: n.refundAcknowledged,
+      refundPaymentNullifier: n.refundPaymentNullifier,
     })),
     nullifiers: [...ledger.nullifiers],
     totalReserve: ledger.totalReserve,
     encumberedReserve: ledger.encumberedReserve,
     redeemedReserve: ledger.redeemedReserve,
     feeReserve: ledger.feeReserve,
+    pendingFeeReserve: ledger.pendingFeeReserve,
+    refundReserve: ledger.refundReserve,
+    reportedRefundReserve: ledger.reportedRefundReserve,
+    feeFlat: ledger.feeFlat,
+    feeBps: ledger.feeBps,
     actionClock: ledger.actionClock,
     events: ledger.events.map((e) => ({ ...e })),
   };

@@ -1,8 +1,33 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { snapshotAt, DEMO_STEPS } from "../../dev/demo.ts";
+import { snapshotAt as runDemo, DEMO_STEPS } from "../../dev/demo.ts";
+const snapshotAt = (step: number) => runDemo(step, { clock: () => 1_700_000_000 });
 
 describe("scripted demo snapshots", () => {
+  it("default demo creates future absolute deadlines for serialized operator state", () => {
+    const before = Math.floor(Date.now() / 1_000);
+    const s = runDemo(5);
+    const after = Math.floor(Date.now() / 1_000);
+    assert.equal(s.ledger.status, "open");
+    assert.ok(s.ledger.lineExpiry >= before + 10_000 && s.ledger.lineExpiry <= after + 10_000);
+    assert.equal(s.notes[0]!.preimage.expiry, s.ledger.lineExpiry);
+    assert.equal(s.ledger.quotes[0]!.expiry, s.ledger.lineExpiry);
+  });
+
+  it("configured issuer pricing charges exact fees and repays actual debt", () => {
+    const options = { clock: () => 1_700_000_000, feeFlat: 2, feeBps: 125 };
+    const s3 = runDemo(3, options); assert.equal(s3.ledger.feeFlat, 2); assert.equal(s3.ledger.feeBps, 125);
+    const s5 = runDemo(5, options); assert.equal(s5.agent?.witness?.B, 43); assert.equal(s5.pendingRepay, 43);
+    assert.equal(s5.ledger.pendingFeeReserve, 3); assert.equal(s5.ledger.feeReserve, 0);
+    const s7 = runDemo(7, options); assert.equal(s7.ledger.pendingFeeReserve, 0); assert.equal(s7.ledger.feeReserve, 3);
+    const s10 = runDemo(10, options); assert.match(s10.lastFailReason ?? "", /capacity|exceed/i);
+    const s11 = runDemo(11, options); assert.equal(s11.agent?.witness?.B, 0); assert.equal(s11.lastAcked, 43);
+    const s13 = runDemo(13, options); assert.equal(s13.agent?.witness?.B, 124); assert.equal(s13.pendingRepay, 124);
+    assert.equal(s13.ledger.pendingFeeReserve, 4); assert.equal(s13.ledger.feeReserve, 3);
+    const s15 = runDemo(15, options); assert.equal(s15.ledger.pendingFeeReserve, 0); assert.equal(s15.ledger.feeReserve, 7);
+    const seeded = runDemo(3, { ...options, feeFlat: 5, feeBps: 0 }); assert.equal(seeded.ledger.feeFlat, 5);
+  });
+
   it("step 1 registers Merchant B", () => {
     const s = snapshotAt(1);
     const mB = Object.keys(s.ledger.registeredMerchants);

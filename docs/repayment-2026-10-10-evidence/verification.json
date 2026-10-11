@@ -1,0 +1,38 @@
+{
+  "date": "2026-10-10",
+  "scope": "current dirty worktree; authoritative exact-reference repayment replay and zero-debt closure",
+  "compactSourceSha256": "f7715bb3eedbb5801268be6273a9e35d423f487d9ac773b46a02d2565797d4ad",
+  "checks": {
+    "npm test": { "exitCode": 0, "tests": 359, "suites": 54, "failed": 0, "skipped": 0, "log": "npm-test.log" },
+    "npm run test:e2e": { "exitCode": 0, "tests": 17, "failed": 0, "browser": "Chromium", "server": "Vite development" },
+    "npm run build": { "exitCode": 0, "warnings": ["SDK browser externalization", "isomorphic-ws named WebSocket import", "large browser bundles"] },
+    "npm run compact:compile": { "exitCode": 0, "compiler": "0.31.1" },
+    "npm run compact:check": { "exitCode": 0, "matchedFiles": 16, "normalization": "source-map output location only; intentionally changed generated files remain unstaged" },
+    "npm run compact:compile:release": { "exitCode": 0, "release": "0.31.1-f7715bb3eedb-a1ba29f6-af29-40d4-81aa-30cb4192cb8d", "files": 52, "bytes": 70026560 },
+    "npm run compact:release:validate": { "exitCode": 0, "releaseSha256": "098d99f317187ff1bda3bd59f6b98739b1ad09d40456dfd5300b5af507401df4" },
+    "npm run check:keys": { "exitCode": 0, "productionModules": 46 },
+    "npm run check:secrets": { "exitCode": 0 },
+    "git diff --check": { "exitCode": 0 }
+  },
+  "focusedEvidence": {
+    "paymentReplayTests": 12,
+    "generatedClosingLifecycleTests": 1,
+    "canonicalReferenceValidationTests": 2,
+    "actualSdkClosingConstructionTests": 1,
+    "consoleClosingLifecycleTests": 1,
+    "previouslyOmittedReconciliationTestsNowIncluded": 9,
+    "networkProviderIo": "simulated; actual SDK construction/generated circuit execution reaches proving sentinel, no proof or submission"
+  },
+  "notEstablished": [
+    "genuine cash verification, alternative receipt identifiers or cross-facility allocations",
+    "partial-payment allocation ledger",
+    "live ZK proving or finalized deployment",
+    "asset custody, payments or token payouts",
+    "independent role custody or underwriting/loss recovery",
+    "full-history credit-book privacy; successful public closure reveals zero debt",
+    "non-grindable expiry, compensation and enforceable fee policy",
+    "migration of prior source-bound journals, checkpoints or deployed contracts",
+    "production certification or customer traction"
+  ],
+  "goalStatus": "active; all fifteen product requirements retained"
+}
