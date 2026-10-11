@@ -19,6 +19,13 @@ const OPERATIONS=new Set(['registerMerchant','disableMerchant','fundReserve','wi
 const forbidden=['callerSecret','agentSecret','reserveOpening','reserveSalt','newReserveSalt','nullifierKey'];
 const ROLE_OPERATIONS={issuer:new Set(['registerMerchant','disableMerchant','fundReserve','withdrawUnencumberedReserve','withdrawFees','openLine','cancelOrExpireNote','acknowledgeRepayment','setStatus']),
  agent:new Set(['openLine','draw','cancelOrExpireNote']),merchant:new Set(['postQuote','redeemDraw','cancelOrExpireNote']),permissionless:new Set(['cancelOrExpireNote'])};
+const BOOK_FIELDS=new Set(['domain','identity','limit','outstanding','epoch','generation','expiry','flatFee','basisPoints','status']);
+const VALUE_FIELDS={registerMerchant:[],disableMerchant:[],fundReserve:[],withdrawUnencumberedReserve:[],withdrawFees:[],
+ openLine:['enrollmentIdentity','acceptedTerms','hasPreviousBook','lineLimit','newSalt','bookOpening','salt'],
+ postQuote:['quoteBuyer','invoiceId','quoteAmount','quoteNonce','quoteGeneration','quoteFlatFee','quoteBasisPoints'],
+ draw:['bookOpening','salt','newSalt','quoteMerchantPk','drawAmount','noteNonce','noteSalt'],redeemDraw:['redeemAmount'],
+ acknowledgeRepayment:['bookOpening','salt','newSalt','repayAmount','paymentRef','receiptNonce'],setStatus:['bookOpening','salt','newSalt']};
+const isRecord=value=>value!==null&&typeof value==='object'&&!Array.isArray(value)&&!(value instanceof Uint8Array);
 const digest=bytes=>createHash('sha256').update(bytes).digest('hex'); // Journal fingerprint only; never Compact hash replacement.
 const clone=value=>decodeVaultJson(encodeVaultJson(value));
 const canonical=value=>value instanceof Uint8Array?value:Array.isArray(value)?value.map(canonical):
@@ -64,9 +71,18 @@ export class DurableApprovalSigner {
   const request=decodeVaultJson(encoded),{config}=this.#state.binding;
   if(!request||!OPERATIONS.has(request.name)||request.privateFinance!==true||
    !(request.domain instanceof Uint8Array)||!Buffer.from(request.domain).equals(Buffer.from(config.domain))||
-   !Array.isArray(request.args)||!request.values||typeof request.values!=='object'||
+   !Array.isArray(request.args)||!isRecord(request.values)||
    request.authorizationNonce!==undefined||request.challengeLiftForTest!==undefined)reject();
   if(forbidden.some(key=>Object.hasOwn(request.values,key)))reject();
+  const topFields=new Set(['name','args','domain','privateFinance','values']);
+  if(['fundReserve','withdrawUnencumberedReserve','withdrawFees'].includes(request.name))topFields.add('reserveCommit');
+  if(request.name==='withdrawFees')topFields.add('feeReserve');
+  if(Object.keys(request).some(key=>!topFields.has(key)))reject();
+  const allowedValues=new Set(request.name==='cancelOrExpireNote'?
+   request.args[1]===0n?[]:request.args[1]===1n?['bookOpening','salt','newSalt']:['repayAmount','paymentRef']:VALUE_FIELDS[request.name]);
+  if(Object.keys(request.values).some(key=>!allowedValues.has(key)))reject();
+  if(Object.hasOwn(request.values,'bookOpening')&&(!isRecord(request.values.bookOpening)||
+   Object.keys(request.values.bookOpening).some(key=>!BOOK_FIELDS.has(key))))reject();
   if(!ROLE_OPERATIONS[this.#state.role].has(request.name))reject();
   if(request.name==='openLine'&&((this.#state.role==='issuer'&&request.args[0]!==1n)||(this.#state.role==='agent'&&request.args[0]!==0n)))reject();
   if(request.name==='cancelOrExpireNote'&&(request.args[1]!==0n&&

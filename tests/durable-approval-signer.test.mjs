@@ -196,3 +196,29 @@ test('baseline role gates and draw budget cannot be bypassed by a permissive pol
    assert.throws(()=>signer.approve({...x.request,descriptor}),/could not be authorized/);
  }finally{signer.close();x.signer.close();}
 });
+
+test('unexpected top-level, nested book and irrelevant action fields reject before policy',()=>{
+ const x=setup();try{
+  for(const mutate of [d=>d.issuerSecret=bytes(),d=>d.reserveCommit=bytes(),d=>d.feeReserve=1n,
+   d=>d.values.bookPath={privatePath:bytes()},d=>d.values.noteMetaOpening={privateBook:bytes()},
+   d=>d.values.bookOpening.signingScalar=bytes(),d=>d.values=[]]){
+   const descriptor=structuredClone(x.descriptor);mutate(descriptor);
+   assert.throws(()=>x.signer.approve({...x.request,descriptor}),/could not be authorized/);
+  }
+  verify(x.signer.approve(x.request),x.descriptor);
+ }finally{x.signer.close();}
+});
+
+test('a merchant request cannot carry an unrelated credit book to local policy',()=>{
+ const x=setup(),directory=mkdtempSync(resolve('.compact-keys/durable-approval-test-'));let policyCalls=0;
+ const signer=new DurableApprovalSigner({directory,encryptionKey:bytes(),custodyId:'merchant-schema-evaluation',role:'merchant',create:true,
+  authorize:()=>{policyCalls++;return {allowed:true,reservationCost:0n};}});
+ try{
+  signer.bindPolicy({domain:x.domain,maxAuthorizedCost:0n});
+  const descriptor={name:'redeemDraw',args:[bytes(),BigInt(NOW+300)],domain:x.domain,privateFinance:true,
+   values:{redeemAmount:20n,bookOpening:x.descriptor.values.bookOpening}};
+  assert.throws(()=>signer.approve({operationId:'claim:1',descriptor}),/could not be authorized/);assert.equal(policyCalls,0);
+  delete descriptor.values.bookOpening;
+  verify(signer.approve({operationId:'claim:1',descriptor}),descriptor);assert.equal(policyCalls,1);
+ }finally{signer.close();x.signer.close();}
+});
