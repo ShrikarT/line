@@ -4,6 +4,9 @@ import type {
   LedgerPublicStatus,
   ReserveStatus,
   RuntimeTransactionResult,
+  RuntimeOperationOptions,
+  RuntimeRecoveryEvidence,
+  RuntimeRecoveryQuery,
 } from "./types.ts";
 import type { Ledger, LineStatus } from "../line/types.ts";
 import {
@@ -32,12 +35,12 @@ export class LocalDevelopmentRuntime implements LineRuntime {
   private txCounter: number = 0;
   private unboundGenesis: boolean = false;
 
-  constructor(initialLedger?: Ledger) {
+  constructor(initialLedger?: Ledger, options?: { clock?: () => number }) {
     if (initialLedger) {
       this.ledger = initialLedger;
       this.unboundGenesis = false;
     } else {
-      this.ledger = createLedger();
+      this.ledger = createLedger({ clock: options?.clock });
       this.unboundGenesis = true;
     }
   }
@@ -66,7 +69,8 @@ export class LocalDevelopmentRuntime implements LineRuntime {
     const total = this.ledger.totalReserve ?? 0;
     const encumbered = this.ledger.encumberedReserve ?? 0;
     const redeemed = this.ledger.redeemedReserve ?? 0;
-    const withdrawable = Math.max(0, total - (encumbered + redeemed));
+    const fee = this.ledger.feeReserve ?? 0;
+    const withdrawable = Math.max(0, total - (encumbered + redeemed + fee + this.ledger.pendingFeeReserve + this.ledger.refundReserve + this.ledger.reportedRefundReserve));
 
     return {
       contractDomain: this.ledger.contractDomain,
@@ -80,6 +84,12 @@ export class LocalDevelopmentRuntime implements LineRuntime {
       totalReserve: total,
       encumberedReserve: encumbered,
       redeemedReserve: redeemed,
+      feeReserve: fee,
+      feeFlat: this.ledger.feeFlat,
+      feeBps: this.ledger.feeBps,
+      pendingFeeReserve: this.ledger.pendingFeeReserve,
+      refundReserve: this.ledger.refundReserve,
+      reportedRefundReserve: this.ledger.reportedRefundReserve,
       withdrawableReserve: withdrawable,
       quoteCount: this.ledger.quotes.length,
       noteCount: this.ledger.notes.length,
@@ -92,66 +102,97 @@ export class LocalDevelopmentRuntime implements LineRuntime {
     const total = this.ledger.totalReserve ?? 0;
     const encumbered = this.ledger.encumberedReserve ?? 0;
     const redeemed = this.ledger.redeemedReserve ?? 0;
-    const withdrawable = Math.max(0, total - (encumbered + redeemed));
+    const fee = this.ledger.feeReserve ?? 0;
+    const withdrawable = Math.max(0, total - (encumbered + redeemed + fee + this.ledger.pendingFeeReserve + this.ledger.refundReserve + this.ledger.reportedRefundReserve));
 
     return {
       totalReserve: total,
       encumberedReserve: encumbered,
       redeemedReserve: redeemed,
+      feeReserve: fee,
+      pendingFeeReserve: this.ledger.pendingFeeReserve,
+      refundReserve: this.ledger.refundReserve,
+      reportedRefundReserve: this.ledger.reportedRefundReserve,
       withdrawableReserve: withdrawable,
       contractDomain: this.ledger.contractDomain,
     };
   }
 
-  async fundReserve(amount: number, callerSk: string): Promise<RuntimeTransactionResult> {
+  /** Local observations are process-memory simulator evidence, not network finality
+   * or durable ledger restoration. No external submission occurs, so beforeSubmit
+   * hooks are deliberately not invoked by this runtime. */
+  async getRecoveryEvidence(query: RuntimeRecoveryQuery = {}): Promise<RuntimeRecoveryEvidence> {
+    const l = this.ledger;
+    const result: RuntimeRecoveryEvidence = {
+      runtime: this.mode, networkId: this.networkId, contractAddress: this.getContractAddress(),
+      contractDomain: l.contractDomain, identityCommitment: l.identityCommitment,
+      lineCommitment: l.lineCommitment, lineGeneration: String(l.lineGeneration), actionClock: String(l.actionClock),
+      feeFlat: String(l.feeFlat), feeBps: String(l.feeBps),
+    };
+    if (query.quoteCommit) {
+      const q = l.quotes.find(q => q.commitment === query.quoteCommit);
+      result.quote = { commitment: query.quoteCommit, present: Boolean(q), ...(q ? { expiry: String(q.expiry), lineGeneration: String(q.lineGeneration), used: q.used } : {}) };
+    }
+    if (query.noteCommit) {
+      const n = l.notes.find(n => n.commitment === query.noteCommit);
+      result.note = { commitment: query.noteCommit, present: Boolean(n), ...(n ? { amount: String(n.amount), fee: String(n.fee), expiry: String(n.expiry), lineGeneration: String(n.lineGeneration), redeemed: n.redeemed, cancelled: n.cancelled,
+        compensationAllocated: n.compensationAllocated, refundCommitment: n.refundCommitment, cashRefundOwed: n.cashRefundOwed, refundAcknowledged: n.refundAcknowledged, refundPaymentNullifier: n.refundPaymentNullifier } : {}) };
+    }
+    if (query.nullifier) result.nullifier = { value: query.nullifier, present: l.nullifiers.includes(query.nullifier) };
+    return result;
+  }
+
+  async fundReserve(amount: number, callerSk: string, _options?: RuntimeOperationOptions): Promise<RuntimeTransactionResult> {
     this.bindGenesisIssuer(callerSk);
     const res = fundReserve(this.ledger, { caller: callerSk, amount });
-    if (!res.ok) return { ok: false, error: res.message, code: res.code };
+    if (!res.ok) return { ok: false, disposition: "definitive-rejection", error: res.message, code: res.code };
     this.ledger = res.ledger;
-    return { ok: true, txHash: this.nextTxHash(), blockHeight: this.ledger.actionClock };
+    return { ok: true, disposition: "confirmed-success", txHash: this.nextTxHash(), blockHeight: this.ledger.actionClock };
   }
 
-  async withdrawReserve(amount: number, callerSk: string): Promise<RuntimeTransactionResult> {
+  async withdrawReserve(amount: number, callerSk: string, _options?: RuntimeOperationOptions): Promise<RuntimeTransactionResult> {
     this.bindGenesisIssuer(callerSk);
     const res = withdrawUnencumberedReserve(this.ledger, { caller: callerSk, amount });
-    if (!res.ok) return { ok: false, error: res.message, code: res.code };
+    if (!res.ok) return { ok: false, disposition: "definitive-rejection", error: res.message, code: res.code };
     this.ledger = res.ledger;
-    return { ok: true, txHash: this.nextTxHash(), blockHeight: this.ledger.actionClock };
+    return { ok: true, disposition: "confirmed-success", txHash: this.nextTxHash(), blockHeight: this.ledger.actionClock };
   }
 
-  async withdrawFees(callerSk?: string): Promise<RuntimeTransactionResult> {
+  async withdrawFees(callerSk?: string, _options?: RuntimeOperationOptions): Promise<RuntimeTransactionResult> {
     const caller = callerSk ?? this.ledger.issuerPubKey ?? "";
     this.bindGenesisIssuer(caller);
     const res = withdrawFees(this.ledger, { caller });
-    if (!res.ok) return { ok: false, error: res.message, code: res.code };
+    if (!res.ok) return { ok: false, disposition: "definitive-rejection", error: res.message, code: res.code };
     this.ledger = res.ledger;
-    return { ok: true, txHash: this.nextTxHash(), blockHeight: this.ledger.actionClock, output: { fees: res.fees } };
+    return { ok: true, disposition: "confirmed-success", txHash: this.nextTxHash(), blockHeight: this.ledger.actionClock, output: { fees: res.fees } };
   }
 
-  async registerMerchant(merchantPk: string, callerSk: string): Promise<RuntimeTransactionResult> {
+  async registerMerchant(merchantPk: string, callerSk: string, _options?: RuntimeOperationOptions): Promise<RuntimeTransactionResult> {
     this.bindGenesisIssuer(callerSk);
     const res = registerMerchant(this.ledger, { caller: callerSk, merchantPk });
-    if (!res.ok) return { ok: false, error: res.message, code: res.code };
+    if (!res.ok) return { ok: false, disposition: "definitive-rejection", error: res.message, code: res.code };
     this.ledger = res.ledger;
-    return { ok: true, txHash: this.nextTxHash(), blockHeight: this.ledger.actionClock };
+    return { ok: true, disposition: "confirmed-success", txHash: this.nextTxHash(), blockHeight: this.ledger.actionClock };
   }
 
-  async disableMerchant(merchantPk: string, callerSk?: string): Promise<RuntimeTransactionResult> {
+  async disableMerchant(merchantPk: string, callerSk?: string, _options?: RuntimeOperationOptions): Promise<RuntimeTransactionResult> {
     const caller = callerSk ?? this.ledger.issuerPubKey ?? "";
     this.bindGenesisIssuer(caller);
     const res = disableMerchant(this.ledger, { caller, merchantPk });
-    if (!res.ok) return { ok: false, error: res.message, code: res.code };
+    if (!res.ok) return { ok: false, disposition: "definitive-rejection", error: res.message, code: res.code };
     this.ledger = res.ledger;
-    return { ok: true, txHash: this.nextTxHash(), blockHeight: this.ledger.actionClock };
+    return { ok: true, disposition: "confirmed-success", txHash: this.nextTxHash(), blockHeight: this.ledger.actionClock };
   }
 
   async openLine(params: {
     limit: number;
     expiry: number;
+    feeFlat?: number;
+    feeBps?: number;
     callerSk: string;
     agentSecret: string;
     salt: string;
-  }): Promise<RuntimeTransactionResult> {
+  }, _options?: RuntimeOperationOptions): Promise<RuntimeTransactionResult> {
     this.bindGenesisIssuer(params.callerSk);
     const res = openLine(this.ledger, {
       caller: params.callerSk,
@@ -159,11 +200,13 @@ export class LocalDevelopmentRuntime implements LineRuntime {
       limit: params.limit,
       salt: params.salt,
       expiry: params.expiry,
+      feeFlat: params.feeFlat ?? 0,
+      feeBps: params.feeBps ?? 0,
     });
-    if (!res.ok) return { ok: false, error: res.message, code: res.code };
+    if (!res.ok) return { ok: false, disposition: "definitive-rejection", error: res.message, code: res.code };
     this.ledger = res.ledger;
     return {
-      ok: true,
+      ok: true, disposition: "confirmed-success",
       txHash: this.nextTxHash(),
       blockHeight: this.ledger.actionClock,
       output: { identityCommitment: res.agent.witness?.I, lineCommitment: this.ledger.lineCommitment },
@@ -176,7 +219,7 @@ export class LocalDevelopmentRuntime implements LineRuntime {
     invoiceId: string;
     nonce: string;
     merchantSk: string;
-  }): Promise<RuntimeTransactionResult> {
+  }, _options?: RuntimeOperationOptions): Promise<RuntimeTransactionResult> {
     const res = postQuote(this.ledger, {
       caller: params.merchantSk,
       amount: params.amount,
@@ -184,10 +227,10 @@ export class LocalDevelopmentRuntime implements LineRuntime {
       expiry: params.expiry,
       nonce: params.nonce,
     });
-    if (!res.ok) return { ok: false, error: res.message, code: res.code };
+    if (!res.ok) return { ok: false, disposition: "definitive-rejection", error: res.message, code: res.code };
     this.ledger = res.ledger;
     return {
-      ok: true,
+      ok: true, disposition: "confirmed-success",
       txHash: this.nextTxHash(),
       blockHeight: this.ledger.actionClock,
       output: { Q: res.Q },
@@ -212,7 +255,7 @@ export class LocalDevelopmentRuntime implements LineRuntime {
     noteNonce: string;
     noteSalt: string;
     merchantPk?: string;
-  }): Promise<RuntimeTransactionResult> {
+  }, _options?: RuntimeOperationOptions): Promise<RuntimeTransactionResult> {
     const rawExp = params.noteExpiry ?? params.expiry;
     if (rawExp === undefined || rawExp === null || Number(rawExp) <= 0) {
       throw new Error("Draw refused: noteExpiry is required");
@@ -221,12 +264,12 @@ export class LocalDevelopmentRuntime implements LineRuntime {
     const feeNum = Number(params.fee ?? 0);
 
     const quoteRec = this.ledger.quotes.find((q) => q.commitment === params.quoteCommit);
-    if (!quoteRec) return { ok: false, error: "Clearance could not be proven.", code: "QUOTE_NOT_FOUND" };
+    if (!quoteRec) return { ok: false, disposition: "definitive-rejection", error: "Clearance could not be proven.", code: "QUOTE_NOT_FOUND" };
 
     const merchantCommitment = params.merchantPk;
     if (!merchantCommitment) {
       return {
-        ok: false,
+        ok: false, disposition: "definitive-rejection",
         error: "Missing merchant public key witness for draw.",
         code: "MISSING_MERCHANT_PK",
       };
@@ -239,6 +282,8 @@ export class LocalDevelopmentRuntime implements LineRuntime {
       expiry: params.expiry ?? exp,
       nonce: params.quoteNonce,
       generation: quoteRec.lineGeneration,
+      feeFlat: this.ledger.feeFlat,
+      feeBps: this.ledger.feeBps,
     };
 
     const witness = {
@@ -260,10 +305,10 @@ export class LocalDevelopmentRuntime implements LineRuntime {
       noteExpiry: exp,
       fee: feeNum,
     });
-    if (!res.ok) return { ok: false, error: res.message, code: res.code };
+    if (!res.ok) return { ok: false, disposition: "definitive-rejection", error: res.message, code: res.code };
     this.ledger = res.ledger;
     return {
-      ok: true,
+      ok: true, disposition: "confirmed-success",
       txHash: this.nextTxHash(),
       blockHeight: this.ledger.actionClock,
       output: { noteCommitment: res.note.D, nextCommitment: this.ledger.lineCommitment },
@@ -280,9 +325,9 @@ export class LocalDevelopmentRuntime implements LineRuntime {
     noteQuoteCommit: string;
     noteNonce: string;
     noteSalt: string;
-  }): Promise<RuntimeTransactionResult> {
+  }, _options?: RuntimeOperationOptions): Promise<RuntimeTransactionResult> {
     const noteRec = this.ledger.notes.find((n) => n.commitment === params.noteCommit);
-    if (!noteRec) return { ok: false, error: "Note not found", code: "NOTE_NOT_FOUND" };
+    if (!noteRec) return { ok: false, disposition: "definitive-rejection", error: "Note not found", code: "NOTE_NOT_FOUND" };
 
     const exp = Number(params.noteExpiry ?? params.expiry ?? noteRec.expiry);
     const preimage = {
@@ -293,6 +338,7 @@ export class LocalDevelopmentRuntime implements LineRuntime {
       merchantPk: merchantPublicKey(params.merchantSk),
       amount: params.amount,
       noteNonce: params.noteNonce,
+      fee: noteRec.fee,
       expiry: exp,
     };
 
@@ -303,16 +349,26 @@ export class LocalDevelopmentRuntime implements LineRuntime {
       noteSalt: params.noteSalt,
       noteExpiry: exp,
     });
-    if (!res.ok) return { ok: false, error: res.message, code: res.code };
+    if (!res.ok) return { ok: false, disposition: "definitive-rejection", error: res.message, code: res.code };
     this.ledger = res.ledger;
-    return { ok: true, txHash: this.nextTxHash(), blockHeight: this.ledger.actionClock };
+    return { ok: true, disposition: "confirmed-success", txHash: this.nextTxHash(), blockHeight: this.ledger.actionClock };
   }
 
-  async cancelOrExpireNote(noteCommit: string, _callerSk: string): Promise<RuntimeTransactionResult> {
-    const res = cancelOrExpireNote(this.ledger, { noteCommitment: noteCommit });
-    if (!res.ok) return { ok: false, error: res.message, code: res.code };
+  async cancelOrExpireNote(noteCommit: string, callerSk: string, options?: RuntimeOperationOptions): Promise<RuntimeTransactionResult> {
+    if (options?.compensation && options.refundAck) return { ok: false, disposition: "definitive-rejection", error: "Choose one compensation action.", code: "COMPENSATION_ACTION" };
+    const comp = options?.compensation;
+    const book = comp?.book;
+    const res = cancelOrExpireNote(this.ledger, { noteCommitment: noteCommit, callerSk,
+      action: options?.refundAck ? 2 : comp ? 1 : 0,
+      ...(comp ? { compensation: { note: { ...comp.note, domain: this.ledger.contractDomain }, noteSalt: comp.noteSalt,
+        newSalt: comp.newSalt, ...(book ? { books: { I: this.ledger.identityCommitment ?? "", domain: this.ledger.contractDomain,
+          L: book.limit, B: book.outstanding, e: book.epoch, s: book.salt } } : {}) } } : {}),
+      ...(options?.refundAck ? { refundAck: options.refundAck } : {}),
+    });
+    if (!res.ok) return { ok: false, disposition: "definitive-rejection", error: res.message, code: res.code };
     this.ledger = res.ledger;
-    return { ok: true, txHash: this.nextTxHash(), blockHeight: this.ledger.actionClock };
+    return { ok: true, disposition: "confirmed-success", txHash: this.nextTxHash(), blockHeight: this.ledger.actionClock,
+      output: { ...(res.refund ? { refund: res.refund } : {}), ...(res.witness ? { witness: res.witness } : {}) } };
   }
 
   async acknowledgeRepayment(params: {
@@ -327,7 +383,7 @@ export class LocalDevelopmentRuntime implements LineRuntime {
     newSalt: string;
     receiptNonce: string;
     paymentRef: string;
-  }): Promise<RuntimeTransactionResult> {
+  }, _options?: RuntimeOperationOptions): Promise<RuntimeTransactionResult> {
     const receipt = {
       identity: this.ledger.identityCommitment ?? "",
       currentC: this.ledger.lineCommitment ?? "",
@@ -351,16 +407,20 @@ export class LocalDevelopmentRuntime implements LineRuntime {
       receipt,
       newSalt: params.newSalt,
     });
-    if (!res.ok) return { ok: false, error: res.message, code: res.code };
+    if (!res.ok) return { ok: false, disposition: "definitive-rejection", error: res.message, code: res.code };
     this.ledger = res.ledger;
-    return { ok: true, txHash: this.nextTxHash(), blockHeight: this.ledger.actionClock };
+    return { ok: true, disposition: "confirmed-success", txHash: this.nextTxHash(), blockHeight: this.ledger.actionClock };
   }
 
-  async setStatus(status: Exclude<LineStatus, "none">, callerSk: string): Promise<RuntimeTransactionResult> {
-    const res = setStatus(this.ledger, { caller: callerSk, status });
-    if (!res.ok) return { ok: false, error: res.message, code: res.code };
+  async setStatus(status: Exclude<LineStatus, "none">, callerSk: string, options?: RuntimeOperationOptions): Promise<RuntimeTransactionResult> {
+    const closing = options?.closingBook;
+    const res = setStatus(this.ledger, { caller: callerSk, status, ...(closing ? { witness: {
+      I: this.ledger.identityCommitment ?? "", domain: this.ledger.contractDomain,
+      L: closing.limit, B: closing.outstanding, e: closing.epoch, s: closing.salt,
+    } } : {}) });
+    if (!res.ok) return { ok: false, disposition: "definitive-rejection", error: res.message, code: res.code };
     this.ledger = res.ledger;
-    return { ok: true, txHash: this.nextTxHash(), blockHeight: this.ledger.actionClock };
+    return { ok: true, disposition: "confirmed-success", txHash: this.nextTxHash(), blockHeight: this.ledger.actionClock };
   }
 
   getRawLedger(): Ledger {

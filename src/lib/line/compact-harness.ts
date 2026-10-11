@@ -96,6 +96,8 @@ export type Session = {
   contract: Contract<PrivateState>;
   state: RT.ContractState | RT.StateValue | RT.ChargedState;
   privateState: PrivateState;
+  /** Trusted execution context for deterministic tests; never a circuit witness. */
+  clock?: () => number;
 };
 
 export async function bootWithPk(
@@ -103,6 +105,7 @@ export async function bootWithPk(
   merchantPk: Uint8Array,
   instanceNonce?: Uint8Array,
   ps?: PrivateState,
+  clock?: () => number,
 ): Promise<Session> {
   const privateState = ps ?? blankPrivate();
   const contract = new Contract(WITNESSES as never);
@@ -117,6 +120,7 @@ export async function bootWithPk(
     contract,
     state: init.currentContractState,
     privateState: init.currentPrivateState,
+    clock,
   };
 }
 
@@ -125,11 +129,12 @@ export async function boot(
   merchantSk: Uint8Array,
   instanceNonce?: Uint8Array,
   ps?: PrivateState,
+  clock?: () => number,
 ): Promise<Session> {
   const privateState = ps ?? blankPrivate({ callerSecret: issuerSk });
   const ipk = issuerPublicKey(issuerSk);
   const mpk = merchantPublicKey(merchantSk);
-  return bootWithPk(ipk, mpk, instanceNonce, privateState);
+  return bootWithPk(ipk, mpk, instanceNonce, privateState, clock);
 }
 
 export function readLedger(session: Session): CompactLedger {
@@ -146,11 +151,11 @@ export type CircuitCall =
   | { name: "registerMerchant"; args: [Uint8Array] }
   | { name: "fundReserve"; args: [bigint] }
   | { name: "withdrawUnencumberedReserve"; args: [bigint] }
-  | { name: "openLine"; args: [bigint] }
+  | { name: "openLine"; args: [bigint, bigint?, bigint?] }
   | { name: "postQuote"; args: [bigint] }
   | { name: "draw"; args: [Uint8Array, bigint, bigint] }
   | { name: "redeemDraw"; args: [Uint8Array, bigint] }
-  | { name: "cancelOrExpireNote"; args: [Uint8Array] }
+  | { name: "cancelOrExpireNote"; args: [Uint8Array, bigint?, bigint?] }
   | { name: "disableMerchant"; args: [Uint8Array] }
   | { name: "withdrawFees"; args: [] }
   | { name: "acknowledgeRepayment"; args: [bigint] }
@@ -162,7 +167,9 @@ export type CallResult =
 
 export async function call(session: Session, ps: PrivateState, op: CircuitCall): Promise<CallResult> {
   const before = snapshotState(session);
-  const ctx = RT.createCircuitContext(op.name, CONTRACT_ADDR, COIN_PK, before, ps);
+  const time = session.clock?.();
+  if (time !== undefined && (!Number.isSafeInteger(time) || time < 0)) throw new Error("Invalid trusted execution time.");
+  const ctx = RT.createCircuitContext(CONTRACT_ADDR, COIN_PK, before, ps, undefined, undefined, time);
   try {
     const circuits = session.contract.circuits;
     let result;
@@ -170,11 +177,11 @@ export async function call(session: Session, ps: PrivateState, op: CircuitCall):
     else if (op.name === "fundReserve") result = await circuits.fundReserve(ctx, ...op.args);
     else if (op.name === "withdrawUnencumberedReserve") {
       result = await circuits.withdrawUnencumberedReserve(ctx, ...op.args);
-    } else if (op.name === "openLine") result = await circuits.openLine(ctx, ...op.args);
+    } else if (op.name === "openLine") result = await circuits.openLine(ctx, op.args[0], op.args[1] ?? 0n, op.args[2] ?? 0n);
     else if (op.name === "postQuote") result = await circuits.postQuote(ctx, ...op.args);
     else if (op.name === "draw") result = await circuits.draw(ctx, ...op.args);
     else if (op.name === "redeemDraw") result = await circuits.redeemDraw(ctx, ...op.args);
-    else if (op.name === "cancelOrExpireNote") result = await circuits.cancelOrExpireNote(ctx, ...op.args);
+    else if (op.name === "cancelOrExpireNote") result = await circuits.cancelOrExpireNote(ctx, op.args[0], op.args[1] ?? 0n, op.args[2] ?? 0n);
     else if (op.name === "disableMerchant") result = await circuits.disableMerchant(ctx, ...op.args);
     else if (op.name === "withdrawFees") result = await circuits.withdrawFees(ctx, ...op.args);
     else if (op.name === "acknowledgeRepayment") {
@@ -183,8 +190,9 @@ export async function call(session: Session, ps: PrivateState, op: CircuitCall):
 
     const next: Session = {
       contract: session.contract,
-      state: result.context.callContext.currentQueryContext.state,
-      privateState: result.context.callContext.currentPrivateState ?? ps,
+      state: result.context.currentQueryContext.state,
+      privateState: result.context.currentPrivateState ?? ps,
+      clock: session.clock,
     };
     return { ok: true, session: next, ledger: readLedger(next) };
   } catch (err) {
@@ -218,10 +226,16 @@ export function notesOf(ledger: CompactLedger) {
   return [...ledger.notes].map(([D, meta]) => ({
     D,
     amount: meta.amount,
+    fee: meta.fee,
     redeemed: meta.redeemed,
     cancelled: meta.cancelled,
     expiry: meta.expiry,
     lineGeneration: meta.lineGeneration,
+    compensationAllocated: meta.compensationAllocated,
+    refundCommitment: meta.refundCommitment,
+    cashRefundOwed: meta.cashRefundOwed,
+    refundAcknowledged: meta.refundAcknowledged,
+    refundPaymentNullifier: meta.refundPaymentNullifier,
   }));
 }
 

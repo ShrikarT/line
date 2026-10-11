@@ -1,0 +1,5 @@
+# Source fingerprints and proving-release provenance use exact bytes.
+# Keep Compact sources identical across Windows and Linux checkouts.
+*.compact text eol=lf
+contracts/managed/** text eol=lf
+scripts/compile-compact.mjs text eol=lf

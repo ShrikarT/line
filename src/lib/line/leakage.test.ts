@@ -9,6 +9,8 @@ import {
   redeemDraw,
   acknowledgeRepayment,
   setStatus,
+  cancelOrExpireNote,
+  publicLedgerView,
 } from "./protocol.ts";
 import {
   ISSUER_SK,
@@ -25,8 +27,39 @@ function assertOk<T extends object>(res: CircuitResult<T>): asserts res is Circu
 }
 
 describe("privacy and leakage boundaries", () => {
-  it("credit book privacy: L, B, capacity, secrets, and salts never appear in public ledger", () => {
+  it("different partial refunds publish the same full-cost reserve movements and no private remainder", () => {
+    const outputs = [15, 25].map(repaid => {
+      let now = 0;
+      const initial = createLedger({ clock: () => now, issuerSecret: ISSUER_SK, merchantSecret: MERCHANT_A_SK, instanceNonce: INSTANCE_NONCE });
+      const funded = fundReserve(initial, { caller: ISSUER_SK, amount: 500 }); assertOk(funded);
+      const opened = openLine(funded.ledger, { caller: ISSUER_SK, agentSecret: AGENT_SK, feeFlat: 5, salt: "privacy-original", expiry: 10_000 }, { limit: 150 }); assertOk(opened);
+      const quoted = postQuote(opened.ledger, { caller: MERCHANT_A_SK, invoiceId: "private-refund", nonce: "private-refund", expiry: 1_000 }, { amount: 40 }); assertOk(quoted);
+      const drawn = draw(quoted.ledger, { agentSecret: AGENT_SK, quoteCommit: quoted.Q, fee: 5, noteNonce: "private-refund-note", noteSalt: "private-note-opening", newSalt: "private-draw" }, { books: opened.agent.witness!, quote: quoted.quote }); assertOk(drawn);
+      const paid = acknowledgeRepayment(drawn.ledger, { caller: ISSUER_SK, newSalt: "private-paid" }, { books: drawn.agent.witness!, receipt: { identity: drawn.agent.witness!.I, currentC: drawn.ledger.lineCommitment!, amount: repaid, paymentRef: "private-payment", nonce: "private-payment", expiry: 2_000, contractDomain: drawn.ledger.contractDomain } }); assertOk(paid);
+      now = 1_000;
+      const allocated = cancelOrExpireNote(paid.ledger, { caller: AGENT_SK, action: 1, note: drawn.note, compensation: { note: drawn.note.preimage, noteSalt: drawn.note.salt, newSalt: "private-refund-opening", books: paid.witness } }); assertOk(allocated);
+      assert.equal(allocated.refund!.amount, repaid);
+      const beforeReport = publicLedgerView(allocated.ledger);
+      assert.equal(beforeReport.refundReserve, 45); assert.equal(beforeReport.totalReserve, 500);
+      const reported = cancelOrExpireNote(allocated.ledger, { caller: ISSUER_SK, action: 2, note: drawn.note, refundAck: { identity: allocated.refund!.identity, amount: repaid, salt: allocated.refund!.salt, paymentRef: "private-refund-rail-event", receiptExpiry: 2_000 } }); assertOk(reported);
+      const afterReport = publicLedgerView(reported.ledger);
+      assert.equal(afterReport.reportedRefundReserve, 45); assert.equal(afterReport.refundReserve, 0); assert.equal(afterReport.totalReserve, 500);
+      for (const publicState of [beforeReport, afterReport]) {
+        const serialized = JSON.stringify(publicState);
+        for (const forbidden of ["refundDue", "refundAmount", "allocatedCredit", "outstanding", "private-refund-opening", "private-refund-rail-event", ISSUER_SK, AGENT_SK]) assert.ok(!serialized.includes(forbidden), `${forbidden} must remain private`);
+        assert.equal(publicState.notes[0]!.cashRefundOwed, true); // A documented balance bound remains public.
+      }
+      return { beforeReport, afterReport };
+    });
+    for (const stage of ["beforeReport", "afterReport"] as const) {
+      for (const field of ["totalReserve", "encumberedReserve", "redeemedReserve", "feeReserve", "pendingFeeReserve", "refundReserve", "reportedRefundReserve"] as const) assert.equal(outputs[0]![stage][field], outputs[1]![stage][field], `${stage}.${field} cannot reveal the different remainders`);
+      assert.notEqual(outputs[0]![stage].notes[0]!.refundCommitment, outputs[1]![stage].notes[0]!.refundCommitment);
+    }
+  });
+
+  it("credit-book openings and capacity are absent as direct public ledger fields", () => {
     const l0 = createLedger({
+      clock: () => 0,
       issuerSecret: ISSUER_SK,
       merchantSecret: MERCHANT_A_SK,
       instanceNonce: INSTANCE_NONCE,
@@ -62,6 +95,7 @@ describe("privacy and leakage boundaries", () => {
 
   it("honest amount disclosure: note amount and reserve deltas match transaction amount A", () => {
     const l0 = createLedger({
+      clock: () => 0,
       issuerSecret: ISSUER_SK,
       merchantSecret: MERCHANT_A_SK,
       instanceNonce: INSTANCE_NONCE,
@@ -125,6 +159,7 @@ describe("privacy and leakage boundaries", () => {
 
   it("merchant linkability boundary: QuoteMeta links merchant pseudonym; note binds merchant privately", () => {
     const l0 = createLedger({
+      clock: () => 0,
       issuerSecret: ISSUER_SK,
       merchantSecret: MERCHANT_A_SK,
       instanceNonce: INSTANCE_NONCE,

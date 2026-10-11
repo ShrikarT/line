@@ -12,6 +12,7 @@ import {
   withdrawUnencumberedReserve,
 } from "../lib/line/protocol.ts";
 import type { AgentStore, DrawNote, Ledger, MerchantInvoice, QuotePreimage } from "../lib/line/types.ts";
+import { requiredDrawFee } from "../lib/line/encoding.ts";
 import {
   AGENT_SK,
   INSTANCE_NONCE,
@@ -56,7 +57,7 @@ export const DEMO_STEPS = [
   {
     id: 5,
     title: "Agent: draw 40 -> Issue Note D1",
-    publicView: "C0 -> C1. Draw note D1 issued. Reserve encumbered by 40.",
+    publicView: "C0 -> C1. Draw note D1 issued. Reserve encumbered by 40; any agreed fee remains pending until redemption.",
     privateView: "Agent store: B = 40, available = 110. Note D1 delivered to Merchant A.",
   },
   {
@@ -157,13 +158,18 @@ export type DemoSnapshot = {
   staleWitness?: any;
 };
 
-function expiry(ledger: Ledger) {
-  return ledger.actionClock + 10_000;
-}
-
-export function snapshotAt(step: number): DemoSnapshot {
+export function snapshotAt(step: number, options?: { clock?: () => number; feeFlat?: number; feeBps?: number }): DemoSnapshot {
+  const clock = options?.clock ?? (() => Math.floor(Date.now() / 1_000));
+  const deadline = clock() + 10_000;
+  const expiry = (_ledger: Ledger) => deadline;
+  const feeFor = (amount: number) => {
+    const fee = requiredDrawFee(BigInt(amount), BigInt(options?.feeFlat ?? 0), BigInt(options?.feeBps ?? 0));
+    if (fee > BigInt(Number.MAX_SAFE_INTEGER)) throw new RangeError("Demo fee exceeds safe integer range");
+    return Number(fee);
+  };
   const n = Math.max(0, Math.min(step, 18));
   let ledger = createLedger({
+    clock,
     issuerSecret: ISSUER_SK,
     merchantSecret: MERCHANT_A_SK,
     instanceNonce: INSTANCE_NONCE,
@@ -212,6 +218,8 @@ export function snapshotAt(step: number): DemoSnapshot {
         agentSecret: AGENT_SK,
         salt: "demo-salt-0",
         expiry: expiry(ledger),
+        feeFlat: options?.feeFlat ?? 0,
+        feeBps: options?.feeBps ?? 0,
       },
       { limit: 150 },
     );
@@ -247,6 +255,7 @@ export function snapshotAt(step: number): DemoSnapshot {
       {
         agentSecret: AGENT_SK,
         quoteCommit: q40.Q,
+        fee: feeFor(40),
         newSalt: "demo-salt-1",
         noteNonce: "nn-40",
         noteSalt: "ns-40",
@@ -258,7 +267,7 @@ export function snapshotAt(step: number): DemoSnapshot {
     agent = d.agent;
     note1 = d.note;
     notes.push(d.note);
-    pendingRepay = 40;
+    pendingRepay = agent.witness!.B;
     invoices[0] = { ...invoices[0], used: true };
   }
 
@@ -347,6 +356,7 @@ export function snapshotAt(step: number): DemoSnapshot {
       {
         agentSecret: AGENT_SK,
         quoteCommit: q120a.Q,
+        fee: feeFor(120),
         newSalt: "demo-salt-fail",
       },
       { books: agent.witness!, quote: q120a.quote },
@@ -361,7 +371,7 @@ export function snapshotAt(step: number): DemoSnapshot {
     const receipt = {
       identity: agent.witness!.I,
       currentC: ledger.lineCommitment!,
-      amount: 40,
+      amount: agent.witness!.B,
       paymentRef: "demo-pay-40",
       nonce: "demo-r1",
       expiry: expiry(ledger),
@@ -380,7 +390,7 @@ export function snapshotAt(step: number): DemoSnapshot {
     ledger = ack.ledger;
     agent = { secret: AGENT_SK, witness: ack.witness };
     pendingRepay = 0;
-    lastAcked = 40;
+    lastAcked = receipt.amount;
   }
 
   // Step 12: Merchant B posts fresh quote 120
@@ -415,6 +425,7 @@ export function snapshotAt(step: number): DemoSnapshot {
       {
         agentSecret: AGENT_SK,
         quoteCommit: q120b.Q,
+        fee: feeFor(120),
         newSalt: "demo-salt-3",
         noteNonce: "nn-120",
         noteSalt: "ns-120",
@@ -426,7 +437,7 @@ export function snapshotAt(step: number): DemoSnapshot {
     agent = d.agent;
     note2 = d.note;
     notes.push(d.note);
-    pendingRepay = 120;
+    pendingRepay = agent.witness!.B;
     const last = invoices.length - 1;
     invoices[last] = { ...invoices[last], used: true };
   }
@@ -476,12 +487,15 @@ export function snapshotAt(step: number): DemoSnapshot {
       expiry: expiry(ledger),
       nonce: "nd",
       generation: ledger.lineGeneration,
+      feeFlat: ledger.feeFlat,
+      feeBps: ledger.feeBps,
     };
     const blocked = draw(
       ledger,
       {
         agentSecret: AGENT_SK,
         quoteCommit: quoteCommitment(adHocQuote, ledger.contractDomain),
+        fee: feeFor(10),
         newSalt: "salt-def-fail",
       },
       { books: agent.witness!, quote: adHocQuote },

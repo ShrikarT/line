@@ -1,106 +1,55 @@
 #!/usr/bin/env node
-/**
- * Midnight Network Smoke Test
- * Strictly executes network validation: verifies indexer, node, and proof server connectivity.
- */
+/** Read-only service/version/public-state checks. Does not prove or submit a transaction. */
+import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { MidnightNetworkRuntime } from "../src/lib/runtime/network.ts";
+import { resolveMidnightEndpoints, assertEndpointCredentials, redactEndpoint, sanitizeServiceError } from "../src/lib/runtime/endpoints.ts";
 
-async function main() {
-  console.log("=================================================");
-  console.log(" Line — Midnight Network Infrastructure Smoke Test");
-  console.log("=================================================");
-
-  const networkId = process.env.MIDNIGHT_NETWORK_ID ?? "midnight-preprod";
-  let indexerUri = process.env.MIDNIGHT_INDEXER_URI ?? "https://indexer.preprod.midnight.network/api/v4/graphql";
-  if (indexerUri.includes("indexer.preprod.midnight.network") && (indexerUri.endsWith("/v1/graphql") || !indexerUri.includes("/graphql"))) {
-    indexerUri = "https://indexer.preprod.midnight.network/api/v4/graphql";
-  }
-  const nodeUri = process.env.MIDNIGHT_NODE_URI ?? "https://rpc.preprod.midnight.network";
-  const proofServerUri = process.env.MIDNIGHT_PROOF_SERVER_URI ?? "http://127.0.0.1:6300";
-  const contractAddress = process.env.MIDNIGHT_CONTRACT_ADDRESS ?? process.env.VITE_MIDNIGHT_CONTRACT_ADDRESS;
-
-  console.log(`Target Network:   ${networkId}`);
-  console.log(`Node RPC URI:     ${nodeUri}`);
-  console.log(`Indexer URI:      ${indexerUri}`);
-  console.log(`Proof Server URI: ${proofServerUri}`);
-  console.log(`Contract Address: ${contractAddress ?? "NOT SET"}`);
-
-  console.log("\n1. Testing Midnight Node RPC reachability...");
-  try {
-    const res = await fetch(nodeUri, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "system_health", params: [] }),
-    });
-    if (!res.ok && res.status !== 405) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
-    console.log("✓ Midnight Node RPC is reachable.");
-  } catch (err) {
-    console.error(`✗ Failed to reach Midnight Node RPC at ${nodeUri}:`, err instanceof Error ? err.message : String(err));
-    console.error("Please ensure the node RPC is online or check your network connection.");
-    process.exit(1);
-  }
-
-  console.log("\n2. Testing Midnight GraphQL Indexer reachability...");
-  try {
-    const res = await fetch(indexerUri, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ query: "{ __typename }" }),
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
-    console.log("✓ Midnight Indexer is reachable.");
-  } catch (err) {
-    console.error(`✗ Failed to reach Midnight Indexer at ${indexerUri}:`, err instanceof Error ? err.message : String(err));
-    console.error("Please ensure the indexer is online or check your network connection.");
-    process.exit(1);
-  }
-
-  console.log("\n3. Testing Midnight Proof Server reachability...");
-  try {
-    const res = await fetch(proofServerUri, { method: "GET" }).catch(() => null);
-    if (res && res.status < 500) {
-      console.log("✓ Midnight Proof Server is reachable.");
-    } else {
-      console.error(`✗ Failed to reach Midnight Proof Server at ${proofServerUri}`);
-      console.error("  (Proving transactions on network requires a running proof-server instance.)");
-      process.exit(1);
-    }
-  } catch (err) {
-    console.error(`✗ Failed to reach Midnight Proof Server at ${proofServerUri}:`, err instanceof Error ? err.message : String(err));
-    process.exit(1);
-  }
-
-  console.log("\n4. Checking deployed contract on network...");
-  if (!contractAddress || contractAddress.trim().length === 0) {
-    console.error("✗ MIDNIGHT_CONTRACT_ADDRESS or VITE_MIDNIGHT_CONTRACT_ADDRESS is not configured.");
-    console.error("Network smoke test strictly requires a target deployed contract address on Midnight network.");
-    process.exit(1);
-  }
-
-  const runtime = new MidnightNetworkRuntime({
-    networkId,
-    indexerUri,
-    nodeUri,
-    proofServerUri,
-    contractAddress,
-  });
-
-  console.log(`Querying deployed contract ${contractAddress}...`);
-  try {
-    const status = await runtime.joinContract(contractAddress);
-    console.log("✓ Contract successfully verified on network:");
-    console.log(`  Domain:    ${status.contractDomain}`);
-    console.log(`  Status:    ${status.status}`);
-    console.log(`  Reserve:   ${status.totalReserve}`);
-  } catch (err) {
-    console.error("✗ Failed to query contract from indexer:", err instanceof Error ? err.message : String(err));
-    process.exit(1);
-  }
-
-  console.log("\n✓ Network smoke test completed.");
+export async function checkInfrastructure(endpoints, { fetchImpl = fetch, timeout = 15000 } = {}) {
+  assertEndpointCredentials(endpoints);
+  const post = async (url, body) => {
+    const response = await fetchImpl(url, { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body), signal: AbortSignal.timeout(timeout) });
+    if (!response.ok) throw new Error(`Service HTTP ${response.status}: ${redactEndpoint(url)}`);
+    return response.json();
+  };
+  const rpc = async (method, id) => {
+    const body = await post(endpoints.nodeUri, { jsonrpc: "2.0", id, method, params: [] });
+    if (body.jsonrpc !== "2.0" || body.id !== id || body.error || body.result == null) throw new Error(`Invalid or rejected RPC response for ${method}.`);
+    return body.result;
+  };
+  const health = await rpc("system_health", 1);
+  if (typeof health !== "object" || typeof health.isSyncing !== "boolean" || health.isSyncing) throw new Error("Node health does not establish a synchronized node.");
+  const ledgerVersion = await rpc("midnight_ledgerVersion", 2);
+  if (typeof ledgerVersion !== "string" || !/^=?8\.\d+\.\d+$/.test(ledgerVersion)) throw new Error("Node does not report a compatible ledger 8 version.");
+  const indexer = await post(endpoints.indexerUri, { query: "{ __typename }" });
+  if (indexer.errors?.length || typeof indexer.data?.__typename !== "string" || !indexer.data.__typename) throw new Error("Indexer returned errors or missing GraphQL data.");
+  const versionUrl = new URL(endpoints.proofServerUri);
+  versionUrl.pathname = `${versionUrl.pathname.replace(/\/$/, "")}/version`;
+  const proofResponse = await fetchImpl(versionUrl.href, { signal: AbortSignal.timeout(timeout) });
+  if (!proofResponse.ok) throw new Error(`Proof server version check failed with HTTP ${proofResponse.status}.`);
+  const text = await proofResponse.text();
+  const versions = text.match(/(?<![0-9.])\d+\.\d+\.\d+(?![0-9.])/g) ?? [];
+  if (versions.length !== 1 || versions[0] !== "8.1.3") throw new Error("Proof server must report supported version 8.1.3.");
+  return { ledgerVersion, proofServerVersion: versions[0], indexerType: indexer.data.__typename };
 }
 
-main().catch((err) => {
-  console.error("✗ Smoke test failed:", err);
-  process.exit(1);
-});
+async function main() {
+  const address = (process.env.MIDNIGHT_CONTRACT_ADDRESS ?? process.env.VITE_MIDNIGHT_CONTRACT_ADDRESS ?? "").trim().replace(/^0x/, "");
+  if (!/^[a-fA-F0-9]{64}$/.test(address)) throw new Error("Configure a 32-byte MIDNIGHT_CONTRACT_ADDRESS for the read-only smoke check.");
+  const endpoints = resolveMidnightEndpoints({ networkId: process.env.MIDNIGHT_NETWORK_ID,
+    blockfrostProjectId: process.env.MIDNIGHT_BLOCKFROST_PROJECT_ID,
+    indexerUri: process.env.MIDNIGHT_INDEXER_URI, indexerWsUri: process.env.MIDNIGHT_INDEXER_WS_URI,
+    nodeUri: process.env.MIDNIGHT_NODE_URI, proofServerUri: process.env.MIDNIGHT_PROOF_SERVER_URI });
+  console.log(`Line read-only service check: ${endpoints.networkId}`);
+  console.log(`Indexer: ${redactEndpoint(endpoints.indexerUri)}`);
+  const versions = await checkInfrastructure(endpoints);
+  console.log(`Service checks passed: ledger ${versions.ledgerVersion}, proof server ${versions.proofServerVersion}.`);
+  const runtime = new MidnightNetworkRuntime({ ...endpoints });
+  const status = await runtime.joinContract(address);
+  console.log(`Public contract state decoded: ${status.contractDomain}, status ${status.status}.`);
+  console.log("No transaction proving, submission, deployment or asset payout was tested.");
+}
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  main().catch(error => { console.error(sanitizeServiceError(error instanceof Error ? error.message : String(error))); process.exitCode = 1; });
+}

@@ -27,10 +27,11 @@ async function main() {
   if (!fundRes.ok) throw new Error(`Fund reserve failed: ${fundRes.error}`);
   console.log(`✓ Reserve funded. Tx: ${fundRes.txHash}`);
 
-  console.log("\n3. Opening Line (Limit: 150, Expiry: 10000)...");
+  const now = Math.floor(Date.now() / 1000);
+  console.log(`\n3. Opening Line (Limit: 150, Unix expiry: ${now + 10_000})...`);
   const openRes = await runtime.openLine({
     limit: 150,
-    expiry: 10000,
+    expiry: now + 10_000,
     callerSk: ISSUER_SK,
     agentSecret: AGENT_SK,
     salt: "salt-init",
@@ -41,7 +42,7 @@ async function main() {
   console.log("\n4. Posting Quote (Amount: 40, Merchant A)...");
   const quoteRes = await runtime.postQuote({
     amount: 40,
-    expiry: 2000,
+    expiry: now + 2_000,
     invoiceId: "inv-smoke-001",
     nonce: "nonce-q-001",
     merchantSk: MERCHANT_A_SK,

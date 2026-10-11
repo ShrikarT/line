@@ -15,7 +15,7 @@ const NAV = [
   { to: "/roadmap", label: "Roadmap" },
 ];
 
-export function Shell({ children }: { children: React.ReactNode }) {
+export function Shell({ children, evaluation }: { children: React.ReactNode; evaluation?: boolean }) {
   const pathname = typeof window !== "undefined" ? window.location.pathname : "/";
   const [showNetworkSetup, setShowNetworkSetup] = useState(false);
   const runtime = getRuntime();

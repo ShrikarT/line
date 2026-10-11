@@ -1,0 +1,40 @@
+{
+  "date": "2026-10-10",
+  "scope": "current dirty worktree; absolute ledger-time validity, authenticated merchant deadlines, time-unit migration and console navigation",
+  "compactSourceSha256": "a3c7895e56d5f343d2c458252a73ad9891adc9bdbad688a659b3761f3e0ca79e",
+  "checks": {
+    "npm test": { "exitCode": 0, "tests": 380, "suites": 56, "failed": 0, "skipped": 0, "log": "npm-test.log" },
+    "npm run test:e2e": { "exitCode": 0, "tests": 18, "failed": 0, "browser": "Chromium", "server": "Vite development", "log": "browser-tests.log" },
+    "npm run build": { "exitCode": 0, "log": "build.log", "warnings": ["SDK browser externalization", "isomorphic-ws named WebSocket import", "large browser bundles"] },
+    "npm run compact:compile": { "exitCode": 0, "compiler": "0.31.1", "language": "0.23.0", "runtime": "0.16.0" },
+    "npm run compact:check": { "exitCode": 0, "matchedFiles": 16, "normalization": "source-map output location only; generated changes intentionally remain unstaged" },
+    "npm run compact:compile:release": { "exitCode": 0, "release": "0.31.1-a3c7895e56d5-7a71f15f-4350-4db7-9a74-d424cecfa60a", "files": 52, "bytes": 70015989 },
+    "npm run compact:release:validate": { "exitCode": 0, "releaseSha256": "a84894adec337de6b7d3ae40cc9ef1052894ca346f853d1c033c94459880bcc8" },
+    "npm run check:keys": { "exitCode": 0, "productionModules": 47 },
+    "npm run check:secrets": { "exitCode": 0 },
+    "git diff --check": { "exitCode": 0 }
+  },
+  "focusedEvidence": {
+    "generatedExpiryTests": 9,
+    "modelAdministrativeActionsBeforeDeadline": 1100,
+    "generatedGrindingTest": "diagnostic action count exceeds absolute deadline number while trusted time remains before expiry",
+    "actualSdkNewTimeConstructionTests": 2,
+    "newRuntimeBoundaryTests": 2,
+    "newMcpLegacyUnitsTest": 1,
+    "expiredGeneratedCheckoutRecoveryTest": 1,
+    "newBrowserDeadlineStatusNavigationTest": 1,
+    "legacyTransferImportChecks": "v1, missing units and unsafe expiry reject before state publication",
+    "networkProviderIo": "simulated; actual SDK/generated circuit construction reaches proving sentinel, no proof or submission"
+  },
+  "notEstablished": [
+    "live chain-time validation, near-deadline finality or finalized deployment",
+    "compensation, borrower debt/fee reversal or cash refund policy",
+    "issuer-approved fee policy or pending/earned fee accounting",
+    "minimum post-acceptance merchant redemption interval",
+    "actual asset backing, payouts or genuine repayment receipts",
+    "independent role custody, full-history privacy or external customer evidence",
+    "migration of prior deployed contracts or source-bound records",
+    "checkout browser-capability recovery after component unmount or reload"
+  ],
+  "goalStatus": "active; all fifteen product requirements retained"
+}

@@ -1,0 +1,300 @@
+{
+  "schema": "line-custody-feasibility/v2",
+  "createdAt": "2026-10-10T18:48:14.560Z",
+  "compiler": "0.31.1",
+  "canonicalChanged": false,
+  "exportedCircuits": [
+    "registerMerchant",
+    "disableMerchant",
+    "fundReserve",
+    "withdrawUnencumberedReserve",
+    "withdrawFees",
+    "openLine",
+    "postQuote",
+    "draw",
+    "redeemDraw",
+    "cancelOrExpireNote",
+    "acknowledgeRepayment",
+    "setStatus"
+  ],
+  "independentlyKeyedActorProcesses": 5,
+  "coordinatorHasSigningSecrets": false,
+  "issuerOpeningUsesAgentSecret": false,
+  "issuerRepaymentUsesAgentSecret": false,
+  "historicalPrivacyPassed": false,
+  "publicHistoryCounterexample": "Known-zero singleton debt reconstructed as 25 from its public note.",
+  "agentFacilityConsentBound": true,
+  "legalBorrowerConsentAuthenticated": false,
+  "experimentalOpeningActionParameter": true,
+  "cryptographicProofsGenerated": false,
+  "networkFinalityConfirmed": false,
+  "assetTransfers": false,
+  "traces": [
+    {
+      "actor": "issuer",
+      "circuit": "registerMerchant",
+      "accepted": true,
+      "witnesses": [
+        "callerSecret"
+      ]
+    },
+    {
+      "actor": "issuer",
+      "circuit": "fundReserve",
+      "accepted": true,
+      "witnesses": [
+        "callerSecret"
+      ]
+    },
+    {
+      "actor": "issuer",
+      "circuit": "openLine",
+      "accepted": false,
+      "witnesses": [
+        "callerSecret",
+        "lineLimit",
+        "enrollmentIdentity",
+        "salt",
+        "acceptedTerms"
+      ]
+    },
+    {
+      "actor": "agent",
+      "circuit": "openLine",
+      "accepted": false,
+      "witnesses": [
+        "callerSecret"
+      ]
+    },
+    {
+      "actor": "agent",
+      "circuit": "openLine",
+      "accepted": true,
+      "witnesses": [
+        "lineLimit",
+        "agentSecret",
+        "salt",
+        "acceptedTerms"
+      ]
+    },
+    {
+      "actor": "agent",
+      "circuit": "openLine",
+      "accepted": false,
+      "witnesses": [
+        "lineLimit",
+        "agentSecret",
+        "salt",
+        "acceptedTerms"
+      ]
+    },
+    {
+      "actor": "issuer",
+      "circuit": "openLine",
+      "accepted": false,
+      "witnesses": [
+        "callerSecret",
+        "lineLimit",
+        "enrollmentIdentity",
+        "salt",
+        "acceptedTerms"
+      ]
+    },
+    {
+      "actor": "issuer",
+      "circuit": "openLine",
+      "accepted": false,
+      "witnesses": [
+        "callerSecret",
+        "lineLimit",
+        "enrollmentIdentity",
+        "salt",
+        "acceptedTerms"
+      ]
+    },
+    {
+      "actor": "issuer",
+      "circuit": "openLine",
+      "accepted": false,
+      "witnesses": [
+        "callerSecret",
+        "lineLimit",
+        "enrollmentIdentity",
+        "salt",
+        "acceptedTerms"
+      ]
+    },
+    {
+      "actor": "issuer",
+      "circuit": "openLine",
+      "accepted": true,
+      "witnesses": [
+        "callerSecret",
+        "lineLimit",
+        "enrollmentIdentity",
+        "salt",
+        "acceptedTerms",
+        "salt"
+      ]
+    },
+    {
+      "actor": "merchant-a",
+      "circuit": "postQuote",
+      "accepted": true,
+      "witnesses": [
+        "callerSecret",
+        "quoteAmount",
+        "invoiceId",
+        "quoteNonce"
+      ]
+    },
+    {
+      "actor": "issuer",
+      "circuit": "draw",
+      "accepted": false,
+      "witnesses": [
+        "agentSecret"
+      ]
+    },
+    {
+      "actor": "merchant-b",
+      "circuit": "draw",
+      "accepted": false,
+      "witnesses": [
+        "agentSecret"
+      ]
+    },
+    {
+      "actor": "other-agent",
+      "circuit": "draw",
+      "accepted": false,
+      "witnesses": [
+        "agentSecret"
+      ]
+    },
+    {
+      "actor": "agent",
+      "circuit": "draw",
+      "accepted": true,
+      "witnesses": [
+        "agentSecret",
+        "lineLimit",
+        "lineOutstanding",
+        "lineEpoch",
+        "drawAmount",
+        "salt",
+        "quoteMerchantPk",
+        "invoiceId",
+        "quoteNonce",
+        "noteNonce",
+        "noteSalt",
+        "newSalt"
+      ]
+    },
+    {
+      "actor": "agent",
+      "circuit": "draw",
+      "accepted": false,
+      "witnesses": [
+        "agentSecret",
+        "lineLimit",
+        "lineOutstanding",
+        "lineEpoch",
+        "drawAmount",
+        "salt"
+      ]
+    },
+    {
+      "actor": "merchant-b",
+      "circuit": "postQuote",
+      "accepted": true,
+      "witnesses": [
+        "callerSecret",
+        "quoteAmount",
+        "invoiceId",
+        "quoteNonce"
+      ]
+    },
+    {
+      "actor": "agent",
+      "circuit": "draw",
+      "accepted": false,
+      "witnesses": [
+        "agentSecret",
+        "lineLimit",
+        "lineOutstanding",
+        "lineEpoch",
+        "drawAmount",
+        "salt",
+        "quoteMerchantPk",
+        "invoiceId",
+        "quoteNonce"
+      ]
+    },
+    {
+      "actor": "merchant-b",
+      "circuit": "redeemDraw",
+      "accepted": false,
+      "witnesses": [
+        "redeemAmount",
+        "callerSecret",
+        "noteIdentity",
+        "noteQuoteCommit",
+        "noteNonce",
+        "noteSalt"
+      ]
+    },
+    {
+      "actor": "merchant-a",
+      "circuit": "redeemDraw",
+      "accepted": true,
+      "witnesses": [
+        "redeemAmount",
+        "callerSecret",
+        "noteIdentity",
+        "noteQuoteCommit",
+        "noteNonce",
+        "noteSalt",
+        "callerSecret"
+      ]
+    },
+    {
+      "actor": "merchant-a",
+      "circuit": "redeemDraw",
+      "accepted": false,
+      "witnesses": []
+    },
+    {
+      "actor": "agent",
+      "circuit": "acknowledgeRepayment",
+      "accepted": false,
+      "witnesses": [
+        "callerSecret"
+      ]
+    },
+    {
+      "actor": "issuer",
+      "circuit": "acknowledgeRepayment",
+      "accepted": true,
+      "witnesses": [
+        "callerSecret",
+        "lineLimit",
+        "lineOutstanding",
+        "lineEpoch",
+        "repayAmount",
+        "salt",
+        "paymentRef",
+        "callerSecret",
+        "receiptNonce",
+        "newSalt"
+      ]
+    }
+  ],
+  "remaining": [
+    "Accountable borrower authority and complete operating terms",
+    "Canonical runtime/console integration and independent storage",
+    "Multi-borrower full-transcript privacy construction",
+    "Proof generation/verification and network metadata",
+    "Authentic settlement receipts and customer evidence"
+  ]
+}

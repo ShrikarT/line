@@ -2,13 +2,58 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { MidnightNetworkRuntime } from "../src/lib/runtime/network.ts";
 import { LocalDevelopmentRuntime } from "../src/lib/runtime/local.ts";
-import { hexToBytes } from "../src/lib/line/encoding.ts";
-import { AGENT_SK, MERCHANT_A_PK } from "../src/test/fixtures/keys.ts";
+import { canonicalPaymentReferenceBytes, hexToBytes } from "../src/lib/line/encoding.ts";
+import { ISSUER_SK, AGENT_SK, MERCHANT_A_PK } from "../src/test/fixtures/keys.ts";
 
 describe("proof test: MidnightNetworkRuntime witness and circuit alignment", () => {
+  it("forwards all issuer-approved opening policy arguments in Compact order", async () => {
+    const net = new MidnightNetworkRuntime({ networkId: "preprod", contractAddress: "11".repeat(32) });
+    (net as any).connectedWallet = {};
+    let received: unknown[] = [];
+    (net as any).boundContract = { callTx: { openLine: async (...args: unknown[]) => {
+      received = args;
+      return { public: { status: "SucceedEntirely", txHash: "12".repeat(32), blockHeight: 42 } };
+    } } };
+    const expiry = Math.floor(Date.now() / 1000) + 10_000;
+    const result = await net.openLine({ limit: 100, expiry, feeFlat: 3, feeBps: 250, callerSk: ISSUER_SK, agentSecret: AGENT_SK, salt: "aa".repeat(32) });
+    assert.equal(result.ok, true);
+    assert.deepEqual(received, [BigInt(expiry), 3n, 250n]);
+    const zero = await net.openLine({ limit: 100, expiry, callerSk: ISSUER_SK, agentSecret: AGENT_SK, salt: "aa".repeat(32) });
+    assert.equal(zero.ok, true);
+    assert.deepEqual(received, [BigInt(expiry), 0n, 0n]);
+  });
+
+  it("forwards compensation actions and deadline exactly while keeping book and cash amount in witnesses", async () => {
+    const net = new MidnightNetworkRuntime({ networkId: "preprod", contractAddress: "11".repeat(32) });
+    (net as any).connectedWallet = {};
+    let received: unknown[] = [], context: any;
+    (net as any).boundContract = { callTx: { cancelOrExpireNote: async (...args: unknown[]) => {
+      received = args; context = { ...(net as any).activeWitnessContext };
+      return { public: { status: "SucceedEntirely", txHash: "12".repeat(32), blockHeight: 42 } };
+    } } };
+    const D = "21".repeat(32), identity = "22".repeat(32), Q = "23".repeat(32), noteSalt = "24".repeat(32), newSalt = "25".repeat(32);
+    assert.equal((await net.cancelOrExpireNote(D, ISSUER_SK)).ok, true);
+    assert.deepEqual(received, [hexToBytes(D), 0n, 0n]);
+    const compensation = { note: { identity, quoteCommit: Q, merchantPk: MERCHANT_A_PK, amount: 40, fee: 5,
+      noteNonce: "26".repeat(32), expiry: 100, lineGeneration: 1 }, noteSalt, newSalt,
+      book: { limit: 100, outstanding: 25, epoch: 2, salt: "27".repeat(32) } };
+    assert.equal((await net.cancelOrExpireNote(D, ISSUER_SK, { compensation })).ok, true);
+    assert.deepEqual(received, [hexToBytes(D), 1n, 0n]);
+    assert.equal(context.lineLimit, 100n); assert.equal(context.lineOutstanding, 25n); assert.equal(context.lineEpoch, 2n);
+    assert.deepEqual(context.noteIdentity, hexToBytes(identity));
+    assert.deepEqual(context.noteQuoteCommit, hexToBytes(Q));
+    assert.deepEqual(context.noteSalt, hexToBytes(noteSalt));
+    assert.deepEqual(context.newSalt, hexToBytes(newSalt));
+    const refundAck = { identity, amount: 20, salt: newSalt, paymentRef: "wire-refund-proof", receiptExpiry: Math.floor(Date.now() / 1000) + 600 };
+    assert.equal((await net.cancelOrExpireNote(D, ISSUER_SK, { refundAck })).ok, true);
+    assert.deepEqual(received, [hexToBytes(D), 2n, BigInt(refundAck.receiptExpiry)]);
+    assert.equal(context.repayAmount, 20n);
+    assert.deepEqual(context.salt, hexToBytes(newSalt));
+    assert.deepEqual(context.paymentRef, canonicalPaymentReferenceBytes(refundAck.paymentRef));
+  });
   it("draw passes exact 3 public arguments (quoteCommit, noteExpiry, fee) and feeds witness books", async () => {
     const net = new MidnightNetworkRuntime({
-      networkId: "midnight-testnet",
+      networkId: "preprod",
       contractAddress: "0x" + "11".repeat(32),
     });
 
@@ -27,16 +72,17 @@ describe("proof test: MidnightNetworkRuntime witness and circuit alignment", () 
         draw: async (...args: any[]) => {
           receivedArgs = args;
           capturedWitnessContext = { ...(net as any).activeWitnessContext };
-          return {
+          return { public: {
+            status: "SucceedEntirely",
             txHash: "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
             blockHeight: 42,
-          };
+          } };
         },
       },
     };
 
     const quoteCommit = "0x" + "aa".repeat(32);
-    const noteExpiry = 1050;
+    const noteExpiry = Math.floor(Date.now() / 1000) + 1050;
     const fee = 5;
 
     const res = await net.draw({
@@ -79,7 +125,7 @@ describe("proof test: MidnightNetworkRuntime witness and circuit alignment", () 
 
   it("all 20 Compact contract witnesses are defined and queryable on the contract binding", async () => {
     const net = new MidnightNetworkRuntime({
-      networkId: "midnight-testnet",
+      networkId: "preprod",
       contractAddress: "0x" + "11".repeat(32),
     });
 
@@ -156,9 +202,9 @@ describe("proof test: MidnightNetworkRuntime witness and circuit alignment", () 
     });
   });
 
-  it("draw refuses when noteExpiry is missing (hard error), while fee keeps ?? 0 default", async () => {
+  it("draw rejects missing expiry with generic copy; local validation retains hard error", async () => {
     const net = new MidnightNetworkRuntime({
-      networkId: "midnight-testnet",
+      networkId: "preprod",
       contractAddress: "0x" + "11".repeat(32),
     });
     (net as any).connectedWallet = { walletProvider: {}, midnightProvider: {} };
@@ -180,11 +226,9 @@ describe("proof test: MidnightNetworkRuntime witness and circuit alignment", () 
       merchantPk: MERCHANT_A_PK,
     };
 
-    // Missing noteExpiry in network runtime must throw
-    await assert.rejects(
-      async () => await net.draw(validParams as any),
-      /Draw refused: noteExpiry is required/
-    );
+    const rejected = await net.draw(validParams as any);
+    assert.equal(rejected.ok, false);
+    assert.equal(rejected.error, "Clearance could not be proven.");
 
     // Missing noteExpiry in local runtime must throw
     const local = new LocalDevelopmentRuntime();

@@ -1,0 +1,37 @@
+{
+  "date": "2026-10-10",
+  "scope": "current dirty worktree; console journal and configured generated-checkout recovery",
+  "compactSourceSha256": "fba1713ebb4a8a1c833941dbb01110e28943517e180944e8b660fd3ccd11d229",
+  "checks": {
+    "npm test": { "exitCode": 0, "tests": 333, "suites": 50, "failed": 0, "skipped": 0 },
+    "npm run test:e2e": { "exitCode": 0, "tests": 17, "failed": 0, "browser": "Chromium", "server": "Vite development" },
+    "npm run build": { "exitCode": 0, "warnings": ["SDK browser externalization", "isomorphic-ws named WebSocket import", "large browser bundles"] },
+    "npm run compact:check": { "exitCode": 0, "matchedFiles": 16, "compiler": "0.31.1", "normalization": "source-map output location only" },
+    "npm run compact:release:validate": { "exitCode": 0, "release": "0.31.1-fba1713ebb4a-c1c05363-d42d-49ea-8211-a76544059ba9" },
+    "npm run check:keys": { "exitCode": 0, "productionModules": 46 },
+    "npm run check:secrets": { "exitCode": 0 },
+    "git diff --check": { "exitCode": 0 }
+  },
+  "focusedEvidence": {
+    "checkoutDurabilityTests": 15,
+    "operationJournalTests": 21,
+    "networkRecoveryTests": 14,
+    "generatedCandidateTests": 2,
+    "storeTests": 22,
+    "newBrowserRecoveryTests": 5,
+    "genuineChildProcessDeath": true,
+    "realIndexedDbAndWebLocks": true,
+    "networkProviderIo": "simulated; actual SDK construction/generated circuit execution tested"
+  },
+  "notEstablished": [
+    "live ZK proving or finalized deployment",
+    "asset custody, payments or token payouts",
+    "independent role custody",
+    "full-history credit-book privacy",
+    "authoritative contract stable-payment replay protection",
+    "device-loss backup, rollback detection and source migration",
+    "external merchant exactly-once economic effects",
+    "production certification or customer traction"
+  ],
+  "goalStatus": "active; all fifteen product requirements retained"
+}
