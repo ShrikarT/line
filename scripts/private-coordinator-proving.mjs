@@ -32,8 +32,8 @@ export function validateCoordinatorProofConfig(config,scope){
  for(const c of manifest.circuits){assert.equal(sha(readFileSync(join(dir,'zkir',c.name+'.zkir'))),c.zkirSha256);
   assert.deepEqual(Object.keys(c.artifacts).sort(),[`zkir/${c.name}.bzkir`,`keys/${c.name}.prover`,`keys/${c.name}.verifier`].sort());
   for(const [p,v]of Object.entries(c.artifacts)){const b=readFileSync(join(dir,p));assert.equal(sha(b),v.sha256);assert.equal(b.length,v.bytes);}}
- assert.deepEqual(Object.keys(config.nativeExecutables).sort(),['checker','prover','verifier']);
- for(const name of ['checker','prover','verifier'])assert.equal(sha(readFileSync(config[name])),config.nativeExecutables[name]);
+ assert.deepEqual(Object.keys(config.nativeExecutables).sort(),['checker','guardian','prover','verifier']);
+ for(const name of ['checker','prover','verifier','guardian'])assert.equal(sha(readFileSync(config[name])),config.nativeExecutables[name]);
  setNetworkId('preview');return {dir,info};
 }
 function strictness(){const s=new L.WellFormedStrictness();s.enforceBalancing=false;s.verifyNativeProofs=true;s.verifyContractProofs=true;s.enforceLimits=true;s.verifySignatures=true;return s;}
@@ -47,8 +47,8 @@ function verifiedApply(config,local,tx,seconds,label){
  const [next,outcome]=local.apply(formed,new L.TransactionContext(local,{secondsSinceEpoch:t,secondsSinceEpochErr:0,parentBlockHash:'0'.repeat(64),lastBlockTime:t-1n}));
  assert.equal(outcome.type,'success');return next;
 }
-function provider(config,checks){return nativeLocalProvingProvider({managedDir:config.managedDir,checker:config.checker,prover:config.prover,parameterCache:config.parameterCache,
- onCheck:x=>checks.push(x),onDiagnostic:x=>checks.push({nativeProcessFailure:x})});}
+function provider(config,checks,onStage=()=>{}){return nativeLocalProvingProvider({managedDir:config.managedDir,checker:config.checker,prover:config.prover,parameterCache:config.parameterCache,
+ onCheck:x=>checks.push(x),onDiagnostic:x=>checks.push({nativeProcessFailure:x}),onStage});}
 export async function initializeCoordinatorProofLedger(initial,config,scope,seconds){
  const {dir,info}=validateCoordinatorProofConfig(config,scope),zk=new NodeZkConfigProvider(dir);
  for(const {name}of info.circuits){const op=new RT.ContractOperation();op.verifierKey=await zk.getVerifierKey(name);initial.currentContractState.setOperation(name,op);}
@@ -58,7 +58,7 @@ export async function initializeCoordinatorProofLedger(initial,config,scope,seco
  const next=verifiedApply(config,L.LedgerState.blank('preview'),proven,seconds,'genesis');
  return {address:deploy.address,transaction:proven.serialize(),publicLedgerState:next.serialize(),seconds};
 }
-export async function proveRestoredCoordinator({config,scope,directory,password,pending,restored,initialQueryContext,publicLedgerState}){
+export async function proveRestoredCoordinator({config,scope,directory,password,pending,restored,initialQueryContext,publicLedgerState,onNativeStage=()=>{}}){
  let stage='configuration',store;
  try{
  const {dir}=validateCoordinatorProofConfig(config,scope);assert(publicLedgerState instanceof Uint8Array&&publicLedgerState.length<=1_000_000);
@@ -83,7 +83,7 @@ export async function proveRestoredCoordinator({config,scope,directory,password,
   const data=restored.proofData,parts=L.partitionTranscripts([new L.PreTranscript(partition,data.publicTranscript)],local.parameters);assert.equal(parts.length,1);
   const call=new L.ContractCallPrototype(scope.contractAddress,pending.circuit,current.operation(pending.circuit),parts[0][0],parts[0][1],data.privateTranscriptOutputs,data.input,data.output,L.communicationCommitmentRandomness(),pending.circuit);
   const tx=L.Transaction.fromPartsRandomized('preview',undefined,undefined,L.Intent.new(new Date((seconds+3600)*1000)).addCall(call)),checks=[],started=Date.now();
-  stage='native-proving';const proven=(await tx.prove(provider(config,checks),L.CostModel.initialCostModel())).bind(),duration=Date.now()-started;
+  stage='native-proving';const proven=(await tx.prove(provider(config,checks,onNativeStage),L.CostModel.initialCostModel())).bind(),duration=Date.now()-started;
   stage='native-verification';const next=verifiedApply(config,local,proven,seconds,'prepared-'+pending.operationId.replaceAll(':','-'));
   assert.deepEqual(next.index(scope.contractAddress).data.state.encode(),RT.ContractState.deserialize(pending.candidate.publicState).data.state.encode());
   record={schema:'line-private-coordinator-proof/v1',operationFingerprint:pending.fingerprint,predecessorSha256:predecessorHash,transaction:proven.serialize(),transactionSha256:sha(proven.serialize()),

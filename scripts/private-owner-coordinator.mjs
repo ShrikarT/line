@@ -17,6 +17,7 @@ import {hash,tag,roleHash,zero} from './private-offer-signers.mjs';
 import {facilityBinding,offerCommit} from './private-offer-encoding.mjs';
 import {commit} from './private-pool-spike.mjs';
 import {initializeCoordinatorProofLedger,proveRestoredCoordinator} from './private-coordinator-proving.mjs';
+import {startWorkerGuardian} from './private-worker-guardian.mjs';
 const self=fileURLToPath(import.meta.url),SOURCE='contracts/experimental/line-private-offer.compact',sha=b=>createHash('sha256').update(b).digest('hex');
 const bytes=()=>new Uint8Array(randomBytes(32)),hex=b=>Buffer.from(b).toString('hex'),COIN=RT.encodeCoinPublicKey('0'.repeat(64));
 const stateBytes=data=>{const s=new RT.ContractState();s.data=data instanceof RT.ChargedState?data:new RT.ChargedState(data);return s.serialize();};
@@ -32,16 +33,32 @@ export function coordinatorDrawFee(amount,flatFee,basisPoints){
 }
 export function coordinatorCommand(config,action,payload){
  assert(['initialize','prepare','restore','prove','confirm','status'].includes(action));const body=wire({action,payload});assert(Buffer.byteLength(body)<=2*1024*1024);
- const child=fork(self,['--worker'],{execArgv:['--experimental-strip-types'],stdio:['ignore','ignore','pipe','ipc'],
+ const child=fork(self,['--worker'],{execArgv:['--experimental-strip-types'],stdio:['ignore','ignore','pipe','ipc'],detached:process.platform!=='win32',windowsHide:true,
   env:{PATH:process.env.PATH,SystemRoot:process.env.SystemRoot,LINE_COORDINATOR_TEST_CONFIG:wire(config)}});
  return new Promise((yes,no)=>{
-  let received=false,result;const timer=setTimeout(()=>{child.kill();no(Error('Coordinator result is uncertain; recover the same operation.'));},action==='prove'?2_000_000:60_000);
-  child.on('error',error=>{clearTimeout(timer);no(error);});
-  child.on('message',message=>{if(message.ready){child.send({body});return;}if(message.body){try{assert(Buffer.byteLength(message.body)<=16*1024*1024);result=unwire(message.body);received=true;}catch{child.kill();}}
-   if(message.error){clearTimeout(timer);const error=Error('Coordinator command rejected.');if(['configuration','cache-open','public-predecessor','transcript-construction','native-proving','native-verification','proof-publication'].includes(message.proofStage))error.coordinatorProofStage=message.proofStage;no(error);}});
-  child.on('exit',code=>{clearTimeout(timer);if(code===0&&received)yes({pid:child.pid,value:result});else{
-   const error=Error('Coordinator result is uncertain; recover the same operation.');error.workerPid=child.pid;error.exitCode=code;no(error);
-  }});
+  let received=false,result,pendingError,workerReady=false,guardReady=!config.localProof,guard,guardPromise,sent=false,exited=false,interrupted=false;
+  const stop=()=>{if(process.platform!=='win32'){try{process.kill(-child.pid,'SIGKILL');}catch{child.kill();}}else child.kill('SIGKILL');};
+  const dispatch=()=>{if(workerReady&&guardReady&&!sent&&!exited){sent=true;child.send({body},error=>{if(error){pendingError=Error('Coordinator dispatch is uncertain.');stop();}});}};
+  const timer=setTimeout(()=>{pendingError=Error('Coordinator result is uncertain; recover the same operation.');stop();},action==='prove'?2_000_000:60_000);
+  child.stderr.resume();child.on('error',error=>{pendingError=error;stop();});
+  child.on('message',message=>{
+   if(message.ready){workerReady=true;dispatch();return;}
+   if(message.nativeStage==='key_material_loaded'&&config.testCrashDuringNativeProve){interrupted=true;stop();return;}
+   if(message.body){try{assert(Buffer.byteLength(message.body)<=16*1024*1024);result=unwire(message.body);received=true;}catch{pendingError=Error('Coordinator response rejected.');stop();}}
+   if(message.error){pendingError=Error('Coordinator command rejected.');if(['configuration','cache-open','public-predecessor','transcript-construction','native-proving','native-verification','proof-publication'].includes(message.proofStage))pendingError.coordinatorProofStage=message.proofStage;}
+  });
+  child.on('close',async code=>{
+   exited=true;clearTimeout(timer);let contained=false;
+   if(guardPromise)try{guard=await guardPromise;await guard.close();contained=true;}catch{pendingError=Error('Worker containment is uncertain; reconcile the saved operation.');}
+   if(code===0&&received&&!pendingError)yes({pid:child.pid,value:result,...(guard?{containmentMode:guard.mode,ownedProcessesStopped:true}:{})});else{
+    const error=pendingError??Error('Coordinator result is uncertain; recover the same operation.');error.workerPid=child.pid;error.exitCode=code;
+    if(interrupted)error.interruptedDuringNativeProve=true;if(guard)error.ownedProcessesStopped=contained;no(error);
+   }
+  });
+  if(config.localProof){
+   guardPromise=startWorkerGuardian(child,{path:config.localProof.guardian,sha256:config.localProof.nativeExecutables.guardian});
+   guardPromise.then(g=>{guard=g;guardReady=true;g.exit.then(r=>{if(r.code!==0&&!exited){pendingError=Error('Worker containment ended unexpectedly.');stop();}});dispatch();},()=>{pendingError=Error('Worker containment unavailable.');stop();});
+  }
  });
 }
 async function worker(config,action,payload){
@@ -151,7 +168,8 @@ async function worker(config,action,payload){
   if(book.generation===1n&&book.status===1&&['draw','redeemDraw'].includes(pending.circuit))assert(root.books.findPathForLeaf(commit(book,pending.candidate.financial.salt)));
   if(action==='prove'){
    assert(config.localProof);assert.equal(resolve(config.localProof.managedDir),dir);assert.deepEqual(Object.keys(payload).sort(),['operationId','publicLedgerState'].sort());
-   const proof=await proveRestoredCoordinator({config:config.localProof,scope:config.scope,directory:config.directory,password:config.password,pending,restored,initialQueryContext,publicLedgerState:payload.publicLedgerState});
+   const proof=await proveRestoredCoordinator({config:config.localProof,scope:config.scope,directory:config.directory,password:config.password,pending,restored,initialQueryContext,publicLedgerState:payload.publicLedgerState,
+    onNativeStage:stage=>{if(process.connected)process.send({nativeStage:stage});}});
    if(config.testCrashAfterProofPublication)process.exit(23);
    return {operationId:pending.operationId,circuit:pending.circuit,fingerprint:pending.fingerprint,publicState:restoredState,...proof};
   }
@@ -160,8 +178,9 @@ async function worker(config,action,payload){
 }
 if(process.argv[1]&&resolve(process.argv[1])===self&&process.argv[2]==='--worker'){
  const config=unwire(process.env.LINE_COORDINATOR_TEST_CONFIG);delete process.env.LINE_COORDINATOR_TEST_CONFIG;
+ let finishing=false;
  process.once('message',async message=>{try{assert(typeof message.body==='string'&&Buffer.byteLength(message.body)<=2*1024*1024);const {action,payload}=unwire(message.body),value=await worker(config,action,payload);
-  process.send({body:wire(value)},()=>process.disconnect());
- }catch(error){process.exitCode=1;process.send({error:true,...(error.coordinatorProofStage?{proofStage:error.coordinatorProofStage}:{})},()=>process.disconnect());}});
- process.on('disconnect',()=>process.exit(process.exitCode??0));process.send({ready:true});
+  process.send({body:wire(value)},()=>{finishing=true;process.disconnect();});
+ }catch(error){process.exitCode=1;process.send({error:true,...(error.coordinatorProofStage?{proofStage:error.coordinatorProofStage}:{})},()=>{finishing=true;process.disconnect();});}});
+ process.on('disconnect',()=>{if(!finishing&&process.platform!=='win32'){try{process.kill(-process.pid,'SIGKILL');return;}catch{}}process.exit(process.exitCode??0);});process.send({ready:true});
 }
