@@ -39,6 +39,8 @@ jobs:
           test "$(wc -c < LICENSE)" -ge 10000
 
       - name: Install project-pinned Compact toolchain
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           bash scripts/install-compact.sh
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
