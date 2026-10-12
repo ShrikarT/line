@@ -62,3 +62,43 @@ test('an actual publication failure closes mutation until the owner reopens comm
  rmdirSync(path);writeFileSync(path,original,{mode:0o600});
  j=await PrivateFinanceJournal.open(x.owner);try{assert.deepEqual(j.snapshot().confirmed,x.initial);assert.equal(j.snapshot().pending,null);}finally{await j.close();}
 });
+
+const intentFor=x=>({operationId:x.operation.operationId,circuit:x.operation.circuit,circuitArgs:x.operation.circuitArgs,witnesses:x.operation.witnesses,
+ descriptor:{name:'draw',args:x.operation.circuitArgs,values:{amount:15n}},semanticRequest:{operationId:x.operation.operationId,actor:'agent',circuit:'draw',merchant:'merchantA'},before:x.initial});
+
+test('write-ahead authorization survives reopening and permits only the identical intent',async()=>{
+ const x=fixture(),intent=intentFor(x);let j=await PrivateFinanceJournal.open({...x.owner,create:true});await j.initialize(x.initial);
+ const saved=await j.stageAuthorization(intent),revision=j.snapshot().revision;await j.close();
+ const raw=readFileSync(join(x.owner.directory,'55555555-5555-4555-8555-555555555555.checkpoint'),'utf8');
+ assert(!raw.includes('drawAmount'));assert(!raw.includes(Buffer.from(x.operation.witnesses.newSalt).toString('hex')));
+ j=await PrivateFinanceJournal.open(x.owner);try{
+  assert.equal(j.snapshot().pending,null);assert.deepEqual(j.snapshot().confirmed,x.initial);
+  assert.deepEqual(await j.stageAuthorization(intent),saved);assert.equal(j.snapshot().revision,revision);
+  for(const changed of [{...intent,operationId:'replacement'}, {...intent,semanticRequest:{...intent.semanticRequest,merchant:'merchantB'}},
+   {...intent,witnesses:{...intent.witnesses,newSalt:bytes()}}, {...intent,descriptor:{...intent.descriptor,args:[]}}])await assert.rejects(j.stageAuthorization(changed));
+  assert.deepEqual(j.snapshot().authorizationIntent,saved);
+ }finally{await j.close();}
+});
+
+test('saved authorization must become the exact candidate and clears atomically on preparation',async()=>{
+ const x=fixture(),j=await PrivateFinanceJournal.open({...x.owner,create:true});try{
+  await j.initialize(x.initial);await j.stageAuthorization(intentFor(x));
+  for(const changed of [{...x.operation,operationId:'replacement'}, {...x.operation,circuit:'postQuote'}, {...x.operation,circuitArgs:[]},
+   {...x.operation,witnesses:{...x.operation.witnesses,newSalt:bytes()}}, {...x.operation,before:{...x.initial,financial:{lost:true}}}])await assert.rejects(j.prepare(changed));
+  assert(j.snapshot().authorizationIntent);assert.equal(j.snapshot().pending,null);
+  // Signed approval fields are added after the pre-RPC intent has been saved.
+  const approved={...x.operation,witnesses:{...x.operation.witnesses,approvalS:123n}};await j.prepare(approved);
+  assert.equal(j.snapshot().authorizationIntent,null);assert.deepEqual(j.snapshot().pending.witnesses,approved.witnesses);
+  await assert.rejects(j.stageAuthorization(intentFor(x)));await j.confirm(x.operation.operationId,x.candidate.publicState);
+  await assert.rejects(j.stageAuthorization(intentFor(x)));assert.equal(j.snapshot().completed.length,1);
+ }finally{await j.close();}
+});
+
+test('failed intent publication cannot proceed to an owner approval or candidate',async()=>{
+ const x=fixture(),j=await PrivateFinanceJournal.open({...x.owner,create:true});await j.initialize(x.initial);
+ const path=join(x.owner.directory,'55555555-5555-4555-8555-555555555555.checkpoint'),raw=readFileSync(path);
+ unlinkSync(path);mkdirSync(path);
+ await assert.rejects(j.stageAuthorization(intentFor(x)));assert.throws(()=>j.snapshot(),/uncertain/);await assert.rejects(j.prepare(x.operation),/uncertain/);
+ await j.close();rmdirSync(path);writeFileSync(path,raw,{mode:0o600});
+ const restored=await PrivateFinanceJournal.open(x.owner);try{assert(!restored.snapshot().authorizationIntent);assert.equal(restored.snapshot().pending,null);}finally{await restored.close();}
+});

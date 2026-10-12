@@ -51,6 +51,8 @@ Clean shutdown uses the owner's local `stop` input or process signal; there is n
 
 ## Reproduction and remaining integration
 
+A subsequent [whole coordinator recovery experiment](OWNER_COORDINATOR_RECOVERY_2026-10-12.md) now restores the generated financial execution worker through these APIs, including eight abrupt exits. This has separate source-bound generated evidence; it does not extend the ten-call native proof report to the new journal/worker or establish independent administration/network confirmation.
+
 `npm run owner:service:test` runs the transport/CLI controls. `npm run owner:service:compact` freshly compiles the exact private-offer source and executes the two-merchant integration. Certificate fixtures use OpenSSL; Windows tests use the existing Ubuntu WSL OpenSSL and create files only in ignored test directories. No operator wallet, existing TLS key, funded helper or global Docker/WSL configuration is used.
 
 Canonical Compact and managed bindings are unchanged. Earlier 65-call and six-call native reports retain their exact historical helper fingerprints; the new owner API has its separate ten-call native report above. Closing the destination still requires whole-coordinator/durable all-role recovery, independent owner deployments and policies, runtime/console integration, complete observer histories, fee-funded finalized network calls, authentic asset settlement and customer evidence. The Wave 2 privacy-demo gate remains open.
