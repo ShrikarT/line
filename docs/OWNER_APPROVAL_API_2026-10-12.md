@@ -20,6 +20,8 @@ The refactor's full regression initially ran alongside native proving and failed
 
 This closes local native verification of this transport fixture. It remains synthetic ledger/time with fee balancing disabled, same-host owner administration and volatile financial state. It proves neither independent operators, production recovery/rotation, all-twelve transport coverage, complete historical privacy, finalized network execution nor asset payouts.
 
+The implementation in `d1cc6db` passes both [push CI](https://github.com/ShrikarT/line/actions/runs/38230245115) and [PR CI](https://github.com/ShrikarT/line/actions/runs/38230250987), including the 502-test inventory (500 Linux passes/two skips), 20 browser checks, fresh owner API integration and both Windows ACL controls. All 23 normalized native helper fingerprints match that Git revision. CI does not replace the separate local proof report or establish the remaining gates.
+
 ## Authentication and disclosure
 
 The owner requires TLS 1.3, a trusted client certificate and an exact approved client-certificate fingerprint. The caller validates CA/hostname and the pinned owner leaf certificate **before sending its body**, then checks the owner's role, private-offer ABI, domain and Compact public point. A public point echoed by an endpoint alone is not authentication; TLS possession and the certificate pin establish the transport peer. Each approval must also match the expected public point, and Compact still verifies its actual signature and accounting constraints.
