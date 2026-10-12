@@ -43,7 +43,7 @@
     "proof:privacy": "node --experimental-strip-types scripts/private-signed-proof.mjs",
     "proof:merchant": "node --experimental-strip-types scripts/private-merchant-proof.mjs",
     "network:receipts": "node --experimental-strip-types scripts/verify-preprod-receipts.mjs",
-    "network:receipts:test": "node --experimental-strip-types --test tests/preprod-receipts.test.mjs",
+    "network:receipts:test": "node --experimental-strip-types --test tests/preprod-receipts.test.mjs tests/finalized-contract-receipt.test.mjs",
     "custody:journal:test": "node --experimental-strip-types --test tests/durable-approval-signer.test.mjs",
     "enrollment:spike": "node --experimental-strip-types scripts/private-enrollment-spike.mjs",
     "proof:enrollment": "node --experimental-strip-types scripts/private-enrollment-proof.mjs",
