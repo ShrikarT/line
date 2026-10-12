@@ -16,7 +16,8 @@ for(const key of ['coordinatorWitnessesReturnedToHarness','networkSubmitted','au
 const helpers=['scripts/recoverable-owner-coordinator.mjs','scripts/private-owner-coordinator.mjs','scripts/private-finance-journal.mjs','server/checkout-storage.ts',
  'scripts/approval-owner-service.mjs','scripts/approval-service-frame.mjs','scripts/approval-owner-example-policy.mjs','scripts/durable-approval-signer.mjs','scripts/durable-approval-actor.mjs',
  'scripts/private-offer-signers.mjs','scripts/signed-pool-signers.mjs','scripts/private-offer-encoding.mjs','scripts/private-pool-spike.mjs',
- 'src/lib/security/vault-codec.ts','src/lib/line/encoding.ts','tests/fixtures/approval-service-tls.mjs'];
+ 'src/lib/security/vault-codec.ts','src/lib/line/encoding.ts','tests/fixtures/approval-service-tls.mjs',
+ 'scripts/private-coordinator-proving.mjs','scripts/native-local-proving-provider.mjs'];
 assert.deepEqual(Object.keys(r.scriptFingerprints).sort(),helpers.sort());
 for(const p of helpers)assert.equal(sha(readFileSync(p)),r.scriptFingerprints[p],'Coordinator helper changed since execution.');
 assert.deepEqual(Object.keys(r.artifacts).sort(),['contract/index.js','compiler/contract-info.json'].sort());

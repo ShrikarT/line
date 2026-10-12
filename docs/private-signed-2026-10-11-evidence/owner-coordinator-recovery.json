@@ -69,7 +69,7 @@
       "exitCode": 23
     }
   ],
-  "createdAt": "2026-10-12T10:20:37.922Z",
+  "createdAt": "2026-10-12T10:48:22.055Z",
   "cryptographicProofsGenerated": false,
   "evidenceScope": "Ten generated Compact calls in separate execution-worker processes, restoring write-ahead authorization intents and private prepared packets through four mTLS services, with eight abrupt publication/approval exits and exact completed retries. Same-host synthetic owner harness and caller-trusted candidate observations; no network receipt/proof/asset/independent-administration claim.",
   "financialCheckpointDurable": true,
@@ -85,8 +85,8 @@
   "preparedPacketReloadedWithoutFreshApproval": true,
   "schema": "line-recoverable-owner-coordinator/v1",
   "scriptFingerprints": {
-    "scripts/recoverable-owner-coordinator.mjs": "49b9c0dda2060167868e18a80bc2431a651342861ae962a27d23e6e0ddf71fc5",
-    "scripts/private-owner-coordinator.mjs": "52e244fee1397855ea5dd85e09f9d18bc9058a1e5f340f90b4602364a988f601",
+    "scripts/recoverable-owner-coordinator.mjs": "a0014b5e2e45dfa5e92d2224a82cc405e04ba60ee30e231682ee34dc475e9b3d",
+    "scripts/private-owner-coordinator.mjs": "eb67b0b1b77fbca6ff17f4711699631649d65194a9c6d97c2a3999860ad500ec",
     "scripts/private-finance-journal.mjs": "5ca55ee14efe2db693f89b72f43abfa1882f113c1d5fd683d0c34517a6a667fc",
     "server/checkout-storage.ts": "343083864e5ad9bb6c6f53e68dc1e070dc97e5360b00c38e6bd4a9cc2cc3860b",
     "scripts/approval-owner-service.mjs": "8513fa94cd4644b86da339bc5ebf042814b53b2e250f2b50eabb2a13dd3589b4",
@@ -100,7 +100,9 @@
     "scripts/private-pool-spike.mjs": "be5b8a3e2f85a3bb3e45fabfaafe55b45f414f6999b3931a6fb4c33f01a04397",
     "src/lib/security/vault-codec.ts": "7df485e705a4d64b2fb6ea262ca96dd5c11c509c32991b03e2dea94d09fb55f9",
     "src/lib/line/encoding.ts": "fb2af647156d2a744c6fb031fe084aee25708a379a7db6412782ca9c2e232b5b",
-    "tests/fixtures/approval-service-tls.mjs": "0231722840e48af75958ea0e9a9ad39b1794e4b20a9164cc774f77770f54d1e5"
+    "tests/fixtures/approval-service-tls.mjs": "0231722840e48af75958ea0e9a9ad39b1794e4b20a9164cc774f77770f54d1e5",
+    "scripts/private-coordinator-proving.mjs": "2397a15efe515fba78be15c45b39305190d7193d6307f397d3ac89a0f8139e8f",
+    "scripts/native-local-proving-provider.mjs": "12a44a9d40ca78abfa9939782aa8feb2659fd9248e54aa04db8a6b73fc84e00b"
   },
   "sourceSha256": "ae970672c048c48692ab690554c77285fec19d1943dc3b4574080970b7fa657d",
   "traces": [
@@ -182,12 +184,14 @@
     "scripts/approval-service-frame.mjs": "550a409609088ca19eef9c56614b5c36a60b0957165a589e46b8938e3035deb8",
     "scripts/durable-approval-actor.mjs": "3ac1a52c31c5bc8136f162772254f25539c0488de939deb659a1454f3b451504",
     "scripts/durable-approval-signer.mjs": "66086d2593a03cc3bbec100e115b8f97877ba0bbb2982cc6094bfce84989efd9",
+    "scripts/native-local-proving-provider.mjs": "12a44a9d40ca78abfa9939782aa8feb2659fd9248e54aa04db8a6b73fc84e00b",
+    "scripts/private-coordinator-proving.mjs": "2397a15efe515fba78be15c45b39305190d7193d6307f397d3ac89a0f8139e8f",
     "scripts/private-finance-journal.mjs": "5ca55ee14efe2db693f89b72f43abfa1882f113c1d5fd683d0c34517a6a667fc",
     "scripts/private-offer-encoding.mjs": "e78ffe273c86f72f58733574287b3099530be96efbed37a6fe3d8c16a36a7f22",
     "scripts/private-offer-signers.mjs": "80695e03759e98c7bda37ea909430e1b94c9ccabf9f2ef4c6defa3a1a5e2660e",
-    "scripts/private-owner-coordinator.mjs": "52e244fee1397855ea5dd85e09f9d18bc9058a1e5f340f90b4602364a988f601",
+    "scripts/private-owner-coordinator.mjs": "eb67b0b1b77fbca6ff17f4711699631649d65194a9c6d97c2a3999860ad500ec",
     "scripts/private-pool-spike.mjs": "be5b8a3e2f85a3bb3e45fabfaafe55b45f414f6999b3931a6fb4c33f01a04397",
-    "scripts/recoverable-owner-coordinator.mjs": "49b9c0dda2060167868e18a80bc2431a651342861ae962a27d23e6e0ddf71fc5",
+    "scripts/recoverable-owner-coordinator.mjs": "a0014b5e2e45dfa5e92d2224a82cc405e04ba60ee30e231682ee34dc475e9b3d",
     "scripts/signed-pool-signers.mjs": "df077892d65f2736322be3e627e6ec9f1bcfa422f9369dcb2016d203ca5831a3",
     "server/checkout-storage.ts": "062dc031363ee0fa3117cadd6029edb9375ac5f038430c236dbd71d3402ad339",
     "src/lib/line/encoding.ts": "8fe151cc8eb4f50727c6658beb42e7892028fccfff34f2c1a8045bf61602d0c5",

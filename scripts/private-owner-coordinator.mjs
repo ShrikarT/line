@@ -1,6 +1,7 @@
 /** Experimental financial execution worker, with no role signing/store keys.
  * Each invocation reconstructs generated Compact from the encrypted journal.
- * It neither proves/submits nor authenticates a network confirmation itself.
+ * Optional local proving returns public bytes only; it never submits or
+ * authenticates network confirmation.
  */
 import assert from 'node:assert/strict';
 import {fork} from 'node:child_process';
@@ -15,6 +16,7 @@ import {encodeVaultJson as wire,decodeVaultJson as unwire} from '../src/lib/secu
 import {hash,tag,roleHash,zero} from './private-offer-signers.mjs';
 import {facilityBinding,offerCommit} from './private-offer-encoding.mjs';
 import {commit} from './private-pool-spike.mjs';
+import {initializeCoordinatorProofLedger,proveRestoredCoordinator} from './private-coordinator-proving.mjs';
 const self=fileURLToPath(import.meta.url),SOURCE='contracts/experimental/line-private-offer.compact',sha=b=>createHash('sha256').update(b).digest('hex');
 const bytes=()=>new Uint8Array(randomBytes(32)),hex=b=>Buffer.from(b).toString('hex'),COIN=RT.encodeCoinPublicKey('0'.repeat(64));
 const stateBytes=data=>{const s=new RT.ContractState();s.data=data instanceof RT.ChargedState?data:new RT.ChargedState(data);return s.serialize();};
@@ -29,14 +31,14 @@ export function coordinatorDrawFee(amount,flatFee,basisPoints){
  assert(u64(fee)&&amount+fee<=U64_MAX);return fee;
 }
 export function coordinatorCommand(config,action,payload){
- assert(['initialize','prepare','restore','confirm','status'].includes(action));const body=wire({action,payload});assert(Buffer.byteLength(body)<=512*1024);
+ assert(['initialize','prepare','restore','prove','confirm','status'].includes(action));const body=wire({action,payload});assert(Buffer.byteLength(body)<=2*1024*1024);
  const child=fork(self,['--worker'],{execArgv:['--experimental-strip-types'],stdio:['ignore','ignore','pipe','ipc'],
   env:{PATH:process.env.PATH,SystemRoot:process.env.SystemRoot,LINE_COORDINATOR_TEST_CONFIG:wire(config)}});
  return new Promise((yes,no)=>{
-  let received=false,result;const timer=setTimeout(()=>{child.kill();no(Error('Coordinator result is uncertain; recover the same operation.'));},60_000);
+  let received=false,result;const timer=setTimeout(()=>{child.kill();no(Error('Coordinator result is uncertain; recover the same operation.'));},action==='prove'?2_000_000:60_000);
   child.on('error',error=>{clearTimeout(timer);no(error);});
-  child.on('message',message=>{if(message.ready){child.send({body});return;}if(message.body){try{result=unwire(message.body);received=true;}catch{child.kill();}}
-   if(message.error){clearTimeout(timer);no(Error('Coordinator command rejected.'));}});
+  child.on('message',message=>{if(message.ready){child.send({body});return;}if(message.body){try{assert(Buffer.byteLength(message.body)<=16*1024*1024);result=unwire(message.body);received=true;}catch{child.kill();}}
+   if(message.error){clearTimeout(timer);const error=Error('Coordinator command rejected.');if(['configuration','cache-open','public-predecessor','transcript-construction','native-proving','native-verification','proof-publication'].includes(message.proofStage))error.coordinatorProofStage=message.proofStage;no(error);}});
   child.on('exit',code=>{clearTimeout(timer);if(code===0&&received)yes({pid:child.pid,value:result});else{
    const error=Error('Coordinator result is uncertain; recover the same operation.');error.workerPid=child.pid;error.exitCode=code;no(error);
   }});
@@ -63,11 +65,13 @@ async function worker(config,action,payload){
    active={reserveSalt:bytes()};const initial=contract.initialState(RT.createConstructorContext({notes:{},quotes:{}},COIN),issuerPk,merchantA,instanceNonce,stableKey);
    const domain=ledger(initial.currentContractState.data).contractDomain,identity=roleHash('agent',points.agent,domain);
    const scope={networkId:'synthetic-preview',sourceSha256:sourceHash,executableSha256:exeHash,contractAddress:RT.dummyContractAddress(),contractDomain:hex(domain)};
+   let proofGenesis;
+   if(config.localProof){assert.equal(resolve(config.localProof.managedDir),dir);proofGenesis=await initializeCoordinatorProofLedger(initial,config.localProof,scope,unixSeconds);scope.contractAddress=proofGenesis.address;}
    const book={domain,identity,limit,outstanding:0n,epoch:0n,generation:1n,expiry:BigInt(unixSeconds+3600),flatFee,basisPoints,status:1};
    const bindingSalt=bytes(),binding=facilityBinding(book,bindingSalt),financial={nullifierKey,unixSeconds,points,terms,book,salt:bytes(),bindingSalt,binding,offers:{},notes:{},requests:{}};
    journal=await PrivateFinanceJournal.open({directory:config.directory,password:config.password,scope,create:true});
    await journal.initialize({publicState:stateBytes(initial.currentContractState.data),privateState:initial.currentPrivateState,financial});
-   return {scope,domain,identity,binding,expiry:book.expiry};
+   return {scope,domain,identity,binding,expiry:book.expiry,...(proofGenesis?{proofGenesis}:{})};
   }
   journal=await PrivateFinanceJournal.open({directory:config.directory,password:config.password,scope:config.scope});
   const snapshot=journal.snapshot();
@@ -99,7 +103,7 @@ async function worker(config,action,payload){
     values={enrollmentIdentity:f.book.identity,acceptedTerms:f.terms,hasPreviousBook:false,lineLimit:f.book.limit,newSalt:f.salt,bookOpening:{...f.book,generation:0n},salt:zero,bookPath:emptyPath()};
    }
    if(circuit==='postQuote'){
-    assert(['merchantA','merchantB'].includes(actor));const merchant=roleHash('merchant',f.points[actor]);args=[BigInt(f.unixSeconds+900)];
+    assert(['merchantA','merchantB'].includes(actor));const merchant=roleHash('merchant',f.points[actor]);const ttl=config.localProof?2700:900;args=[BigInt(f.unixSeconds+ttl)];
     values={quoteFacilityBinding:f.binding,invoiceId:bytes(),quoteAmount:payload.amount,quoteNonce:bytes(),quoteBindingSalt:f.bindingSalt,enabledMerchantPath:v.enabledMerchantTree.findPathForLeaf(merchant)};
    }
    if(circuit==='draw'){
@@ -140,18 +144,24 @@ async function worker(config,action,payload){
    pending=journal.snapshot().pending;
   }
   assert.equal(pending?.operationId,payload.operationId,'Restore requires exact pending operation.');active=pending.witnesses;
-  const ctx=RT.createCircuitContext(config.scope.contractAddress,COIN,RT.ContractState.deserialize(pending.before.publicState).data,structuredClone(pending.before.privateState),undefined,undefined,pending.before.financial.unixSeconds);
+  const ctx=RT.createCircuitContext(config.scope.contractAddress,COIN,RT.ContractState.deserialize(pending.before.publicState).data,structuredClone(pending.before.privateState),undefined,undefined,pending.before.financial.unixSeconds),initialQueryContext=ctx.currentQueryContext;
   const restored=contract.circuits[pending.circuit](ctx,...pending.circuitArgs),restoredState=stateBytes(restored.context.currentQueryContext.state);
   assert.deepEqual(restoredState,pending.candidate.publicState);assert.deepEqual(restored.context.currentPrivateState,pending.candidate.privateState);
   const root=ledger(restored.context.currentQueryContext.state),book=pending.candidate.financial.book;
   if(book.generation===1n&&book.status===1&&['draw','redeemDraw'].includes(pending.circuit))assert(root.books.findPathForLeaf(commit(book,pending.candidate.financial.salt)));
+  if(action==='prove'){
+   assert(config.localProof);assert.equal(resolve(config.localProof.managedDir),dir);assert.deepEqual(Object.keys(payload).sort(),['operationId','publicLedgerState'].sort());
+   const proof=await proveRestoredCoordinator({config:config.localProof,scope:config.scope,directory:config.directory,password:config.password,pending,restored,initialQueryContext,publicLedgerState:payload.publicLedgerState});
+   if(config.testCrashAfterProofPublication)process.exit(23);
+   return {operationId:pending.operationId,circuit:pending.circuit,fingerprint:pending.fingerprint,publicState:restoredState,...proof};
+  }
   return {operationId:pending.operationId,circuit:pending.circuit,fingerprint:pending.fingerprint,publicState:restoredState,sourceBound:true,restoredFromEncryptedJournal:true,networkFinalityVerified:false};
  }finally{if(journal)await journal.close();}
 }
 if(process.argv[1]&&resolve(process.argv[1])===self&&process.argv[2]==='--worker'){
  const config=unwire(process.env.LINE_COORDINATOR_TEST_CONFIG);delete process.env.LINE_COORDINATOR_TEST_CONFIG;
- process.once('message',async message=>{try{assert(typeof message.body==='string'&&Buffer.byteLength(message.body)<=512*1024);const {action,payload}=unwire(message.body),value=await worker(config,action,payload);
+ process.once('message',async message=>{try{assert(typeof message.body==='string'&&Buffer.byteLength(message.body)<=2*1024*1024);const {action,payload}=unwire(message.body),value=await worker(config,action,payload);
   process.send({body:wire(value)},()=>process.disconnect());
- }catch{process.exitCode=1;process.send({error:true},()=>process.disconnect());}});
+ }catch(error){process.exitCode=1;process.send({error:true,...(error.coordinatorProofStage?{proofStage:error.coordinatorProofStage}:{})},()=>process.disconnect());}});
  process.on('disconnect',()=>process.exit(process.exitCode??0));process.send({ready:true});
 }
