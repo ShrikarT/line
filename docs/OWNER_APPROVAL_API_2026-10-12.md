@@ -47,6 +47,8 @@ For bootstrap, the owner can use `--identity` to create/read its encrypted ident
 
 The supplied `approval-owner-example-policy.mjs` demonstrates bounded first-generation purchases. Issuer policy allows selected merchant registration/disable, bounded reserve authorization and consent acceptance for a specific borrower/terms; agent policy checks its own book, merchants, price/fee and time; merchant policy checks its opaque facility binding, price and time bounds. Other governance, receipt, refund and dispute operations deny by default. Those require an owner-selected policy with real reconciled terms/receipts; enabling them blindly would not establish cash authenticity. The underlying Compact source still exports exactly the same twelve circuit names.
 
+A separate [per-offer supplier policy](PER_OFFER_BINDINGS_2026-10-12.md) supports fresh randomized bindings in the newer coordinator fixture. It requires explicit owner selection and accepts opaque handles from the pinned financial caller under price/time bounds; it does not retain the fixed policy's stable customer-binding allowlist. Existing stores and fixed-binding policies are not automatically changed. These two policy scopes must not be described as equivalent.
+
 Clean shutdown uses the owner's local `stop` input or process signal; there is no network stop route. A hard-death signer lease still requires the existing owner-only stopped-PID recovery procedure. OS administration, process-death uncertainty, production backup and institutional key custody are not certified here.
 
 ## Reproduction and remaining integration

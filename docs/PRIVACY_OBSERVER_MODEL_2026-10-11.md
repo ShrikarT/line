@@ -8,6 +8,8 @@ The canonical and earlier merchant/enrollment quote requests contain borrower id
 
 This observer target spans the merchant, enrollment and private-offer experiments; their evidence scopes are separate. It is not an achieved guarantee or a change to the deployed canonical contract. The canonical inventory remains in [PRIVACY.md](PRIVACY.md). The [twelve-circuit public dependency review](PUBLIC_DEPENDENCY_REVIEW_2026-10-12.md) records the exact current private-offer source and corrects older lifecycle/recovery descriptions.
 
+The subsequent [per-offer runtime continuation](PER_OFFER_BINDINGS_2026-10-12.md) replaces repeated initialization bindings on new coordinator quotes with fresh salted Compact bindings persisted through retry. Its synthetic supplier owners explicitly choose a separate per-offer policy; fixed-binding policies remain unchanged. This removes one supplier-facing equality channel without establishing full observer distributions, deployment or complete-history privacy.
+
 ## Protected information and authorized readers
 
 The target protects a facility's limit, outstanding debt and remaining capacity from public observers and unrelated participants. It also protects purchase amounts and aggregate reserve totals from public readers. An issuer and its explicitly trusted financial coordinator receive books and reserve openings. A legal borrower receives its own terms and debt. A merchant receives its own quote, claim and payment information, including price, but must not receive unrelated books or aggregate reserve openings merely to sign a quote or redeem a claim.

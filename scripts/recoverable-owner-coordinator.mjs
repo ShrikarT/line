@@ -11,6 +11,7 @@ import {resolve,join,relative,sep} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {DurableApprovalSigner} from './durable-approval-signer.mjs';
 import {authorize} from './approval-owner-example-policy.mjs';
+import {authorize as authorizePerOffer} from './approval-owner-per-offer-policy.mjs';
 import {startApprovalOwnerService} from './approval-owner-service.mjs';
 import {coordinatorCommand} from './private-owner-coordinator.mjs';
 import {tlsFixture} from '../tests/fixtures/approval-service-tls.mjs';
@@ -25,14 +26,14 @@ const files=['scripts/recoverable-owner-coordinator.mjs','scripts/private-owner-
  'scripts/approval-owner-service.mjs','scripts/approval-service-frame.mjs','scripts/approval-owner-example-policy.mjs','scripts/durable-approval-signer.mjs','scripts/durable-approval-actor.mjs',
  'scripts/private-offer-signers.mjs','scripts/signed-pool-signers.mjs','scripts/private-offer-encoding.mjs','scripts/private-pool-spike.mjs','src/lib/security/vault-codec.ts','src/lib/line/encoding.ts','tests/fixtures/approval-service-tls.mjs',
  'scripts/private-coordinator-proving.mjs','scripts/native-local-proving-provider.mjs','scripts/private-worker-guardian.mjs',
- 'scripts/private-finance-network.mjs','scripts/finalized-contract-receipt.mjs','src/lib/runtime/endpoints.ts'];
+ 'scripts/private-finance-network.mjs','scripts/finalized-contract-receipt.mjs','src/lib/runtime/endpoints.ts','scripts/approval-owner-per-offer-policy.mjs'];
 const fingerprints=Object.fromEntries(files.map(p=>[p,sha(readFileSync(p))])),sourceHash=sha(readFileSync(SOURCE)),tls=tlsFixture();
 const owners={},services={},labels={issuer:'issuer',agent:'agent',merchantA:'merchant',merchantB:'merchant'},traces=[],controls=[],processes=[],crashes=[];
 const config={managedDir,sourceSha256:sourceHash,executableSha256:sha(readFileSync(join(managedDir,'contract/index.js'))),directory:join(work,'private-financial-state'),password:Buffer.from(bytes()).toString('hex')};
 if(localProof)config.localProof=localProof;
 const command=async(action,payload)=>{const response=await coordinatorCommand(config,action,payload);processes.push(response.pid);return response;};
 try{
- for(const [label,role]of Object.entries(labels))owners[label]=new DurableApprovalSigner({directory:join(work,label),encryptionKey:bytes(),custodyId:label+'-owner',role,authorize,create:true,approvalABI:'line-private-offer/v1'});
+ for(const [label,role]of Object.entries(labels))owners[label]=new DurableApprovalSigner({directory:join(work,label),encryptionKey:bytes(),custodyId:label+'-owner',role,authorize:role==='merchant'?authorizePerOffer:authorize,create:true,approvalABI:'line-private-offer/v1'});
  const points=Object.fromEntries(Object.entries(owners).map(([label,s])=>[label,s.publicKey])),terms=bytes(),now=Math.floor(Date.now()/1000);
  const initialized=await command('initialize',{points,instanceNonce:bytes(),terms,limit:100n,flatFee:1n,basisPoints:100n,unixSeconds:now});
  const {scope,domain,identity,binding}=initialized.value;config.scope=scope;config.clients={};
@@ -41,7 +42,7 @@ try{
  const merchantA=roleHash('merchant',points.merchantA),merchantB=roleHash('merchant',points.merchantB),common={domain,maxAuthorizedCost:500n,validBefore:BigInt(now+7200)};
  owners.issuer.bindPolicy({...common,maxReserveAction:200n,maxLineLimit:100n,maxFee:2n,maxBasisPoints:100n,agentIdentity:identity,acceptedTerms:terms,allowedMerchants:[merchantA,merchantB]});
  owners.agent.bindPolicy({...common,maxAuthorizedCost:50n,maxLineLimit:100n,maxFee:2n,maxBasisPoints:100n,maxDrawAmount:30n,acceptedTerms:terms,allowedMerchants:[merchantA,merchantB]});
- for(const label of ['merchantA','merchantB'])owners[label].bindPolicy({...common,facilityBinding:binding,maxQuoteAmount:15n});
+ for(const label of ['merchantA','merchantB'])owners[label].bindPolicy({...common,facilityBindingMode:'per-offer',maxQuoteAmount:15n});
  for(const [label,role]of Object.entries(labels)){
   services[label]=await startApprovalOwnerService({signer:owners[label],role,approvalABI:'line-private-offer/v1',domain,...tls.material('server'),allowedClients:[tls.fingerprint('caller')]});
   config.clients[label]={url:'https://127.0.0.1:'+services[label].port+'/',...tls.material('caller'),expectedServerFingerprint:tls.fingerprint('server'),expectedRole:role,expectedPublicKey:points[label],expectedDomain:domain};
