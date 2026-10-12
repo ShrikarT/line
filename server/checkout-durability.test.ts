@@ -14,13 +14,15 @@ const PASSWORD = "test-only-checkpoint-passphrase";
 test("Windows checkpoint ACL validation works with an unavailable module search path", { skip: process.platform !== "win32" }, async () => {
   const root = await mkdtemp(join(tmpdir(), "line-checkout-module-path-"));
   try {
-    const code = `const {EncryptedCheckoutStore}=await import('./server/checkout-storage.ts'); const store=await EncryptedCheckoutStore.open(process.env.TEST_CHECKOUT_DIR,process.env.TEST_CHECKOUT_PASSWORD); await store.close();`;
+    const code = `try { const {EncryptedCheckoutStore}=await import('./server/checkout-storage.ts'); const store=await EncryptedCheckoutStore.open(process.env.TEST_CHECKOUT_DIR,process.env.TEST_CHECKOUT_PASSWORD); await store.close(); } catch(e) { console.error(e.message.includes('unrelated explicit access')?'ACL_POLICY_REJECTION':e.message.includes('powershell.exe')?'ACL_COMMAND_FAILURE':e.message.includes('lease')?'LEASE_FAILURE':'CHECKPOINT_OTHER_FAILURE'); process.exitCode=1; }`;
     await new Promise<void>((yes, no) => {
       const child = spawn(process.execPath, ["--experimental-strip-types", "--input-type=module", "-e", code], {
         cwd: resolve("."), env: { ...process.env, PSModulePath: join(root, "missing-modules"), TEST_CHECKOUT_DIR: join(root, "private"), TEST_CHECKOUT_PASSWORD: PASSWORD },
-        windowsHide: true, stdio: "ignore",
+        windowsHide: true, stdio: ["ignore", "ignore", "pipe"],
       });
-      child.on("error", no); child.on("close", code => code === 0 ? yes() : no(new Error("Private checkpoint ACL inspection failed without module discovery.")));
+      let category = "CHECKPOINT_OTHER_FAILURE";
+      child.stderr.on("data", bytes => { const match = bytes.toString().match(/\b(ACL_POLICY_REJECTION|ACL_COMMAND_FAILURE|LEASE_FAILURE|CHECKPOINT_OTHER_FAILURE)\b/); if (match) category = match[1]; });
+      child.on("error", no); child.on("close", code => code === 0 ? yes() : no(new Error(`Private checkpoint ACL inspection failed without module discovery: ${category}.`)));
     });
   } finally { await rm(root, { recursive: true, force: true }); }
 });

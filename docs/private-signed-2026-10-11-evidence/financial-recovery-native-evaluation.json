@@ -1,6 +1,6 @@
 {
   "schema": "line-recoverable-offer-preimage-check/v1",
-  "createdAt": "2026-10-12T07:21:45.571Z",
+  "createdAt": "2026-10-12T07:40:24.009Z",
   "complete": true,
   "sourceSha256": "ae970672c048c48692ab690554c77285fec19d1943dc3b4574080970b7fa657d",
   "nativeCheckerSha256": "441e12062c2b168a301be55f5ada64ad198f829a6561060cb093a9b40f3786c8",
@@ -15,7 +15,7 @@
     "scripts/private-offer-encoding.mjs": "e78ffe273c86f72f58733574287b3099530be96efbed37a6fe3d8c16a36a7f22",
     "scripts/private-pool-spike.mjs": "be5b8a3e2f85a3bb3e45fabfaafe55b45f414f6999b3931a6fb4c33f01a04397",
     "scripts/signed-pool-signers.mjs": "df077892d65f2736322be3e627e6ec9f1bcfa422f9369dcb2016d203ca5831a3",
-    "server/checkout-storage.ts": "c1dfa5ca3244c56331689bdc68a2e66c01a89d8c47e4795d17d9c499391b19cc",
+    "server/checkout-storage.ts": "343083864e5ad9bb6c6f53e68dc1e070dc97e5360b00c38e6bd4a9cc2cc3860b",
     "src/lib/security/vault-codec.ts": "7df485e705a4d64b2fb6ea262ca96dd5c11c509c32991b03e2dea94d09fb55f9",
     "src/lib/line/encoding.ts": "fb2af647156d2a744c6fb031fe084aee25708a379a7db6412782ca9c2e232b5b",
     "scripts/native-preimage-checker/src/main.rs": "d6c792b64f09b2b36772d2db5410174c6be228209ae0295dc9c0efd7b329b4b1",
@@ -176,7 +176,7 @@
       "bytes": 39403
     }
   },
-  "generatedPrerequisiteSha256": "832250911a128be9f6210f2e7bee4c2bcafe3b20402ba745027cdb676bc5cb68",
+  "generatedPrerequisiteSha256": "82933f9e83ad9a7d1e70ebe12a0983b85b1ad910060b3cf4027cb04ab06abdef",
   "checks": [
     {
       "circuit": "fundReserve",
@@ -314,7 +314,7 @@
     "scripts/private-offer-encoding.mjs": "e78ffe273c86f72f58733574287b3099530be96efbed37a6fe3d8c16a36a7f22",
     "scripts/private-pool-spike.mjs": "be5b8a3e2f85a3bb3e45fabfaafe55b45f414f6999b3931a6fb4c33f01a04397",
     "scripts/signed-pool-signers.mjs": "df077892d65f2736322be3e627e6ec9f1bcfa422f9369dcb2016d203ca5831a3",
-    "server/checkout-storage.ts": "26d122ddd1846d35675afb10b894ce8383272ddbc075b70d1f306af0afec930b",
+    "server/checkout-storage.ts": "062dc031363ee0fa3117cadd6029edb9375ac5f038430c236dbd71d3402ad339",
     "src/lib/security/vault-codec.ts": "0abc995f6f042c9b142833d43cb97fd43f3eb934fdcfee0d043368db1d757062",
     "src/lib/line/encoding.ts": "8fe151cc8eb4f50727c6658beb42e7892028fccfff34f2c1a8045bf61602d0c5",
     "scripts/native-preimage-checker/src/main.rs": "d6c792b64f09b2b36772d2db5410174c6be228209ae0295dc9c0efd7b329b4b1",

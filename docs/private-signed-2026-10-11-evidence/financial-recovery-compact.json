@@ -1,6 +1,6 @@
 {
   "schema": "line-recoverable-offer-compact/v1",
-  "createdAt": "2026-10-12T07:20:18.741Z",
+  "createdAt": "2026-10-12T07:38:43.687Z",
   "sourceSha256": "ae970672c048c48692ab690554c77285fec19d1943dc3b4574080970b7fa657d",
   "scriptFingerprints": {
     "scripts/recoverable-offer-compact.mjs": "1de3a4cadbca2ad8a5225db91a38c0d59bbbacc9749ebd3e1ef209ffb402cc2b",
@@ -8,7 +8,7 @@
     "scripts/durable-approval-signer.mjs": "2c3b6e3350a64b49255058f08588f08692d952660e05b5c92e51d1885ce3c1fd",
     "scripts/private-finance-child.mjs": "c2ae3d79eee6148e6db2753550707331ae3bd39db47b44b4cc793ab2912a8159",
     "scripts/private-finance-journal.mjs": "c819ccad6f161703f49fc6d013121610425a651d06854607a29b3200128c1393",
-    "server/checkout-storage.ts": "c1dfa5ca3244c56331689bdc68a2e66c01a89d8c47e4795d17d9c499391b19cc",
+    "server/checkout-storage.ts": "343083864e5ad9bb6c6f53e68dc1e070dc97e5360b00c38e6bd4a9cc2cc3860b",
     "scripts/private-offer-encoding.mjs": "e78ffe273c86f72f58733574287b3099530be96efbed37a6fe3d8c16a36a7f22",
     "scripts/private-offer-signers.mjs": "80695e03759e98c7bda37ea909430e1b94c9ccabf9f2ef4c6defa3a1a5e2660e",
     "scripts/signed-pool-signers.mjs": "df077892d65f2736322be3e627e6ec9f1bcfa422f9369dcb2016d203ca5831a3",
@@ -127,7 +127,7 @@
     "scripts/durable-approval-signer.mjs": "2c3b6e3350a64b49255058f08588f08692d952660e05b5c92e51d1885ce3c1fd",
     "scripts/private-finance-child.mjs": "c2ae3d79eee6148e6db2753550707331ae3bd39db47b44b4cc793ab2912a8159",
     "scripts/private-finance-journal.mjs": "c819ccad6f161703f49fc6d013121610425a651d06854607a29b3200128c1393",
-    "server/checkout-storage.ts": "26d122ddd1846d35675afb10b894ce8383272ddbc075b70d1f306af0afec930b",
+    "server/checkout-storage.ts": "062dc031363ee0fa3117cadd6029edb9375ac5f038430c236dbd71d3402ad339",
     "scripts/private-offer-encoding.mjs": "e78ffe273c86f72f58733574287b3099530be96efbed37a6fe3d8c16a36a7f22",
     "scripts/private-offer-signers.mjs": "80695e03759e98c7bda37ea909430e1b94c9ccabf9f2ef4c6defa3a1a5e2660e",
     "scripts/signed-pool-signers.mjs": "df077892d65f2736322be3e627e6ec9f1bcfa422f9369dcb2016d203ca5831a3",
