@@ -23,7 +23,7 @@ The worker also computes `flatFee + ceil(amount * basisPoints / 10000)` with Big
 
 The earlier 34-invocation graceful and 40-invocation four-crash local experiments are historical. Their helper fingerprints differ from this report and are not relabeled as current evidence. Older native proof reports similarly retain their exact versions: the previous ten-call native owner-API fixture had volatile financial state, and the earlier six-call financial recovery fixture restarted storage children rather than this complete worker. Neither verifies this new crash-recovery path cryptographically.
 
-The full sequenced local Windows suite passes **507 tests / 60 suites**, with canonical compilation/zero managed drift, build/typecheck and production fixture/credential scans passing. Remote CI is a separate publication check.
+The full sequenced local Windows suite passes **507 tests / 60 suites**, with canonical compilation/zero managed drift, build/typecheck and production fixture/credential scans passing. Implementation `7ee6a41` passes [push CI](https://github.com/ShrikarT/line/actions/runs/38236212478) and [PR CI](https://github.com/ShrikarT/line/actions/runs/38236217724): 505 Linux tests with two platform skips, both Windows ACL controls, 20 browser checks and the fresh ten-call/eight-crash coordinator integration, plus compile/zero-drift, build/typecheck and scans.
 
 ## Trust boundary and open work
 
