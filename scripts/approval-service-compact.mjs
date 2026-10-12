@@ -7,7 +7,7 @@ import {spawn} from 'node:child_process';
 import {createHash,randomBytes} from 'node:crypto';
 import {readFileSync,writeFileSync,mkdirSync,mkdtempSync} from 'node:fs';
 import {resolve,join,relative,sep} from 'node:path';
-import {pathToFileURL} from 'node:url';
+import {pathToFileURL,fileURLToPath} from 'node:url';
 import * as RT from '@midnight-ntwrk/compact-runtime';
 import {DurableApprovalSigner} from './durable-approval-signer.mjs';
 import {authorize} from './approval-owner-example-policy.mjs';
@@ -17,14 +17,15 @@ import {hash,tag,roleHash,zero} from './private-offer-signers.mjs';
 import {facilityBinding,offerCommit} from './private-offer-encoding.mjs';
 import {commit} from './private-pool-spike.mjs';
 const SOURCE='contracts/experimental/line-private-offer.compact',sha=b=>createHash('sha256').update(b).digest('hex'),bytes=()=>new Uint8Array(randomBytes(32)),hex=b=>Buffer.from(b).toString('hex');
+export async function runApprovalServiceCompact({compiledDir,onInitialize,onAccepted,onComplete}={}){
 const NOW=Math.floor(Date.now()/1000),COIN=RT.encodeCoinPublicKey('0'.repeat(64));
-mkdirSync('.compact-keys',{recursive:true});const work=mkdtempSync(resolve('.compact-keys/approval-service-compact-')),dir=join(work,'managed');
+mkdirSync('.compact-keys',{recursive:true});const work=mkdtempSync(resolve('.compact-keys/approval-service-compact-')),dir=compiledDir?resolve(compiledDir):join(work,'managed');
 const files=['scripts/approval-service-compact.mjs','scripts/approval-owner-service.mjs','scripts/approval-service-frame.mjs','scripts/approval-owner-example-policy.mjs',
  'scripts/durable-approval-signer.mjs','scripts/durable-approval-actor.mjs','scripts/signed-pool-signers.mjs','scripts/private-offer-signers.mjs','scripts/private-offer-encoding.mjs',
  'scripts/private-pool-spike.mjs','src/lib/line/encoding.ts','src/lib/security/vault-codec.ts','scripts/compile-compact.mjs','tests/fixtures/approval-service-tls.mjs'];
 const fingerprints=Object.fromEntries(files.map(p=>[p,sha(readFileSync(p))])),sourceHash=sha(readFileSync(SOURCE));
 const portable=p=>relative(process.cwd(),p).split(sep).join('/');
-await new Promise((yes,no)=>{const p=spawn(process.execPath,['scripts/compile-compact.mjs','--skip-zk',SOURCE,portable(dir)],{stdio:'inherit'});p.on('error',no);p.on('close',c=>c===0?yes():no(Error('Fresh Compact compilation failed.')));});
+if(!compiledDir)await new Promise((yes,no)=>{const p=spawn(process.execPath,['scripts/compile-compact.mjs','--skip-zk',SOURCE,portable(dir)],{stdio:'inherit'});p.on('error',no);p.on('close',c=>c===0?yes():no(Error('Fresh Compact compilation failed.')));});
 const {Contract,ledger}=await import(pathToFileURL(join(dir,'contract/index.js')).href),info=JSON.parse(readFileSync(join(dir,'compiler/contract-info.json')));
 assert.equal(info['compiler-version'],'0.31.1');assert.equal(info['runtime-version'],'0.16.0');
 assert.deepEqual(info.circuits.map(x=>x.name).sort(),JSON.parse(readFileSync('contracts/managed/line/compiler/contract-info.json')).circuits.map(x=>x.name).sort());
@@ -55,6 +56,9 @@ try{
  }]));
  const contract=new Contract(witnesses);active={reserveSalt:bytes()};const initial=contract.initialState(RT.createConstructorContext({notes:{},quotes:{}},COIN),issuerPk,merchantA,nonce,stableKey);
  let state=initial.currentContractState.data;privateState=initial.currentPrivateState;
+ const execution=await onInitialize?.({dir,info,initial,sourceHash,now:NOW});
+ const address=execution?.contractAddress??RT.dummyContractAddress();
+ const stateBytes=data=>{const s=new RT.ContractState();s.data=data instanceof RT.ChargedState?data:new RT.ChargedState(data);return s.serialize();};
  const view=()=>ledger(state);assert.deepEqual(view().contractDomain,domain);
  async function execute(label,name,args,values,operationId){
   const full={nullifierKey,reserveOpening:privateState.reserve.book,reserveSalt:privateState.reserve.salt,newReserveSalt:bytes(),newQuoteMetaSalt:bytes(),newNoteMetaSalt:bytes(),currentBookRoot:view().books.root(),...values};
@@ -66,8 +70,10 @@ try{
   if(name==='fundReserve'){active.reserveAmount=args[0];circuitArgs=[];}
   if(name==='openLine'){active.lineFlatFee=args[2];active.lineBasisPoints=args[3];circuitArgs=args.slice(0,2);}
   if(name==='draw'){active.drawFee=args[2];circuitArgs=args.slice(0,2);}
-  context=RT.createCircuitContext(RT.dummyContractAddress(),COIN,state,structuredClone(privateState),undefined,undefined,NOW);
-  const result=contract.circuits[name](context,...circuitArgs);state=result.context.currentQueryContext.state;privateState=result.context.currentPrivateState;
+  context=RT.createCircuitContext(address,COIN,state,structuredClone(privateState),undefined,undefined,NOW);
+  const input=stateBytes(state),initialQueryContext=context.currentQueryContext,result=contract.circuits[name](context,...circuitArgs);
+  await onAccepted?.({role:label,name,seconds:NOW,input,nextState:stateBytes(result.context.currentQueryContext.state),result,initialQueryContext,descriptor,approval});
+  state=result.context.currentQueryContext.state;privateState=result.context.currentPrivateState;
   traces.push({actor:label,circuit:name,approvalOverMutualTls:true,signingScalarWitnesses:0});return {descriptor,approval};
  }
  await execute('issuer','registerMerchant',[merchantB],{},'merchant:B');await execute('issuer','fundReserve',[200n],{},'fund:1');
@@ -105,10 +111,12 @@ try{
  assert.equal(traces.length,10);assert.equal(controls.length,4);assert.equal(privateState.reserve.book.redeemedReserve,30n);
  for(const [p,h]of Object.entries(fingerprints))assert.equal(sha(readFileSync(p)),h);assert.equal(sha(readFileSync(SOURCE)),sourceHash);
  const report={schema:'line-owner-approval-service-compact/v1',createdAt:new Date().toISOString(),sourceSha256:sourceHash,scriptFingerprints:fingerprints,
-  artifacts:Object.fromEntries(['contract/index.js','compiler/contract-info.json'].map(p=>[p,sha(readFileSync(join(dir,p)))])),freshCompilation:true,traces,controls,
+  artifacts:Object.fromEntries(['contract/index.js','compiler/contract-info.json'].map(p=>[p,sha(readFileSync(join(dir,p)))])),freshCompilation:!compiledDir,cachedGeneratedBindings:Boolean(compiledDir),traces,controls,
   owners:4,merchants:2,serviceRestarts,requestApplicationBytes:128*1024,responseApplicationBytes:8*1024,signingScalarWitnesses:0,
   compiler:info['compiler-version'],runtime:info['runtime-version'],exportedCircuits:info.circuits.map(x=>x.name),
   cryptographicProofsGenerated:false,networkSubmitted:false,authenticAssetSettlement:false,independentAdministrativeCustody:false,fullHistoryPrivacyPassed:false,
   evidenceScope:'Fresh generated Compact through four mTLS owner services and two suppliers. Same-host synthetic owner harness knows encryption keys; financial state is volatile. No native proofs, separate operators, assets or complete privacy certification.'};
- writeFileSync(join(work,'evidence.json'),JSON.stringify(report,null,2)+'\n');console.log(JSON.stringify({acceptedCalls:10,ownerServices:4,report:join(work,'evidence.json')}));
+ writeFileSync(join(work,'evidence.json'),JSON.stringify(report,null,2)+'\n');await onComplete?.(report);console.log(JSON.stringify({acceptedCalls:10,ownerServices:4,report:join(work,'evidence.json')}));return report;
 }finally{for(const service of Object.values(services))await service.close();for(const signer of Object.values(owners))signer.close();}
+}
+if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url))runApprovalServiceCompact().catch(()=>{console.error('Owner-service Compact integration failed.');process.exitCode=1;});

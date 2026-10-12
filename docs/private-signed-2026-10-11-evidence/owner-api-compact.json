@@ -1,9 +1,9 @@
 {
   "schema": "line-owner-approval-service-compact/v1",
-  "createdAt": "2026-10-12T08:48:57.054Z",
+  "createdAt": "2026-10-12T09:10:50.369Z",
   "sourceSha256": "ae970672c048c48692ab690554c77285fec19d1943dc3b4574080970b7fa657d",
   "scriptFingerprints": {
-    "scripts/approval-service-compact.mjs": "562c86ffd6b7f87dc72ad99b88358ce505247da70604bcf742279d037e47319c",
+    "scripts/approval-service-compact.mjs": "a5369737c5b529266ab52b53651fd4b67aea2329ccdb1dfe4f70de4dc0a2dc0f",
     "scripts/approval-owner-service.mjs": "8513fa94cd4644b86da339bc5ebf042814b53b2e250f2b50eabb2a13dd3589b4",
     "scripts/approval-service-frame.mjs": "550a409609088ca19eef9c56614b5c36a60b0957165a589e46b8938e3035deb8",
     "scripts/approval-owner-example-policy.mjs": "0f54f84ca2a313c519c3a89d5bf849ff2fa120c8f857118c0687a1e6ccc80b30",
@@ -23,6 +23,7 @@
     "compiler/contract-info.json": "10a94c9d83abde894552fb57960188ae6b15e29be4b424a59fc0ee0320cbcfc5"
   },
   "freshCompilation": true,
+  "cachedGeneratedBindings": false,
   "traces": [
     {
       "actor": "issuer",
@@ -132,7 +133,7 @@
   "fullHistoryPrivacyPassed": false,
   "evidenceScope": "Fresh generated Compact through four mTLS owner services and two suppliers. Same-host synthetic owner harness knows encryption keys; financial state is volatile. No native proofs, separate operators, assets or complete privacy certification.",
   "gitNormalizedScriptFingerprints": {
-    "scripts/approval-service-compact.mjs": "562c86ffd6b7f87dc72ad99b88358ce505247da70604bcf742279d037e47319c",
+    "scripts/approval-service-compact.mjs": "a5369737c5b529266ab52b53651fd4b67aea2329ccdb1dfe4f70de4dc0a2dc0f",
     "scripts/approval-owner-service.mjs": "8513fa94cd4644b86da339bc5ebf042814b53b2e250f2b50eabb2a13dd3589b4",
     "scripts/approval-service-frame.mjs": "550a409609088ca19eef9c56614b5c36a60b0957165a589e46b8938e3035deb8",
     "scripts/approval-owner-example-policy.mjs": "0f54f84ca2a313c519c3a89d5bf849ff2fa120c8f857118c0687a1e6ccc80b30",
