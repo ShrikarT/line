@@ -123,6 +123,9 @@ jobs:
       - name: Whole coordinator recovery through owner approval services
         run: npm run owner:coordinator:compact
 
+      - name: Older claims survive repeated supplier purchases and restart
+        run: npm run owner:coordinator:compact -- --repeat-supplier
+
       - name: Decode source-bound public privacy pairs and check wire-size findings
         env:
           CARGO_PROFILE_DEV_DEBUG: "0"

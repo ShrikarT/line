@@ -12,7 +12,10 @@ import {runRecoverableOwnerCoordinator} from './recoverable-owner-coordinator.mj
 const sha=b=>createHash('sha256').update(b).digest('hex'),json=p=>JSON.parse(readFileSync(p,'utf8')),SOURCE='contracts/experimental/line-private-offer.compact';
 const [keyDir,freshDir]=process.argv.slice(2);assert(keyDir&&freshDir,'Provide full keys and fresh generated coordinator bindings.');
 const dir=resolve(keyDir),checkedDir=resolve(freshDir),checkedPath=join(dirname(checkedDir),'evidence.json'),checked=json(checkedPath),sourceHash=sha(readFileSync(SOURCE));
-assert.equal(checked.schema,'line-recoverable-owner-coordinator/v1');assert.equal(checked.freshCompilation,true);assert.equal(checked.traces.length,10);assert.equal(checked.controls.length,6);assert.equal(checked.crashes.length,8);assert.equal(checked.sourceSha256,sourceHash);
+const repeatSupplier=checked.schema==='line-recoverable-owner-coordinator/repeat-supplier/v1';
+assert([ 'line-recoverable-owner-coordinator/v1','line-recoverable-owner-coordinator/repeat-supplier/v1'].includes(checked.schema));
+assert.equal(checked.freshCompilation,true);assert.equal(checked.traces.length,repeatSupplier?13:10);assert.equal(checked.controls.length,repeatSupplier?12:6);assert.equal(checked.crashes.length,repeatSupplier?12:8);assert.equal(checked.sourceSha256,sourceHash);
+if(repeatSupplier)assert.equal(checked.retainedClaims.olderNoteRedeemedAfterNewerDraw,true);
 for(const [p,h]of Object.entries(checked.scriptFingerprints))assert.equal(sha(readFileSync(p)),h,'Fresh coordinator helper changed.');
 for(const [p,h]of Object.entries(checked.artifacts)){assert.equal(sha(readFileSync(join(checkedDir,p))),h);assert.equal(sha(readFileSync(join(dir,p))),h);}
 const info=json(join(dir,'compiler/contract-info.json')),manifestPath=join(dirname(dir),'key-generation.json'),manifest=json(manifestPath);
@@ -29,12 +32,12 @@ const scriptFingerprints=Object.fromEntries(helpers.map(p=>[p,sha(readFileSync(p
 const localProof={managedDir:dir,keyManifestSha256:sha(readFileSync(manifestPath)),verifier,checker,prover,guardian,nativeExecutables:executables,
  parameterCache:process.argv[4]?resolve(process.argv[4]):join(work,'public-parameters'),publicArtifactsDirectory:join(work,'worker-public-artifacts')};
 const traces=[],negativeChecks=[],cacheControls=[];let local=L.LedgerState.blank('preview'),stage='initialization',complete=false,fixture,failure,scope,containmentMode=null;
-const report=()=>({schema:'line-private-coordinator-native-proof/v2',createdAt:new Date().toISOString(),complete,sourceSha256:sourceHash,artifacts,scriptFingerprints,nativeExecutables:executables,
- keyManifestSha256:localProof.keyManifestSha256,generatedPrerequisiteSha256:sha(readFileSync(checkedPath)),traces,negativeChecks,cacheControls,
+const report=()=>({schema:repeatSupplier?'line-private-coordinator-native-proof/repeat-supplier/v1':'line-private-coordinator-native-proof/v2',createdAt:new Date().toISOString(),complete,sourceSha256:sourceHash,artifacts,scriptFingerprints,nativeExecutables:executables,...(repeatSupplier?{retainedClaims:checked.retainedClaims}:{}),
+ keyManifestSha256:localProof.keyManifestSha256,generatedPrerequisiteSha256:sha(readFileSync(checkedPath)),...(repeatSupplier?{generatedPrerequisiteWorkerInvocations:checked.coordinatorProcessInvocations}:{}),traces,negativeChecks,cacheControls,
  owners:4,merchants:2,financialCheckpointDurable:true,completeExecutionWorkerRestart:true,coordinatorWitnessesReturnedToHarness:false,proofWorkerContainmentRequired:true,containmentMode,
  abruptExits:fixture?.crashes??[],generatedRecoveryControls:fixture?.controls??[],coordinatorProcessInvocations:fixture?.coordinatorProcessInvocations??null,
  syntheticLedger:true,syntheticTime:true,feeBalancingEnabled:false,networkSubmitted:false,authenticAssetSettlement:false,independentAdministrativeCustody:false,fullHistoryPrivacyPassed:false,allTwelveCircuitsCoveredByThisReport:false,
- ...(failure?{failure}:{}),evidenceScope:'This lane targets ten restored worker calls, four mTLS owners and two merchants, with native proving inside the financial worker and separate Rust verification before synthetic state advances. Actual coverage is established only by traces and the complete flag. Same-host synthetic custody and caller-trusted confirmation; no network finality, assets or full-history privacy claim.'});
+ ...(failure?{failure}:{}),evidenceScope:repeatSupplier?'Thirteen restored calls include two unsettled Merchant A quotes/draws, older quote selection and older note redemption after a newer draw, plus Merchant B separation. Native proving runs inside the financial worker with separate Rust verification before synthetic state advances. Same-host synthetic custody and caller-trusted confirmation; no network, assets, compensation or full-history privacy claim.':'This lane targets ten restored worker calls, four mTLS owners and two merchants, with native proving inside the financial worker and separate Rust verification before synthetic state advances. Actual coverage is established only by traces and the complete flag. Same-host synthetic custody and caller-trusted confirmation; no network finality, assets or full-history privacy claim.'});
 const checkpoint=()=>writeFileSync(join(work,'verification.json'),JSON.stringify(report(),null,2)+'\n');
 function verify(tx,name,seconds){
  const statePath=join(work,`${traces.length}-${name}.public-state.bin`),txPath=join(work,`${traces.length}-${name}.proven-public-tx.bin`);
@@ -50,7 +53,7 @@ function apply(tx,name,actor,seconds,expectedLedger){
  console.log(JSON.stringify({circuit:name,acceptedContractProofs:traces.length-1,restoredWorkerNativeVerificationPassed:true}));
 }
 try{
- checkpoint();await runRecoverableOwnerCoordinator({compiledDir:dir,localProof,
+ checkpoint();await runRecoverableOwnerCoordinator({compiledDir:dir,localProof,repeatSupplier,
   async onInitialized({scope:actual,proofGenesis,now}){
    scope=actual;assert.equal(proofGenesis.address,scope.contractAddress);const tx=L.Transaction.deserialize('signature','proof','binding',proofGenesis.transaction);
    apply(tx,'syntheticDeployment','fixture',now,proofGenesis.publicLedgerState);
@@ -80,9 +83,10 @@ try{
    traces.at(-1).nativeChecks=p.checks;assert.deepEqual(local.index(scope.contractAddress).data.state.encode(),RT.ContractState.deserialize(prepared.publicState).data.state.encode());checkpoint();
   },async onComplete(r){fixture=r;}
  });
- assert.equal(traces.length,11);assert.equal(negativeChecks.length,2);assert.equal(cacheControls.length,2);assert.equal(fixture.crashes.length,12);assert.equal(fixture.controls.length,6);assert.equal(fixture.coordinatorProcessInvocations,62);
+ assert.equal(traces.length,repeatSupplier?14:11);assert.equal(negativeChecks.length,repeatSupplier?3:2);assert.equal(cacheControls.length,repeatSupplier?3:2);assert.equal(fixture.crashes.length,repeatSupplier?18:12);assert.equal(fixture.controls.length,repeatSupplier?12:6);
+ assert.equal(fixture.coordinatorProcessInvocations,checked.coordinatorProcessInvocations+(repeatSupplier?24:16));
  for(const [p,h]of Object.entries(scriptFingerprints))assert.equal(sha(readFileSync(p)),h,'Proof helper changed during execution.');
  for(const [p,h]of Object.entries(artifacts))assert.equal(sha(readFileSync(join(dir,p))),h.sha256);
  for(const [name,p]of [['verifier',verifier],['checker',checker],['prover',prover],['guardian',guardian]])assert.equal(sha(readFileSync(p)),executables[name]);
- complete=true;checkpoint();console.log(JSON.stringify({complete:true,contractCalls:10,abruptExits:12,activeProverInterruptions:2,corruptedDrawRejections:2,report:join(work,'verification.json')}));
+ complete=true;checkpoint();console.log(JSON.stringify({complete:true,contractCalls:traces.length-1,abruptExits:fixture.crashes.length,activeProverInterruptions:cacheControls.length,corruptedDrawRejections:negativeChecks.length,report:join(work,'verification.json')}));
 }catch(error){failure={stage,errorClass:error.name,category:'coordinator_proving_or_verification_failed',...(error.coordinatorProofStage?{workerStage:error.coordinatorProofStage}:{})};checkpoint();console.error('Restored coordinator native proof run failed: '+(error.coordinatorProofStage??stage));process.exitCode=1;}
