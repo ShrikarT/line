@@ -8,6 +8,8 @@ Seven targeted tests pass: fixed-frame bounds/round-trip; bounded issuer approva
 
 The complete sequenced local regression passes **502 tests / 60 suites**, with canonical compilation/zero managed drift, typecheck and fixture-key/credential scans passing. An earlier run overlapped canonical regeneration and passed 499/502, with truncated copied release fixtures; it is not acceptance evidence. CI now includes the new transport controls and fresh two-merchant generated integration. Remote results remain separate from these local checks.
 
+Publication `667ef7d` passes [push CI](https://github.com/ShrikarT/line/actions/runs/38227192082) and [PR CI](https://github.com/ShrikarT/line/actions/runs/38227197798): 500 Linux tests with two platform skips, 20 browser checks, fresh owner-service Compact integration and both separate Windows ACL controls. This supersedes the pending remote checkpoint, not the stated custody/privacy/proof limits.
+
 ## Authentication and disclosure
 
 The owner requires TLS 1.3, a trusted client certificate and an exact approved client-certificate fingerprint. The caller validates CA/hostname and the pinned owner leaf certificate **before sending its body**, then checks the owner's role, private-offer ABI, domain and Compact public point. A public point echoed by an endpoint alone is not authentication; TLS possession and the certificate pin establish the transport peer. Each approval must also match the expected public point, and Compact still verifies its actual signature and accounting constraints.
