@@ -24,7 +24,7 @@ await new Promise((yes,no)=>{const p=spawn(process.execPath,['scripts/compile-co
 const files=['scripts/recoverable-owner-coordinator.mjs','scripts/private-owner-coordinator.mjs','scripts/private-finance-journal.mjs','server/checkout-storage.ts',
  'scripts/approval-owner-service.mjs','scripts/approval-service-frame.mjs','scripts/approval-owner-example-policy.mjs','scripts/durable-approval-signer.mjs','scripts/durable-approval-actor.mjs',
  'scripts/private-offer-signers.mjs','scripts/signed-pool-signers.mjs','scripts/private-offer-encoding.mjs','scripts/private-pool-spike.mjs','src/lib/security/vault-codec.ts','src/lib/line/encoding.ts','tests/fixtures/approval-service-tls.mjs',
- 'scripts/private-coordinator-proving.mjs','scripts/native-local-proving-provider.mjs'];
+ 'scripts/private-coordinator-proving.mjs','scripts/native-local-proving-provider.mjs','scripts/private-worker-guardian.mjs'];
 const fingerprints=Object.fromEntries(files.map(p=>[p,sha(readFileSync(p))])),sourceHash=sha(readFileSync(SOURCE)),tls=tlsFixture();
 const owners={},services={},labels={issuer:'issuer',agent:'agent',merchantA:'merchant',merchantB:'merchant'},traces=[],controls=[],processes=[],crashes=[];
 const config={managedDir,sourceSha256:sourceHash,executableSha256:sha(readFileSync(join(managedDir,'contract/index.js'))),directory:join(work,'private-financial-state'),password:Buffer.from(bytes()).toString('hex')};
@@ -77,11 +77,13 @@ try{
    await assert.rejects(command('confirm',{operationId,observedPublicState:changed}));controls.push({check:'unobserved-candidate-retained',rejected:true});
    const again=await command('restore',{operationId});assert.equal(again.value.fingerprint,restored.value.fingerprint);
   }
-  await onBeforeConfirm({operationId,request,prepared:restored.value,prove:async(publicLedgerState,{crashAfterPublication=false}={})=>{
+  await onBeforeConfirm({operationId,request,prepared:restored.value,prove:async(publicLedgerState,{crashAfterPublication=false,crashDuringProve=false}={})=>{
    if(crashAfterPublication)config.testCrashAfterProofPublication=true;
+   if(crashDuringProve)config.testCrashDuringNativeProve=true;
    try{return await command('prove',{operationId,publicLedgerState});}
-   catch(error){if(crashAfterPublication&&error.exitCode===23)crashes.push({stage:'after-proven-transaction-publication',workerPid:error.workerPid,exitCode:23});throw error;}
-   finally{delete config.testCrashAfterProofPublication;}
+   catch(error){if(crashAfterPublication&&error.exitCode===23)crashes.push({stage:'after-proven-transaction-publication',workerPid:error.workerPid,exitCode:23});
+    if(crashDuringProve&&error.interruptedDuringNativeProve){assert.equal(error.ownedProcessesStopped,true);crashes.push({stage:'during-native-prove-after-key-load',workerPid:error.workerPid,ownedProcessesStopped:true});}throw error;}
+   finally{delete config.testCrashAfterProofPublication;delete config.testCrashDuringNativeProve;}
   }});
   if(request.circuit==='draw'){
    config.testCrashAfterConfirm=true;
@@ -96,7 +98,7 @@ try{
   traces.push({circuit:request.circuit,actor:request.actor,wholeExecutionWorkerReconstructed:true,exactPreparedPacketRestored:true,signingScalarWitnesses:0});
  }
  const status=await command('status',{});assert.equal(status.value.authorizationOperation,null);assert.equal(status.value.pendingOperation,null);assert.equal(status.value.completedOperations.length,10);
- assert.equal(traces.length,10);assert.equal(controls.length,6);assert.equal(crashes.length,localProof?10:8);
+ assert.equal(traces.length,10);assert.equal(controls.length,6);assert.equal(crashes.length,localProof?12:8);
  for(const [p,h]of Object.entries(fingerprints))assert.equal(sha(readFileSync(p)),h);assert.equal(sha(readFileSync(SOURCE)),sourceHash);
  const report={schema:localProof?'line-recoverable-owner-coordinator/native-fixture/v1':'line-recoverable-owner-coordinator/v1',createdAt:new Date().toISOString(),sourceSha256:sourceHash,scriptFingerprints:fingerprints,
   artifacts:Object.fromEntries(['contract/index.js','compiler/contract-info.json'].map(p=>[p,sha(readFileSync(join(managedDir,p)))])),freshCompilation:!compiledDir,

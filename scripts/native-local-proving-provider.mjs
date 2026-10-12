@@ -3,20 +3,24 @@ import assert from 'node:assert/strict';
 import {spawn} from 'node:child_process';
 import {mkdirSync} from 'node:fs';
 import {join,resolve} from 'node:path';
-export function nativeLocalProvingProvider({managedDir,checker,prover,parameterCache,onCheck=()=>{},onDiagnostic=()=>{}}){
+export function nativeLocalProvingProvider({managedDir,checker,prover,parameterCache,onCheck=()=>{},onDiagnostic=()=>{},onStage=()=>{}}){
  const cache=resolve(parameterCache);mkdirSync(cache,{recursive:true});
  const circuit=name=>{assert(typeof name==='string'&&/^[a-zA-Z][a-zA-Z0-9_]*$/.test(name),'Invalid circuit name.');return name;};
  function execute(file,args,input){
   return new Promise((yes,no)=>{
-   const child=spawn(file,args,{stdio:['pipe','pipe','pipe'],env:{...process.env,RAYON_NUM_THREADS:'2',MIDNIGHT_PP:cache,MIDNIGHT_PARAM_SOURCE:'https://srs.midnight.network/'}});
-   const output=[];let size=0,diagnostic='',lastStage=null,done=false;
+   const child=spawn(file,args,{stdio:['pipe','pipe','pipe'],windowsHide:true,env:{...process.env,RAYON_NUM_THREADS:'2',MIDNIGHT_PP:cache,MIDNIGHT_PARAM_SOURCE:'https://srs.midnight.network/'}});
+   const output=[];let size=0,diagnostic='',lastStage=null,done=false,stageBuffer='';
    const timer=setTimeout(()=>{child.kill();finish(Error('Native prover timeout.'));},1_800_000);
    function finish(error,result){if(done)return;done=true;clearTimeout(timer);error?no(error):yes(result);}
    child.on('error',()=>finish(Error('Native proving process unavailable.')));
    child.stdout.on('data',chunk=>{size+=chunk.length;if(size>16*1024*1024){child.kill();finish(Error('Native proving output exceeds limit.'));}else output.push(chunk);});
    // Store only a bounded static error category, never raw library output.
-   child.stderr.on('data',chunk=>{const message=chunk.toString(),match=message.match(/(?:LOCAL_PROVER|PREIMAGE_CHECK)_REJECTED:([a-z_]+)/);if(match)diagnostic=match[1];else if(/stack overflow/i.test(message))diagnostic='stack_overflow';
-    const stage=message.match(/LOCAL_PROVER_STAGE:(preimage_decoded|provider_ready|key_material_loaded|proof_self_verified)/);if(stage)lastStage=stage[1];});
+   child.stderr.on('data',chunk=>{
+    stageBuffer=(stageBuffer+chunk.toString()).slice(-4096);const end=stageBuffer.lastIndexOf('\n');if(end<0)return;
+    const message=stageBuffer.slice(0,end+1);stageBuffer=stageBuffer.slice(end+1);
+    const match=message.match(/(?:LOCAL_PROVER|PREIMAGE_CHECK)_REJECTED:([a-z_]{1,64})/);if(match)diagnostic=match[1];else if(/stack overflow/i.test(message))diagnostic='stack_overflow';
+    for(const stage of message.matchAll(/LOCAL_PROVER_STAGE:(preimage_decoded|provider_ready|key_material_loaded|proof_self_verified)/g)){lastStage=stage[1];onStage(lastStage);}
+   });
    child.on('close',(code,signal)=>{if(code===0)finish(null,Buffer.concat(output));else{onDiagnostic({category:diagnostic||'process_failure',exitCode:code,signal,lastStage});finish(Error('Native prover rejected: '+(diagnostic||'process_failure')));}});
    child.stdin.on('error',()=>{});child.stdin.end(input);
   });
