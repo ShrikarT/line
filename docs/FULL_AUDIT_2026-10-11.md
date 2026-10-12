@@ -66,6 +66,8 @@ The comparison shows a concrete improvement: a supplier can receive exactly the 
 
 The finite native refund/enrollment reports retain differing transaction lengths and public leaves. Their causes and distributions are not certified as harmless noise. There is no borrower-anonymity or full-history pass. [Observer model](PRIVACY_OBSERVER_MODEL_2026-10-11.md), [enrollment evidence](PRIVATE_ENROLLMENT_2026-10-11.md), [custody feasibility](CUSTODY_FEASIBILITY_2026-10-11.md).
 
+The later eleven-pair [public component review](private-signed-2026-10-11-evidence/offer-native-components.json) narrows one uncertainty: proof lengths match within each pair, and canonical SCALE width of the already-public Schnorr reply accounts exactly for standalone binding-size variation. Full transaction and intent deltas remain partly unexplained; this component result does not certify full distributions or historical privacy. Financial recovery publication `92e438e` now passes both CI runs, including all 493 tests, 20 browser checks and fresh compiled recovery. Its native consent failure remains unresolved and Docker is unavailable for the checked follow-up.
+
 ## Product direction and economics
 
 Keep the full destination: organization-level purchasing credit, independent capital, a protected wider credit book, multiple suppliers and actual reconciliation to service and payment. The accepted first-customer hypothesis is enterprise teams whose agents buy APIs and compute. It is unvalidated; no contacts or outreach results are invented.
