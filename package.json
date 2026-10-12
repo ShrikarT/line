@@ -67,7 +67,8 @@
     "owner:service:compact": "node --experimental-strip-types scripts/approval-service-compact.mjs",
     "owner:service:proof": "node --experimental-strip-types scripts/approval-service-proof.mjs",
     "owner:coordinator:compact": "node --experimental-strip-types scripts/recoverable-owner-coordinator.mjs",
-    "owner:coordinator:proof": "node --experimental-strip-types scripts/private-coordinator-proof.mjs"
+    "owner:coordinator:proof": "node --experimental-strip-types scripts/private-coordinator-proof.mjs",
+    "privacy:wire:review": "node scripts/private-offer-wire-review.mjs"
   },
   "compact": {
     "compiler": "0.31.1",
