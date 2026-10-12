@@ -101,6 +101,9 @@ jobs:
       - name: Owner approval services and two-merchant Compact integration
         run: npm run owner:service:compact
 
+      - name: Whole coordinator recovery through owner approval services
+        run: npm run owner:coordinator:compact
+
       - name: Fail-closed network receipt metadata checks
         run: npm run network:receipts:test
 

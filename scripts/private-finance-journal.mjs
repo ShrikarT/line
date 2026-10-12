@@ -24,6 +24,14 @@ const checkpoint=value=>{
  assert(value.privateState&&typeof value.privateState==='object');assert(value.financial&&typeof value.financial==='object');
  assert.deepEqual(Object.keys(value).sort(),['publicState','privateState','financial'].sort());return clone(value);
 };
+const authorizationIntent=value=>{
+ assert(value&&typeof value==='object');
+ assert.deepEqual(Object.keys(value).sort(),['operationId','circuit','circuitArgs','witnesses','descriptor','semanticRequest','before','fingerprint'].sort());
+ assert(typeof value.operationId==='string'&&/^[a-zA-Z0-9:._-]{1,128}$/.test(value.operationId));
+ assert(names.has(value.circuit)&&Array.isArray(value.circuitArgs));
+ for(const key of ['witnesses','descriptor','semanticRequest'])assert(value[key]&&typeof value[key]==='object'&&!Array.isArray(value[key]));
+ checkpoint(value.before);const {fingerprint,...intent}=value;assert.equal(fp(intent),fingerprint);return value;
+};
 export class PrivateFinanceJournal {
  #store;#scope;#record;#unavailable=false;
  static async open({directory,password,scope,create=false}){
@@ -40,6 +48,7 @@ export class PrivateFinanceJournal {
    assert.equal(new Set(journal.#record.completed.map(c=>c.operationId)).size,journal.#record.completed.length);
    for(const c of journal.#record.completed)assert(typeof c.operationId==='string'&&/^[0-9a-f]{64}$/.test(c.fingerprint)&&/^[0-9a-f]{64}$/.test(c.stateSha256));
    if(journal.#record.confirmed)checkpoint(journal.#record.confirmed);
+   if(journal.#record.authorizationIntent){const intent=authorizationIntent(journal.#record.authorizationIntent);assert(!journal.#record.pending,'Authorization intent and candidate cannot coexist.');assert.equal(fp(intent.before),fp(journal.#record.confirmed));assert(!journal.#record.completed.some(x=>x.operationId===intent.operationId));}
    if(journal.#record.pending){const {fingerprint,...operation}=journal.#record.pending;assert.equal(fp(operation),fingerprint);assert.equal(fp(operation.before),fp(journal.#record.confirmed));checkpoint(operation.candidate);}
    if(create)await journal.#publish(journal.#record);
    return journal;
@@ -55,6 +64,18 @@ export class PrivateFinanceJournal {
   await this.#publish({...this.#record,revision:this.#record.revision+1,confirmed:checkpoint(initial)});
  }
  snapshot(){this.#available();return clone(this.#record);}
+ async stageAuthorization({operationId,circuit,circuitArgs,witnesses,descriptor,semanticRequest,before}){
+  this.#available();assert(!this.#record.pending,'An unresolved financial candidate blocks authorization.');
+  assert(typeof operationId==='string'&&/^[a-zA-Z0-9:._-]{1,128}$/.test(operationId));assert(names.has(circuit)&&Array.isArray(circuitArgs));
+  assert(witnesses&&typeof witnesses==='object'&&descriptor&&typeof descriptor==='object');
+  assert(!this.#record.completed.some(x=>x.operationId===operationId),'Completed operation cannot stage a new authorization.');
+  const prior=checkpoint(before);assert.equal(fp(prior),fp(this.#record.confirmed),'Authorization predecessor differs.');
+  const intent={operationId,circuit,circuitArgs:clone(circuitArgs),witnesses:clone(witnesses),descriptor:clone(descriptor),semanticRequest:clone(semanticRequest),before:prior};
+  const fingerprint=fp(intent);
+  authorizationIntent({...intent,fingerprint});assert(this.#record.completed.length<256,'Financial operation capacity reached; explicit archival is required.');
+  if(this.#record.authorizationIntent){assert.equal(this.#record.authorizationIntent.fingerprint,fingerprint,'Unresolved authorization blocks new work.');return clone(this.#record.authorizationIntent);}
+  await this.#publish({...this.#record,revision:this.#record.revision+1,authorizationIntent:{...intent,fingerprint}});return clone(this.#record.authorizationIntent);
+ }
  async prepare({operationId,circuit,circuitArgs,witnesses,before,candidate}){
   this.#available();assert(typeof operationId==='string'&&/^[a-zA-Z0-9:._-]{1,128}$/.test(operationId));
   assert(names.has(circuit)&&Array.isArray(circuitArgs));assert(witnesses&&typeof witnesses==='object');
@@ -64,9 +85,12 @@ export class PrivateFinanceJournal {
   if(completed){assert.equal(completed.fingerprint,fingerprint,'Operation ID already binds another financial candidate.');return {status:'confirmed',...clone(completed)};}
   assert(this.#record.confirmed&&equal(this.#record.confirmed.publicState,prior.publicState),'Prepared predecessor differs from confirmed state.');
   assert.equal(fp(this.#record.confirmed),fp(prior),'Prepared predecessor lost private financial data.');
+  if(this.#record.authorizationIntent){const intent=this.#record.authorizationIntent;assert.equal(intent.operationId,operationId);assert.equal(intent.circuit,circuit);
+   assert.deepEqual(intent.circuitArgs,circuitArgs);assert.equal(fp(intent.before),fp(prior));
+   for(const [key,value]of Object.entries(intent.witnesses))assert.equal(fp(value),fp(witnesses[key]),'Prepared witness differs from saved authorization intent.');}
   if(this.#record.pending){assert.equal(this.#record.pending.fingerprint,fingerprint,'An unresolved financial candidate blocks new work.');return {status:'prepared',...clone(this.#record.pending)};}
   assert(this.#record.completed.length<256,'Financial operation capacity reached; explicit archival is required.');
-  await this.#publish({...this.#record,revision:this.#record.revision+1,pending:{...operation,fingerprint}});
+  await this.#publish({...this.#record,revision:this.#record.revision+1,pending:{...operation,fingerprint},authorizationIntent:null});
   return {status:'prepared',...clone(this.#record.pending)};
  }
  async confirm(operationId,observedPublicState){
