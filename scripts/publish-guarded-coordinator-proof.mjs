@@ -9,7 +9,7 @@ const repeat=r.schema==='line-private-coordinator-native-proof/repeat-supplier/v
 assert(r.traces.every(t=>t.proofVerifiedInSeparateRustProcess));assert.equal(r.negativeChecks.length,repeat?3:2);assert(r.negativeChecks.every(x=>x.decodableProofCorruption&&x.rejectedByNativeCryptographicVerifier));
 assert.equal(r.cacheControls.length,repeat?3:2);assert(r.cacheControls.every(x=>x.activeProverInterrupted&&x.ownedProcessesStopped&&x.abruptPublicationRecovery&&x.identicalTransactionRetry&&x.wrongPublicPredecessorRejected));
 assert.equal(r.abruptExits.length,repeat?18:12);assert(r.abruptExits.every(x=>x.exitCode===23||(x.stage==='during-native-prove-after-key-load'&&x.ownedProcessesStopped===true)));assert.equal(r.proofWorkerContainmentRequired,true);assert(['windows-job','posix-group'].includes(r.containmentMode));assert.equal(r.generatedRecoveryControls.length,repeat?12:6);
-if(repeat){assert.equal(r.retainedClaims.olderNoteRedeemedAfterNewerDraw,true);assert.equal(r.retainedClaims.olderQuoteSelectedAfterNewerQuote,true);assert.equal(r.generatedPrerequisiteWorkerInvocations,63);assert.equal(r.coordinatorProcessInvocations,87);assert(output,'Repeated-supplier evidence requires a separate publication path.');}
+if(repeat){assert.equal(r.retainedClaims.olderNoteRedeemedAfterNewerDraw,true);assert.equal(r.retainedClaims.olderQuoteSelectedAfterNewerQuote,true);assert.equal(r.generatedPrerequisiteWorkerInvocations,63);assert.equal(r.coordinatorProcessInvocations,85);assert(output,'Repeated-supplier evidence requires a separate publication path.');}
 else assert.equal(r.coordinatorProcessInvocations,62);
 assert.equal(r.owners,4);assert.equal(r.merchants,2);
 for(const key of ['financialCheckpointDurable','completeExecutionWorkerRestart','syntheticLedger','syntheticTime'])assert.equal(r[key],true);
@@ -26,4 +26,4 @@ assert.equal(r.nativeExecutables.guardian,sha(readFileSync(resolve('.compact-key
 r.gitNormalizedScriptFingerprints=Object.fromEntries(Object.keys(r.scriptFingerprints).map(p=>[p,sha(readFileSync(p,'utf8').replaceAll('\r\n','\n'))]));
 r.fingerprintScope='Runtime hashes identify exact files executed; LF-normalized hashes correlate Git source and do not establish another run.';
 writeFileSync(output??'docs/private-signed-2026-10-11-evidence/owner-coordinator-guarded-native-proof.json',JSON.stringify(r,null,2)+'\n');
-console.log(JSON.stringify({publishedContractCalls:10,abruptExits:12,activeProverInterruptions:2,identicalProofRecoveries:2,nativeCorruptionRejections:2,networkSubmitted:false}));
+console.log(JSON.stringify({publishedContractCalls:r.traces.length-1,abruptExits:r.abruptExits.length,activeProverInterruptions:r.cacheControls.length,identicalProofRecoveries:r.cacheControls.length,nativeCorruptionRejections:r.negativeChecks.length,networkSubmitted:false}));
