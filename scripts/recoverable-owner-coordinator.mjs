@@ -24,7 +24,8 @@ await new Promise((yes,no)=>{const p=spawn(process.execPath,['scripts/compile-co
 const files=['scripts/recoverable-owner-coordinator.mjs','scripts/private-owner-coordinator.mjs','scripts/private-finance-journal.mjs','server/checkout-storage.ts',
  'scripts/approval-owner-service.mjs','scripts/approval-service-frame.mjs','scripts/approval-owner-example-policy.mjs','scripts/durable-approval-signer.mjs','scripts/durable-approval-actor.mjs',
  'scripts/private-offer-signers.mjs','scripts/signed-pool-signers.mjs','scripts/private-offer-encoding.mjs','scripts/private-pool-spike.mjs','src/lib/security/vault-codec.ts','src/lib/line/encoding.ts','tests/fixtures/approval-service-tls.mjs',
- 'scripts/private-coordinator-proving.mjs','scripts/native-local-proving-provider.mjs','scripts/private-worker-guardian.mjs'];
+ 'scripts/private-coordinator-proving.mjs','scripts/native-local-proving-provider.mjs','scripts/private-worker-guardian.mjs',
+ 'scripts/private-finance-network.mjs','scripts/finalized-contract-receipt.mjs','src/lib/runtime/endpoints.ts'];
 const fingerprints=Object.fromEntries(files.map(p=>[p,sha(readFileSync(p))])),sourceHash=sha(readFileSync(SOURCE)),tls=tlsFixture();
 const owners={},services={},labels={issuer:'issuer',agent:'agent',merchantA:'merchant',merchantB:'merchant'},traces=[],controls=[],processes=[],crashes=[];
 const config={managedDir,sourceSha256:sourceHash,executableSha256:sha(readFileSync(join(managedDir,'contract/index.js'))),directory:join(work,'private-financial-state'),password:Buffer.from(bytes()).toString('hex')};
