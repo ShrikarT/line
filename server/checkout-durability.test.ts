@@ -14,10 +14,16 @@ const PASSWORD = "test-only-checkpoint-passphrase";
 test("Windows checkpoint ACL validation works with an unavailable module search path", { skip: process.platform !== "win32" }, async () => {
   const root = await mkdtemp(join(tmpdir(), "line-checkout-module-path-"));
   try {
+    const directory = join(root, "private");
+    await mkdir(directory);
+    // Hosted runners can create temp directories with unrelated explicit ACLs.
+    // Establish a genuinely private fixture before testing module discovery.
+    const escaped = directory.replaceAll("'", "''");
+    execFileSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", `$ErrorActionPreference='Stop'; $user=[System.Security.Principal.WindowsIdentity]::GetCurrent().User; $system=[System.Security.Principal.SecurityIdentifier]::new('S-1-5-18'); $acl=[System.Security.AccessControl.DirectorySecurity]::new(); $acl.SetOwner($user); $acl.SetAccessRuleProtection($true,$false); foreach($principal in @($user,$system)){ $acl.AddAccessRule([System.Security.AccessControl.FileSystemAccessRule]::new($principal,'FullControl','ContainerInherit, ObjectInherit','None','Allow')) }; [System.IO.Directory]::SetAccessControl('${escaped}',$acl)`], { windowsHide: true, stdio: "pipe" });
     const code = `try { const {EncryptedCheckoutStore}=await import('./server/checkout-storage.ts'); const store=await EncryptedCheckoutStore.open(process.env.TEST_CHECKOUT_DIR,process.env.TEST_CHECKOUT_PASSWORD); await store.close(); } catch(e) { console.error(e.message.includes('unrelated explicit access')?'ACL_POLICY_REJECTION':e.message.includes('powershell.exe')?'ACL_COMMAND_FAILURE':e.message.includes('lease')?'LEASE_FAILURE':'CHECKPOINT_OTHER_FAILURE'); process.exitCode=1; }`;
     await new Promise<void>((yes, no) => {
       const child = spawn(process.execPath, ["--experimental-strip-types", "--input-type=module", "-e", code], {
-        cwd: resolve("."), env: { ...process.env, PSModulePath: join(root, "missing-modules"), TEST_CHECKOUT_DIR: join(root, "private"), TEST_CHECKOUT_PASSWORD: PASSWORD },
+        cwd: resolve("."), env: { ...process.env, PSModulePath: join(root, "missing-modules"), TEST_CHECKOUT_DIR: directory, TEST_CHECKOUT_PASSWORD: PASSWORD },
         windowsHide: true, stdio: ["ignore", "ignore", "pipe"],
       });
       let category = "CHECKPOINT_OTHER_FAILURE";
