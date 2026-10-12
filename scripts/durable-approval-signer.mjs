@@ -73,6 +73,8 @@ export class DurableApprovalSigner {
   }catch(error){this.close();throw error;}
  }
  get publicKey(){this.#live();return RT.ecMulGenerator(this.#state.scalar);}
+ get ownerScope(){this.#live();return {role:this.#state.role,approvalABI:this.#approvalABI,
+  domain:this.#state.binding?new Uint8Array(this.#state.binding.config.domain):undefined};}
  bindPolicy(config){
   this.#live();assert(config.domain instanceof Uint8Array&&config.domain.length===32);
   assert(typeof config.maxAuthorizedCost==='bigint'&&config.maxAuthorizedCost>=0n&&config.maxAuthorizedCost<=18446744073709551615n);

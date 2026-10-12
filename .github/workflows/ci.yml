@@ -98,6 +98,9 @@ jobs:
       - name: Recoverable private financial openings and candidates
         run: npm run finance:compact
 
+      - name: Owner approval services and two-merchant Compact integration
+        run: npm run owner:service:compact
+
       - name: Fail-closed network receipt metadata checks
         run: npm run network:receipts:test
 
