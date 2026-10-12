@@ -1,6 +1,10 @@
 # Engineering status and acceptance evidence
 
-Updated **11 October 2026**. Canonical contract: `contracts/line.compact`; managed bindings: `contracts/managed/line/`. Product version `0.3.0`. This replaces older completion checklists that incorrectly described domain binding, history privacy, runtime execution and production readiness.
+Updated **12 October 2026 (IST)**. Canonical contract: `contracts/line.compact`; managed bindings: `contracts/managed/line/`. Product version `0.3.0`. This replaces older completion checklists that incorrectly described domain binding, history privacy, runtime execution and production readiness.
+
+## Financial recovery continuation — 12 October 2026 (IST)
+
+The [financial recovery revision](PRIVATE_FINANCIAL_RECOVERY_2026-10-11.md) passes six fresh compiled lifecycle calls with 20 storage subprocess invocations, cleared/reloaded financial memory, exact restored candidates and Compact book-commitment checks. Six journal tests include lost responses after process exit and real filesystem failure. A complete sequenced regression passes **493 tests / 60 suites**; canonical compile/zero drift, typecheck and fixture/credential scans pass. Its first native attempt verified funding, then consent returned HTTP 400 of unknown cause. A diagnostic follow-up stopped before proving because Docker’s Linux daemon was unavailable. Native verification remains incomplete; fresh remote CI is pending. [Failed-attempt metadata](private-signed-2026-10-11-evidence/financial-recovery-native-attempts.json). It persists the prepared witness packet before proving, blocks unresolved competing work, and retains exact book/binding salts and reserve/quote/note openings. Whole-coordinator restart, owner-key recovery, all-twelve financial recovery and network reconciliation remain unverified. Existing local checkout snapshots require explicit source-bound migration because the shared storage implementation fingerprint changed; none was performed. Evidence filenames retain the UTC execution date.
 
 ## Latest verified private-offer, enrollment and durable-agent evidence — 11 October 2026
 

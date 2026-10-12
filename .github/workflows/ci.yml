@@ -79,6 +79,9 @@ jobs:
       - name: Durable agent approvals with private supplier offers
         run: npm run custody:offer:compact
 
+      - name: Recoverable private financial openings and candidates
+        run: npm run finance:compact
+
       - name: Fail-closed network receipt metadata checks
         run: npm run network:receipts:test
 
