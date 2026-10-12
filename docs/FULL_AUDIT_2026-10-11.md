@@ -4,6 +4,8 @@ Audit snapshot: 11 October 2026. This consolidates the [original detailed audit 
 
 **Verdict:** Line has substantial Compact accounting, adversarial tests, a working local checkout and real local cryptographic proof evidence. The repository reports canonical Preprod deployment and eight calls. Its proposed private credit product still has unresolved privacy, independent custody, network reconciliation, asset settlement and demand gates. The internal privacy-demo gate is unmet. A compiling contract satisfies a technical event requirement; it does not establish the full product or a guaranteed judging result.
 
+Latest verified implementation: `912e4f0`, with green [push CI](https://github.com/ShrikarT/line/actions/runs/38219834546) and [PR CI](https://github.com/ShrikarT/line/actions/runs/38219840676). Linux passes 493 tests with two platform skips and 20 browser checks; the Windows job passes the two ACL controls. The full local Windows regression passes all 495 tests / 60 suites. This supersedes the earlier failed/pending workflow checkpoints retained below. Runtime source is unchanged by this evidence update; cryptographic reports retain their exact earlier helper revisions.
+
 ## Scope and exact evidence
 
 The review covers the product/customer hypothesis, capital and settlement model, all twelve circuit families, encoding and generated bindings, role authorization, complete-history leakage, proof tooling, browser/network adapters, multi-role consoles, checkout/MCP boundaries, encrypted state and operation recovery, deployment evidence, tests/CI, dependency/toolchain compatibility and submission claims. Reproductions and precise source-level findings remain linked below rather than replacing historical evidence.
