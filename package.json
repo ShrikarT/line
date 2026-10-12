@@ -64,7 +64,8 @@
     "proof:local:build": "cargo build --release --locked --manifest-path scripts/native-preimage-checker/Cargo.toml --bin line-native-local-prover --target-dir .compact-keys/native-proof-target",
     "owner:service": "node --experimental-strip-types scripts/serve-approval-owner.mjs",
     "owner:service:test": "node --experimental-strip-types --test tests/approval-owner-service.test.mjs",
-    "owner:service:compact": "node --experimental-strip-types scripts/approval-service-compact.mjs"
+    "owner:service:compact": "node --experimental-strip-types scripts/approval-service-compact.mjs",
+    "owner:service:proof": "node --experimental-strip-types scripts/approval-service-proof.mjs"
   },
   "compact": {
     "compiler": "0.31.1",
