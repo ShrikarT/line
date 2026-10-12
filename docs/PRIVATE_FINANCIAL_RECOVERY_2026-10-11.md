@@ -14,4 +14,6 @@ The storage subprocesses restart; the whole proof coordinator is not killed or r
 
 The new generic store entry point changes the checkout implementation fingerprint. Existing local checkout snapshots therefore fail their original source binding; no automatic migration is supplied. The owner workspace and deployed canonical contract are unchanged. An operator needs an explicit recovery/migration procedure before adopting a different bound implementation.
 
+The first remote CI runs for `4db36c2` passed 492/493 tests. The fault-injection test restored a checkpoint with default public permissions on Linux, and the store rejected it. Its restoration now explicitly uses mode `0600`; the storage check is unchanged. Six targeted journal tests pass locally after the correction, with fresh Linux CI still required.
+
 Reproduce with `npm run finance:journal:test` and `npm run finance:compact`. Native verification requires full private-offer keys and fresh source-bound recovery evidence: `npm run proof:finance -- <full-managed-dir> --compiled-check <fresh-generated-managed-dir> --recycle-prover --recycle-each-call`. It requires six native-accepted calls, five circuit names, one corrupted draw rejection, restored financial memory and all 20 storage invocations. Synthetic ledger/time and disabled fee balancing remain explicit.

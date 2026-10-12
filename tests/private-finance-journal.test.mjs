@@ -59,6 +59,6 @@ test('an actual publication failure closes mutation until the owner reopens comm
  // This dedicated test file is replaced by a directory to make rename fail.
  unlinkSync(path);mkdirSync(path);
  await assert.rejects(j.prepare(x.operation));assert.throws(()=>j.snapshot(),/uncertain/);await assert.rejects(j.prepare(x.operation),/uncertain/);await j.close();
- rmdirSync(path);writeFileSync(path,original);
+ rmdirSync(path);writeFileSync(path,original,{mode:0o600});
  j=await PrivateFinanceJournal.open(x.owner);try{assert.deepEqual(j.snapshot().confirmed,x.initial);assert.equal(j.snapshot().pending,null);}finally{await j.close();}
 });
