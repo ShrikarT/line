@@ -34,6 +34,8 @@ An uncertain transport response never causes an automatic new operation or new o
 
 ## Owner setup
 
+The [13 October module-integrity fix](OWNER_POLICY_INTEGRITY_2026-10-13.md) binds the verified full policy-module hash into newly bound CLI stores. Changed or removed module pins reject on reopen, including a helper change accompanied by an updated profile hash. Older bound CLI stores require a separately reviewed migration; the new CLI does not silently upgrade them. Direct function-only fixtures and transitive imports remain outside this module guarantee.
+
 `npm run owner:service -- <owner-profile-file>` starts the CLI. The profile uses the repository's `encodeVaultJson` format, so bytes and BigInts retain their types. It contains:
 
 - `version: 1`, `approvalABI: "line-private-offer/v1"`, role and custody namespace;

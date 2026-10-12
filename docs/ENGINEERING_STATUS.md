@@ -1,5 +1,9 @@
 # Engineering status and acceptance evidence
 
+## Owner policy module integrity — 13 October 2026 (IST)
+
+The [module-integrity continuation](OWNER_POLICY_INTEGRITY_2026-10-13.md) reproduces changed authorization from an outer helper despite identical function text. The owner CLI now persists its verified full module hash in the encrypted policy binding; changed or removed pins and silent legacy-store upgrades reject. Targeted signer/service checks pass **26/26**, including real CLI helper/profile mutation. Full local regression passes **537 tests / 60 suites**; canonical compilation/zero managed drift, build/typecheck and fixture-key/credential scans pass. Imported dependencies, direct function-only fixtures, independent administration and hardware custody remain separate gaps; no new native or network evidence is claimed. Remote CI for this change remains separate.
+
 Updated **13 October 2026 (IST)**. Canonical contract: `contracts/line.compact`; managed bindings: `contracts/managed/line/`. Product version `0.3.0`. This replaces older completion checklists that incorrectly described domain binding, history privacy, runtime execution and production readiness.
 
 The [current consolidated audit](AUDIT_REPORT_2026-10-13.md) is the submission-facing overview of idea/customer hypothesis, code/runtime evidence, critical gates, repaired bugs, measured proving latency, custody, settlement and Wave 2 priorities. It preserves the separate 65-call/all-twelve contract, six-name coordinator, 13-call revalidation and eight-name reported Preprod scopes. Pitch/demo/validation documents now include the newer evidence and correct stale redesign/encoding statements. Primary competitor and schedule sources were rechecked on 13 October; no contacts, payments, entrant eligibility, submitted deck/video or judging outcome are inferred. Documentation only; no new test/proof scope is added.

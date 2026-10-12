@@ -24,6 +24,8 @@ Latest implemented custody changes passed **535 local tests / 60 suites**, 36 se
 
 ## Critical findings
 
+Continuation: the [owner policy integrity review](OWNER_POLICY_INTEGRITY_2026-10-13.md) reproduced a helper-change authorization gap and adds an encrypted-store pin for the CLI's full policy module. Updated profile hashes cannot silently broaden an existing bound module policy. Imported dependencies remain unpinned, and older CLI stores have no automatic migration. The current local regression passes **537 tests / 60 suites**, with canonical compile/zero managed drift and build/scans passing. This adds no contract, native-proof, network or settlement claim; remote CI is separate.
+
 | Priority | Finding | Required change / evidence |
 |---|---|---|
 | P0 | Canonical history reconstructs debt from a known-zero opening | Replace the disclosure path in the actual submitted runtime. A public 15-unit debit plus known 1-unit fee establishes 16 owed; a hidden commitment cannot undo that arithmetic |

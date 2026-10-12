@@ -103,7 +103,7 @@ test('denied and accepted RPC results use the same application response size',as
 
 test('a separately launched owner CLI retains identity and exact approval across process restart',async()=>{
  const directory=mkdtempSync(join(tls.root,'cli-owner-')),profilePath=join(directory,'owner-profile.json'),policyPath=join(directory,'policy.mjs');
- const source='export const authorize = '+policy.toString()+';\n';writeFileSync(policyPath,source);
+ const source='const ownerLimit=30n;\nexport const authorize = '+policy.toString().replace('<=30n','<=ownerLimit')+';\n';writeFileSync(policyPath,source);
  const key=bytes(),domain=bytes(),profile={version:1,approvalABI:'line-private-offer/v1',role:'issuer',custodyId:'cli-issuer-owner',createIdentity:true,
   storeDirectory:join(directory,'encrypted-store'),policyModule:policyPath,policyModuleSha256:createHash('sha256').update(source).digest('hex'),
   policy:{domain,binding:bytes(),maxAuthorizedCost:50n},port:0,
@@ -126,5 +126,9 @@ test('a separately launched owner CLI retains identity and exact approval across
   const request={operationId:'fund:cli',descriptor:{name:'fundReserve',args:[20n],domain,privateFinance:true,values:{},reserveCommit:bytes()}},first=await actor.client.approve(request);
   verify(first,request.descriptor);const oldPid=actor.child.pid;await actor.stop();profile.createIdentity=false;actor=await start();
   assert.notEqual(actor.child.pid,oldPid);assert.deepEqual(actor.ready.identity.publicKey,first.rolePublicKey);assert.deepEqual(await actor.client.approve(request),first);
- }finally{await actor.stop();}
+  await actor.stop();actor=undefined;
+  const changed=source.replace('ownerLimit=30n','ownerLimit=100n');writeFileSync(policyPath,changed);
+  profile.policyModuleSha256=createHash('sha256').update(changed).digest('hex');
+  await assert.rejects(start(),/stopped before readiness/);
+ }finally{if(actor)await actor.stop();}
 });

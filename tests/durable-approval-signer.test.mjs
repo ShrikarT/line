@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { randomBytes } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { mkdirSync, mkdtempSync, readFileSync, renameSync, rmdirSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { spawn } from 'node:child_process';
@@ -50,6 +50,34 @@ test('committed approval and public identity survive lost response and restart',
  finally{restored.close();}
  const ciphertext=readFileSync(join(x.directory,'signer.enc.json'),'utf8');
  assert(!ciphertext.includes('purchase:1')&&!ciphertext.includes('drawAmount')&&!ciphertext.includes('scalar'));
+});
+
+test('module pin rejects changed helpers despite identical authorize text and rejects pin removal',async()=>{
+ const moduleSource=limit=>`const allowedAmount = ${limit}n;
+ export function authorize(request) { return {allowed:request.args[0]<=allowedAmount,reservationCost:0n}; }`;
+ const original=moduleSource(20),changed=moduleSource(100),hash=s=>createHash('sha256').update(s).digest('hex');
+ const load=s=>import('data:text/javascript;base64,'+Buffer.from(s).toString('base64'));
+ const before=await load(original),after=await load(changed);
+ assert.equal(before.authorize.toString(),after.authorize.toString());
+ assert.equal(before.authorize({args:[30n]}).allowed,false);
+ assert.equal(after.authorize({args:[30n]}).allowed,true);
+ mkdirSync('.compact-keys',{recursive:true});
+ const options={directory:mkdtempSync(resolve('.compact-keys/policy-module-pin-test-')),encryptionKey:bytes(),
+  custodyId:'module-pin-test',role:'issuer',authorize:before.authorize,policyModuleSha256:hash(original)};
+ const signer=new DurableApprovalSigner({...options,create:true}),publicKey=signer.publicKey;
+ signer.bindPolicy({domain:bytes(),maxAuthorizedCost:50n});signer.close();
+ const stored=readFileSync(join(options.directory,'signer.enc.json'));
+ assert.throws(()=>new DurableApprovalSigner({...options,authorize:after.authorize,policyModuleSha256:hash(changed)}),/Stored policy module differs/);
+ assert.throws(()=>new DurableApprovalSigner({...options,policyModuleSha256:undefined}),/Stored policy module differs/);
+ assert.deepEqual(readFileSync(join(options.directory,'signer.enc.json')),stored);
+ const reopened=new DurableApprovalSigner(options);try{assert.deepEqual(reopened.publicKey,publicKey);}finally{reopened.close();}
+});
+
+test('legacy function-only stores cannot silently acquire module pins',()=>{
+ const x=setup();x.signer.close();
+ assert.throws(()=>new DurableApprovalSigner({...x.options,policyModuleSha256:'a'.repeat(64)}),/Stored policy module differs/);
+ const restored=new DurableApprovalSigner(x.options);restored.close();
+ assert.throws(()=>new DurableApprovalSigner({...x.options,policyModuleSha256:'invalid'}),/Invalid policy module fingerprint/);
 });
 test('retry canonicalizes key ordering and does not expose a mutable cached response',()=>{
  const x=setup();try{
