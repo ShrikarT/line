@@ -84,7 +84,9 @@ try{
   },async onComplete(r){fixture=r;}
  });
  assert.equal(traces.length,repeatSupplier?14:11);assert.equal(negativeChecks.length,repeatSupplier?3:2);assert.equal(cacheControls.length,repeatSupplier?3:2);assert.equal(fixture.crashes.length,repeatSupplier?18:12);assert.equal(fixture.controls.length,repeatSupplier?12:6);
- assert.equal(fixture.coordinatorProcessInvocations,checked.coordinatorProcessInvocations+(repeatSupplier?24:16));
+ // One successful prove per call; each draw adds two deliberate proving exits
+ // and one extra successful exact-byte retry. Rejected controls are uncounted.
+ assert.equal(fixture.coordinatorProcessInvocations,checked.coordinatorProcessInvocations+checked.traces.length+cacheControls.length*3);
  for(const [p,h]of Object.entries(scriptFingerprints))assert.equal(sha(readFileSync(p)),h,'Proof helper changed during execution.');
  for(const [p,h]of Object.entries(artifacts))assert.equal(sha(readFileSync(join(dir,p))),h.sha256);
  for(const [name,p]of [['verifier',verifier],['checker',checker],['prover',prover],['guardian',guardian]])assert.equal(sha(readFileSync(p)),executables[name]);
