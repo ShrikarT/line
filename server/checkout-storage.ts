@@ -70,7 +70,9 @@ export class EncryptedCheckoutStore implements CheckoutCheckpointStore {
       execFileSync("icacls.exe", [target, "/inheritance:r", "/grant:r", `*${sid}:(OI)(CI)F`, "*S-1-5-18:(OI)(CI)F"], { windowsHide: true, stdio: "pipe" });
       // An existing directory may contain unrelated explicit ACL entries: reject them.
       const escaped = target.replaceAll("'", "''");
-      const acl = execFileSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", `(Get-Acl -LiteralPath '${escaped}').Access | ForEach-Object { $_.IdentityReference.Translate([System.Security.Principal.SecurityIdentifier]).Value }`], { encoding: "utf8", windowsHide: true });
+      // Read the .NET ACL directly: inherited PowerShell 7 module paths can
+      // make Windows PowerShell's Get-Acl autoload fail with duplicate types.
+      const acl = execFileSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", `$ErrorActionPreference = 'Stop'; [System.IO.Directory]::GetAccessControl('${escaped}').Access | ForEach-Object { $_.IdentityReference.Translate([System.Security.Principal.SecurityIdentifier]).Value }`], { encoding: "utf8", windowsHide: true });
       if (acl.trim().split(/\r?\n/).some(entry => entry !== sid && entry !== "S-1-5-18")) throw new CheckoutPersistenceError("Checkout directory has unrelated explicit access. Use a new private directory.");
     } else if ((stat.mode & 0o077) !== 0 || stat.uid !== process.getuid?.()) {
       throw new CheckoutPersistenceError("Checkout directory must be owned by this user with mode 0700.");

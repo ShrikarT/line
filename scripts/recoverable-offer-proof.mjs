@@ -17,6 +17,7 @@ import { NodeZkConfigProvider } from '@midnight-ntwrk/midnight-js-node-zk-config
 import { httpClientProvingProvider } from '@midnight-ntwrk/midnight-js-http-client-proof-provider';
 import { setNetworkId } from '@midnight-ntwrk/midnight-js-network-id';
 import { runRecoverableOfferCompact } from './recoverable-offer-compact.mjs';
+import { nativeLocalProvingProvider } from './native-local-proving-provider.mjs';
 
 const ZERO='0'.repeat(64),endpoint='http://127.0.0.1:6301',source='contracts/experimental/line-private-offer.compact';
 const digest=value=>createHash('sha256').update(value).digest('hex');
@@ -29,6 +30,8 @@ const manage=action=>new Promise((yes,no)=>{
 async function main(){
  const recycleProver=process.argv.includes('--recycle-prover');
  const recycleEveryCall=process.argv.includes('--recycle-each-call');
+ const nativeLocal=process.argv.includes('--native-local');
+ assert(!nativeLocal||(!recycleProver&&!recycleEveryCall),'Native proving does not use Docker recycling flags.');
  assert(process.argv[2],'Provide the full compiled managed directory.');
  const checkedIndex=process.argv.indexOf('--compiled-check');
  const checkedPath=checkedIndex>=0?process.argv[checkedIndex+1]:process.argv[3];
@@ -68,7 +71,9 @@ async function main(){
  const native=resolve('.compact-keys/native-proof-target/debug',process.platform==='win32'?'line-native-proof-verifier.exe':'line-native-proof-verifier');
  assert(existsSync(native),'Build the native verifier first.');
  const scriptFingerprints=Object.fromEntries(['scripts/recoverable-offer-proof.mjs','scripts/private-pool-provers.mjs','scripts/recoverable-offer-compact.mjs','scripts/durable-approval-actor.mjs','scripts/durable-approval-signer.mjs','scripts/private-finance-child.mjs','scripts/private-finance-journal.mjs','server/checkout-storage.ts','scripts/private-offer-encoding.mjs','scripts/private-offer-signers.mjs','src/lib/security/vault-codec.ts','scripts/signed-pool-signers.mjs',
-  'scripts/private-pool-spike.mjs','src/lib/line/encoding.ts'].map(file=>[file,digest(readFileSync(file))]));
+  'scripts/private-pool-spike.mjs','src/lib/line/encoding.ts',...(nativeLocal?[
+   'scripts/native-local-proving-provider.mjs','scripts/native-preimage-checker/src/main.rs','scripts/native-preimage-checker/src/bin/line-native-local-prover.rs',
+   'scripts/native-preimage-checker/Cargo.toml','scripts/native-preimage-checker/Cargo.lock']:[])].map(file=>[file,digest(readFileSync(file))]));
  mkdirSync('.compact-keys',{recursive:true});const work=mkdtempSync(resolve('.compact-keys/recoverable-offer-proof-'));
  const traces=[],negativeChecks=[],proofServerChecks=[],verifiedStates=new Map();
  const generatedStateBytes=data=>{const state=new RT.ContractState();state.data=data instanceof RT.ChargedState?data:new RT.ChargedState(data);return state.serialize();};
@@ -76,6 +81,9 @@ async function main(){
  let local=L.LedgerState.blank('preview'),deploy,version,ownedProver=false,complete=false,fixtureReport,failure,stage='initialization',lastProvenCircuit,proverRestarts=0,currentIsolatedBranch=false;
  const report=()=>({schema:'line-recoverable-offer-native-proof/v1',createdAt:new Date().toISOString(),complete,sourceSha256,artifacts,scriptFingerprints,
   nativeVerifierSha256:digest(readFileSync(native)),proofServerVersion:version??null,
+  provingBackend:nativeLocal?'pinned-native-rust':'docker-http',
+  ...(nativeLocal?{nativeProverSha256:digest(readFileSync(resolve('.compact-keys/native-proof-target/release',process.platform==='win32'?'line-native-local-prover.exe':'line-native-local-prover'))),
+   nativeCheckerSha256:digest(readFileSync(resolve('.compact-keys/native-proof-target/debug',process.platform==='win32'?'line-native-preimage-checker.exe':'line-native-preimage-checker')))}:{}),
   sourceBoundGeneratedExecutable:true,checkedGeneratedDirectory:checkedDir,
   ...(keyGeneration?{keyGeneration}:{}),
   syntheticLedger:true,syntheticTime:true,feeBalancingEnabled:false,networkSubmitted:false,authenticAssetSettlement:false,
@@ -112,15 +120,23 @@ async function main(){
   checkpoint();
   // This run owns its prover lifecycle. Refuse an already-existing container
   // even if labeled correctly, rather than stopping another run's resources.
+  if(!nativeLocal){
   const inspected=spawnSync('docker',['inspect','line-pool-proof-issuer'],{encoding:'utf8',timeout:15_000});
   if(inspected.error)throw inspected.error;
   assert(inspected.status!==0,'Coordinator prover already exists; do not take ownership of another run.');
   assert.match(inspected.stderr,/No such (object|container)/i);
   ownedProver=true;await manage('start');
   version=(await (await fetch(`${endpoint}/version`,{signal:AbortSignal.timeout(5000)})).text()).trim().replace(/^"|"$/g,'');
-  assert.equal(version,'8.1.3');setNetworkId('preview');
+  assert.equal(version,'8.1.3');
+  }
+  setNetworkId('preview');
   const zk=new NodeZkConfigProvider(dir),base=httpClientProvingProvider(endpoint,zk,{timeout:600_000});
-  const provider={async proveTx(tx){return tx.prove({check:base.check,async prove(preimage,keyLocation,overwriteBindingInput){
+  const localProvider=nativeLocal?nativeLocalProvingProvider({managedDir:dir,
+   checker:resolve('.compact-keys/native-proof-target/debug',process.platform==='win32'?'line-native-preimage-checker.exe':'line-native-preimage-checker'),
+   prover:resolve('.compact-keys/native-proof-target/release',process.platform==='win32'?'line-native-local-prover.exe':'line-native-local-prover'),
+   parameterCache:join(work,'public-parameters'),onCheck:check=>{proofServerChecks.push({stage,...check});checkpoint();},
+   onDiagnostic:diagnostic=>{proofServerChecks.push({stage,nativeProcessFailure:diagnostic});checkpoint();}}):null;
+  const provider={async proveTx(tx){return tx.prove(localProvider??{check:base.check,async prove(preimage,keyLocation,overwriteBindingInput){
    const checked=await base.check(preimage,keyLocation);assert(Array.isArray(checked));
    // Only result shape is retained; check outputs may contain witness data.
    proofServerChecks.push({stage,checkRequestCompleted:true,resultEntries:checked.length,undefinedEntries:checked.filter(x=>x===undefined).length});checkpoint();
