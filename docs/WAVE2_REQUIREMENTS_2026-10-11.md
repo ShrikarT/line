@@ -2,7 +2,7 @@
 
 This is a source review, not organizer confirmation, an eligibility determination or a predicted score. The technical audit remains [AUDIT_UPDATE_2026-10-11.md](AUDIT_UPDATE_2026-10-11.md). Observed public metadata is fingerprinted in [wave2-public-metadata.json](private-signed-2026-10-11-evidence/wave2-public-metadata.json); full third-party documents are not republished.
 
-Public API and Midnight overview rechecked on **12 October 2026**: active Wave 2 still lists October 19 at 15:00:34 UTC, while the overview still lists October 17. The earlier rules-PDF conflict remains unresolved; no controlling organizer amendment is established. This read-only recheck does not certify entrant registration or submission.
+Public API and Midnight overview rechecked on **13 October 2026**: active Wave 2 still lists October 19 at 15:00:34 UTC, while the overview still lists October 17. The earlier rules-PDF conflict remains unresolved; no controlling organizer amendment is established. This read-only recheck does not certify entrant registration or submission. Use the [current consolidated audit](AUDIT_REPORT_2026-10-13.md) to distinguish the newer proof/recovery scopes from the original canonical browser and reported deployment paths.
 
 ## Deadline conflict requires written clarification
 
