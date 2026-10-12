@@ -53,6 +53,7 @@ export function createFinalizedReceiptReader({endpoints,fetchImpl=globalThis.fet
   need(url.protocol==='https:'&&!url.username&&!url.password,'NETWORK_READ_ENDPOINT_INVALID');
  }
  need(typeof fetchImpl==='function','NETWORK_READ_TRANSPORT_INVALID');
+ const indexerUri=endpoints.indexerUri,nodeUri=endpoints.nodeUri;
  let id=0;
  async function post(url,body){
   const signal=AbortSignal.timeout(30000);let response;
@@ -72,30 +73,36 @@ export function createFinalizedReceiptReader({endpoints,fetchImpl=globalThis.fet
   try{return JSON.parse(Buffer.concat(chunks).toString('utf8'));}catch{throw new ReceiptError('SERVICE_JSON_INVALID');}
  }
  async function rpc(method,params=[]){
-  const requestId=++id,result=await post(endpoints.nodeUri,{jsonrpc:'2.0',id:requestId,method,params});
+  const requestId=++id,result=await post(nodeUri,{jsonrpc:'2.0',id:requestId,method,params});
   need(result&&result.jsonrpc==='2.0'&&result.id===requestId&&!result.error&&result.result!=null,'RPC_RESULT_INVALID');return result.result;
  }
  return {async read(row,address){
   need(row&&typeof row==='object','RECEIPT_METADATA_INVALID');
-  hash(row.txHash);hash(address);need(height(row.blockHeight),'RECEIPT_HEIGHT_INVALID');
+  need(Boolean(row.txHash)!==Boolean(row.identifier),'RECEIPT_LOOKUP_INVALID');
+  const offset=row.identifier?{identifier:identifier(row.identifier)}:{hash:hash(row.txHash)};
+  hash(address);need(row.identifier&&row.blockHeight===undefined||height(row.blockHeight),'RECEIPT_HEIGHT_INVALID');
   const finalizedHash=hash(await rpc('chain_getFinalizedHead'));
   const header=await rpc('chain_getHeader',['0x'+finalizedHash]);
   need(header&&typeof header.number==='string'&&/^0x[0-9a-fA-F]+$/.test(header.number),'FINALIZED_HEIGHT_INVALID');
   const finalizedHeight=Number(BigInt(header.number));need(height(finalizedHeight),'FINALIZED_HEIGHT_INVALID');
-  need(row.blockHeight<=finalizedHeight,'BLOCK_NOT_FINALIZED');
-  const indexed=await post(endpoints.indexerUri,{query:QUERY,variables:{offset:{hash:hash(row.txHash)}}});
+  if(row.blockHeight!==undefined)need(row.blockHeight<=finalizedHeight,'BLOCK_NOT_FINALIZED');
+  const indexed=await post(indexerUri,{query:QUERY,variables:{offset}});
   need(indexed&&!indexed.errors&&Array.isArray(indexed.data?.transactions),'INDEXER_QUERY_INVALID');
   need(indexed.data.transactions.length===1,'REPORTED_TRANSACTION_NOT_UNIQUE');const tx=indexed.data.transactions[0];
-  const canonicalHash=hash(await rpc('chain_getBlockHash',[row.blockHeight]));
-  const action=validateReceiptMetadata(row,tx,address,finalizedHeight,canonicalHash);
+  need(tx&&typeof tx==='object','RECEIPT_METADATA_INVALID');
+  const expected={...row,txHash:row.txHash??tx.hash,blockHeight:row.blockHeight??tx.block?.height};
+  need(height(expected.blockHeight),'RECEIPT_HEIGHT_INVALID');need(expected.blockHeight<=finalizedHeight,'BLOCK_NOT_FINALIZED');
+  const canonicalHash=hash(await rpc('chain_getBlockHash',[expected.blockHeight]));
+  const action=validateReceiptMetadata(expected,tx,address,finalizedHeight,canonicalHash);
   let raw,state;const encodedTx=bytes(tx.raw),encodedState=bytes(action.state);
   try{raw=L.Transaction.deserialize('signature','proof','binding',encodedTx);state=L.ContractState.deserialize(encodedState);}
   catch{throw new ReceiptError('NETWORK_BYTES_DECODE_FAILED');}
   need(Buffer.from(raw.serialize()).equals(Buffer.from(encodedTx))&&Buffer.from(state.serialize()).equals(Buffer.from(encodedState)),'NETWORK_BYTES_NOT_CANONICAL');
-  need(hash(raw.transactionHash())===hash(row.txHash),'RAW_TRANSACTION_HASH_MISMATCH');
+  need(hash(raw.transactionHash())===hash(expected.txHash),'RAW_TRANSACTION_HASH_MISMATCH');
   need(Array.isArray(tx.identifiers),'TRANSACTION_IDENTIFIERS_INVALID');
   const identifiers=tx.identifiers.map(identifier).sort(),actual=raw.identifiers().map(identifier).sort();
   need(identifiers.length===actual.length&&identifiers.every((v,i)=>v===actual[i]),'RAW_TRANSACTION_IDENTIFIERS_MISMATCH');
+  if(row.identifier)need(actual.includes(identifier(row.identifier)),'SUBMITTED_IDENTIFIER_MISSING');
   const actions=[...(raw.intents?.values()??[])].flatMap(intent=>intent.actions).filter(a=>hash(a.address)===hash(address));
   need(actions.length===1,'RAW_CONTRACT_ACTION_NOT_UNIQUE');const rawAction=actions[0];
   need(row.kind==='call'?rawAction instanceof L.ContractCall:row.kind==='deploy'?rawAction instanceof L.ContractDeploy:rawAction instanceof L.MaintenanceUpdate,'RAW_CONTRACT_ACTION_KIND_MISMATCH');

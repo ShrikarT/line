@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import {readFileSync,writeFileSync} from 'node:fs';
 import {resolve,join,dirname} from 'node:path';
-const sha=b=>createHash('sha256').update(b).digest('hex'),[path,dir]=process.argv.slice(2);assert(path&&dir);
+const sha=b=>createHash('sha256').update(b).digest('hex'),[path,dir,output]=process.argv.slice(2);assert(path&&dir);
 const r=JSON.parse(readFileSync(path,'utf8'));
 assert.equal(r.schema,'line-private-coordinator-native-proof/v2');assert.equal(r.complete,true);assert.equal(r.traces.length,11);
 assert(r.traces.every(t=>t.proofVerifiedInSeparateRustProcess));assert.equal(r.negativeChecks.length,2);assert(r.negativeChecks.every(x=>x.decodableProofCorruption&&x.rejectedByNativeCryptographicVerifier));
@@ -23,5 +23,5 @@ for(const [name,profile,exe]of [['verifier','debug','line-native-proof-verifier'
 assert.equal(r.nativeExecutables.guardian,sha(readFileSync(resolve('.compact-keys/worker-guardian-target/debug/line-private-worker-guardian'+(process.platform==='win32'?'.exe':'')))));
 r.gitNormalizedScriptFingerprints=Object.fromEntries(Object.keys(r.scriptFingerprints).map(p=>[p,sha(readFileSync(p,'utf8').replaceAll('\r\n','\n'))]));
 r.fingerprintScope='Runtime hashes identify exact files executed; LF-normalized hashes correlate Git source and do not establish another run.';
-writeFileSync('docs/private-signed-2026-10-11-evidence/owner-coordinator-guarded-native-proof.json',JSON.stringify(r,null,2)+'\n');
+writeFileSync(output??'docs/private-signed-2026-10-11-evidence/owner-coordinator-guarded-native-proof.json',JSON.stringify(r,null,2)+'\n');
 console.log(JSON.stringify({publishedContractCalls:10,abruptExits:12,activeProverInterruptions:2,identicalProofRecoveries:2,nativeCorruptionRejections:2,networkSubmitted:false}));
