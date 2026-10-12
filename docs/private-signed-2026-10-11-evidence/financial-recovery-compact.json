@@ -1,6 +1,6 @@
 {
   "schema": "line-recoverable-offer-compact/v1",
-  "createdAt": "2026-10-12T02:34:13.107Z",
+  "createdAt": "2026-10-12T07:20:18.741Z",
   "sourceSha256": "ae970672c048c48692ab690554c77285fec19d1943dc3b4574080970b7fa657d",
   "scriptFingerprints": {
     "scripts/recoverable-offer-compact.mjs": "1de3a4cadbca2ad8a5225db91a38c0d59bbbacc9749ebd3e1ef209ffb402cc2b",
@@ -8,7 +8,7 @@
     "scripts/durable-approval-signer.mjs": "2c3b6e3350a64b49255058f08588f08692d952660e05b5c92e51d1885ce3c1fd",
     "scripts/private-finance-child.mjs": "c2ae3d79eee6148e6db2753550707331ae3bd39db47b44b4cc793ab2912a8159",
     "scripts/private-finance-journal.mjs": "c819ccad6f161703f49fc6d013121610425a651d06854607a29b3200128c1393",
-    "server/checkout-storage.ts": "f29c13ae64ae3a0e45442995dddbcc04d8d243b7955d346f841607e60ed0ea92",
+    "server/checkout-storage.ts": "c1dfa5ca3244c56331689bdc68a2e66c01a89d8c47e4795d17d9c499391b19cc",
     "scripts/private-offer-encoding.mjs": "e78ffe273c86f72f58733574287b3099530be96efbed37a6fe3d8c16a36a7f22",
     "scripts/private-offer-signers.mjs": "80695e03759e98c7bda37ea909430e1b94c9ccabf9f2ef4c6defa3a1a5e2660e",
     "scripts/signed-pool-signers.mjs": "df077892d65f2736322be3e627e6ec9f1bcfa422f9369dcb2016d203ca5831a3",
@@ -127,7 +127,7 @@
     "scripts/durable-approval-signer.mjs": "2c3b6e3350a64b49255058f08588f08692d952660e05b5c92e51d1885ce3c1fd",
     "scripts/private-finance-child.mjs": "c2ae3d79eee6148e6db2753550707331ae3bd39db47b44b4cc793ab2912a8159",
     "scripts/private-finance-journal.mjs": "c819ccad6f161703f49fc6d013121610425a651d06854607a29b3200128c1393",
-    "server/checkout-storage.ts": "e0426fccecc652165f365acf283dd372489a270b02c0a79a9fc1b696dbba444a",
+    "server/checkout-storage.ts": "26d122ddd1846d35675afb10b894ce8383272ddbc075b70d1f306af0afec930b",
     "scripts/private-offer-encoding.mjs": "e78ffe273c86f72f58733574287b3099530be96efbed37a6fe3d8c16a36a7f22",
     "scripts/private-offer-signers.mjs": "80695e03759e98c7bda37ea909430e1b94c9ccabf9f2ef4c6defa3a1a5e2660e",
     "scripts/signed-pool-signers.mjs": "df077892d65f2736322be3e627e6ec9f1bcfa422f9369dcb2016d203ca5831a3",
@@ -135,5 +135,5 @@
     "src/lib/line/encoding.ts": "8fe151cc8eb4f50727c6658beb42e7892028fccfff34f2c1a8045bf61602d0c5",
     "src/lib/security/vault-codec.ts": "0abc995f6f042c9b142833d43cb97fd43f3eb934fdcfee0d043368db1d757062"
   },
-  "fingerprintScope": "Execution hashes retain actual bytes; Git-normalized hashes explicitly account for Windows CRLF."
+  "fingerprintScope": "Runtime hashes identify exact local files used; secondary LF-normalized hashes correlate Git source and do not establish another execution."
 }

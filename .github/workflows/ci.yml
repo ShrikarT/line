@@ -6,6 +6,19 @@ on:
   pull_request:
 
 jobs:
+  windows-checkpoint-acl:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - name: Install JavaScript dependencies
+        run: npm ci
+      - name: Check private directory ACLs without module discovery
+        run: node --experimental-strip-types --test --test-name-pattern="Windows checkpoint" server/checkout-durability.test.ts
+
   verify:
     runs-on: ubuntu-latest
     steps:
@@ -43,6 +56,9 @@ jobs:
 
       - name: Check for generated artifact drift
         run: git diff --exit-code contracts/managed/
+
+      - name: Compiler numeric-range regression probes
+        run: npm run compact:range:check
 
       - name: Compact simulator tests
         run: npm run compact:test

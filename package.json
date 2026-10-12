@@ -57,7 +57,11 @@
     "proof:custody:offer": "node --experimental-strip-types scripts/durable-offer-proof.mjs",
     "finance:journal:test": "node --experimental-strip-types --test tests/private-finance-journal.test.mjs",
     "finance:compact": "node --experimental-strip-types scripts/recoverable-offer-compact.mjs",
-    "proof:finance": "node --experimental-strip-types scripts/recoverable-offer-proof.mjs"
+    "proof:finance": "node --experimental-strip-types scripts/recoverable-offer-proof.mjs",
+    "compact:range:check": "node scripts/check-compact-cse-range.mjs",
+    "proof:preimage:build": "cargo build --locked --manifest-path scripts/native-preimage-checker/Cargo.toml --target-dir .compact-keys/native-proof-target",
+    "finance:preimage": "node --experimental-strip-types scripts/recoverable-offer-preimage-check.mjs",
+    "proof:local:build": "cargo build --release --locked --manifest-path scripts/native-preimage-checker/Cargo.toml --bin line-native-local-prover --target-dir .compact-keys/native-proof-target"
   },
   "compact": {
     "compiler": "0.31.1",
