@@ -23,7 +23,7 @@ const bytes=()=>new Uint8Array(randomBytes(32)),hex=b=>Buffer.from(b).toString('
 const stateBytes=data=>{const s=new RT.ContractState();s.data=data instanceof RT.ChargedState?data:new RT.ChargedState(data);return s.serialize();};
 const emptyPath=()=>({leaf:zero,path:Array.from({length:20},()=>({sibling:{field:0n},goes_left:false}))});
 const SELECTED={openLine:['enrollmentIdentity','acceptedTerms','hasPreviousBook','lineLimit','newSalt','bookOpening','salt'],
- draw:['bookOpening','salt','newSalt','quoteMerchantPk','drawAmount','noteNonce','noteSalt'],postQuote:['quoteFacilityBinding','invoiceId','quoteAmount','quoteNonce'],redeemDraw:['redeemAmount']};
+ draw:['bookOpening','salt','newSalt','quoteMerchantPk','drawAmount','noteNonce','noteSalt'],postQuote:['quoteFacilityBinding','invoiceId','quoteAmount','quoteNonce'],redeemDraw:['redeemAmount'],setStatus:['bookOpening','salt','newSalt']};
 const U64_MAX=(1n<<64n)-1n;
 const u64=value=>typeof value==='bigint'&&value>=0n&&value<=U64_MAX;
 export function coordinatorDrawFee(amount,flatFee,basisPoints){
@@ -33,6 +33,12 @@ export function coordinatorDrawFee(amount,flatFee,basisPoints){
 }
 export function coordinatorOfferBinding(book){
  const bindingSalt=bytes();return {bindingSalt,binding:facilityBinding(book,bindingSalt)};
+}
+export function coordinatorUnencumberedReserve(reserve){
+ const fields=['totalReserve','encumberedReserve','redeemedReserve','feeReserve','pendingFeeReserve','refundReserve','reportedRefundReserve'];
+ assert(fields.every(key=>u64(reserve[key])));
+ const locked=fields.slice(1).reduce((sum,key)=>sum+reserve[key],0n);assert(locked<=reserve.totalReserve);
+ return reserve.totalReserve-locked;
 }
 // Latest supplier records are convenience selectors, never the only custody copy.
 export function coordinatorRetainClaims(financial){
@@ -128,17 +134,26 @@ async function worker(config,action,payload){
   if(action==='prepare'){
    assert(!pending,'Unresolved operation blocks preparation.');
    const {operationId,actor,circuit}=payload,before=snapshot.confirmed,f=before.financial,v=ledger(RT.ContractState.deserialize(before.publicState).data),domain=f.book.domain;
-   const allowedKeys=['operationId','actor','circuit',...(['fundReserve','postQuote'].includes(circuit)?['amount']:[]),...(['registerMerchant','draw'].includes(circuit)?['merchant']:[]),
+   const allowedKeys=['operationId','actor','circuit',...(['fundReserve','withdrawUnencumberedReserve','postQuote'].includes(circuit)?['amount']:[]),...(['registerMerchant','disableMerchant','draw'].includes(circuit)?['merchant']:[]),...(circuit==='setStatus'?['status']:[]),
     ...(circuit==='draw'&&Object.hasOwn(payload,'quoteCommit')?['quoteCommit']:[]),...(circuit==='redeemDraw'&&Object.hasOwn(payload,'noteCommit')?['noteCommit']:[])];
    assert.deepEqual(Object.keys(payload).sort(),allowedKeys.sort());
    if(snapshot.completed.some(x=>x.operationId===operationId)){
     assert.deepEqual(f.requests[operationId],payload,'Completed operation cannot change its semantic request.');
     return {operationId,alreadyConfirmed:true};
    }
-   assert(config.clients[actor]);assert(['registerMerchant','fundReserve','openLine','postQuote','draw','redeemDraw'].includes(circuit));
+   assert(config.clients[actor]);assert(['registerMerchant','disableMerchant','fundReserve','withdrawUnencumberedReserve','withdrawFees','openLine','postQuote','draw','redeemDraw','setStatus'].includes(circuit));
    let args=[],values={},selectedOffer;
-   if(circuit==='registerMerchant'){assert.equal(actor,'issuer');assert(['merchantA','merchantB'].includes(payload.merchant));args=[roleHash('merchant',f.points[payload.merchant])];}
+   if(circuit==='registerMerchant'||circuit==='disableMerchant'){assert.equal(actor,'issuer');assert(['merchantA','merchantB'].includes(payload.merchant));args=[roleHash('merchant',f.points[payload.merchant])];}
    if(circuit==='fundReserve'){assert.equal(actor,'issuer');args=[payload.amount];}
+   if(circuit==='withdrawUnencumberedReserve'){
+    assert.equal(actor,'issuer');assert(u64(payload.amount)&&payload.amount>0n&&payload.amount<=coordinatorUnencumberedReserve(before.privateState.reserve.book));args=[payload.amount];
+   }
+   if(circuit==='withdrawFees'){assert.equal(actor,'issuer');assert(before.privateState.reserve.book.feeReserve>0n);}
+   if(circuit==='setStatus'){
+    assert.equal(actor,'issuer');assert(Number.isInteger(payload.status)&&payload.status>=1&&payload.status<=3);
+    assert(f.book.status===1||f.book.status===2);assert(payload.status!==3||f.book.outstanding===0n);
+    args=[payload.status];values={bookOpening:f.book,salt:f.salt,newSalt:bytes(),bookPath:v.books.findPathForLeaf(commit(f.book,f.salt))};assert(values.bookPath);
+   }
    if(circuit==='openLine'){
     assert(['issuer','agent'].includes(actor));args=[actor==='agent'?0n:1n,f.book.expiry,f.book.flatFee,f.book.basisPoints];
     values={enrollmentIdentity:f.book.identity,acceptedTerms:f.terms,hasPreviousBook:false,lineLimit:f.book.limit,newSalt:f.salt,bookOpening:{...f.book,generation:0n},salt:zero,bookPath:emptyPath()};
@@ -147,9 +162,10 @@ async function worker(config,action,payload){
     assert(['merchantA','merchantB'].includes(actor));const merchant=roleHash('merchant',f.points[actor]);const ttl=config.localProof?2700:900;args=[BigInt(f.unixSeconds+ttl)];
     const offerBinding=coordinatorOfferBinding(f.book);
     values={quoteFacilityBinding:offerBinding.binding,invoiceId:bytes(),quoteAmount:payload.amount,quoteNonce:bytes(),quoteBindingSalt:offerBinding.bindingSalt,enabledMerchantPath:v.enabledMerchantTree.findPathForLeaf(merchant)};
+    assert(values.enabledMerchantPath,'Supplier is not enabled.');
    }
    if(circuit==='draw'){
-    assert.equal(actor,'agent');const offer=coordinatorSelectClaim(f,'offer',payload.merchant,payload.quoteCommit);selectedOffer=offer;
+    assert.equal(actor,'agent');assert.equal(f.book.status,1);const offer=coordinatorSelectClaim(f,'offer',payload.merchant,payload.quoteCommit);selectedOffer=offer;
     const quote=before.privateState.quotes[hex(offer.Q)];assert(quote&&!quote.meta.used,'Quote is unavailable or already used.');args=[offer.Q,offer.expiry,coordinatorDrawFee(offer.amount,f.book.flatFee,f.book.basisPoints)];
     values={bookOpening:f.book,salt:f.salt,newSalt:bytes(),bookPath:v.books.findPathForLeaf(commit(f.book,f.salt)),invoiceId:offer.invoice,quoteNonce:offer.nonce,quoteBindingSalt:offer.bindingSalt??f.bindingSalt,
      drawAmount:offer.amount,quoteMerchantPk:offer.merchant,noteNonce:bytes(),noteSalt:bytes(),quoteMetaOpening:quote.meta,quoteMetaSalt:quote.salt,registeredMerchantPath:v.registeredMerchantTree.findPathForLeaf(offer.merchant)};
@@ -160,9 +176,10 @@ async function worker(config,action,payload){
     values={noteMetaOpening:opening.meta,noteMetaSalt:opening.salt,noteGeneration:note.generation,noteIdentity:note.identity??f.book.identity,noteQuoteCommit:note.Q,quoteMerchantPk:note.merchant,redeemAmount:note.amount,noteNonce:note.nonce,noteSalt:note.salt};
    }
    const full={nullifierKey:f.nullifierKey,reserveOpening:before.privateState.reserve.book,reserveSalt:before.privateState.reserve.salt,newReserveSalt:bytes(),newQuoteMetaSalt:bytes(),newNoteMetaSalt:bytes(),currentBookRoot:v.books.root(),...values};
-   const descriptor={name:circuit,args,domain,privateFinance:true,values:Object.fromEntries((SELECTED[circuit]??[]).filter(k=>Object.hasOwn(full,k)).map(k=>[k,full[k]])),...(circuit==='fundReserve'?{reserveCommit:v.reserveCommit}:{})};
+   const descriptor={name:circuit,args,domain,privateFinance:true,values:Object.fromEntries((SELECTED[circuit]??[]).filter(k=>Object.hasOwn(full,k)).map(k=>[k,full[k]])),...(['fundReserve','withdrawUnencumberedReserve','withdrawFees'].includes(circuit)?{reserveCommit:v.reserveCommit}:{}),...(circuit==='withdrawFees'?{feeReserve:before.privateState.reserve.book.feeReserve}:{})};
    let base=full,selected=descriptor,circuitArgs=args;
-   if(circuit==='fundReserve'){base.reserveAmount=args[0];circuitArgs=[];}
+   if(circuit==='fundReserve'||circuit==='withdrawUnencumberedReserve'){base.reserveAmount=args[0];circuitArgs=[];}
+   if(circuit==='setStatus'){base.requestedStatus=args[0];circuitArgs=[];}
    if(circuit==='openLine'){base.lineFlatFee=args[2];base.lineBasisPoints=args[3];circuitArgs=args.slice(0,2);}
    if(circuit==='draw'){base.drawFee=args[2];circuitArgs=args.slice(0,2);}
    if(snapshot.authorizationIntent){
@@ -176,6 +193,7 @@ async function worker(config,action,payload){
    const context=RT.createCircuitContext(config.scope.contractAddress,COIN,RT.ContractState.deserialize(before.publicState).data,structuredClone(before.privateState),undefined,undefined,f.unixSeconds);
    const result=contract.circuits[circuit](context,...circuitArgs),financial=coordinatorRetainClaims(f);
    financial.requests[operationId]=structuredClone(payload);
+   if(circuit==='setStatus'){financial.book={...f.book,status:base.requestedStatus,epoch:f.book.epoch+1n};financial.salt=base.newSalt;}
    if(circuit==='postQuote')financial.offers[actor]={Q:offerCommit({merchant:roleHash('merchant',f.points[actor]),binding:base.quoteFacilityBinding,invoice:base.invoiceId,amount:base.quoteAmount,expiry:selected.args[0],nonce:base.quoteNonce,domain}),binding:base.quoteFacilityBinding,bindingSalt:base.quoteBindingSalt,merchant:roleHash('merchant',f.points[actor]),invoice:base.invoiceId,nonce:base.quoteNonce,amount:base.quoteAmount,expiry:selected.args[0]};
    if(circuit==='draw'){
     const D=[...ledger(result.context.currentQueryContext.state).notes].find(([d])=>!Object.hasOwn(before.privateState.notes,hex(d)))[0],offer=selectedOffer;
@@ -192,7 +210,7 @@ async function worker(config,action,payload){
   const restored=contract.circuits[pending.circuit](ctx,...pending.circuitArgs),restoredState=stateBytes(restored.context.currentQueryContext.state);
   assert.deepEqual(restoredState,pending.candidate.publicState);assert.deepEqual(restored.context.currentPrivateState,pending.candidate.privateState);
   const root=ledger(restored.context.currentQueryContext.state),book=pending.candidate.financial.book;
-  if(book.generation===1n&&book.status===1&&['draw','redeemDraw'].includes(pending.circuit))assert(root.books.findPathForLeaf(commit(book,pending.candidate.financial.salt)));
+  if(['draw','redeemDraw','setStatus'].includes(pending.circuit))assert(root.books.findPathForLeaf(commit(book,pending.candidate.financial.salt)));
   if(action==='prove'){
    assert(config.localProof);assert.equal(resolve(config.localProof.managedDir),dir);assert.deepEqual(Object.keys(payload).sort(),['operationId','publicLedgerState'].sort());
    const proof=await proveRestoredCoordinator({config:config.localProof,scope:config.scope,directory:config.directory,password:config.password,pending,restored,initialQueryContext,publicLedgerState:payload.publicLedgerState,
