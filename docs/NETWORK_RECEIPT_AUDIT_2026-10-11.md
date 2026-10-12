@@ -4,6 +4,8 @@ Deployment commit `babc507`, merged into `main` by PR #11, adds `deployment-evid
 
 **Independent network verification is pending.** The read-only verifier cannot currently query Blockfrost because its environment has no Preprod project token. Its first run returned `PREPROD_READ_ONLY_TOKEN_MISSING`, recorded an incomplete result and made no network request. The reported transactions are new evidence; neither their existence in JSON nor this audit establishes finality.
 
+The [12 October reader hardening](RECEIPT_RECONCILIATION_2026-10-12.md) now compares indexed actions with the actual decoded transaction address, action kind and entry point, validates exact byte roundtrips and tagged identifiers, and bounds HTTPS responses. All 36 receipt controls pass with simulated provider responses and public serialization fixtures. A fresh read-only attempt still returns the missing-token category with zero checked receipts; no independent live finality or asset claim is added.
+
 ## Exact reported coverage
 
 The eight execution names are `fundReserve`, `registerMerchant`, `openLine`, `postQuote`, `draw`, `redeemDraw`, `acknowledgeRepayment`, and `withdrawFees`. The other four names are registered but not executed by this flow: `disableMerchant`, `withdrawUnencumberedReserve`, `cancelOrExpireNote`, and `setStatus`. Earlier text saying all twelve were executed has been corrected in the integration branch.

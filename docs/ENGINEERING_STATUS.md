@@ -2,6 +2,8 @@
 
 Updated **12 October 2026 (IST)**. Canonical contract: `contracts/line.compact`; managed bindings: `contracts/managed/line/`. Product version `0.3.0`. This replaces older completion checklists that incorrectly described domain binding, history privacy, runtime execution and production readiness.
 
+The [new finalized receipt reader](RECEIPT_RECONCILIATION_2026-10-12.md) binds indexer action metadata to the actual decoded transaction address/type/entry point and requires exact roundtrips, tagged identifiers, finality/canonical-block agreement and bounded HTTPS responses. The canonical read-only audit now uses it and fingerprints its helpers. All **36 receipt controls**, **510 core tests / 60 suites**, canonical compile/zero drift, build/typecheck and key/credential scans pass locally. A fresh live attempt still records `PREPROD_READ_ONLY_TOKEN_MISSING` with zero checked receipts. Private-coordinator confirmation remains caller-trusted; its source and historical native evidence are unchanged. Fresh CI for this implementation is pending.
+
 The [latest public dependency review](PUBLIC_DEPENDENCY_REVIEW_2026-10-12.md) covers all twelve private-offer circuit bodies and shared public helpers. It corrects older observer-model statements about a public reopening flag and missing local recovery integration. The source hashes and implementation remain unchanged; this is a documentation review, with no newly generated proofs or rerun code regression. Complete observer privacy, caller-trusted confirmation, real assets and independently administered custody remain open. A fresh fetch confirms main `a0e51ee` is included with no unseen upstream commits.
 
 ## Owner-operated approval boundary — 12 October 2026 (IST)
