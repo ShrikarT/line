@@ -5,10 +5,11 @@ import {readFileSync,writeFileSync} from 'node:fs';
 import {dirname,join} from 'node:path';
 const sha=b=>createHash('sha256').update(b).digest('hex'),path=process.argv[2];assert(path,'Provide the fresh coordinator evidence path.');
 const r=JSON.parse(readFileSync(path,'utf8'));
-assert.equal(r.schema,'line-recoverable-owner-coordinator/v1');assert.equal(r.freshCompilation,true);
+const repeat=r.schema==='line-recoverable-owner-coordinator/repeat-supplier/v1';assert(repeat||r.schema==='line-recoverable-owner-coordinator/v1');assert.equal(r.freshCompilation,true);
 assert.equal(r.sourceSha256,sha(readFileSync('contracts/experimental/line-private-offer.compact')));
-assert.equal(r.traces.length,10);assert.equal(r.controls.length,6);assert.equal(r.crashes.length,8);
-assert.equal(r.coordinatorProcessInvocations,46);assert.equal(r.owners,4);assert.equal(r.merchants,2);
+assert.equal(r.traces.length,repeat?13:10);assert.equal(r.controls.length,repeat?12:6);assert.equal(r.crashes.length,repeat?12:8);
+assert.equal(r.coordinatorProcessInvocations,repeat?63:46);assert.equal(r.owners,4);assert.equal(r.merchants,2);
+if(repeat){assert.equal(r.retainedClaims.olderQuoteSelectedAfterNewerQuote,true);assert.equal(r.retainedClaims.olderNoteRedeemedAfterNewerDraw,true);assert(process.argv[3],'Repeated-supplier evidence requires a separate publication path.');}
 for(const key of ['wholeExecutionWorkerReconstructed','nonzeroBasisPointPolicyExercised','financialCheckpointDurable',
  'authorizationIntentPersistedBeforeOwnerRPC','preparedCandidatePersistedBeforeResponse','preparedPacketReloadedWithoutFreshApproval'])assert.equal(r[key],true);
 for(const key of ['coordinatorWitnessesReturnedToHarness','networkSubmitted','authenticAssetSettlement','cryptographicProofsGenerated',
@@ -32,9 +33,9 @@ const keys=['schema','createdAt','sourceSha256','scriptFingerprints','artifacts'
  'nonzeroBasisPointPolicyExercised','financialCheckpointDurable','authorizationIntentPersistedBeforeOwnerRPC',
  'preparedCandidatePersistedBeforeResponse','preparedPacketReloadedWithoutFreshApproval','networkSubmitted','authenticAssetSettlement',
  'cryptographicProofsGenerated','nativeProofVerificationPerformed','independentAdministrativeCustody','fullHistoryPrivacyPassed','evidenceScope'];
-assert.deepEqual(Object.keys(r).sort(),keys.sort());
+if(repeat)keys.push('retainedClaims');assert.deepEqual(Object.keys(r).sort(),keys.sort());
 const published=Object.fromEntries(keys.map(k=>[k,r[k]]));
 published.gitNormalizedScriptFingerprints=Object.fromEntries(helpers.map(p=>[p,sha(readFileSync(p,'utf8').replaceAll('\r\n','\n'))]));
 published.fingerprintScope='Runtime hashes identify exact files executed. LF-normalized hashes correlate Git source and do not establish another run.';
-writeFileSync('docs/private-signed-2026-10-11-evidence/owner-coordinator-recovery.json',JSON.stringify(published,null,2)+'\n');
-console.log(JSON.stringify({publishedCalls:10,abruptExits:8,executionWorkers:46,nativeProofs:false,networkSubmitted:false}));
+writeFileSync(process.argv[3]??'docs/private-signed-2026-10-11-evidence/owner-coordinator-recovery.json',JSON.stringify(published,null,2)+'\n');
+console.log(JSON.stringify({publishedCalls:r.traces.length,abruptExits:r.crashes.length,executionWorkers:r.coordinatorProcessInvocations,nativeProofs:false,networkSubmitted:false}));

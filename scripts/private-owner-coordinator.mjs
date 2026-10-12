@@ -34,6 +34,26 @@ export function coordinatorDrawFee(amount,flatFee,basisPoints){
 export function coordinatorOfferBinding(book){
  const bindingSalt=bytes();return {bindingSalt,binding:facilityBinding(book,bindingSalt)};
 }
+// Latest supplier records are convenience selectors, never the only custody copy.
+export function coordinatorRetainClaims(financial){
+ const next=structuredClone(financial);next.offerRecords??={};next.noteRecords??={};
+ for(const [latest,archive,key]of [[next.offers,next.offerRecords,'Q'],[next.notes,next.noteRecords,'D']]){
+  for(const record of Object.values(latest??{})){
+   assert(record[key] instanceof Uint8Array&&record[key].length===32);const id=hex(record[key]);
+   if(Object.hasOwn(archive,id))assert.deepEqual(archive[id],record,'An archived claim opening cannot change.');
+   else archive[id]=structuredClone(record);
+  }
+ }
+ return next;
+}
+export function coordinatorSelectClaim(financial,kind,merchant,selector){
+ assert(['offer','note'].includes(kind)&&['merchantA','merchantB'].includes(merchant));
+ if(selector!==undefined)assert(typeof selector==='string'&&/^[0-9a-f]{64}$/.test(selector),'Invalid claim selector.');
+ const f=coordinatorRetainClaims(financial),key=kind==='offer'?'Q':'D',archive=kind==='offer'?f.offerRecords:f.noteRecords;
+ const record=selector===undefined?(kind==='offer'?f.offers:f.notes)[merchant]:archive[selector];assert(record,'Claim opening is unavailable.');
+ assert.deepEqual(record.merchant,roleHash('merchant',f.points[merchant]),'Claim belongs to another supplier.');
+ assert.deepEqual(record[key],new Uint8Array(Buffer.from(selector??hex(record[key]),'hex')));return structuredClone(record);
+}
 export function coordinatorCommand(config,action,payload){
  assert(['initialize','prepare','restore','prove','confirm','status'].includes(action));const body=wire({action,payload});assert(Buffer.byteLength(body)<=2*1024*1024);
  const child=fork(self,['--worker'],{execArgv:['--experimental-strip-types'],stdio:['ignore','ignore','pipe','ipc'],detached:process.platform!=='win32',windowsHide:true,
@@ -108,14 +128,15 @@ async function worker(config,action,payload){
   if(action==='prepare'){
    assert(!pending,'Unresolved operation blocks preparation.');
    const {operationId,actor,circuit}=payload,before=snapshot.confirmed,f=before.financial,v=ledger(RT.ContractState.deserialize(before.publicState).data),domain=f.book.domain;
-   const allowedKeys=['operationId','actor','circuit',...(['fundReserve','postQuote'].includes(circuit)?['amount']:[]),...(['registerMerchant','draw'].includes(circuit)?['merchant']:[])];
+   const allowedKeys=['operationId','actor','circuit',...(['fundReserve','postQuote'].includes(circuit)?['amount']:[]),...(['registerMerchant','draw'].includes(circuit)?['merchant']:[]),
+    ...(circuit==='draw'&&Object.hasOwn(payload,'quoteCommit')?['quoteCommit']:[]),...(circuit==='redeemDraw'&&Object.hasOwn(payload,'noteCommit')?['noteCommit']:[])];
    assert.deepEqual(Object.keys(payload).sort(),allowedKeys.sort());
    if(snapshot.completed.some(x=>x.operationId===operationId)){
     assert.deepEqual(f.requests[operationId],payload,'Completed operation cannot change its semantic request.');
     return {operationId,alreadyConfirmed:true};
    }
    assert(config.clients[actor]);assert(['registerMerchant','fundReserve','openLine','postQuote','draw','redeemDraw'].includes(circuit));
-   let args=[],values={},noteKey;
+   let args=[],values={},selectedOffer;
    if(circuit==='registerMerchant'){assert.equal(actor,'issuer');assert(['merchantA','merchantB'].includes(payload.merchant));args=[roleHash('merchant',f.points[payload.merchant])];}
    if(circuit==='fundReserve'){assert.equal(actor,'issuer');args=[payload.amount];}
    if(circuit==='openLine'){
@@ -128,13 +149,15 @@ async function worker(config,action,payload){
     values={quoteFacilityBinding:offerBinding.binding,invoiceId:bytes(),quoteAmount:payload.amount,quoteNonce:bytes(),quoteBindingSalt:offerBinding.bindingSalt,enabledMerchantPath:v.enabledMerchantTree.findPathForLeaf(merchant)};
    }
    if(circuit==='draw'){
-    assert.equal(actor,'agent');assert(['merchantA','merchantB'].includes(payload.merchant));const offer=f.offers[payload.merchant];assert(offer);const quote=before.privateState.quotes[hex(offer.Q)];args=[offer.Q,offer.expiry,coordinatorDrawFee(offer.amount,f.book.flatFee,f.book.basisPoints)];
+    assert.equal(actor,'agent');const offer=coordinatorSelectClaim(f,'offer',payload.merchant,payload.quoteCommit);selectedOffer=offer;
+    const quote=before.privateState.quotes[hex(offer.Q)];assert(quote&&!quote.meta.used,'Quote is unavailable or already used.');args=[offer.Q,offer.expiry,coordinatorDrawFee(offer.amount,f.book.flatFee,f.book.basisPoints)];
     values={bookOpening:f.book,salt:f.salt,newSalt:bytes(),bookPath:v.books.findPathForLeaf(commit(f.book,f.salt)),invoiceId:offer.invoice,quoteNonce:offer.nonce,quoteBindingSalt:offer.bindingSalt??f.bindingSalt,
      drawAmount:offer.amount,quoteMerchantPk:offer.merchant,noteNonce:bytes(),noteSalt:bytes(),quoteMetaOpening:quote.meta,quoteMetaSalt:quote.salt,registeredMerchantPath:v.registeredMerchantTree.findPathForLeaf(offer.merchant)};
    }
    if(circuit==='redeemDraw'){
-    assert(['merchantA','merchantB'].includes(actor));const note=f.notes[actor];assert(note);noteKey=actor;const opening=before.privateState.notes[hex(note.D)];args=[note.D,note.expiry];
-    values={noteMetaOpening:opening.meta,noteMetaSalt:opening.salt,noteGeneration:note.generation,noteIdentity:f.book.identity,noteQuoteCommit:note.Q,quoteMerchantPk:note.merchant,redeemAmount:note.amount,noteNonce:note.nonce,noteSalt:note.salt};
+    const note=coordinatorSelectClaim(f,'note',actor,payload.noteCommit),opening=before.privateState.notes[hex(note.D)];
+    assert(opening&&!opening.meta.redeemed&&!opening.meta.cancelled,'Claim is unavailable or already spent.');args=[note.D,note.expiry];
+    values={noteMetaOpening:opening.meta,noteMetaSalt:opening.salt,noteGeneration:note.generation,noteIdentity:note.identity??f.book.identity,noteQuoteCommit:note.Q,quoteMerchantPk:note.merchant,redeemAmount:note.amount,noteNonce:note.nonce,noteSalt:note.salt};
    }
    const full={nullifierKey:f.nullifierKey,reserveOpening:before.privateState.reserve.book,reserveSalt:before.privateState.reserve.salt,newReserveSalt:bytes(),newQuoteMetaSalt:bytes(),newNoteMetaSalt:bytes(),currentBookRoot:v.books.root(),...values};
    const descriptor={name:circuit,args,domain,privateFinance:true,values:Object.fromEntries((SELECTED[circuit]??[]).filter(k=>Object.hasOwn(full,k)).map(k=>[k,full[k]])),...(circuit==='fundReserve'?{reserveCommit:v.reserveCommit}:{})};
@@ -151,15 +174,15 @@ async function worker(config,action,payload){
    if(config.testCrashAfterApproval)process.exit(23);
    active={...base,...approval};
    const context=RT.createCircuitContext(config.scope.contractAddress,COIN,RT.ContractState.deserialize(before.publicState).data,structuredClone(before.privateState),undefined,undefined,f.unixSeconds);
-   const result=contract.circuits[circuit](context,...circuitArgs),financial=structuredClone(f);
+   const result=contract.circuits[circuit](context,...circuitArgs),financial=coordinatorRetainClaims(f);
    financial.requests[operationId]=structuredClone(payload);
    if(circuit==='postQuote')financial.offers[actor]={Q:offerCommit({merchant:roleHash('merchant',f.points[actor]),binding:base.quoteFacilityBinding,invoice:base.invoiceId,amount:base.quoteAmount,expiry:selected.args[0],nonce:base.quoteNonce,domain}),binding:base.quoteFacilityBinding,bindingSalt:base.quoteBindingSalt,merchant:roleHash('merchant',f.points[actor]),invoice:base.invoiceId,nonce:base.quoteNonce,amount:base.quoteAmount,expiry:selected.args[0]};
    if(circuit==='draw'){
-    const D=[...ledger(result.context.currentQueryContext.state).notes].find(([d])=>!Object.hasOwn(before.privateState.notes,hex(d)))[0],offer=f.offers[payload.merchant];
-    financial.notes[payload.merchant]={D,Q:offer.Q,merchant:offer.merchant,amount:offer.amount,expiry:offer.expiry,generation:f.book.generation,nonce:base.noteNonce,salt:base.noteSalt};
+    const D=[...ledger(result.context.currentQueryContext.state).notes].find(([d])=>!Object.hasOwn(before.privateState.notes,hex(d)))[0],offer=selectedOffer;
+    financial.notes[payload.merchant]={D,Q:offer.Q,merchant:offer.merchant,identity:f.book.identity,amount:offer.amount,expiry:offer.expiry,generation:f.book.generation,nonce:base.noteNonce,salt:base.noteSalt};
     financial.book={...f.book,outstanding:f.book.outstanding+base.drawAmount+active.drawFee,epoch:f.book.epoch+1n};financial.salt=base.newSalt;
    }
-   const candidate={publicState:stateBytes(result.context.currentQueryContext.state),privateState:result.context.currentPrivateState,financial};
+   const candidate={publicState:stateBytes(result.context.currentQueryContext.state),privateState:result.context.currentPrivateState,financial:coordinatorRetainClaims(financial)};
    await journal.prepare({operationId,circuit,circuitArgs,witnesses:active,before,candidate});
    if(config.testCrashAfterPrepare)process.exit(23);
    pending=journal.snapshot().pending;

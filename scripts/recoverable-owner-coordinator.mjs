@@ -8,7 +8,8 @@ import {spawn} from 'node:child_process';
 import {createHash,randomBytes} from 'node:crypto';
 import {readFileSync,writeFileSync,mkdirSync,mkdtempSync} from 'node:fs';
 import {resolve,join,relative,sep} from 'node:path';
-import {fileURLToPath} from 'node:url';
+import {fileURLToPath,pathToFileURL} from 'node:url';
+import * as RT from '@midnight-ntwrk/compact-runtime';
 import {DurableApprovalSigner} from './durable-approval-signer.mjs';
 import {authorize} from './approval-owner-example-policy.mjs';
 import {authorize as authorizePerOffer} from './approval-owner-per-offer-policy.mjs';
@@ -17,7 +18,7 @@ import {coordinatorCommand} from './private-owner-coordinator.mjs';
 import {tlsFixture} from '../tests/fixtures/approval-service-tls.mjs';
 import {roleHash} from './private-offer-signers.mjs';
 const SOURCE='contracts/experimental/line-private-offer.compact',sha=b=>createHash('sha256').update(b).digest('hex'),bytes=()=>new Uint8Array(randomBytes(32));
-export async function runRecoverableOwnerCoordinator({compiledDir,localProof,onInitialized=async()=>{},onBeforeConfirm=async()=>{},onComplete=async()=>{}}={}){
+export async function runRecoverableOwnerCoordinator({compiledDir,localProof,repeatSupplier=false,onInitialized=async()=>{},onBeforeConfirm=async()=>{},onComplete=async()=>{}}={}){
 mkdirSync('.compact-keys',{recursive:true});const work=mkdtempSync(resolve('.compact-keys/recoverable-owner-coordinator-')),managedDir=compiledDir?resolve(compiledDir):join(work,'managed');
 const portable=p=>relative(process.cwd(),p).split(sep).join('/');
 if(!compiledDir)
@@ -28,6 +29,10 @@ const files=['scripts/recoverable-owner-coordinator.mjs','scripts/private-owner-
  'scripts/private-coordinator-proving.mjs','scripts/native-local-proving-provider.mjs','scripts/private-worker-guardian.mjs',
  'scripts/private-finance-network.mjs','scripts/finalized-contract-receipt.mjs','src/lib/runtime/endpoints.ts','scripts/approval-owner-per-offer-policy.mjs'];
 const fingerprints=Object.fromEntries(files.map(p=>[p,sha(readFileSync(p))])),sourceHash=sha(readFileSync(SOURCE)),tls=tlsFixture();
+const {ledger}=await import(pathToFileURL(join(managedDir,'contract/index.js')).href),quoteIds=[],noteIds=[],seenQuotes=new Set(),seenNotes=new Set();
+const observePublic=state=>{const view=ledger(RT.ContractState.deserialize(state).data);
+ for(const [keys,seen,ids]of [[view.quotes,seenQuotes,quoteIds],[view.notes,seenNotes,noteIds]])for(const [key]of keys){const id=Buffer.from(key).toString('hex');if(!seen.has(id)){seen.add(id);ids.push(id);}}
+ return view;};
 const owners={},services={},labels={issuer:'issuer',agent:'agent',merchantA:'merchant',merchantB:'merchant'},traces=[],controls=[],processes=[],crashes=[];
 const config={managedDir,sourceSha256:sourceHash,executableSha256:sha(readFileSync(join(managedDir,'contract/index.js'))),directory:join(work,'private-financial-state'),password:Buffer.from(bytes()).toString('hex')};
 if(localProof)config.localProof=localProof;
@@ -47,11 +52,21 @@ try{
   services[label]=await startApprovalOwnerService({signer:owners[label],role,approvalABI:'line-private-offer/v1',domain,...tls.material('server'),allowedClients:[tls.fingerprint('caller')]});
   config.clients[label]={url:'https://127.0.0.1:'+services[label].port+'/',...tls.material('caller'),expectedServerFingerprint:tls.fingerprint('server'),expectedRole:role,expectedPublicKey:points[label],expectedDomain:domain};
  }
- const itinerary=[{actor:'issuer',circuit:'registerMerchant',merchant:'merchantB'},{actor:'issuer',circuit:'fundReserve',amount:200n},
+ const setup=[{actor:'issuer',circuit:'registerMerchant',merchant:'merchantB'},{actor:'issuer',circuit:'fundReserve',amount:200n},
+  {actor:'agent',circuit:'openLine'},{actor:'issuer',circuit:'openLine'}];
+ const itinerary=repeatSupplier?[...setup,
+  {actor:'merchantA',circuit:'postQuote',amount:10n},{actor:'merchantA',circuit:'postQuote',amount:10n},
+  ()=>({actor:'agent',circuit:'draw',merchant:'merchantA',quoteCommit:quoteIds[0]}),
+  {actor:'agent',circuit:'draw',merchant:'merchantA'},
+  ()=>({actor:'merchantA',circuit:'redeemDraw',noteCommit:noteIds[0]}),
+  {actor:'merchantA',circuit:'redeemDraw'},
+  {actor:'merchantB',circuit:'postQuote',amount:15n},{actor:'agent',circuit:'draw',merchant:'merchantB'},{actor:'merchantB',circuit:'redeemDraw'}]:[{actor:'issuer',circuit:'registerMerchant',merchant:'merchantB'},{actor:'issuer',circuit:'fundReserve',amount:200n},
   {actor:'agent',circuit:'openLine'},{actor:'issuer',circuit:'openLine'},
   {actor:'merchantA',circuit:'postQuote',amount:15n},{actor:'agent',circuit:'draw',merchant:'merchantA'},{actor:'merchantA',circuit:'redeemDraw'},
   {actor:'merchantB',circuit:'postQuote',amount:15n},{actor:'agent',circuit:'draw',merchant:'merchantB'},{actor:'merchantB',circuit:'redeemDraw'}];
- for(const [i,request]of itinerary.entries()){
+ let finalPublic;
+ for(const [i,entry]of itinerary.entries()){
+  const request=typeof entry==='function'?entry():entry;
   const operationId='coordinator:'+i;let prepared;
   if(request.circuit==='draw'){
    config.testCrashBeforeApproval=true;
@@ -71,6 +86,7 @@ try{
   }else prepared=await command('prepare',{operationId,...request});
   const restored=await command('restore',{operationId});assert.notEqual(restored.pid,prepared.pid);assert.equal(restored.value.fingerprint,prepared.value.fingerprint);
   assert.deepEqual(restored.value.publicState,prepared.value.publicState);assert.equal(restored.value.restoredFromEncryptedJournal,true);
+  observePublic(restored.value.publicState);finalPublic=restored.value.publicState;
   assert.deepEqual(Object.keys(restored.value).sort(),['operationId','circuit','fingerprint','publicState','sourceBound','restoredFromEncryptedJournal','networkFinalityVerified'].sort());
   assert.equal(restored.value.networkFinalityVerified,false);
   if(request.circuit==='draw'){
@@ -99,16 +115,30 @@ try{
   }else await command('confirm',{operationId,observedPublicState:restored.value.publicState});
   traces.push({circuit:request.circuit,actor:request.actor,wholeExecutionWorkerReconstructed:true,exactPreparedPacketRestored:true,signingScalarWitnesses:0});
  }
- const status=await command('status',{});assert.equal(status.value.authorizationOperation,null);assert.equal(status.value.pendingOperation,null);assert.equal(status.value.completedOperations.length,10);
- assert.equal(traces.length,10);assert.equal(controls.length,6);assert.equal(crashes.length,localProof?12:8);
+ const status=await command('status',{});assert.equal(status.value.authorizationOperation,null);assert.equal(status.value.pendingOperation,null);assert.equal(status.value.completedOperations.length,repeatSupplier?13:10);
+ assert.equal(traces.length,repeatSupplier?13:10);assert.equal(controls.length,repeatSupplier?9:6);assert.equal(crashes.length,(repeatSupplier?3:2)*(localProof?6:4));
+ let retainedClaims;
+ if(repeatSupplier){
+  const view=observePublic(finalPublic);assert.equal(quoteIds.length,3);assert.equal(noteIds.length,3);
+  for(const id of noteIds)assert.equal(view.notes.member(new Uint8Array(Buffer.from(id,'hex'))),true);
+  for(const request of [{actor:'merchantA',circuit:'redeemDraw',noteCommit:noteIds[0]},
+   {actor:'merchantB',circuit:'redeemDraw',noteCommit:noteIds[0]},
+   {actor:'agent',circuit:'draw',merchant:'merchantB',quoteCommit:quoteIds[0]}]){
+   await assert.rejects(command('prepare',{operationId:'archive-denial:'+controls.length,...request}));
+   controls.push({check:'spent-or-foreign-archive-selector',rejected:true});
+  }
+  const after=await command('status',{});assert.equal(after.value.authorizationOperation,null);assert.equal(after.value.pendingOperation,null);assert.equal(after.value.completedOperations.length,13);
+  retainedClaims={sameSupplierQuotes:2,sameSupplierDraws:2,olderQuoteSelectedAfterNewerQuote:true,olderNoteRedeemedAfterNewerDraw:true,
+   explicitSelectorsVerifiedByCompact:true,spentAndForeignSelectorsRejectedBeforeAuthorization:true,fullHistoryPrivacyPassed:false};
+ }
  for(const [p,h]of Object.entries(fingerprints))assert.equal(sha(readFileSync(p)),h);assert.equal(sha(readFileSync(SOURCE)),sourceHash);
- const report={schema:localProof?'line-recoverable-owner-coordinator/native-fixture/v1':'line-recoverable-owner-coordinator/v1',createdAt:new Date().toISOString(),sourceSha256:sourceHash,scriptFingerprints:fingerprints,
+ const report={schema:repeatSupplier?(localProof?'line-recoverable-owner-coordinator/repeat-supplier-native-fixture/v1':'line-recoverable-owner-coordinator/repeat-supplier/v1'):localProof?'line-recoverable-owner-coordinator/native-fixture/v1':'line-recoverable-owner-coordinator/v1',createdAt:new Date().toISOString(),sourceSha256:sourceHash,scriptFingerprints:fingerprints,...(retainedClaims?{retainedClaims}:{}),
   artifacts:Object.fromEntries(['contract/index.js','compiler/contract-info.json'].map(p=>[p,sha(readFileSync(join(managedDir,p)))])),freshCompilation:!compiledDir,
   traces,controls,crashes:crashes.map(({workerPid,...metadata})=>metadata),coordinatorProcessInvocations:processes.length+crashes.length,wholeExecutionWorkerReconstructed:true,coordinatorWitnessesReturnedToHarness:false,
   owners:4,merchants:2,nonzeroBasisPointPolicyExercised:true,financialCheckpointDurable:true,authorizationIntentPersistedBeforeOwnerRPC:true,preparedCandidatePersistedBeforeResponse:true,preparedPacketReloadedWithoutFreshApproval:true,
   networkSubmitted:false,authenticAssetSettlement:false,cryptographicProofsGenerated:Boolean(localProof),nativeProofVerificationPerformed:Boolean(localProof),independentAdministrativeCustody:false,fullHistoryPrivacyPassed:false,
-  evidenceScope:'Ten generated Compact calls in separate execution-worker processes, restoring write-ahead authorization intents and private prepared packets through four mTLS services, with eight abrupt publication/approval exits and exact completed retries. Same-host synthetic owner harness and caller-trusted candidate observations; no network receipt/proof/asset/independent-administration claim.'};
- writeFileSync(join(work,'evidence.json'),JSON.stringify(report,null,2)+'\n');await onComplete(report);console.log(JSON.stringify({calls:10,controls:6,abruptExits:crashes.length,workerInvocations:processes.length+crashes.length,report:join(work,'evidence.json')}));return report;
+  evidenceScope:repeatSupplier?'Thirteen restored Compact calls with two quotes and draws at Merchant A, selection/redemption of older archived claims after newer purchases, Merchant B separation and twelve generated publication/approval exits. Native proving, when selected, adds its separately recorded interruption/proof controls. Synthetic same-host configuration; no network or asset claim.':'Ten generated Compact calls in separate execution-worker processes, restoring write-ahead authorization intents and private prepared packets through four mTLS services, with eight abrupt publication/approval exits and exact completed retries. Same-host synthetic owner harness and caller-trusted candidate observations; no network receipt/proof/asset/independent-administration claim.'};
+ writeFileSync(join(work,'evidence.json'),JSON.stringify(report,null,2)+'\n');await onComplete(report);console.log(JSON.stringify({calls:traces.length,controls:controls.length,abruptExits:crashes.length,workerInvocations:processes.length+crashes.length,report:join(work,'evidence.json')}));return report;
 }finally{for(const service of Object.values(services))await service.close();for(const signer of Object.values(owners))signer.close();}
 }
-if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url))await runRecoverableOwnerCoordinator();
+if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url))await runRecoverableOwnerCoordinator({repeatSupplier:process.argv.includes('--repeat-supplier')});

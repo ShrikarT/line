@@ -1,7 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomBytes} from 'node:crypto';
-import {coordinatorDrawFee,coordinatorOfferBinding} from '../scripts/private-owner-coordinator.mjs';
+import * as RT from '@midnight-ntwrk/compact-runtime';
+import {coordinatorDrawFee,coordinatorOfferBinding,coordinatorRetainClaims,coordinatorSelectClaim} from '../scripts/private-owner-coordinator.mjs';
+import {roleHash} from '../scripts/private-offer-signers.mjs';
 import {facilityBinding} from '../scripts/private-offer-encoding.mjs';
 import {authorize as perOfferPolicy} from '../scripts/approval-owner-per-offer-policy.mjs';
 import {authorize as fixedPolicy} from '../scripts/approval-owner-example-policy.mjs';
@@ -43,4 +45,28 @@ test('per-offer supplier policy denies invalid bindings, prices, deadlines and u
   {...request,values:{...request.values,quoteAmount:16n}},{...request,values:{...request.values,quoteAmount:0n}},
   {...request,values:{...request.values,quoteFacilityBinding:new Uint8Array(32)}},{...request,values:{...request.values,quoteFacilityBinding:new Uint8Array(31)}}])assert.equal(perOfferPolicy(change,context).allowed,false);
  assert.equal(perOfferPolicy({name:'redeemDraw',args:[new Uint8Array(32),200n],values:{redeemAmount:15n}},context).allowed,true);
+});
+const claimFixture=()=>{
+ const bytes=()=>new Uint8Array(randomBytes(32)),points={merchantA:RT.ecMulGenerator(1n),merchantB:RT.ecMulGenerator(2n)};
+ const merchant=roleHash('merchant',points.merchantA),offer={Q:bytes(),merchant,nonce:bytes(),bindingSalt:bytes(),amount:10n};
+ const note={D:bytes(),Q:offer.Q,merchant,identity:bytes(),nonce:bytes(),salt:bytes(),generation:1n,amount:10n};
+ return {points,offers:{merchantA:offer},notes:{merchantA:note},book:{identity:note.identity},bindingSalt:bytes()};
+};
+test('older quote and note openings survive replacement of current supplier selectors',()=>{
+ const f=claimFixture(),oldOffer=structuredClone(f.offers.merchantA),oldNote=structuredClone(f.notes.merchantA),a=coordinatorRetainClaims(f);
+ a.offers.merchantA={...oldOffer,Q:new Uint8Array(randomBytes(32)),nonce:new Uint8Array(randomBytes(32))};
+ a.notes.merchantA={...oldNote,D:new Uint8Array(randomBytes(32)),nonce:new Uint8Array(randomBytes(32)),salt:new Uint8Array(randomBytes(32))};
+ const b=coordinatorRetainClaims(a);assert.equal(Object.keys(b.offerRecords).length,2);assert.equal(Object.keys(b.noteRecords).length,2);
+ assert.deepEqual(coordinatorSelectClaim(b,'offer','merchantA',Buffer.from(oldOffer.Q).toString('hex')),oldOffer);
+ assert.deepEqual(coordinatorSelectClaim(b,'note','merchantA',Buffer.from(oldNote.D).toString('hex')),oldNote);
+ assert.deepEqual(coordinatorSelectClaim(b,'note','merchantA'),b.notes.merchantA);assert.equal(f.offerRecords,undefined);
+});
+test('archive selectors reject foreign suppliers, missing records and ambiguous identifiers',()=>{
+ const f=coordinatorRetainClaims(claimFixture()),id=Buffer.from(f.notes.merchantA.D).toString('hex');
+ for(const [kind,merchant,selector]of [['note','merchantB',id],['note','merchantA','00'.repeat(32)],['note','merchantA','0x'+id],['offer','merchantA',id]])assert.throws(()=>coordinatorSelectClaim(f,kind,merchant,selector));
+});
+test('retention preserves legacy openings and rejects replacement of an archived nonce',()=>{
+ const f=claimFixture();delete f.notes.merchantA.identity;const saved=coordinatorRetainClaims(f);
+ assert.deepEqual(coordinatorSelectClaim(saved,'note','merchantA'),f.notes.merchantA);
+ saved.notes.merchantA.nonce=new Uint8Array(randomBytes(32));assert.throws(()=>coordinatorRetainClaims(saved),/cannot change/);
 });
