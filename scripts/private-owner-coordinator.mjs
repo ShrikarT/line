@@ -31,6 +31,9 @@ export function coordinatorDrawFee(amount,flatFee,basisPoints){
  const fee=flatFee+(amount*basisPoints+9999n)/10000n;
  assert(u64(fee)&&amount+fee<=U64_MAX);return fee;
 }
+export function coordinatorOfferBinding(book){
+ const bindingSalt=bytes();return {bindingSalt,binding:facilityBinding(book,bindingSalt)};
+}
 export function coordinatorCommand(config,action,payload){
  assert(['initialize','prepare','restore','prove','confirm','status'].includes(action));const body=wire({action,payload});assert(Buffer.byteLength(body)<=2*1024*1024);
  const child=fork(self,['--worker'],{execArgv:['--experimental-strip-types'],stdio:['ignore','ignore','pipe','ipc'],detached:process.platform!=='win32',windowsHide:true,
@@ -121,11 +124,12 @@ async function worker(config,action,payload){
    }
    if(circuit==='postQuote'){
     assert(['merchantA','merchantB'].includes(actor));const merchant=roleHash('merchant',f.points[actor]);const ttl=config.localProof?2700:900;args=[BigInt(f.unixSeconds+ttl)];
-    values={quoteFacilityBinding:f.binding,invoiceId:bytes(),quoteAmount:payload.amount,quoteNonce:bytes(),quoteBindingSalt:f.bindingSalt,enabledMerchantPath:v.enabledMerchantTree.findPathForLeaf(merchant)};
+    const offerBinding=coordinatorOfferBinding(f.book);
+    values={quoteFacilityBinding:offerBinding.binding,invoiceId:bytes(),quoteAmount:payload.amount,quoteNonce:bytes(),quoteBindingSalt:offerBinding.bindingSalt,enabledMerchantPath:v.enabledMerchantTree.findPathForLeaf(merchant)};
    }
    if(circuit==='draw'){
     assert.equal(actor,'agent');assert(['merchantA','merchantB'].includes(payload.merchant));const offer=f.offers[payload.merchant];assert(offer);const quote=before.privateState.quotes[hex(offer.Q)];args=[offer.Q,offer.expiry,coordinatorDrawFee(offer.amount,f.book.flatFee,f.book.basisPoints)];
-    values={bookOpening:f.book,salt:f.salt,newSalt:bytes(),bookPath:v.books.findPathForLeaf(commit(f.book,f.salt)),invoiceId:offer.invoice,quoteNonce:offer.nonce,quoteBindingSalt:f.bindingSalt,
+    values={bookOpening:f.book,salt:f.salt,newSalt:bytes(),bookPath:v.books.findPathForLeaf(commit(f.book,f.salt)),invoiceId:offer.invoice,quoteNonce:offer.nonce,quoteBindingSalt:offer.bindingSalt??f.bindingSalt,
      drawAmount:offer.amount,quoteMerchantPk:offer.merchant,noteNonce:bytes(),noteSalt:bytes(),quoteMetaOpening:quote.meta,quoteMetaSalt:quote.salt,registeredMerchantPath:v.registeredMerchantTree.findPathForLeaf(offer.merchant)};
    }
    if(circuit==='redeemDraw'){
@@ -149,7 +153,7 @@ async function worker(config,action,payload){
    const context=RT.createCircuitContext(config.scope.contractAddress,COIN,RT.ContractState.deserialize(before.publicState).data,structuredClone(before.privateState),undefined,undefined,f.unixSeconds);
    const result=contract.circuits[circuit](context,...circuitArgs),financial=structuredClone(f);
    financial.requests[operationId]=structuredClone(payload);
-   if(circuit==='postQuote')financial.offers[actor]={Q:offerCommit({merchant:roleHash('merchant',f.points[actor]),binding:f.binding,invoice:base.invoiceId,amount:base.quoteAmount,expiry:selected.args[0],nonce:base.quoteNonce,domain}),merchant:roleHash('merchant',f.points[actor]),invoice:base.invoiceId,nonce:base.quoteNonce,amount:base.quoteAmount,expiry:selected.args[0]};
+   if(circuit==='postQuote')financial.offers[actor]={Q:offerCommit({merchant:roleHash('merchant',f.points[actor]),binding:base.quoteFacilityBinding,invoice:base.invoiceId,amount:base.quoteAmount,expiry:selected.args[0],nonce:base.quoteNonce,domain}),binding:base.quoteFacilityBinding,bindingSalt:base.quoteBindingSalt,merchant:roleHash('merchant',f.points[actor]),invoice:base.invoiceId,nonce:base.quoteNonce,amount:base.quoteAmount,expiry:selected.args[0]};
    if(circuit==='draw'){
     const D=[...ledger(result.context.currentQueryContext.state).notes].find(([d])=>!Object.hasOwn(before.privateState.notes,hex(d)))[0],offer=f.offers[payload.merchant];
     financial.notes[payload.merchant]={D,Q:offer.Q,merchant:offer.merchant,amount:offer.amount,expiry:offer.expiry,generation:f.book.generation,nonce:base.noteNonce,salt:base.noteSalt};

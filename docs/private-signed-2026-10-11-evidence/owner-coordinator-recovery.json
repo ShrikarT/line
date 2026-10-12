@@ -69,7 +69,7 @@
       "exitCode": 23
     }
   ],
-  "createdAt": "2026-10-12T15:50:19.072Z",
+  "createdAt": "2026-10-12T18:28:18.153Z",
   "cryptographicProofsGenerated": false,
   "evidenceScope": "Ten generated Compact calls in separate execution-worker processes, restoring write-ahead authorization intents and private prepared packets through four mTLS services, with eight abrupt publication/approval exits and exact completed retries. Same-host synthetic owner harness and caller-trusted candidate observations; no network receipt/proof/asset/independent-administration claim.",
   "financialCheckpointDurable": true,
@@ -85,8 +85,8 @@
   "preparedPacketReloadedWithoutFreshApproval": true,
   "schema": "line-recoverable-owner-coordinator/v1",
   "scriptFingerprints": {
-    "scripts/recoverable-owner-coordinator.mjs": "44ae92cc9483d13e96ecdcdce9de947d2724e61febd544e179b12ce49799c3b5",
-    "scripts/private-owner-coordinator.mjs": "867b200e1855c30e32dcb660cf99228faeefb08ba740426491070993d889131a",
+    "scripts/recoverable-owner-coordinator.mjs": "030e9e95cc4125336c716e6832847c05a35ac37f3740810ffe0f72868017b182",
+    "scripts/private-owner-coordinator.mjs": "dbefe03360977d7530c39d0ac132fa9306b65917d07d1e6611bf5b7a098d60b5",
     "scripts/private-finance-journal.mjs": "f2c74d966605c2859a29db5b4f4a4e6b4da88588cac9db6b4ef2ae850136fdd2",
     "server/checkout-storage.ts": "343083864e5ad9bb6c6f53e68dc1e070dc97e5360b00c38e6bd4a9cc2cc3860b",
     "scripts/approval-owner-service.mjs": "8513fa94cd4644b86da339bc5ebf042814b53b2e250f2b50eabb2a13dd3589b4",
@@ -106,7 +106,8 @@
     "scripts/private-worker-guardian.mjs": "6fccbf41a817c7e2d2e03793d8553cdf01ae4d713c8a1b9f0a74f036fde5b269",
     "scripts/private-finance-network.mjs": "d169b0c657724568e16dc92b6aeb314ff8912e8a841d9ebd73489bc219a5c740",
     "scripts/finalized-contract-receipt.mjs": "a128ee033f7f93dd0551e9ac0e5239289034c4b922b45f1b10f4d306e42ddcdf",
-    "src/lib/runtime/endpoints.ts": "198afd83fd314ad92924224a85b3e6c6d97c5098b89d56bf051e536cc11cfcde"
+    "src/lib/runtime/endpoints.ts": "198afd83fd314ad92924224a85b3e6c6d97c5098b89d56bf051e536cc11cfcde",
+    "scripts/approval-owner-per-offer-policy.mjs": "2666881c94e9f125e0cda110ad4ad7c42b290ec85eddc4d1acf422dff599cd12"
   },
   "sourceSha256": "ae970672c048c48692ab690554c77285fec19d1943dc3b4574080970b7fa657d",
   "traces": [
@@ -184,6 +185,7 @@
   "wholeExecutionWorkerReconstructed": true,
   "gitNormalizedScriptFingerprints": {
     "scripts/approval-owner-example-policy.mjs": "0f54f84ca2a313c519c3a89d5bf849ff2fa120c8f857118c0687a1e6ccc80b30",
+    "scripts/approval-owner-per-offer-policy.mjs": "2666881c94e9f125e0cda110ad4ad7c42b290ec85eddc4d1acf422dff599cd12",
     "scripts/approval-owner-service.mjs": "8513fa94cd4644b86da339bc5ebf042814b53b2e250f2b50eabb2a13dd3589b4",
     "scripts/approval-service-frame.mjs": "550a409609088ca19eef9c56614b5c36a60b0957165a589e46b8938e3035deb8",
     "scripts/durable-approval-actor.mjs": "3ac1a52c31c5bc8136f162772254f25539c0488de939deb659a1454f3b451504",
@@ -195,10 +197,10 @@
     "scripts/private-finance-network.mjs": "d169b0c657724568e16dc92b6aeb314ff8912e8a841d9ebd73489bc219a5c740",
     "scripts/private-offer-encoding.mjs": "e78ffe273c86f72f58733574287b3099530be96efbed37a6fe3d8c16a36a7f22",
     "scripts/private-offer-signers.mjs": "80695e03759e98c7bda37ea909430e1b94c9ccabf9f2ef4c6defa3a1a5e2660e",
-    "scripts/private-owner-coordinator.mjs": "867b200e1855c30e32dcb660cf99228faeefb08ba740426491070993d889131a",
+    "scripts/private-owner-coordinator.mjs": "dbefe03360977d7530c39d0ac132fa9306b65917d07d1e6611bf5b7a098d60b5",
     "scripts/private-pool-spike.mjs": "be5b8a3e2f85a3bb3e45fabfaafe55b45f414f6999b3931a6fb4c33f01a04397",
     "scripts/private-worker-guardian.mjs": "6fccbf41a817c7e2d2e03793d8553cdf01ae4d713c8a1b9f0a74f036fde5b269",
-    "scripts/recoverable-owner-coordinator.mjs": "44ae92cc9483d13e96ecdcdce9de947d2724e61febd544e179b12ce49799c3b5",
+    "scripts/recoverable-owner-coordinator.mjs": "030e9e95cc4125336c716e6832847c05a35ac37f3740810ffe0f72868017b182",
     "scripts/signed-pool-signers.mjs": "df077892d65f2736322be3e627e6ec9f1bcfa422f9369dcb2016d203ca5831a3",
     "server/checkout-storage.ts": "062dc031363ee0fa3117cadd6029edb9375ac5f038430c236dbd71d3402ad339",
     "src/lib/line/encoding.ts": "8fe151cc8eb4f50727c6658beb42e7892028fccfff34f2c1a8045bf61602d0c5",
