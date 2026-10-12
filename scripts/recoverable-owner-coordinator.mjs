@@ -13,12 +13,14 @@ import * as RT from '@midnight-ntwrk/compact-runtime';
 import {DurableApprovalSigner} from './durable-approval-signer.mjs';
 import {authorize} from './approval-owner-example-policy.mjs';
 import {authorize as authorizePerOffer} from './approval-owner-per-offer-policy.mjs';
+import {authorize as authorizeGovernance} from './approval-owner-governance-policy.mjs';
 import {startApprovalOwnerService} from './approval-owner-service.mjs';
 import {coordinatorCommand} from './private-owner-coordinator.mjs';
 import {tlsFixture} from '../tests/fixtures/approval-service-tls.mjs';
 import {roleHash} from './private-offer-signers.mjs';
 const SOURCE='contracts/experimental/line-private-offer.compact',sha=b=>createHash('sha256').update(b).digest('hex'),bytes=()=>new Uint8Array(randomBytes(32));
-export async function runRecoverableOwnerCoordinator({compiledDir,localProof,repeatSupplier=false,onInitialized=async()=>{},onBeforeConfirm=async()=>{},onComplete=async()=>{}}={}){
+export async function runRecoverableOwnerCoordinator({compiledDir,localProof,repeatSupplier=false,governance=false,onInitialized=async()=>{},onBeforeConfirm=async()=>{},onComplete=async()=>{}}={}){
+assert(!governance||!repeatSupplier&&!localProof,'Governance has a separate generated-only fixture.');
 mkdirSync('.compact-keys',{recursive:true});const work=mkdtempSync(resolve('.compact-keys/recoverable-owner-coordinator-')),managedDir=compiledDir?resolve(compiledDir):join(work,'managed');
 const portable=p=>relative(process.cwd(),p).split(sep).join('/');
 if(!compiledDir)
@@ -27,7 +29,7 @@ const files=['scripts/recoverable-owner-coordinator.mjs','scripts/private-owner-
  'scripts/approval-owner-service.mjs','scripts/approval-service-frame.mjs','scripts/approval-owner-example-policy.mjs','scripts/durable-approval-signer.mjs','scripts/durable-approval-actor.mjs',
  'scripts/private-offer-signers.mjs','scripts/signed-pool-signers.mjs','scripts/private-offer-encoding.mjs','scripts/private-pool-spike.mjs','src/lib/security/vault-codec.ts','src/lib/line/encoding.ts','tests/fixtures/approval-service-tls.mjs',
  'scripts/private-coordinator-proving.mjs','scripts/native-local-proving-provider.mjs','scripts/private-worker-guardian.mjs',
- 'scripts/private-finance-network.mjs','scripts/finalized-contract-receipt.mjs','src/lib/runtime/endpoints.ts','scripts/approval-owner-per-offer-policy.mjs'];
+ 'scripts/private-finance-network.mjs','scripts/finalized-contract-receipt.mjs','src/lib/runtime/endpoints.ts','scripts/approval-owner-per-offer-policy.mjs','scripts/approval-owner-governance-policy.mjs'];
 const fingerprints=Object.fromEntries(files.map(p=>[p,sha(readFileSync(p))])),sourceHash=sha(readFileSync(SOURCE)),tls=tlsFixture();
 const {ledger}=await import(pathToFileURL(join(managedDir,'contract/index.js')).href),quoteIds=[],noteIds=[],seenQuotes=new Set(),seenNotes=new Set();
 const observePublic=state=>{const view=ledger(RT.ContractState.deserialize(state).data);
@@ -38,14 +40,14 @@ const config={managedDir,sourceSha256:sourceHash,executableSha256:sha(readFileSy
 if(localProof)config.localProof=localProof;
 const command=async(action,payload)=>{const response=await coordinatorCommand(config,action,payload);processes.push(response.pid);return response;};
 try{
- for(const [label,role]of Object.entries(labels))owners[label]=new DurableApprovalSigner({directory:join(work,label),encryptionKey:bytes(),custodyId:label+'-owner',role,authorize:role==='merchant'?authorizePerOffer:authorize,create:true,approvalABI:'line-private-offer/v1'});
+ for(const [label,role]of Object.entries(labels))owners[label]=new DurableApprovalSigner({directory:join(work,label),encryptionKey:bytes(),custodyId:label+'-owner',role,authorize:role==='merchant'?authorizePerOffer:governance&&role==='issuer'?authorizeGovernance:authorize,create:true,approvalABI:'line-private-offer/v1'});
  const points=Object.fromEntries(Object.entries(owners).map(([label,s])=>[label,s.publicKey])),terms=bytes(),now=Math.floor(Date.now()/1000);
  const initialized=await command('initialize',{points,instanceNonce:bytes(),terms,limit:100n,flatFee:1n,basisPoints:100n,unixSeconds:now});
  const {scope,domain,identity,binding}=initialized.value;config.scope=scope;config.clients={};
  assert.deepEqual(Object.keys(initialized.value).sort(),['scope','domain','identity','binding','expiry',...(localProof?['proofGenesis']:[])].sort());
  await onInitialized({scope,now,proofGenesis:initialized.value.proofGenesis});
  const merchantA=roleHash('merchant',points.merchantA),merchantB=roleHash('merchant',points.merchantB),common={domain,maxAuthorizedCost:500n,validBefore:BigInt(now+7200)};
- owners.issuer.bindPolicy({...common,maxReserveAction:200n,maxLineLimit:100n,maxFee:2n,maxBasisPoints:100n,agentIdentity:identity,acceptedTerms:terms,allowedMerchants:[merchantA,merchantB]});
+ owners.issuer.bindPolicy({...common,maxReserveAction:200n,maxLineLimit:100n,maxFee:2n,maxBasisPoints:100n,agentIdentity:identity,acceptedTerms:terms,allowedMerchants:[merchantA,merchantB],...(governance?{governanceMode:'bounded',maxReserveWithdrawal:20n,maxFeeWithdrawal:5n,allowedStatuses:[1,2,3]}:{})});
  owners.agent.bindPolicy({...common,maxAuthorizedCost:50n,maxLineLimit:100n,maxFee:2n,maxBasisPoints:100n,maxDrawAmount:30n,acceptedTerms:terms,allowedMerchants:[merchantA,merchantB]});
  for(const label of ['merchantA','merchantB'])owners[label].bindPolicy({...common,facilityBindingMode:'per-offer',maxQuoteAmount:15n});
  for(const [label,role]of Object.entries(labels)){
@@ -54,7 +56,13 @@ try{
  }
  const setup=[{actor:'issuer',circuit:'registerMerchant',merchant:'merchantB'},{actor:'issuer',circuit:'fundReserve',amount:200n},
   {actor:'agent',circuit:'openLine'},{actor:'issuer',circuit:'openLine'}];
- const itinerary=repeatSupplier?[...setup,
+ const itinerary=governance?[...setup,
+  {actor:'merchantA',circuit:'postQuote',amount:15n},{actor:'agent',circuit:'draw',merchant:'merchantA'},
+  {actor:'issuer',circuit:'setStatus',status:2},{actor:'issuer',circuit:'setStatus',status:1},
+  {actor:'issuer',circuit:'withdrawUnencumberedReserve',amount:10n},{actor:'issuer',circuit:'disableMerchant',merchant:'merchantA'},
+  {actor:'merchantA',circuit:'redeemDraw'},
+  {actor:'merchantB',circuit:'postQuote',amount:15n},{actor:'agent',circuit:'draw',merchant:'merchantB'},{actor:'merchantB',circuit:'redeemDraw'},
+  {actor:'issuer',circuit:'withdrawFees'}]:repeatSupplier?[...setup,
   {actor:'merchantA',circuit:'postQuote',amount:10n},{actor:'merchantA',circuit:'postQuote',amount:10n},
   ()=>({actor:'agent',circuit:'draw',merchant:'merchantA',quoteCommit:quoteIds[0]}),
   {actor:'agent',circuit:'draw',merchant:'merchantA'},
@@ -68,7 +76,8 @@ try{
  for(const [i,entry]of itinerary.entries()){
   const request=typeof entry==='function'?entry():entry;
   const operationId='coordinator:'+i;let prepared;
-  if(request.circuit==='draw'){
+  const recovery=request.circuit==='draw'||governance&&['setStatus','withdrawUnencumberedReserve','withdrawFees','disableMerchant'].includes(request.circuit);
+  if(recovery){
    config.testCrashBeforeApproval=true;
    try{await command('prepare',{operationId,...request});assert.fail('Expected staged-intent process exit.');}
    catch(error){assert.equal(error.exitCode,23);crashes.push({stage:'before-approval-after-intent-publication',workerPid:error.workerPid,exitCode:23});}
@@ -89,7 +98,7 @@ try{
   observePublic(restored.value.publicState);finalPublic=restored.value.publicState;
   assert.deepEqual(Object.keys(restored.value).sort(),['operationId','circuit','fingerprint','publicState','sourceBound','restoredFromEncryptedJournal','networkFinalityVerified'].sort());
   assert.equal(restored.value.networkFinalityVerified,false);
-  if(request.circuit==='draw'){
+  if(recovery){
    await assert.rejects(command('prepare',{operationId:'replacement:'+i,...request}));controls.push({check:'pending-blocks-replacement-draw',rejected:true});
    const changed=new Uint8Array(restored.value.publicState);changed[changed.length-1]^=1;
    await assert.rejects(command('confirm',{operationId,observedPublicState:changed}));controls.push({check:'unobserved-candidate-retained',rejected:true});
@@ -103,20 +112,33 @@ try{
     if(crashDuringProve&&error.interruptedDuringNativeProve){assert.equal(error.ownedProcessesStopped,true);crashes.push({stage:'during-native-prove-after-key-load',workerPid:error.workerPid,ownedProcessesStopped:true});}throw error;}
    finally{delete config.testCrashAfterProofPublication;delete config.testCrashDuringNativeProve;}
   }});
-  if(request.circuit==='draw'){
+  if(recovery){
    config.testCrashAfterConfirm=true;
    try{await command('confirm',{operationId,observedPublicState:restored.value.publicState});assert.fail('Expected confirmed-publication process exit.');}
    catch(error){assert.equal(error.exitCode,23);crashes.push({stage:'after-confirm-publication',workerPid:error.workerPid,exitCode:23});}
    finally{delete config.testCrashAfterConfirm;}
    const status=await command('status',{});assert.equal(status.value.authorizationOperation,null);assert.equal(status.value.pendingOperation,null);assert(status.value.completedOperations.includes(operationId));
    const repeated=await command('prepare',{operationId,...request});assert.deepEqual(repeated.value,{operationId,alreadyConfirmed:true});
-   await assert.rejects(command('prepare',{operationId,...request,merchant:request.merchant==='merchantA'?'merchantB':'merchantA'}));
+   const substituted=request.circuit==='setStatus'?{...request,status:request.status===1?2:1}:Object.hasOwn(request,'amount')?{...request,amount:request.amount+1n}:
+    request.circuit==='withdrawFees'?{...request,actor:'agent'}:{...request,merchant:request.merchant==='merchantA'?'merchantB':'merchantA'};
+   await assert.rejects(command('prepare',{operationId,...substituted}));
    controls.push({check:'completed-request-retry-and-substitution',exactRetryConfirmed:true,changedRequestRejected:true});
   }else await command('confirm',{operationId,observedPublicState:restored.value.publicState});
   traces.push({circuit:request.circuit,actor:request.actor,wholeExecutionWorkerReconstructed:true,exactPreparedPacketRestored:true,signingScalarWitnesses:0});
  }
- const status=await command('status',{});assert.equal(status.value.authorizationOperation,null);assert.equal(status.value.pendingOperation,null);assert.equal(status.value.completedOperations.length,repeatSupplier?13:10);
- assert.equal(traces.length,repeatSupplier?13:10);assert.equal(controls.length,repeatSupplier?9:6);assert.equal(crashes.length,(repeatSupplier?3:2)*(localProof?6:4));
+ const expectedCalls=governance?15:repeatSupplier?13:10,expectedRecovery=governance?7:repeatSupplier?3:2;
+ const status=await command('status',{});assert.equal(status.value.authorizationOperation,null);assert.equal(status.value.pendingOperation,null);assert.equal(status.value.completedOperations.length,expectedCalls);
+ assert.equal(traces.length,expectedCalls);assert.equal(controls.length,expectedRecovery*3);assert.equal(crashes.length,expectedRecovery*(localProof?6:4));
+ if(governance){
+  for(const request of [{actor:'merchantA',circuit:'postQuote',amount:15n},{actor:'issuer',circuit:'setStatus',status:3},
+   {actor:'issuer',circuit:'withdrawUnencumberedReserve',amount:161n},{actor:'issuer',circuit:'withdrawFees'},
+   {actor:'agent',circuit:'setStatus',status:2},{actor:'agent',circuit:'disableMerchant',merchant:'merchantB'}]){
+   await assert.rejects(command('prepare',{operationId:'governance-denial:'+controls.length,...request}));
+   controls.push({check:'invalid-governance-or-disabled-quote-rejected-before-authorization',circuit:request.circuit,rejected:true});
+   const after=await command('status',{});assert.equal(after.value.authorizationOperation,null);assert.equal(after.value.pendingOperation,null);assert.equal(after.value.completedOperations.length,expectedCalls);
+  }
+  assert.equal(new Set(traces.map(t=>t.circuit)).size,10);
+ }
  let retainedClaims;
  if(repeatSupplier){
   const view=observePublic(finalPublic);assert.equal(quoteIds.length,3);assert.equal(noteIds.length,3);
@@ -132,13 +154,13 @@ try{
    explicitSelectorsVerifiedByCompact:true,spentAndForeignSelectorsRejectedBeforeAuthorization:true,fullHistoryPrivacyPassed:false};
  }
  for(const [p,h]of Object.entries(fingerprints))assert.equal(sha(readFileSync(p)),h);assert.equal(sha(readFileSync(SOURCE)),sourceHash);
- const report={schema:repeatSupplier?(localProof?'line-recoverable-owner-coordinator/repeat-supplier-native-fixture/v1':'line-recoverable-owner-coordinator/repeat-supplier/v1'):localProof?'line-recoverable-owner-coordinator/native-fixture/v1':'line-recoverable-owner-coordinator/v1',createdAt:new Date().toISOString(),sourceSha256:sourceHash,scriptFingerprints:fingerprints,...(retainedClaims?{retainedClaims}:{}),
+ const report={schema:governance?'line-recoverable-owner-coordinator/governance/v1':repeatSupplier?(localProof?'line-recoverable-owner-coordinator/repeat-supplier-native-fixture/v1':'line-recoverable-owner-coordinator/repeat-supplier/v1'):localProof?'line-recoverable-owner-coordinator/native-fixture/v1':'line-recoverable-owner-coordinator/v1',createdAt:new Date().toISOString(),sourceSha256:sourceHash,scriptFingerprints:fingerprints,...(retainedClaims?{retainedClaims}:{}),
   artifacts:Object.fromEntries(['contract/index.js','compiler/contract-info.json'].map(p=>[p,sha(readFileSync(join(managedDir,p)))])),freshCompilation:!compiledDir,
   traces,controls,crashes:crashes.map(({workerPid,...metadata})=>metadata),coordinatorProcessInvocations:processes.length+crashes.length,wholeExecutionWorkerReconstructed:true,coordinatorWitnessesReturnedToHarness:false,
   owners:4,merchants:2,nonzeroBasisPointPolicyExercised:true,financialCheckpointDurable:true,authorizationIntentPersistedBeforeOwnerRPC:true,preparedCandidatePersistedBeforeResponse:true,preparedPacketReloadedWithoutFreshApproval:true,
   networkSubmitted:false,authenticAssetSettlement:false,cryptographicProofsGenerated:Boolean(localProof),nativeProofVerificationPerformed:Boolean(localProof),independentAdministrativeCustody:false,fullHistoryPrivacyPassed:false,
-  evidenceScope:repeatSupplier?'Thirteen restored Compact calls with two quotes and draws at Merchant A, selection/redemption of older archived claims after newer purchases, Merchant B separation and twelve generated publication/approval exits. Native proving, when selected, adds its separately recorded interruption/proof controls. Synthetic same-host configuration; no network or asset claim.':'Ten generated Compact calls in separate execution-worker processes, restoring write-ahead authorization intents and private prepared packets through four mTLS services, with eight abrupt publication/approval exits and exact completed retries. Same-host synthetic owner harness and caller-trusted candidate observations; no network receipt/proof/asset/independent-administration claim.'};
+  evidenceScope:governance?'Fifteen generated calls across ten names, default/resume with debt, bounded reserve/fee withdrawals and merchant disable before redemption; twenty-eight exits and exact recovery/retries. Synthetic same-host owners and caller-trusted observation; no repayment/compensation/reopening, native proof, network or payout claim.':repeatSupplier?'Thirteen restored Compact calls with two quotes and draws at Merchant A, selection/redemption of older archived claims after newer purchases, Merchant B separation and twelve generated publication/approval exits. Native proving, when selected, adds its separately recorded interruption/proof controls. Synthetic same-host configuration; no network or asset claim.':'Ten generated Compact calls in separate execution-worker processes, restoring write-ahead authorization intents and private prepared packets through four mTLS services, with eight abrupt publication/approval exits and exact completed retries. Same-host synthetic owner harness and caller-trusted candidate observations; no network receipt/proof/asset/independent-administration claim.'};
  writeFileSync(join(work,'evidence.json'),JSON.stringify(report,null,2)+'\n');await onComplete(report);console.log(JSON.stringify({calls:traces.length,controls:controls.length,abruptExits:crashes.length,workerInvocations:processes.length+crashes.length,report:join(work,'evidence.json')}));return report;
 }finally{for(const service of Object.values(services))await service.close();for(const signer of Object.values(owners))signer.close();}
 }
-if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url))await runRecoverableOwnerCoordinator({repeatSupplier:process.argv.includes('--repeat-supplier')});
+if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url))await runRecoverableOwnerCoordinator({repeatSupplier:process.argv.includes('--repeat-supplier'),governance:process.argv.includes('--governance')});

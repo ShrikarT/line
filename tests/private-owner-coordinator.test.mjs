@@ -2,11 +2,41 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomBytes} from 'node:crypto';
 import * as RT from '@midnight-ntwrk/compact-runtime';
-import {coordinatorDrawFee,coordinatorOfferBinding,coordinatorRetainClaims,coordinatorSelectClaim} from '../scripts/private-owner-coordinator.mjs';
+import {coordinatorDrawFee,coordinatorOfferBinding,coordinatorRetainClaims,coordinatorSelectClaim,coordinatorUnencumberedReserve} from '../scripts/private-owner-coordinator.mjs';
 import {roleHash} from '../scripts/private-offer-signers.mjs';
 import {facilityBinding} from '../scripts/private-offer-encoding.mjs';
 import {authorize as perOfferPolicy} from '../scripts/approval-owner-per-offer-policy.mjs';
 import {authorize as fixedPolicy} from '../scripts/approval-owner-example-policy.mjs';
+import {authorize as governancePolicy} from '../scripts/approval-owner-governance-policy.mjs';
+
+test('free-reserve preflight retains every Compact lock including reported refund holds',()=>{
+ const reserve={totalReserve:100n,encumberedReserve:10n,redeemedReserve:20n,feeReserve:3n,pendingFeeReserve:2n,refundReserve:5n,reportedRefundReserve:7n};
+ assert.equal(coordinatorUnencumberedReserve(reserve),53n);
+ assert.equal(coordinatorUnencumberedReserve({...reserve,totalReserve:47n}),0n);
+ for(const change of [{totalReserve:46n},{refundReserve:-1n},{feeReserve:3},{redeemedReserve:1n<<64n}])assert.throws(()=>coordinatorUnencumberedReserve({...reserve,...change}));
+});
+
+test('opt-in issuer governance keeps own-book status, debt closure and withdrawal bounds',()=>{
+ const b=()=>new Uint8Array(randomBytes(32)),domain=b(),identity=b(),book={domain,identity,status:1,outstanding:17n,limit:100n,epoch:1n};
+ const context={role:'issuer',config:{domain,agentIdentity:identity,governanceMode:'bounded',allowedStatuses:[1,2,3],maxReserveWithdrawal:20n,maxFeeWithdrawal:5n}};
+ const request={name:'setStatus',args:[2],values:{bookOpening:book}};
+ assert.equal(governancePolicy(request,context).allowed,true);
+ for(const changed of [{...request,args:[3]},{...request,args:[0]},{...request,args:[4]},
+  {...request,values:{bookOpening:{...book,identity:b()}}},{...request,values:{bookOpening:{...book,domain:b()}}},
+  {...request,values:{bookOpening:{...book,status:3}}},{...request,values:{bookOpening:{...book,epoch:(1n<<64n)-1n}}}])assert.equal(governancePolicy(changed,context).allowed,false);
+ assert.equal(governancePolicy({...request,args:[3],values:{bookOpening:{...book,outstanding:0n}}},context).allowed,true);
+ for(const change of [{...context,role:'agent'},{...context,config:{...context.config,governanceMode:'off'}},
+  {...context,config:{...context.config,allowedStatuses:[1]}}])assert.equal(governancePolicy(request,change).allowed,false);
+ for(const name of ['withdrawUnencumberedReserve','withdrawFees']){
+  const amount=name==='withdrawFees'?4n:20n,withdraw={name,args:name==='withdrawFees'?[]:[amount],values:{},reserveCommit:b(),feeReserve:amount};
+  assert.deepEqual(governancePolicy(withdraw,context),{allowed:true,reservationCost:amount});
+  for(const changed of [{...withdraw,reserveCommit:undefined},{...withdraw,args:[21n],feeReserve:6n},
+   {...withdraw,args:[0n],feeReserve:0n}])assert.equal(governancePolicy(changed,context).allowed,false);
+  assert.equal(governancePolicy(withdraw,{...context,role:'merchant'}).allowed,false);
+ }
+ assert.equal(fixedPolicy(request,context).allowed,false);
+ assert.equal(governancePolicy({name:'acknowledgeRepayment',args:[100n],values:{}},context).allowed,false);
+});
 
 test('coordinator uses exact ceiling fees for zero, fractional and maximum basis points',()=>{
  assert.equal(coordinatorDrawFee(15n,1n,0n),1n);
