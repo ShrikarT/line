@@ -1,0 +1,514 @@
+{
+  "schema": "line-private-coordinator-native-proof/v1",
+  "createdAt": "2026-10-12T10:59:48.597Z",
+  "complete": true,
+  "sourceSha256": "ae970672c048c48692ab690554c77285fec19d1943dc3b4574080970b7fa657d",
+  "artifacts": {
+    "contract/index.js": {
+      "sha256": "23e5c49249dd0af5aef7e25625db197dd4d6d7244d324bbe6a876d49a1624683",
+      "bytes": 600479
+    },
+    "compiler/contract-info.json": {
+      "sha256": "10a94c9d83abde894552fb57960188ae6b15e29be4b424a59fc0ee0320cbcfc5",
+      "bytes": 33570
+    },
+    "keys/registerMerchant.prover": {
+      "sha256": "24d2ccfe5dd9f52071434ba2c41cda936b5f72626821d032c55e6908e2afd6ec",
+      "bytes": 11071610
+    },
+    "keys/registerMerchant.verifier": {
+      "sha256": "9ee96d535017addc7ddf4926f00dd105539de5b34d1b07c73f4645767a6f2eac",
+      "bytes": 2311
+    },
+    "zkir/registerMerchant.bzkir": {
+      "sha256": "a7aa1db823f3d581ff0f31d004a55d8d95403503f141717e5defa685ed44edc1",
+      "bytes": 1851
+    },
+    "keys/disableMerchant.prover": {
+      "sha256": "c14833df580128835c9e18ea45704d65fc39f7d529284b5ed41e5bc421eceb36",
+      "bytes": 11063993
+    },
+    "keys/disableMerchant.verifier": {
+      "sha256": "d7d14acd45b7ba1506671a0ca94dddcbabec0dafec38e0bdf87d3771d079302d",
+      "bytes": 2311
+    },
+    "zkir/disableMerchant.bzkir": {
+      "sha256": "45afdf2993ec41de3654b97d8fa5b1b630f8a2b7f6a422c4e77a6b466f9a52ae",
+      "bytes": 1502
+    },
+    "keys/fundReserve.prover": {
+      "sha256": "fb1cced00945bb4834355c7996d7d1609970d281271942ede03c68b7a4fc21ab",
+      "bytes": 21655313
+    },
+    "keys/fundReserve.verifier": {
+      "sha256": "2dcb8ffc1c28d3bd7156b7087d19070855845291738a3a6f6f14e569031cb0de",
+      "bytes": 2311
+    },
+    "zkir/fundReserve.bzkir": {
+      "sha256": "52994d1208c81d72e3922c5dd5d693949ddebebfb8469d07619cd4a97f5818ca",
+      "bytes": 1643
+    },
+    "keys/withdrawUnencumberedReserve.prover": {
+      "sha256": "4de081a97246a10d7d36200327607daf490d0a1a71b7328f6a83b4aa5eed5377",
+      "bytes": 21655416
+    },
+    "keys/withdrawUnencumberedReserve.verifier": {
+      "sha256": "4784474ebd40f680d8af041f633ccc0ba274853bbe44a7cd7f2de23cc7222dc2",
+      "bytes": 2311
+    },
+    "zkir/withdrawUnencumberedReserve.bzkir": {
+      "sha256": "28c0c3043826e6ebcf66d187a104aabc7ab089a8820e9997ddd9c4c01fea97cf",
+      "bytes": 1683
+    },
+    "keys/withdrawFees.prover": {
+      "sha256": "a6d66372cf23098a61da047236c1fead6e1c15e025034356ab2cf2860c751df0",
+      "bytes": 21655141
+    },
+    "keys/withdrawFees.verifier": {
+      "sha256": "cd5a405f3f18779f34d0e15962dd4b10b5223406735f52fa5087e384fe870af0",
+      "bytes": 2311
+    },
+    "zkir/withdrawFees.bzkir": {
+      "sha256": "1510843aea7598d1ae63cbdfb2e51aa9587bbe5e77a7803d59e30f93cacdbd5c",
+      "bytes": 1634
+    },
+    "keys/openLine.prover": {
+      "sha256": "41adeb3c29612db9e8d5d9e2a58f0a91f4b0a4077d83c5747956ef37775d5898",
+      "bytes": 42824522
+    },
+    "keys/openLine.verifier": {
+      "sha256": "d47768f5c12918959d9adea1b436306533cec98f49dcb6b58c5428643a4e7b29",
+      "bytes": 2311
+    },
+    "zkir/openLine.bzkir": {
+      "sha256": "56d24bd1e296b168c314e4389ef4d49063513a42b1c8783d9efc1970e04293f3",
+      "bytes": 4407
+    },
+    "keys/postQuote.prover": {
+      "sha256": "4cc4b68310a1bbb08770a7232156a6ffd85a15a1089b92c654f270042534df57",
+      "bytes": 21660136
+    },
+    "keys/postQuote.verifier": {
+      "sha256": "48608b4cb879b0e0520e380a7155ff40fcab3e9e7b72002dd454e16617aefa90",
+      "bytes": 2311
+    },
+    "zkir/postQuote.bzkir": {
+      "sha256": "c2406e6b88c062c63c72ec236a2fa7438cec1a9d21f98a793f0fa372e0924110",
+      "bytes": 2227
+    },
+    "keys/draw.prover": {
+      "sha256": "a4c2c23375f41bc77554e41381ba3e57a3d9d911228a358701117da53a0c89a8",
+      "bytes": 85094620
+    },
+    "keys/draw.verifier": {
+      "sha256": "16309048451a29db3765baf4f720bfaedffc743e76c48b0619a4765d6842ad75",
+      "bytes": 2311
+    },
+    "zkir/draw.bzkir": {
+      "sha256": "61cc140158a1497b14fec4985de8ad9ce5ad41029c8ea6172b7d4b0ca4a93179",
+      "bytes": 5650
+    },
+    "keys/redeemDraw.prover": {
+      "sha256": "f26e0f10288df5e7c41892eaefef8e4054fe38a398953923193eae23dd0d96e2",
+      "bytes": 42785493
+    },
+    "keys/redeemDraw.verifier": {
+      "sha256": "09a36d65ed7fc1face9281e2a0c86205be0f2b7ec844126646f8be0c76565253",
+      "bytes": 2311
+    },
+    "zkir/redeemDraw.bzkir": {
+      "sha256": "636a87da9a66043384f19b7edb123c92c6b926b6152ce70c4548c017a43fddaa",
+      "bytes": 2594
+    },
+    "keys/cancelOrExpireNote.prover": {
+      "sha256": "0bc34d0f4e14ff6077e5d791689c88f40b74af85636179c3141970e7acf9990a",
+      "bytes": 42931919
+    },
+    "keys/cancelOrExpireNote.verifier": {
+      "sha256": "19b55a89a64834144bab02d44378754de6ece352ee6a19842b30bce2751528e6",
+      "bytes": 2311
+    },
+    "zkir/cancelOrExpireNote.bzkir": {
+      "sha256": "e4a710f1be8a714c6de26e52112016226888097c2068e32c5dd0254fa6395eae",
+      "bytes": 6095
+    },
+    "keys/acknowledgeRepayment.prover": {
+      "sha256": "adb45332efc2b5ef0ed74544e8aa686b0cb6306c2c06c7f4847c09fc6bbd2b30",
+      "bytes": 42856937
+    },
+    "keys/acknowledgeRepayment.verifier": {
+      "sha256": "ac94dce6a129a5f6bb3d9352a16868605bed7a7fa5a6129265c82225dd41497b",
+      "bytes": 2311
+    },
+    "zkir/acknowledgeRepayment.bzkir": {
+      "sha256": "3a935f6d88adc3d4045de7685f1874ee160c8dddafbb1b01359776a87240291a",
+      "bytes": 3617
+    },
+    "keys/setStatus.prover": {
+      "sha256": "871b3ec1af94ee45bfd461dd93cca07483c5a12f3100b5305fcd4c2c215d8892",
+      "bytes": 42798984
+    },
+    "keys/setStatus.verifier": {
+      "sha256": "e1e5e469711cc7ca465f08d1117dc547ccf26d0e042cc8d89e6c579d0b518a0d",
+      "bytes": 2311
+    },
+    "zkir/setStatus.bzkir": {
+      "sha256": "69412bb86a516de1c0c6be62434d4897ace0e065f11c75f6a8d857e4d6e9173d",
+      "bytes": 2846
+    }
+  },
+  "scriptFingerprints": {
+    "scripts/recoverable-owner-coordinator.mjs": "a0014b5e2e45dfa5e92d2224a82cc405e04ba60ee30e231682ee34dc475e9b3d",
+    "scripts/private-owner-coordinator.mjs": "eb67b0b1b77fbca6ff17f4711699631649d65194a9c6d97c2a3999860ad500ec",
+    "scripts/private-finance-journal.mjs": "5ca55ee14efe2db693f89b72f43abfa1882f113c1d5fd683d0c34517a6a667fc",
+    "server/checkout-storage.ts": "343083864e5ad9bb6c6f53e68dc1e070dc97e5360b00c38e6bd4a9cc2cc3860b",
+    "scripts/approval-owner-service.mjs": "8513fa94cd4644b86da339bc5ebf042814b53b2e250f2b50eabb2a13dd3589b4",
+    "scripts/approval-service-frame.mjs": "550a409609088ca19eef9c56614b5c36a60b0957165a589e46b8938e3035deb8",
+    "scripts/approval-owner-example-policy.mjs": "0f54f84ca2a313c519c3a89d5bf849ff2fa120c8f857118c0687a1e6ccc80b30",
+    "scripts/durable-approval-signer.mjs": "66086d2593a03cc3bbec100e115b8f97877ba0bbb2982cc6094bfce84989efd9",
+    "scripts/durable-approval-actor.mjs": "3ac1a52c31c5bc8136f162772254f25539c0488de939deb659a1454f3b451504",
+    "scripts/private-offer-signers.mjs": "80695e03759e98c7bda37ea909430e1b94c9ccabf9f2ef4c6defa3a1a5e2660e",
+    "scripts/signed-pool-signers.mjs": "df077892d65f2736322be3e627e6ec9f1bcfa422f9369dcb2016d203ca5831a3",
+    "scripts/private-offer-encoding.mjs": "e78ffe273c86f72f58733574287b3099530be96efbed37a6fe3d8c16a36a7f22",
+    "scripts/private-pool-spike.mjs": "be5b8a3e2f85a3bb3e45fabfaafe55b45f414f6999b3931a6fb4c33f01a04397",
+    "src/lib/security/vault-codec.ts": "7df485e705a4d64b2fb6ea262ca96dd5c11c509c32991b03e2dea94d09fb55f9",
+    "src/lib/line/encoding.ts": "fb2af647156d2a744c6fb031fe084aee25708a379a7db6412782ca9c2e232b5b",
+    "tests/fixtures/approval-service-tls.mjs": "0231722840e48af75958ea0e9a9ad39b1794e4b20a9164cc774f77770f54d1e5",
+    "scripts/private-coordinator-proving.mjs": "2397a15efe515fba78be15c45b39305190d7193d6307f397d3ac89a0f8139e8f",
+    "scripts/native-local-proving-provider.mjs": "12a44a9d40ca78abfa9939782aa8feb2659fd9248e54aa04db8a6b73fc84e00b",
+    "scripts/private-coordinator-proof.mjs": "5274e089bb6b0f3e36faacfe75dbd3ad490a2ea96441c00bf43e417928c1697a",
+    "scripts/native-proof-verifier/src/main.rs": "8ce82ebc186f187a1c754d429dcd4d2ebfef6b735ffa8130e409c1ef83833cbf",
+    "scripts/native-proof-verifier/Cargo.toml": "dcfc5b3225513b11819bdb3e2940d8c00f5b752a57da884d48f775ec161309a0",
+    "scripts/native-proof-verifier/Cargo.lock": "b32eb0aa9c7cde8e45fbd7b5ecbf60ac7f6f970045148d173b5ddd30c5897be7",
+    "scripts/native-preimage-checker/src/main.rs": "d6c792b64f09b2b36772d2db5410174c6be228209ae0295dc9c0efd7b329b4b1",
+    "scripts/native-preimage-checker/src/bin/line-native-local-prover.rs": "52b5e80140c88e8faa9913f7e527195ace0f7cf4f034525e8280aaaec485e0c1",
+    "scripts/native-preimage-checker/Cargo.toml": "6a24180c8e1382e9fa56d441cd9764d24ff9055b60914fc96e910d9d76bc82f5",
+    "scripts/native-preimage-checker/Cargo.lock": "fac9015cf5af129d4a53753b86949081148c560551ac3334e81c621b263c3101"
+  },
+  "nativeExecutables": {
+    "verifier": "a1906a9cec364a736c4b76ee0e46b1fd06160a7cbda8b59d9f2c80277fb4380c",
+    "checker": "441e12062c2b168a301be55f5ada64ad198f829a6561060cb093a9b40f3786c8",
+    "prover": "d7b94b611d50b5d43f323768e8e6124bd4b22be63b30c12b45d9903300866c09"
+  },
+  "keyManifestSha256": "256790aa458db281300ee6376fa8dc09ea8ece0df699999e55a1d55eae542a1f",
+  "generatedPrerequisiteSha256": "aeb815092962646b176fb94d9e398d15c7c04d66cad398777d66244e2842b12b",
+  "traces": [
+    {
+      "circuit": "syntheticDeployment",
+      "actor": "fixture",
+      "proofVerifiedInSeparateRustProcess": true,
+      "transactionSha256": "85007c80b9881f0c32ee5afc13470fd6499639c68d0dfca6f0af1d7cfed32dd5",
+      "bytes": 30630
+    },
+    {
+      "circuit": "registerMerchant",
+      "actor": "issuer",
+      "proofVerifiedInSeparateRustProcess": true,
+      "transactionSha256": "90c6077ef8f579841347929c79f731b7355e1203c87018290c584c606687232b",
+      "bytes": 6266,
+      "provingDurationMs": 11103,
+      "preparedFingerprint": "3472ad8c6ba7005e3a326693a769f2bdd74f2f1863e5e49c6d38eb41b345d207",
+      "nativeChecks": [
+        {
+          "circuit": "registerMerchant",
+          "nativeEvaluationPassed": true,
+          "statementBlocks": 81,
+          "skippedBlocks": 0
+        }
+      ]
+    },
+    {
+      "circuit": "fundReserve",
+      "actor": "issuer",
+      "proofVerifiedInSeparateRustProcess": true,
+      "transactionSha256": "2d848162a83790b23a5a16012c77b1d30672a1e50b0932fa268b99aa840eb1f6",
+      "bytes": 5816,
+      "provingDurationMs": 18425,
+      "preparedFingerprint": "0925a096f126e24f9bec47bdf6f15594ab65a3f2e2b5b1ab79a64615a143800c",
+      "nativeChecks": [
+        {
+          "circuit": "fundReserve",
+          "nativeEvaluationPassed": true,
+          "statementBlocks": 36,
+          "skippedBlocks": 0
+        }
+      ]
+    },
+    {
+      "circuit": "openLine",
+      "actor": "agent",
+      "proofVerifiedInSeparateRustProcess": true,
+      "transactionSha256": "6bf92ed62962794c19120886a0f5fe5137737c9e74ce2c15ee9e961b90bc2277",
+      "bytes": 6129,
+      "provingDurationMs": 45044,
+      "preparedFingerprint": "b75545ce5c4d0f3bad6b44ecf2b0fddb09467df81b1a5f8558604e0eb2f65404",
+      "nativeChecks": [
+        {
+          "circuit": "openLine",
+          "nativeEvaluationPassed": true,
+          "statementBlocks": 112,
+          "skippedBlocks": 42
+        }
+      ]
+    },
+    {
+      "circuit": "openLine",
+      "actor": "issuer",
+      "proofVerifiedInSeparateRustProcess": true,
+      "transactionSha256": "ba01c17de07fa99c38278c9bcf2616cdd96b1c40b14ef487e3d0073664ebec81",
+      "bytes": 6579,
+      "provingDurationMs": 37664,
+      "preparedFingerprint": "704021ae968cb1f21c46724e829ce754b464cd0a4b8bf59c189863902f121a84",
+      "nativeChecks": [
+        {
+          "circuit": "openLine",
+          "nativeEvaluationPassed": true,
+          "statementBlocks": 112,
+          "skippedBlocks": 13
+        }
+      ]
+    },
+    {
+      "circuit": "postQuote",
+      "actor": "merchantA",
+      "proofVerifiedInSeparateRustProcess": true,
+      "transactionSha256": "771e7c15880731487c1de7c7ffec15ce0779650cb378024125d555a550c70adf",
+      "bytes": 5939,
+      "provingDurationMs": 15792,
+      "preparedFingerprint": "5007c8837c75fc31f209255dc951513a9df5294702ef71e1d9780aa02f2486f4",
+      "nativeChecks": [
+        {
+          "circuit": "postQuote",
+          "nativeEvaluationPassed": true,
+          "statementBlocks": 47,
+          "skippedBlocks": 0
+        }
+      ]
+    },
+    {
+      "circuit": "draw",
+      "actor": "agent",
+      "proofVerifiedInSeparateRustProcess": true,
+      "transactionSha256": "cadb7a4a0042638f0ca128217b76be24d1a74ed6fefdd524f82df519f9f402a3",
+      "bytes": 6975,
+      "provingDurationMs": 90138,
+      "preparedFingerprint": "f06fca66af5fa69e6aef7256a545672dff4acef974f486bd70b8486a3cc7834f",
+      "nativeChecks": [
+        {
+          "circuit": "draw",
+          "nativeEvaluationPassed": true,
+          "statementBlocks": 143,
+          "skippedBlocks": 0
+        }
+      ]
+    },
+    {
+      "circuit": "redeemDraw",
+      "actor": "merchantA",
+      "proofVerifiedInSeparateRustProcess": true,
+      "transactionSha256": "feb530edc8a0eb8b29adf30fbf8942c952b7de68c1d0c0b55898d9d59bd236fa",
+      "bytes": 6278,
+      "provingDurationMs": 36995,
+      "preparedFingerprint": "cc394270aeb8f5b2acfd4ea178e3f1da4c2802fc0cabcf6ace479946268999cf",
+      "nativeChecks": [
+        {
+          "circuit": "redeemDraw",
+          "nativeEvaluationPassed": true,
+          "statementBlocks": 71,
+          "skippedBlocks": 0
+        }
+      ]
+    },
+    {
+      "circuit": "postQuote",
+      "actor": "merchantB",
+      "proofVerifiedInSeparateRustProcess": true,
+      "transactionSha256": "1560106ad558b372f01dfaa164596a4a3ff5e8ee950049e30f05e988f3fa477b",
+      "bytes": 5939,
+      "provingDurationMs": 17534,
+      "preparedFingerprint": "f24e3c50bc9f1a518387954c32bc3bd770ab469190e8a0691da523504967ff72",
+      "nativeChecks": [
+        {
+          "circuit": "postQuote",
+          "nativeEvaluationPassed": true,
+          "statementBlocks": 47,
+          "skippedBlocks": 0
+        }
+      ]
+    },
+    {
+      "circuit": "draw",
+      "actor": "agent",
+      "proofVerifiedInSeparateRustProcess": true,
+      "transactionSha256": "df58adf7ae2171927ae1fa56e4cfcffb4030f85750c3a3a9606807b4a3516112",
+      "bytes": 6975,
+      "provingDurationMs": 86430,
+      "preparedFingerprint": "f7fe0dec9dade6a8ebf7f34312e139fabe309fe79a407ee1a322c6c231584028",
+      "nativeChecks": [
+        {
+          "circuit": "draw",
+          "nativeEvaluationPassed": true,
+          "statementBlocks": 143,
+          "skippedBlocks": 0
+        }
+      ]
+    },
+    {
+      "circuit": "redeemDraw",
+      "actor": "merchantB",
+      "proofVerifiedInSeparateRustProcess": true,
+      "transactionSha256": "ce0672f518207ee1a411c29943e898e00c7fefa4a803fe46c8eb7166656342b7",
+      "bytes": 6278,
+      "provingDurationMs": 38154,
+      "preparedFingerprint": "fb992d7dddf4b266e76d73ade58bd64d37c123879150005dfabd81e9aa3a1007",
+      "nativeChecks": [
+        {
+          "circuit": "redeemDraw",
+          "nativeEvaluationPassed": true,
+          "statementBlocks": 71,
+          "skippedBlocks": 0
+        }
+      ]
+    }
+  ],
+  "negativeChecks": [
+    {
+      "circuit": "draw",
+      "decodableProofCorruption": true,
+      "rejectedByNativeCryptographicVerifier": true
+    },
+    {
+      "circuit": "draw",
+      "decodableProofCorruption": true,
+      "rejectedByNativeCryptographicVerifier": true
+    }
+  ],
+  "cacheControls": [
+    {
+      "circuit": "draw",
+      "abruptPublicationRecovery": true,
+      "identicalTransactionRetry": true,
+      "wrongPublicPredecessorRejected": true
+    },
+    {
+      "circuit": "draw",
+      "abruptPublicationRecovery": true,
+      "identicalTransactionRetry": true,
+      "wrongPublicPredecessorRejected": true
+    }
+  ],
+  "owners": 4,
+  "merchants": 2,
+  "financialCheckpointDurable": true,
+  "completeExecutionWorkerRestart": true,
+  "coordinatorWitnessesReturnedToHarness": false,
+  "abruptExits": [
+    {
+      "stage": "before-approval-after-intent-publication",
+      "exitCode": 23
+    },
+    {
+      "stage": "after-approval-before-candidate",
+      "exitCode": 23
+    },
+    {
+      "stage": "after-prepare-publication",
+      "exitCode": 23
+    },
+    {
+      "stage": "after-proven-transaction-publication",
+      "exitCode": 23
+    },
+    {
+      "stage": "after-confirm-publication",
+      "exitCode": 23
+    },
+    {
+      "stage": "before-approval-after-intent-publication",
+      "exitCode": 23
+    },
+    {
+      "stage": "after-approval-before-candidate",
+      "exitCode": 23
+    },
+    {
+      "stage": "after-prepare-publication",
+      "exitCode": 23
+    },
+    {
+      "stage": "after-proven-transaction-publication",
+      "exitCode": 23
+    },
+    {
+      "stage": "after-confirm-publication",
+      "exitCode": 23
+    }
+  ],
+  "generatedRecoveryControls": [
+    {
+      "check": "pending-blocks-replacement-draw",
+      "rejected": true
+    },
+    {
+      "check": "unobserved-candidate-retained",
+      "rejected": true
+    },
+    {
+      "check": "completed-request-retry-and-substitution",
+      "exactRetryConfirmed": true,
+      "changedRequestRejected": true
+    },
+    {
+      "check": "pending-blocks-replacement-draw",
+      "rejected": true
+    },
+    {
+      "check": "unobserved-candidate-retained",
+      "rejected": true
+    },
+    {
+      "check": "completed-request-retry-and-substitution",
+      "exactRetryConfirmed": true,
+      "changedRequestRejected": true
+    }
+  ],
+  "coordinatorProcessInvocations": 60,
+  "syntheticLedger": true,
+  "syntheticTime": true,
+  "feeBalancingEnabled": false,
+  "networkSubmitted": false,
+  "authenticAssetSettlement": false,
+  "independentAdministrativeCustody": false,
+  "fullHistoryPrivacyPassed": false,
+  "allTwelveCircuitsCoveredByThisReport": false,
+  "evidenceScope": "This lane targets ten restored worker calls, four mTLS owners and two merchants, with native proving inside the financial worker and separate Rust verification before synthetic state advances. Actual coverage is established only by traces and the complete flag. Same-host synthetic custody and caller-trusted confirmation; no network finality, assets or full-history privacy claim.",
+  "gitNormalizedScriptFingerprints": {
+    "scripts/recoverable-owner-coordinator.mjs": "a0014b5e2e45dfa5e92d2224a82cc405e04ba60ee30e231682ee34dc475e9b3d",
+    "scripts/private-owner-coordinator.mjs": "eb67b0b1b77fbca6ff17f4711699631649d65194a9c6d97c2a3999860ad500ec",
+    "scripts/private-finance-journal.mjs": "5ca55ee14efe2db693f89b72f43abfa1882f113c1d5fd683d0c34517a6a667fc",
+    "server/checkout-storage.ts": "062dc031363ee0fa3117cadd6029edb9375ac5f038430c236dbd71d3402ad339",
+    "scripts/approval-owner-service.mjs": "8513fa94cd4644b86da339bc5ebf042814b53b2e250f2b50eabb2a13dd3589b4",
+    "scripts/approval-service-frame.mjs": "550a409609088ca19eef9c56614b5c36a60b0957165a589e46b8938e3035deb8",
+    "scripts/approval-owner-example-policy.mjs": "0f54f84ca2a313c519c3a89d5bf849ff2fa120c8f857118c0687a1e6ccc80b30",
+    "scripts/durable-approval-signer.mjs": "66086d2593a03cc3bbec100e115b8f97877ba0bbb2982cc6094bfce84989efd9",
+    "scripts/durable-approval-actor.mjs": "3ac1a52c31c5bc8136f162772254f25539c0488de939deb659a1454f3b451504",
+    "scripts/private-offer-signers.mjs": "80695e03759e98c7bda37ea909430e1b94c9ccabf9f2ef4c6defa3a1a5e2660e",
+    "scripts/signed-pool-signers.mjs": "df077892d65f2736322be3e627e6ec9f1bcfa422f9369dcb2016d203ca5831a3",
+    "scripts/private-offer-encoding.mjs": "e78ffe273c86f72f58733574287b3099530be96efbed37a6fe3d8c16a36a7f22",
+    "scripts/private-pool-spike.mjs": "be5b8a3e2f85a3bb3e45fabfaafe55b45f414f6999b3931a6fb4c33f01a04397",
+    "src/lib/security/vault-codec.ts": "0abc995f6f042c9b142833d43cb97fd43f3eb934fdcfee0d043368db1d757062",
+    "src/lib/line/encoding.ts": "8fe151cc8eb4f50727c6658beb42e7892028fccfff34f2c1a8045bf61602d0c5",
+    "tests/fixtures/approval-service-tls.mjs": "0231722840e48af75958ea0e9a9ad39b1794e4b20a9164cc774f77770f54d1e5",
+    "scripts/private-coordinator-proving.mjs": "2397a15efe515fba78be15c45b39305190d7193d6307f397d3ac89a0f8139e8f",
+    "scripts/native-local-proving-provider.mjs": "12a44a9d40ca78abfa9939782aa8feb2659fd9248e54aa04db8a6b73fc84e00b",
+    "scripts/private-coordinator-proof.mjs": "5274e089bb6b0f3e36faacfe75dbd3ad490a2ea96441c00bf43e417928c1697a",
+    "scripts/native-proof-verifier/src/main.rs": "8ce82ebc186f187a1c754d429dcd4d2ebfef6b735ffa8130e409c1ef83833cbf",
+    "scripts/native-proof-verifier/Cargo.toml": "dcfc5b3225513b11819bdb3e2940d8c00f5b752a57da884d48f775ec161309a0",
+    "scripts/native-proof-verifier/Cargo.lock": "b32eb0aa9c7cde8e45fbd7b5ecbf60ac7f6f970045148d173b5ddd30c5897be7",
+    "scripts/native-preimage-checker/src/main.rs": "d6c792b64f09b2b36772d2db5410174c6be228209ae0295dc9c0efd7b329b4b1",
+    "scripts/native-preimage-checker/src/bin/line-native-local-prover.rs": "52b5e80140c88e8faa9913f7e527195ace0f7cf4f034525e8280aaaec485e0c1",
+    "scripts/native-preimage-checker/Cargo.toml": "6a24180c8e1382e9fa56d441cd9764d24ff9055b60914fc96e910d9d76bc82f5",
+    "scripts/native-preimage-checker/Cargo.lock": "fac9015cf5af129d4a53753b86949081148c560551ac3334e81c621b263c3101"
+  },
+  "fingerprintScope": "Runtime hashes identify exact files executed; LF-normalized hashes correlate Git source and do not establish another run."
+}
