@@ -22,7 +22,8 @@ try{
  const secret=process.env.LINE_APPROVAL_OWNER_STORE_KEY_HEX;assert(typeof secret==='string'&&/^[0-9a-f]{64}$/.test(secret));
  delete process.env.LINE_APPROVAL_OWNER_STORE_KEY_HEX;
  signer=new DurableApprovalSigner({directory:file(profile.storeDirectory),encryptionKey:Buffer.from(secret,'hex'),
-  custodyId:profile.custodyId,role:profile.role,approvalABI:profile.approvalABI,create:profile.createIdentity===true,authorize});
+  custodyId:profile.custodyId,role:profile.role,approvalABI:profile.approvalABI,create:profile.createIdentity===true,authorize,
+  policyModuleSha256:profile.policyModuleSha256});
  if(process.argv.includes('--identity')){process.stdout.write(encodeVaultJson({role:profile.role,publicKey:signer.publicKey})+'\n');signer.close();}
  else{
   signer.bindPolicy(profile.policy);

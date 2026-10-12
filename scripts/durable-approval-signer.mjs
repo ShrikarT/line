@@ -46,14 +46,16 @@ function scalar(){for(;;){const value=BigInt('0x'+randomBytes(32).toString('hex'
 const reject=()=>{throw Error('Approval could not be authorized.');};
 
 export class DurableApprovalSigner {
- #directory;#file;#lock;#lease;#key;#aad;#state;#authorize;#clock;#approvalABI;#uncertain=false;#closed=false;
- constructor({directory,encryptionKey,custodyId,role,authorize,create=false,clock=()=>Math.floor(Date.now()/1000),approvalABI=LEGACY_ABI}){
+ #directory;#file;#lock;#lease;#key;#aad;#state;#authorize;#clock;#approvalABI;#policyModuleSha256;#uncertain=false;#closed=false;
+ constructor({directory,encryptionKey,custodyId,role,authorize,policyModuleSha256,create=false,clock=()=>Math.floor(Date.now()/1000),approvalABI=LEGACY_ABI}){
   assert(['issuer','agent','merchant','permissionless'].includes(role));
   assert([LEGACY_ABI,OFFER_ABI].includes(approvalABI),'Unsupported owner-selected approval ABI.');
   this.#approvalABI=approvalABI;
   assert(encryptionKey instanceof Uint8Array&&encryptionKey.length===32);
   assert(typeof custodyId==='string'&&/^[a-zA-Z0-9][a-zA-Z0-9:._-]{0,127}$/.test(custodyId));
   assert.equal(typeof authorize,'function');assert.equal(typeof clock,'function');
+  assert(policyModuleSha256===undefined||typeof policyModuleSha256==='string'&&/^[0-9a-f]{64}$/.test(policyModuleSha256),'Invalid policy module fingerprint.');
+  this.#policyModuleSha256=policyModuleSha256;
   this.#directory=resolve(directory);mkdirSync(this.#directory,{recursive:true,mode:0o700});
   assert(!lstatSync(this.#directory).isSymbolicLink(),'Signer directory must not be a symlink.');
   this.#file=join(this.#directory,'signer.enc.json');this.#lock=join(this.#directory,'signer.lock');
@@ -69,7 +71,12 @@ export class DurableApprovalSigner {
    assert.equal(this.#state.role,role);assert.equal(this.#state.version,1);
    assert.equal(this.#state.custodyId,custodyId);
    assert(this.#state.scalar>0n&&this.#state.scalar<ORDER);
-   if(this.#state.binding)assert.equal(this.#state.binding.policyCodeSha256,digest(authorize.toString()),'Stored policy differs.');
+   if(this.#state.binding){
+    assert.equal(this.#state.binding.policyCodeSha256,digest(authorize.toString()),'Stored policy differs.');
+    // A pinned store cannot be downgraded to function-text-only validation.
+    // Legacy function-only stores are not silently upgraded to module pins.
+    assert.equal(this.#state.binding.policyModuleSha256,policyModuleSha256,'Stored policy module differs.');
+   }
   }catch(error){this.close();throw error;}
  }
  get publicKey(){this.#live();return RT.ecMulGenerator(this.#state.scalar);}
@@ -79,6 +86,7 @@ export class DurableApprovalSigner {
   this.#live();assert(config.domain instanceof Uint8Array&&config.domain.length===32);
   assert(typeof config.maxAuthorizedCost==='bigint'&&config.maxAuthorizedCost>=0n&&config.maxAuthorizedCost<=18446744073709551615n);
   const binding={config:clone(config),policyCodeSha256:digest(this.#authorize.toString())};
+  if(this.#policyModuleSha256!==undefined)binding.policyModuleSha256=this.#policyModuleSha256;
   if(this.#state.binding){assert.equal(fingerprint(binding),fingerprint(this.#state.binding),'Policy/domain binding cannot change.');return;}
   this.#commit({...this.#state,binding});
  }
