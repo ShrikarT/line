@@ -3,6 +3,11 @@ import assert from 'node:assert/strict';
 import {hash,tag,u64} from './signed-pool-signers.mjs';
 
 export const ADDRESS_BOUND_APPROVAL_ABI='line-private-offer/v2';
+export function privateOfferApprovalProfile(approvalABI='line-private-offer/v1'){
+ assert(['line-private-offer/v1',ADDRESS_BOUND_APPROVAL_ABI].includes(approvalABI),'Unsupported coordinator approval ABI.');
+ return {approvalABI,source:approvalABI===ADDRESS_BOUND_APPROVAL_ABI
+  ?'contracts/experimental/line-private-offer-addressed.compact':'contracts/experimental/line-private-offer.compact'};
+}
 export const isContractAddress=value=>typeof value==='string'&&/^[0-9a-f]{64}$/.test(value);
 export function addressedApprovalMessage(domain,contractAddress,operation,body,nonce){
  assert(isContractAddress(contractAddress),'A canonical deployed contract address is required.');

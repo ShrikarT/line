@@ -92,6 +92,11 @@ jobs:
           COMPACT_ADDRESS_MANAGED_DIR: .compact-keys/address-bound-managed
         run: npm test
 
+      - name: Address-bound coordinator owner approvals and recovery
+        env:
+          COMPACT_ADDRESS_MANAGED_DIR: .compact-keys/address-bound-managed
+        run: node --experimental-strip-types --test tests/address-bound-coordinator.test.mjs
+
       - name: Compiled independent-key opening experiment
         run: npm run custody:spike
 
@@ -141,6 +146,9 @@ jobs:
 
       - name: Recover all twelve actions and all compensation modes
         run: npm run owner:coordinator:compact -- --compensation
+
+      - name: Recover all twelve actions through address-bound owners
+        run: npm run owner:coordinator:addressed:compact
 
       - name: Decode source-bound public privacy pairs and check wire-size findings
         env:

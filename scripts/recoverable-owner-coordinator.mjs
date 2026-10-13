@@ -21,8 +21,10 @@ import {startApprovalOwnerService} from './approval-owner-service.mjs';
 import {coordinatorCommand,coordinatorQuoteLifetimeSeconds} from './private-owner-coordinator.mjs';
 import {tlsFixture} from '../tests/fixtures/approval-service-tls.mjs';
 import {roleHash} from './private-offer-signers.mjs';
-const SOURCE='contracts/experimental/line-private-offer.compact',sha=b=>createHash('sha256').update(b).digest('hex'),bytes=()=>new Uint8Array(randomBytes(32));
-export async function runRecoverableOwnerCoordinator({compiledDir,localProof,repeatSupplier=false,governance=false,lifecycle=false,compensation=false,onInitialized=async()=>{},onBeforeConfirm=async()=>{},onComplete=async()=>{}}={}){
+import {privateOfferApprovalProfile,ADDRESS_BOUND_APPROVAL_ABI} from './address-bound-approval.mjs';
+const sha=b=>createHash('sha256').update(b).digest('hex'),bytes=()=>new Uint8Array(randomBytes(32));
+export async function runRecoverableOwnerCoordinator({compiledDir,localProof,approvalABI='line-private-offer/v1',repeatSupplier=false,governance=false,lifecycle=false,compensation=false,onInitialized=async()=>{},onBeforeConfirm=async()=>{},onComplete=async()=>{}}={}){
+const {source:SOURCE}=privateOfferApprovalProfile(approvalABI),addressed=approvalABI===ADDRESS_BOUND_APPROVAL_ABI;
 assert(!governance||!repeatSupplier&&!localProof,'Governance has a separate generated-only fixture.');
 assert(!lifecycle||!repeatSupplier&&!localProof&&!governance,'Lifecycle has a separate generated-only fixture.');
 assert(!compensation||!repeatSupplier&&!governance&&!lifecycle,'Compensation has a separate fixture.');
@@ -35,15 +37,15 @@ const files=['scripts/recoverable-owner-coordinator.mjs','scripts/private-owner-
  'scripts/private-offer-signers.mjs','scripts/signed-pool-signers.mjs','scripts/private-offer-encoding.mjs','scripts/private-pool-spike.mjs','src/lib/security/vault-codec.ts','src/lib/line/encoding.ts','tests/fixtures/approval-service-tls.mjs',
  'scripts/private-coordinator-proving.mjs','scripts/native-local-proving-provider.mjs','scripts/private-worker-guardian.mjs',
  'scripts/private-finance-network.mjs','scripts/finalized-contract-receipt.mjs','src/lib/runtime/endpoints.ts','scripts/approval-owner-per-offer-policy.mjs','scripts/approval-owner-governance-policy.mjs','scripts/approval-owner-lifecycle-policy.mjs',
- 'scripts/owner-receipt-registry.mjs','scripts/approval-owner-compensation-policy.mjs'];
+ 'scripts/owner-receipt-registry.mjs','scripts/approval-owner-compensation-policy.mjs','scripts/address-bound-approval.mjs'];
 const fingerprints=Object.fromEntries(files.map(p=>[p,sha(readFileSync(p))])),sourceHash=sha(readFileSync(SOURCE)),tls=tlsFixture();
 const {ledger}=await import(pathToFileURL(join(managedDir,'contract/index.js')).href),quoteIds=[],noteIds=[],seenQuotes=new Set(),seenNotes=new Set();
 const observePublic=state=>{const view=ledger(RT.ContractState.deserialize(state).data);
  for(const [keys,seen,ids]of [[view.quotes,seenQuotes,quoteIds],[view.notes,seenNotes,noteIds]])for(const [key]of keys){const id=Buffer.from(key).toString('hex');if(!seen.has(id)){seen.add(id);ids.push(id);}}
  return view;};
 const owners={},services={},labels={issuer:'issuer',agent:'agent',merchantA:'merchant',merchantB:'merchant'},traces=[],controls=[],processes=[],crashes=[];
-const config={managedDir,sourceSha256:sourceHash,executableSha256:sha(readFileSync(join(managedDir,'contract/index.js'))),directory:join(work,'private-financial-state'),password:Buffer.from(bytes()).toString('hex')};
-if(localProof)config.localProof=localProof;
+const config={managedDir,approvalABI,sourceSha256:sourceHash,executableSha256:sha(readFileSync(join(managedDir,'contract/index.js'))),directory:join(work,'private-financial-state'),password:Buffer.from(bytes()).toString('hex')};
+if(localProof)config.localProof={...localProof,approvalABI};
 const command=async(action,payload)=>{const response=await coordinatorCommand(config,action,payload);processes.push(response.pid);return response;};
 let receiptRegistry,receiptOptions,syntheticNow,fixtureStage='initialization';
 const receiptAuthority={get binding(){return receiptRegistry.binding;},get:ref=>receiptRegistry.get(ref)};
@@ -53,14 +55,14 @@ try{
  // lifetime and extend later facility/receipt/policy horizons together.
  const timingScale=compensation?coordinatorQuoteLifetimeSeconds(config)/900:1;
  syntheticNow=now;if(compensation)config.allowSyntheticTimeAdvance=true;
- for(const [label,role]of Object.entries(labels))owners[label]=new DurableApprovalSigner({directory:join(work,label),encryptionKey:bytes(),custodyId:label+'-owner',role,authorize:role==='merchant'?authorizePerOffer:compensation?createCompensationPolicy(role==='issuer'?receiptAuthority:undefined):lifecycle?authorizeLifecycle:governance&&role==='issuer'?authorizeGovernance:authorize,create:true,approvalABI:'line-private-offer/v1',...(lifecycle||compensation?{clock:()=>syntheticNow}:{})});
+ for(const [label,role]of Object.entries(labels))owners[label]=new DurableApprovalSigner({directory:join(work,label),encryptionKey:bytes(),custodyId:label+'-owner',role,authorize:role==='merchant'?authorizePerOffer:compensation?createCompensationPolicy(role==='issuer'?receiptAuthority:undefined):lifecycle?authorizeLifecycle:governance&&role==='issuer'?authorizeGovernance:authorize,create:true,approvalABI,...(lifecycle||compensation?{clock:()=>syntheticNow}:{})});
  const points=Object.fromEntries(Object.entries(owners).map(([label,s])=>[label,s.publicKey])),terms=bytes(),newTerms=bytes(),receiptA=bytes(),receiptB=bytes();
  const initialized=await command('initialize',{points,instanceNonce:bytes(),terms,limit:100n,flatFee:1n,basisPoints:100n,unixSeconds:now});
  const {scope,domain,identity,binding}=initialized.value;config.scope=scope;config.clients={};
  if(compensation){receiptOptions={directory:join(work,'issuer-receipts'),password:Buffer.from(bytes()).toString('hex'),scope:{custodyId:'issuer-owner-receipts',domain,beneficiaryIdentity:identity,denomination:'synthetic-units'}};receiptRegistry=await OwnerReceiptRegistry.open({...receiptOptions,create:true});}
  assert.deepEqual(Object.keys(initialized.value).sort(),['scope','domain','identity','binding','expiry',...(localProof?['proofGenesis']:[])].sort());
  await onInitialized({scope,now,proofGenesis:initialized.value.proofGenesis});
- const merchantA=roleHash('merchant',points.merchantA),merchantB=roleHash('merchant',points.merchantB),common={domain,maxAuthorizedCost:500n,validBefore:BigInt(now+7200*timingScale)};
+ const merchantA=roleHash('merchant',points.merchantA),merchantB=roleHash('merchant',points.merchantB),common={domain,...(addressed?{contractAddress:scope.contractAddress}:{}),maxAuthorizedCost:500n,validBefore:BigInt(now+7200*timingScale)};
  const lifecycleConfig=lifecycle||compensation?{lifecycleMode:'owner-records',acceptedTermsCatalog:[terms,newTerms],denomination:'synthetic-units',receipts:compensation?[]:[
   {paymentRef:receiptA,amount:17n,domain,beneficiaryIdentity:identity,denomination:'synthetic-units'},
   {paymentRef:receiptB,amount:16n,domain,beneficiaryIdentity:identity,denomination:'synthetic-units'}]}:{};
@@ -68,8 +70,8 @@ try{
  owners.agent.bindPolicy({...common,maxAuthorizedCost:compensation?70n:50n,maxLineLimit:100n,maxFee:2n,maxBasisPoints:100n,maxDrawAmount:30n,acceptedTerms:terms,allowedMerchants:[merchantA,merchantB],...(lifecycle||compensation?{...lifecycleConfig,agentIdentity:identity}:{}),...(compensation?{compensationMode:'bounded',compensationModes:[1n]}:{})});
  for(const label of ['merchantA','merchantB'])owners[label].bindPolicy({...common,facilityBindingMode:'per-offer',maxQuoteAmount:15n});
  for(const [label,role]of Object.entries(labels)){
-  services[label]=await startApprovalOwnerService({signer:owners[label],role,approvalABI:'line-private-offer/v1',domain,...tls.material('server'),allowedClients:[tls.fingerprint('caller')]});
-  config.clients[label]={url:'https://127.0.0.1:'+services[label].port+'/',...tls.material('caller'),expectedServerFingerprint:tls.fingerprint('server'),expectedRole:role,expectedPublicKey:points[label],expectedDomain:domain};
+  services[label]=await startApprovalOwnerService({signer:owners[label],role,approvalABI,domain,...tls.material('server'),allowedClients:[tls.fingerprint('caller')]});
+  config.clients[label]={url:'https://127.0.0.1:'+services[label].port+'/',...tls.material('caller'),expectedServerFingerprint:tls.fingerprint('server'),expectedRole:role,expectedPublicKey:points[label],expectedDomain:domain,...(addressed?{expectedApprovalABI:approvalABI,expectedContractAddress:scope.contractAddress}:{})};
  }
  const initialFacility=timingScale===1?{}:{facility:{limit:100n,expiry:BigInt(now+3600*timingScale),flatFee:1n,basisPoints:100n,terms}};
  const setup=[{actor:'issuer',circuit:'registerMerchant',merchant:'merchantB'},{actor:'issuer',circuit:'fundReserve',amount:200n},
@@ -239,7 +241,7 @@ try{
  }
  for(const [p,h]of Object.entries(fingerprints))assert.equal(sha(readFileSync(p)),h);assert.equal(sha(readFileSync(SOURCE)),sourceHash);
  const report={schema:compensation?(localProof?'line-recoverable-owner-coordinator/compensation-native-fixture/v1':'line-recoverable-owner-coordinator/compensation/v1'):lifecycle?'line-recoverable-owner-coordinator/lifecycle/v1':governance?'line-recoverable-owner-coordinator/governance/v1':repeatSupplier?(localProof?'line-recoverable-owner-coordinator/repeat-supplier-native-fixture/v1':'line-recoverable-owner-coordinator/repeat-supplier/v1'):localProof?'line-recoverable-owner-coordinator/native-fixture/v1':'line-recoverable-owner-coordinator/v1',createdAt:new Date().toISOString(),sourceSha256:sourceHash,scriptFingerprints:fingerprints,...(retainedClaims?{retainedClaims}:{}),
-  artifacts:Object.fromEntries(['contract/index.js','compiler/contract-info.json'].map(p=>[p,sha(readFileSync(join(managedDir,p)))])),freshCompilation:!compiledDir,
+  artifacts:Object.fromEntries(['contract/index.js','compiler/contract-info.json'].map(p=>[p,sha(readFileSync(join(managedDir,p)))])),freshCompilation:!compiledDir,...(addressed?{approvalABI,contractAddress:config.scope.contractAddress}:{}),
   traces,controls,crashes:crashes.map(({workerPid,...metadata})=>metadata),coordinatorProcessInvocations:processes.length+crashes.length,wholeExecutionWorkerReconstructed:true,coordinatorWitnessesReturnedToHarness:false,
   owners:4,merchants:2,nonzeroBasisPointPolicyExercised:true,financialCheckpointDurable:true,authorizationIntentPersistedBeforeOwnerRPC:true,preparedCandidatePersistedBeforeResponse:true,preparedPacketReloadedWithoutFreshApproval:true,
   networkSubmitted:false,authenticAssetSettlement:false,cryptographicProofsGenerated:Boolean(localProof),nativeProofVerificationPerformed:Boolean(localProof),independentAdministrativeCustody:false,fullHistoryPrivacyPassed:false,
@@ -248,4 +250,4 @@ try{
 }catch(error){error.coordinatorFixtureStage=fixtureStage;throw error;}
 finally{for(const service of Object.values(services))await service.close();for(const signer of Object.values(owners))signer.close();if(receiptRegistry)await receiptRegistry.close();}
 }
-if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url))await runRecoverableOwnerCoordinator({repeatSupplier:process.argv.includes('--repeat-supplier'),governance:process.argv.includes('--governance'),lifecycle:process.argv.includes('--lifecycle'),compensation:process.argv.includes('--compensation')});
+if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url))await runRecoverableOwnerCoordinator({approvalABI:process.argv.includes('--address-bound')?ADDRESS_BOUND_APPROVAL_ABI:'line-private-offer/v1',repeatSupplier:process.argv.includes('--repeat-supplier'),governance:process.argv.includes('--governance'),lifecycle:process.argv.includes('--lifecycle'),compensation:process.argv.includes('--compensation')});
