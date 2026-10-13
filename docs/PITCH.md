@@ -1,5 +1,7 @@
 # Line pitch and demonstration evidence
 
+Latest scope: [all-twelve generated compensation/recovery](COORDINATOR_COMPENSATION_2026-10-13.md) completes 30 calls, 92 exits and 82 controls with both allocation roles, partial/full/zero obligations, saved refund salts and owner-local receipt admission. These records/time are synthetic; the new integrated path is not natively proved, network-confirmed or paid. Historical native scopes below retain their exact earlier helpers.
+
 Current continuation: [repayment/reopening recovery](COORDINATOR_REPAYMENT_REOPENING_2026-10-13.md) verifies 23 generated calls across eleven names, 56 deliberate exits and 49 controls, including changed terms and old-generation redemption. Receipt records and time are synthetic. Compensation and native/network proof of this new path remain open; the older scopes below are historical, not relabeled as the current implementation.
 
 Latest continuation: [recoverable governance](COORDINATOR_GOVERNANCE_2026-10-13.md) adds fifteen generated calls across ten names with twenty-eight deliberate exits and twenty-seven controls. Historical archived-claim native evidence below retains its six-name scope. Integrated repayment, compensation, reopening and native/network proof of this governance path remain open.

@@ -5,10 +5,15 @@ import {readFileSync,writeFileSync} from 'node:fs';
 import {dirname,join} from 'node:path';
 const sha=b=>createHash('sha256').update(b).digest('hex'),path=process.argv[2];assert(path,'Provide the fresh coordinator evidence path.');
 const r=JSON.parse(readFileSync(path,'utf8'));
-const repeat=r.schema==='line-recoverable-owner-coordinator/repeat-supplier/v1',governance=r.schema==='line-recoverable-owner-coordinator/governance/v1',lifecycle=r.schema==='line-recoverable-owner-coordinator/lifecycle/v1';assert(lifecycle||governance||repeat||r.schema==='line-recoverable-owner-coordinator/v1');assert.equal(r.freshCompilation,true);
+const repeat=r.schema==='line-recoverable-owner-coordinator/repeat-supplier/v1',governance=r.schema==='line-recoverable-owner-coordinator/governance/v1',lifecycle=r.schema==='line-recoverable-owner-coordinator/lifecycle/v1',compensation=r.schema==='line-recoverable-owner-coordinator/compensation/v1';assert(compensation||lifecycle||governance||repeat||r.schema==='line-recoverable-owner-coordinator/v1');assert.equal(r.freshCompilation,true);
 assert.equal(r.sourceSha256,sha(readFileSync('contracts/experimental/line-private-offer.compact')));
-assert.equal(r.traces.length,lifecycle?23:governance?15:repeat?13:10);assert.equal(r.controls.length,lifecycle?49:governance?27:repeat?12:6);assert.equal(r.crashes.length,lifecycle?56:governance?28:repeat?12:8);
-assert.equal(r.coordinatorProcessInvocations,lifecycle?176:governance?102:repeat?63:46);assert.equal(r.owners,4);assert.equal(r.merchants,2);
+assert.equal(r.traces.length,compensation?30:lifecycle?23:governance?15:repeat?13:10);assert.equal(r.controls.length,compensation?82:lifecycle?49:governance?27:repeat?12:6);assert.equal(r.crashes.length,compensation?92:lifecycle?56:governance?28:repeat?12:8);
+assert.equal(r.coordinatorProcessInvocations,compensation?268:lifecycle?176:governance?102:repeat?63:46);assert.equal(r.owners,4);assert.equal(r.merchants,2);
+if(compensation){
+ assert(process.argv[3],'Compensation evidence requires a separate publication path.');
+ assert.deepEqual([...new Set(r.traces.map(t=>t.circuit))].sort(),['registerMerchant','disableMerchant','fundReserve','withdrawUnencumberedReserve','withdrawFees','openLine','postQuote','draw','redeemDraw','cancelOrExpireNote','acknowledgeRepayment','setStatus'].sort());
+ assert.equal(r.traces.filter(t=>t.circuit==='cancelOrExpireNote').length,7);
+}
 if(lifecycle){
  assert(process.argv[3],'Lifecycle evidence requires a separate publication path.');
  assert.deepEqual([...new Set(r.traces.map(t=>t.circuit))].sort(),['registerMerchant','disableMerchant','fundReserve','withdrawUnencumberedReserve','withdrawFees','openLine','postQuote','draw','redeemDraw','setStatus','acknowledgeRepayment'].sort());
@@ -27,7 +32,8 @@ const helpers=['scripts/recoverable-owner-coordinator.mjs','scripts/private-owne
  'scripts/private-offer-signers.mjs','scripts/signed-pool-signers.mjs','scripts/private-offer-encoding.mjs','scripts/private-pool-spike.mjs',
  'src/lib/security/vault-codec.ts','src/lib/line/encoding.ts','tests/fixtures/approval-service-tls.mjs',
  'scripts/private-coordinator-proving.mjs','scripts/native-local-proving-provider.mjs','scripts/private-worker-guardian.mjs',
- 'scripts/private-finance-network.mjs','scripts/finalized-contract-receipt.mjs','src/lib/runtime/endpoints.ts','scripts/approval-owner-per-offer-policy.mjs','scripts/approval-owner-governance-policy.mjs','scripts/approval-owner-lifecycle-policy.mjs'];
+ 'scripts/private-finance-network.mjs','scripts/finalized-contract-receipt.mjs','src/lib/runtime/endpoints.ts','scripts/approval-owner-per-offer-policy.mjs','scripts/approval-owner-governance-policy.mjs','scripts/approval-owner-lifecycle-policy.mjs',
+ 'scripts/owner-receipt-registry.mjs','scripts/approval-owner-compensation-policy.mjs'];
 assert.deepEqual(Object.keys(r.scriptFingerprints).sort(),helpers.sort());
 for(const p of helpers)assert.equal(sha(readFileSync(p)),r.scriptFingerprints[p],'Coordinator helper changed since execution.');
 assert.deepEqual(Object.keys(r.artifacts).sort(),['contract/index.js','compiler/contract-info.json'].sort());

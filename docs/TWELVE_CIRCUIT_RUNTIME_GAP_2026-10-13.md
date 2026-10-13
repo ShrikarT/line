@@ -1,5 +1,7 @@
 # Twelve-circuit runtime completion audit — 13 October 2026
 
+Latest continuation: [all-twelve generated compensation/recovery](COORDINATOR_COMPENSATION_2026-10-13.md) now dispatches all twelve names and three compensation modes, with 30 calls, 92 deliberate exits and 82 controls. This closes the single-borrower generated dispatch gap. Earlier inspection paragraphs retain their prior scopes. The new path still needs native proof, consistent proof/ledger time, fee-funded finalized network receipts, authentic asset/receipt admission, independent owner administration and complete observer privacy.
+
 This review checks the current Compact, durable signer, owner policy and financial coordinator separately. It does not combine their different evidence scopes into an end-to-end pass. Source inspected at `928e2aa`, with fetched main `a0e51ee` already included in the audit branch.
 
 ## Actual coverage
@@ -21,7 +23,7 @@ The [later repayment/reopening implementation](COORDINATOR_REPAYMENT_REOPENING_2
 | `postQuote` | Supplier | Supported | Fixed binding or separately opted-in per-offer mode | Independent supplier service/customer scope, concurrency and complete observer history |
 | `draw` | Agent | Supported | Own book, merchant, amount/fee/time and cumulative budget | Actual wallet/proving/finality flow, parallel stale-path recovery and observer outcomes |
 | `redeemDraw` | Supplier | Supported, including archived selection | Own authenticated supplier, price/time limits | Authentic delivery/payment and expiry/uncertain network recovery |
-| `cancelOrExpireNote` | Authenticated expiry; authorized borrower/issuer allocation; issuer refund acknowledgment | Not dispatched | Example policies deny; signer distinguishes action modes | Original note/book/refund openings, all three modes, durable expiry/credit/cash/zero-obligation acknowledgment and replay controls |
+| `cancelOrExpireNote` | Authenticated expiry; authorized borrower/issuer allocation; issuer refund acknowledgment | All three modes pass generated recovery | Explicit mode opt-in and local owner receipt registry; old policies remain unchanged | Native/network/real-transfer evidence, independent receipt admission and historical missing-opening recovery; partial/full/zero obligations, both allocation roles, original-generation notes and cross-mode references covered locally |
 | `acknowledgeRepayment` | Issuer | Generated recovery supported | Separate owner-record reference/amount/domain/facility/denomination matches; original policies deny | Actual receipt admission/settlement, denied-intent resolution and native/network evidence; debt rotation, persisted nonce and duplicate reference controls pass locally |
 | `setStatus` | Issuer | Generated default/resume/zero-debt closure recovery supported | Separately opted-in statuses and own-book constraints | Native/network lifecycle proof and independently operated owners; debt-bearing closure denies, zero-debt closure/reopen covered locally |
 
@@ -42,6 +44,6 @@ These requirements preserve the full credit/checkout destination. They do not au
 
 ## Hackathon implication
 
-Line can demonstrate substantial local engineering: exact accounting, real proof verification, role-separated approval interfaces, fresh opaque offers and recovered older claims. Reported canonical flow covers eight names; new generated lifecycle covers eleven; governance covers ten; historical native coordinator recovery covers six; original private-offer native fixtures cover twelve. These are distinct scopes.
+Line can demonstrate substantial local engineering: exact accounting, real proof verification, role-separated approval interfaces, fresh opaque offers and recovered claims/refunds. Reported canonical flow covers eight names; latest generated compensation covers twelve; historical generated lifecycle/governance cover eleven/ten; historical native coordinator recovery covers six; original ephemeral native fixtures cover twelve. These are distinct scopes.
 
 For the submission, provide one evidence matrix and show the exact lane being demonstrated. Keep private revolving credit and full settlement as the destination, but do not call the newer coordinator a complete credit lifecycle or imply that a local native proof paid a supplier. Freeze the deck/video/source package while prioritizing the missing lifecycle integration and external receipt/settlement/customer evidence. The compiling-contract event requirement and the project's full privacy release gate remain separate.

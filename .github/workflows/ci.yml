@@ -132,6 +132,9 @@ jobs:
       - name: Recover repayment and bilateral closed-book reopening
         run: npm run owner:coordinator:compact -- --lifecycle
 
+      - name: Recover all twelve actions and all compensation modes
+        run: npm run owner:coordinator:compact -- --compensation
+
       - name: Decode source-bound public privacy pairs and check wire-size findings
         env:
           CARGO_PROFILE_DEV_DEBUG: "0"
