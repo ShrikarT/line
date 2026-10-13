@@ -1,5 +1,9 @@
 # Line pitch and demonstration evidence
 
+Current verified scope: the [corrected integrated native lifecycle](COORDINATOR_NATIVE_TIME_2026-10-13.md) completes **30 calls across all twelve circuits, 100 deliberate exits, 82 controls and four proof corruption/interruption checks**. The generated lane independently completes 30 calls/92 exits/82 controls. Both earlier seven-call native failures remain preserved. These are local synthetic ledger/time and owner records, with disabled fee balancing and same-host administration; finalized network receipts, actual settlement and full-history privacy remain open. The [rendered deck](../artifacts/wave2/line-wave2.html) now reflects this result; the approved [narrated review](../artifacts/wave2/line-review-video/README.md) is rendered and verified locally at 204.7 seconds, 1080p/30 fps with narration. It is an evidence presentation, not captured live operation or a submitted entry.
+
+The following paragraphs retain earlier checkpoints; their pending native scopes are superseded by the exact current report above.
+
 Latest scope: [all-twelve generated compensation/recovery](COORDINATOR_COMPENSATION_2026-10-13.md) completes 30 calls, 92 exits and 82 controls with both allocation roles, partial/full/zero obligations, saved refund salts and owner-local receipt admission. These records/time are synthetic; the new integrated path is not natively proved, network-confirmed or paid. Historical native scopes below retain their exact earlier helpers.
 
 Current continuation: [repayment/reopening recovery](COORDINATOR_REPAYMENT_REOPENING_2026-10-13.md) verifies 23 generated calls across eleven names, 56 deliberate exits and 49 controls, including changed terms and old-generation redemption. Receipt records and time are synthetic. Compensation and native/network proof of this new path remain open; the older scopes below are historical, not relabeled as the current implementation.

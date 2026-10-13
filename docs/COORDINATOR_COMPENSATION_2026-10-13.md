@@ -2,7 +2,7 @@
 
 The private financial worker now dispatches all twelve existing Compact names and all three `cancelOrExpireNote` modes. Fresh generated execution completes **30 calls, 92 deliberate exits and 82 controls** through four mTLS owners and both suppliers. [Exact source/helper/artifact-bound report](private-signed-2026-10-11-evidence/owner-coordinator-compensation.json). Compact source, its signatures, hashing and canonical managed artifacts are unchanged.
 
-This closes the generated single-borrower lifecycle dispatch gap. It does **not** establish native proof of the new integrated path, finalized network execution, real receipts/payouts, independent administration, full-history privacy or fleet/multi-borrower operation. Historical native coordinator reports still cover their exact six-name helper scopes; the original ephemeral private-offer native fixture covers twelve names separately.
+This closes the generated single-borrower lifecycle dispatch gap. The [subsequent corrected native continuation](COORDINATOR_NATIVE_TIME_2026-10-13.md) also completes thirty integrated calls across all twelve names, one hundred exits, eighty-two controls and four proof corruption/interruption checks. Keep this generated report distinct from that separately verified native report. Neither establishes finalized network execution, real receipts/payouts, independent administration, full-history privacy or fleet/multi-borrower operation. Historical native coordinator reports retain their exact six-name helper scopes.
 
 ## Implemented modes and retained state
 
