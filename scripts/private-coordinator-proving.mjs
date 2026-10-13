@@ -12,6 +12,7 @@ import {NodeZkConfigProvider} from '@midnight-ntwrk/midnight-js-node-zk-config-p
 import {setNetworkId} from '@midnight-ntwrk/midnight-js-network-id';
 import {EncryptedCheckoutStore} from '../server/checkout-storage.ts';
 import {nativeLocalProvingProvider} from './native-local-proving-provider.mjs';
+import {privateOfferApprovalProfile} from './address-bound-approval.mjs';
 const sha=b=>createHash('sha256').update(b).digest('hex'),ID='66666666-6666-4666-8666-666666666666';
 const json=p=>JSON.parse(readFileSync(p,'utf8'));
 const CIRCUITS=['registerMerchant','disableMerchant','fundReserve','withdrawUnencumberedReserve','withdrawFees','openLine','postQuote','draw','redeemDraw','cancelOrExpireNote','acknowledgeRepayment','setStatus'];
@@ -22,7 +23,7 @@ export function coordinatorProofDirectory(directory,operationId){
 }
 export function validateCoordinatorProofConfig(config,scope){
  assert.equal(scope.networkId,'synthetic-preview');const dir=resolve(config.managedDir);
- assert.equal(sha(readFileSync('contracts/experimental/line-private-offer.compact')),scope.sourceSha256);
+ assert.equal(sha(readFileSync(privateOfferApprovalProfile(config.approvalABI).source)),scope.sourceSha256);
  assert.equal(sha(readFileSync(join(dir,'contract/index.js'))),scope.executableSha256);
  const info=json(join(dir,'compiler/contract-info.json')),manifestPath=join(dirname(dir),'key-generation.json'),manifest=json(manifestPath);
  assert.equal(sha(readFileSync(manifestPath)),config.keyManifestSha256);

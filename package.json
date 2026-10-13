@@ -67,6 +67,7 @@
     "owner:service:compact": "node --experimental-strip-types scripts/approval-service-compact.mjs",
     "owner:service:proof": "node --experimental-strip-types scripts/approval-service-proof.mjs",
     "owner:coordinator:compact": "node --experimental-strip-types scripts/recoverable-owner-coordinator.mjs",
+    "owner:coordinator:addressed:compact": "node --experimental-strip-types scripts/recoverable-owner-coordinator.mjs --address-bound --compensation",
     "owner:coordinator:proof": "node --experimental-strip-types scripts/private-coordinator-proof.mjs",
     "privacy:wire:review": "node scripts/private-offer-wire-review.mjs",
     "process:guardian:build": "cargo build --locked --manifest-path scripts/private-worker-guardian/Cargo.toml --target-dir .compact-keys/worker-guardian-target",

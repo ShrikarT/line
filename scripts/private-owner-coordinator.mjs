@@ -12,6 +12,7 @@ import {fileURLToPath,pathToFileURL} from 'node:url';
 import * as RT from '@midnight-ntwrk/compact-runtime';
 import {PrivateFinanceJournal} from './private-finance-journal.mjs';
 import {approvalOwnerClient} from './approval-owner-service.mjs';
+import {privateOfferApprovalProfile,ADDRESS_BOUND_APPROVAL_ABI} from './address-bound-approval.mjs';
 import {encodeVaultJson as wire,decodeVaultJson as unwire} from '../src/lib/security/vault-codec.ts';
 import {hash,tag,roleHash,zero} from './private-offer-signers.mjs';
 import {facilityBinding,offerCommit} from './private-offer-encoding.mjs';
@@ -19,7 +20,7 @@ import {commit} from './private-pool-spike.mjs';
 import {refundCommit} from '../src/lib/line/encoding.ts';
 import {initializeCoordinatorProofLedger,proveRestoredCoordinator} from './private-coordinator-proving.mjs';
 import {startWorkerGuardian} from './private-worker-guardian.mjs';
-const self=fileURLToPath(import.meta.url),SOURCE='contracts/experimental/line-private-offer.compact',sha=b=>createHash('sha256').update(b).digest('hex');
+const self=fileURLToPath(import.meta.url),sha=b=>createHash('sha256').update(b).digest('hex');
 const bytes=()=>new Uint8Array(randomBytes(32)),hex=b=>Buffer.from(b).toString('hex'),COIN=RT.encodeCoinPublicKey('0'.repeat(64));
 const stateBytes=data=>{const s=new RT.ContractState();s.data=data instanceof RT.ChargedState?data:new RT.ChargedState(data);return s.serialize();};
 const emptyPath=()=>({leaf:zero,path:Array.from({length:20},()=>({sibling:{field:0n},goes_left:false}))});
@@ -94,8 +95,16 @@ export function coordinatorCommand(config,action,payload){
  });
 }
 async function worker(config,action,payload){
- const dir=resolve(config.managedDir),sourceHash=sha(readFileSync(SOURCE)),exeHash=sha(readFileSync(join(dir,'contract/index.js')));
+ const profile=privateOfferApprovalProfile(config.approvalABI),addressed=profile.approvalABI===ADDRESS_BOUND_APPROVAL_ABI;
+ const dir=resolve(config.managedDir),sourceHash=sha(readFileSync(profile.source)),exeHash=sha(readFileSync(join(dir,'contract/index.js')));
  assert.equal(sourceHash,config.sourceSha256);assert.equal(exeHash,config.executableSha256);
+ if(action!=='initialize'){
+  assert.equal(config.scope.sourceSha256,sourceHash);assert.equal(config.scope.executableSha256,exeHash);
+  if(addressed)for(const client of Object.values(config.clients??{})){
+   assert.equal(client.expectedApprovalABI,profile.approvalABI);assert.equal(client.expectedContractAddress,config.scope.contractAddress);
+  }
+ }
+ if(config.localProof)assert.equal(privateOfferApprovalProfile(config.localProof.approvalABI).approvalABI,profile.approvalABI);
  const {Contract,ledger}=await import(pathToFileURL(join(dir,'contract/index.js')).href),info=JSON.parse(readFileSync(join(dir,'compiler/contract-info.json')));
  assert.equal(info['compiler-version'],'0.31.1');assert.equal(info['runtime-version'],'0.16.0');
  let active={};const witnesses=Object.fromEntries(info.witnesses.map(({name})=>[name,(ctx,...args)=>{
@@ -239,6 +248,7 @@ async function worker(config,action,payload){
    const full={nullifierKey:f.nullifierKey,reserveOpening:before.privateState.reserve.book,reserveSalt:before.privateState.reserve.salt,newReserveSalt:bytes(),newQuoteMetaSalt:bytes(),newNoteMetaSalt:bytes(),currentBookRoot:v.books.root(),...values};
    const descriptor={name:circuit,args,domain,privateFinance:true,values:Object.fromEntries((SELECTED[circuit]??[]).filter(k=>Object.hasOwn(full,k)).map(k=>[k,full[k]])),...(['fundReserve','withdrawUnencumberedReserve','withdrawFees'].includes(circuit)?{reserveCommit:v.reserveCommit}:{}),...(circuit==='withdrawFees'?{feeReserve:before.privateState.reserve.book.feeReserve}:{})};
    if(circuit==='cancelOrExpireNote')descriptor.values=Object.fromEntries((payload.mode===0n?[]:payload.mode===1n?['bookOpening','salt','newSalt']:['repayAmount','paymentRef']).map(k=>[k,full[k]]));
+   if(addressed)descriptor.contractAddress=config.scope.contractAddress;
    let base=full,selected=descriptor,circuitArgs=args;
    if(circuit==='fundReserve'||circuit==='withdrawUnencumberedReserve'){base.reserveAmount=args[0];circuitArgs=[];}
    if(circuit==='setStatus'){base.requestedStatus=args[0];circuitArgs=[];}

@@ -3,10 +3,13 @@ import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import {readFileSync,writeFileSync} from 'node:fs';
 import {dirname,join} from 'node:path';
+import {privateOfferApprovalProfile,ADDRESS_BOUND_APPROVAL_ABI,isContractAddress} from './address-bound-approval.mjs';
 const sha=b=>createHash('sha256').update(b).digest('hex'),path=process.argv[2];assert(path,'Provide the fresh coordinator evidence path.');
 const r=JSON.parse(readFileSync(path,'utf8'));
 const repeat=r.schema==='line-recoverable-owner-coordinator/repeat-supplier/v1',governance=r.schema==='line-recoverable-owner-coordinator/governance/v1',lifecycle=r.schema==='line-recoverable-owner-coordinator/lifecycle/v1',compensation=r.schema==='line-recoverable-owner-coordinator/compensation/v1';assert(compensation||lifecycle||governance||repeat||r.schema==='line-recoverable-owner-coordinator/v1');assert.equal(r.freshCompilation,true);
-assert.equal(r.sourceSha256,sha(readFileSync('contracts/experimental/line-private-offer.compact')));
+const profile=privateOfferApprovalProfile(r.approvalABI),addressed=profile.approvalABI===ADDRESS_BOUND_APPROVAL_ABI;
+assert.equal(r.sourceSha256,sha(readFileSync(profile.source)));
+if(addressed){assert(process.argv[3],'Address-bound evidence requires a separate publication path.');assert(isContractAddress(r.contractAddress));}
 assert.equal(r.traces.length,compensation?30:lifecycle?23:governance?15:repeat?13:10);assert.equal(r.controls.length,compensation?82:lifecycle?49:governance?27:repeat?12:6);assert.equal(r.crashes.length,compensation?92:lifecycle?56:governance?28:repeat?12:8);
 assert.equal(r.coordinatorProcessInvocations,compensation?268:lifecycle?176:governance?102:repeat?63:46);assert.equal(r.owners,4);assert.equal(r.merchants,2);
 if(compensation){
@@ -33,7 +36,7 @@ const helpers=['scripts/recoverable-owner-coordinator.mjs','scripts/private-owne
  'src/lib/security/vault-codec.ts','src/lib/line/encoding.ts','tests/fixtures/approval-service-tls.mjs',
  'scripts/private-coordinator-proving.mjs','scripts/native-local-proving-provider.mjs','scripts/private-worker-guardian.mjs',
  'scripts/private-finance-network.mjs','scripts/finalized-contract-receipt.mjs','src/lib/runtime/endpoints.ts','scripts/approval-owner-per-offer-policy.mjs','scripts/approval-owner-governance-policy.mjs','scripts/approval-owner-lifecycle-policy.mjs',
- 'scripts/owner-receipt-registry.mjs','scripts/approval-owner-compensation-policy.mjs'];
+ 'scripts/owner-receipt-registry.mjs','scripts/approval-owner-compensation-policy.mjs','scripts/address-bound-approval.mjs'];
 assert.deepEqual(Object.keys(r.scriptFingerprints).sort(),helpers.sort());
 for(const p of helpers)assert.equal(sha(readFileSync(p)),r.scriptFingerprints[p],'Coordinator helper changed since execution.');
 assert.deepEqual(Object.keys(r.artifacts).sort(),['contract/index.js','compiler/contract-info.json'].sort());
@@ -47,7 +50,7 @@ const keys=['schema','createdAt','sourceSha256','scriptFingerprints','artifacts'
  'nonzeroBasisPointPolicyExercised','financialCheckpointDurable','authorizationIntentPersistedBeforeOwnerRPC',
  'preparedCandidatePersistedBeforeResponse','preparedPacketReloadedWithoutFreshApproval','networkSubmitted','authenticAssetSettlement',
  'cryptographicProofsGenerated','nativeProofVerificationPerformed','independentAdministrativeCustody','fullHistoryPrivacyPassed','evidenceScope'];
-if(repeat)keys.push('retainedClaims');assert.deepEqual(Object.keys(r).sort(),keys.sort());
+if(repeat)keys.push('retainedClaims');if(addressed)keys.push('approvalABI','contractAddress');assert.deepEqual(Object.keys(r).sort(),keys.sort());
 const published=Object.fromEntries(keys.map(k=>[k,r[k]]));
 published.gitNormalizedScriptFingerprints=Object.fromEntries(helpers.map(p=>[p,sha(readFileSync(p,'utf8').replaceAll('\r\n','\n'))]));
 published.fingerprintScope='Runtime hashes identify exact files executed. LF-normalized hashes correlate Git source and do not establish another run.';
