@@ -23,3 +23,5 @@ The new `--governance` fixture freshly compiles and completes **15 generated cal
 The historical process counter records **102 successful commands plus deliberate crashes**; failed negative-control worker invocations are excluded, so it is not the total number of process starts. The fixture is generated-only and cannot select native proving or the repeated-supplier mode. Confirmation is a caller-trusted synthetic candidate observation. CI includes a separate fresh governance run alongside the original and repeated-supplier scenarios; remote results remain separate.
 
 Historical native reports retain their exact earlier helper sets. No proof, finalized network call, independent administration, authentic payout or complete-history privacy result is added by the unit regression.
+
+Implementation `1a1cb03` passes [push CI](https://github.com/ShrikarT/line/actions/runs/38303776838) and [PR CI](https://github.com/ShrikarT/line/actions/runs/38303782158), including the new fresh governance scenario, original/archive scenarios, core tests, browser checks and Windows/Linux platform jobs. This does not prove the separate repayment/reopening continuation.

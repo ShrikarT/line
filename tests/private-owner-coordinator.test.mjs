@@ -8,6 +8,45 @@ import {facilityBinding} from '../scripts/private-offer-encoding.mjs';
 import {authorize as perOfferPolicy} from '../scripts/approval-owner-per-offer-policy.mjs';
 import {authorize as fixedPolicy} from '../scripts/approval-owner-example-policy.mjs';
 import {authorize as governancePolicy} from '../scripts/approval-owner-governance-policy.mjs';
+import {authorize as lifecyclePolicy} from '../scripts/approval-owner-lifecycle-policy.mjs';
+
+test('repayment owner records pin reference, amount, beneficiary, domain and denomination',()=>{
+ const bytes=()=>new Uint8Array(randomBytes(32)),domain=bytes(),identity=bytes(),paymentRef=bytes();
+ const book={domain,identity,limit:100n,outstanding:17n,epoch:1n,status:2};
+ const receipt={paymentRef,amount:17n,domain,beneficiaryIdentity:identity,denomination:'synthetic-units'};
+ const context={role:'issuer',clockUnixSeconds:100,config:{domain,agentIdentity:identity,lifecycleMode:'owner-records',validBefore:500n,denomination:'synthetic-units',receipts:[receipt]}};
+ const request={name:'acknowledgeRepayment',args:[300n],values:{bookOpening:book,paymentRef,repayAmount:17n}};
+ assert.deepEqual(lifecyclePolicy(request,context),{allowed:true,reservationCost:0n});
+ for(const changed of [{...request,args:[100n]},{...request,args:[501n]},{...request,values:{...request.values,paymentRef:bytes()}},
+  {...request,values:{...request.values,repayAmount:16n}},{...request,values:{...request.values,repayAmount:18n}},
+  {...request,values:{...request.values,bookOpening:{...book,identity:bytes()}}},
+  {...request,values:{...request.values,bookOpening:{...book,status:3}}}])assert.equal(lifecyclePolicy(changed,context).allowed,false);
+ for(const config of [{...context.config,lifecycleMode:'off'},{...context.config,validBefore:undefined},
+  {...context.config,receipts:[{...receipt,denomination:'other'}]},{...context.config,receipts:[{...receipt,domain:bytes()}]},
+  {...context.config,receipts:[{...receipt,beneficiaryIdentity:bytes()}]}])assert.equal(lifecyclePolicy(request,{...context,config}).allowed,false);
+ assert.equal(lifecyclePolicy(request,{...context,role:'agent'}).allowed,false);
+ assert.equal(governancePolicy(request,context).allowed,false);
+});
+
+test('bilateral reopening requires debt-free own predecessor and owner-pinned terms catalog',()=>{
+ const bytes=()=>new Uint8Array(randomBytes(32)),domain=bytes(),publicKey=RT.ecMulGenerator(19n),identity=roleHash('agent',publicKey,domain),terms=bytes();
+ const config={domain,agentIdentity:identity,lifecycleMode:'owner-records',validBefore:500n,acceptedTermsCatalog:[terms],maxLineLimit:100n,maxFee:2n,maxBasisPoints:100n};
+ const book={domain,identity,limit:100n,outstanding:0n,epoch:2n,generation:1n,status:3};
+ const request={name:'openLine',args:[1n,300n,0n,100n],values:{enrollmentIdentity:identity,acceptedTerms:terms,hasPreviousBook:true,lineLimit:80n,bookOpening:book}};
+ const context={role:'issuer',publicKey,clockUnixSeconds:100,config};
+ assert.deepEqual(lifecyclePolicy(request,context),{allowed:true,reservationCost:80n});
+ const agent={...context,role:'agent'},consent={...request,args:[0n,...request.args.slice(1)]};
+ assert.deepEqual(lifecyclePolicy(consent,agent),{allowed:true,reservationCost:0n});
+ for(const changed of [{...request,values:{...request.values,acceptedTerms:bytes()}},
+  {...request,values:{...request.values,bookOpening:{...book,outstanding:1n}}},
+  {...request,values:{...request.values,bookOpening:{...book,status:1}}},
+  {...request,values:{...request.values,bookOpening:{...book,identity:bytes()}}},
+  {...request,values:{...request.values,bookOpening:{...book,generation:(1n<<64n)-1n}}},
+  {...request,values:{...request.values,lineLimit:101n}}])assert.equal(lifecyclePolicy(changed,context).allowed,false);
+ assert.equal(lifecyclePolicy(consent,{...agent,publicKey:RT.ecMulGenerator(20n)}).allowed,false);
+ assert.equal(lifecyclePolicy(request,{...context,config:{...config,lifecycleMode:'off'}}).allowed,false);
+ assert.equal(fixedPolicy(request,{...context,config:{...config,acceptedTerms:terms}}).allowed,false);
+});
 
 test('free-reserve preflight retains every Compact lock including reported refund holds',()=>{
  const reserve={totalReserve:100n,encumberedReserve:10n,redeemedReserve:20n,feeReserve:3n,pendingFeeReserve:2n,refundReserve:5n,reportedRefundReserve:7n};

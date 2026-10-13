@@ -23,7 +23,8 @@ const bytes=()=>new Uint8Array(randomBytes(32)),hex=b=>Buffer.from(b).toString('
 const stateBytes=data=>{const s=new RT.ContractState();s.data=data instanceof RT.ChargedState?data:new RT.ChargedState(data);return s.serialize();};
 const emptyPath=()=>({leaf:zero,path:Array.from({length:20},()=>({sibling:{field:0n},goes_left:false}))});
 const SELECTED={openLine:['enrollmentIdentity','acceptedTerms','hasPreviousBook','lineLimit','newSalt','bookOpening','salt'],
- draw:['bookOpening','salt','newSalt','quoteMerchantPk','drawAmount','noteNonce','noteSalt'],postQuote:['quoteFacilityBinding','invoiceId','quoteAmount','quoteNonce'],redeemDraw:['redeemAmount'],setStatus:['bookOpening','salt','newSalt']};
+ draw:['bookOpening','salt','newSalt','quoteMerchantPk','drawAmount','noteNonce','noteSalt'],postQuote:['quoteFacilityBinding','invoiceId','quoteAmount','quoteNonce'],redeemDraw:['redeemAmount'],setStatus:['bookOpening','salt','newSalt'],
+ acknowledgeRepayment:['bookOpening','salt','newSalt','repayAmount','paymentRef','receiptNonce']};
 const U64_MAX=(1n<<64n)-1n;
 const u64=value=>typeof value==='bigint'&&value>=0n&&value<=U64_MAX;
 export function coordinatorDrawFee(amount,flatFee,basisPoints){
@@ -114,7 +115,7 @@ async function worker(config,action,payload){
    let proofGenesis;
    if(config.localProof){assert.equal(resolve(config.localProof.managedDir),dir);proofGenesis=await initializeCoordinatorProofLedger(initial,config.localProof,scope,unixSeconds);scope.contractAddress=proofGenesis.address;}
    const book={domain,identity,limit,outstanding:0n,epoch:0n,generation:1n,expiry:BigInt(unixSeconds+3600),flatFee,basisPoints,status:1};
-   const bindingSalt=bytes(),binding=facilityBinding(book,bindingSalt),financial={nullifierKey,unixSeconds,points,terms,book,salt:bytes(),bindingSalt,binding,offers:{},notes:{},requests:{}};
+   const bindingSalt=bytes(),binding=facilityBinding(book,bindingSalt),financial={nullifierKey,unixSeconds,points,terms,book,salt:bytes(),bindingSalt,binding,offers:{},notes:{},requests:{},enrolled:false,enrollment:null,paymentReceipts:{}};
    journal=await PrivateFinanceJournal.open({directory:config.directory,password:config.password,scope,create:true});
    await journal.initialize({publicState:stateBytes(initial.currentContractState.data),privateState:initial.currentPrivateState,financial});
    return {scope,domain,identity,binding,expiry:book.expiry,...(proofGenesis?{proofGenesis}:{})};
@@ -134,14 +135,15 @@ async function worker(config,action,payload){
   if(action==='prepare'){
    assert(!pending,'Unresolved operation blocks preparation.');
    const {operationId,actor,circuit}=payload,before=snapshot.confirmed,f=before.financial,v=ledger(RT.ContractState.deserialize(before.publicState).data),domain=f.book.domain;
-   const allowedKeys=['operationId','actor','circuit',...(['fundReserve','withdrawUnencumberedReserve','postQuote'].includes(circuit)?['amount']:[]),...(['registerMerchant','disableMerchant','draw'].includes(circuit)?['merchant']:[]),...(circuit==='setStatus'?['status']:[]),
+   const allowedKeys=['operationId','actor','circuit',...(['fundReserve','withdrawUnencumberedReserve','postQuote','acknowledgeRepayment'].includes(circuit)?['amount']:[]),...(['registerMerchant','disableMerchant','draw'].includes(circuit)?['merchant']:[]),...(circuit==='setStatus'?['status']:[]),
+    ...(circuit==='acknowledgeRepayment'?['paymentRef','receiptExpiry']:[]),...(circuit==='openLine'&&Object.hasOwn(payload,'facility')?['facility']:[]),
     ...(circuit==='draw'&&Object.hasOwn(payload,'quoteCommit')?['quoteCommit']:[]),...(circuit==='redeemDraw'&&Object.hasOwn(payload,'noteCommit')?['noteCommit']:[])];
    assert.deepEqual(Object.keys(payload).sort(),allowedKeys.sort());
    if(snapshot.completed.some(x=>x.operationId===operationId)){
     assert.deepEqual(f.requests[operationId],payload,'Completed operation cannot change its semantic request.');
     return {operationId,alreadyConfirmed:true};
    }
-   assert(config.clients[actor]);assert(['registerMerchant','disableMerchant','fundReserve','withdrawUnencumberedReserve','withdrawFees','openLine','postQuote','draw','redeemDraw','setStatus'].includes(circuit));
+   assert(config.clients[actor]);assert(['registerMerchant','disableMerchant','fundReserve','withdrawUnencumberedReserve','withdrawFees','openLine','postQuote','draw','redeemDraw','setStatus','acknowledgeRepayment'].includes(circuit));
    let args=[],values={},selectedOffer;
    if(circuit==='registerMerchant'||circuit==='disableMerchant'){assert.equal(actor,'issuer');assert(['merchantA','merchantB'].includes(payload.merchant));args=[roleHash('merchant',f.points[payload.merchant])];}
    if(circuit==='fundReserve'){assert.equal(actor,'issuer');args=[payload.amount];}
@@ -155,8 +157,33 @@ async function worker(config,action,payload){
     args=[payload.status];values={bookOpening:f.book,salt:f.salt,newSalt:bytes(),bookPath:v.books.findPathForLeaf(commit(f.book,f.salt))};assert(values.bookPath);
    }
    if(circuit==='openLine'){
-    assert(['issuer','agent'].includes(actor));args=[actor==='agent'?0n:1n,f.book.expiry,f.book.flatFee,f.book.basisPoints];
-    values={enrollmentIdentity:f.book.identity,acceptedTerms:f.terms,hasPreviousBook:false,lineLimit:f.book.limit,newSalt:f.salt,bookOpening:{...f.book,generation:0n},salt:zero,bookPath:emptyPath()};
+    assert(['issuer','agent'].includes(actor));let enrollment;
+    if(actor==='agent'){
+     assert(!f.enrollment,'An enrollment already awaits issuer acceptance.');
+     const previous=f.enrolled??Boolean(v.books.findPathForLeaf(commit(f.book,f.salt)));
+     if(previous)assert(f.book.status===3&&f.book.outstanding===0n&&f.book.generation<U64_MAX,'Reopening needs a closed, debt-free predecessor.');
+     const facility=payload.facility??{limit:f.book.limit,expiry:f.book.expiry,flatFee:f.book.flatFee,basisPoints:f.book.basisPoints,terms:f.terms};
+     assert.deepEqual(Object.keys(facility).sort(),['limit','expiry','flatFee','basisPoints','terms'].sort());
+     assert(u64(facility.limit)&&facility.limit>0n&&u64(facility.expiry)&&facility.expiry>BigInt(f.unixSeconds)&&u64(facility.flatFee)&&u64(facility.basisPoints)&&facility.basisPoints<=10000n);
+     assert(facility.terms instanceof Uint8Array&&facility.terms.length===32);
+     enrollment={book:{...f.book,limit:facility.limit,expiry:facility.expiry,flatFee:facility.flatFee,basisPoints:facility.basisPoints,outstanding:0n,epoch:0n,status:1,generation:previous?f.book.generation+1n:1n},
+      salt:previous||payload.facility?bytes():f.salt,priorBook:previous?f.book:{...f.book,generation:0n},priorSalt:previous?f.salt:zero,hasPreviousBook:previous,terms:facility.terms};
+    }else{
+     assert(f.enrollment,'Agent consent must be retained before issuer acceptance.');enrollment=f.enrollment;
+     if(payload.facility)assert.deepEqual(payload.facility,{limit:enrollment.book.limit,expiry:enrollment.book.expiry,flatFee:enrollment.book.flatFee,basisPoints:enrollment.book.basisPoints,terms:enrollment.terms});
+    }
+    const b=enrollment.book;args=[actor==='agent'?0n:1n,b.expiry,b.flatFee,b.basisPoints];
+    values={enrollmentIdentity:b.identity,acceptedTerms:enrollment.terms,hasPreviousBook:enrollment.hasPreviousBook,lineLimit:b.limit,newSalt:enrollment.salt,bookOpening:enrollment.priorBook,salt:enrollment.priorSalt,
+     bookPath:enrollment.hasPreviousBook?v.books.findPathForLeaf(commit(enrollment.priorBook,enrollment.priorSalt)):emptyPath()};assert(values.bookPath);
+   }
+   if(circuit==='acknowledgeRepayment'){
+    assert.equal(actor,'issuer');assert(f.book.status===1||f.book.status===2);assert(u64(payload.amount)&&payload.amount>0n&&payload.amount<=f.book.outstanding);
+    assert(u64(payload.receiptExpiry)&&payload.receiptExpiry>BigInt(f.unixSeconds));
+    assert(payload.paymentRef instanceof Uint8Array&&payload.paymentRef.length===32&&payload.paymentRef.some(n=>n!==0));
+    // Match this experimental Compact's v2 tag and [key, reference, domain]
+    // ordering; canonical v3 payment encoding is a different contract ABI.
+    assert(!v.nullifiers.member(hash([tag('line:v2:payment'),f.nullifierKey,payload.paymentRef,domain])),'Payment reference has already been consumed.');
+    args=[payload.receiptExpiry];values={bookOpening:f.book,salt:f.salt,newSalt:bytes(),bookPath:v.books.findPathForLeaf(commit(f.book,f.salt)),repayAmount:payload.amount,paymentRef:payload.paymentRef,receiptNonce:bytes()};assert(values.bookPath);
    }
    if(circuit==='postQuote'){
     assert(['merchantA','merchantB'].includes(actor));const merchant=roleHash('merchant',f.points[actor]);const ttl=config.localProof?2700:900;args=[BigInt(f.unixSeconds+ttl)];
@@ -166,6 +193,7 @@ async function worker(config,action,payload){
    }
    if(circuit==='draw'){
     assert.equal(actor,'agent');assert.equal(f.book.status,1);const offer=coordinatorSelectClaim(f,'offer',payload.merchant,payload.quoteCommit);selectedOffer=offer;
+    assert.deepEqual(facilityBinding(f.book,offer.bindingSalt??f.bindingSalt),offer.binding??f.binding,'Quote belongs to another facility generation.');
     const quote=before.privateState.quotes[hex(offer.Q)];assert(quote&&!quote.meta.used,'Quote is unavailable or already used.');args=[offer.Q,offer.expiry,coordinatorDrawFee(offer.amount,f.book.flatFee,f.book.basisPoints)];
     values={bookOpening:f.book,salt:f.salt,newSalt:bytes(),bookPath:v.books.findPathForLeaf(commit(f.book,f.salt)),invoiceId:offer.invoice,quoteNonce:offer.nonce,quoteBindingSalt:offer.bindingSalt??f.bindingSalt,
      drawAmount:offer.amount,quoteMerchantPk:offer.merchant,noteNonce:bytes(),noteSalt:bytes(),quoteMetaOpening:quote.meta,quoteMetaSalt:quote.salt,registeredMerchantPath:v.registeredMerchantTree.findPathForLeaf(offer.merchant)};
@@ -193,6 +221,16 @@ async function worker(config,action,payload){
    const context=RT.createCircuitContext(config.scope.contractAddress,COIN,RT.ContractState.deserialize(before.publicState).data,structuredClone(before.privateState),undefined,undefined,f.unixSeconds);
    const result=contract.circuits[circuit](context,...circuitArgs),financial=coordinatorRetainClaims(f);
    financial.requests[operationId]=structuredClone(payload);
+   if(circuit==='openLine'){
+    const enrollment={book:{...base.bookOpening,domain,identity:base.enrollmentIdentity,limit:base.lineLimit,outstanding:0n,epoch:0n,generation:base.hasPreviousBook?base.bookOpening.generation+1n:1n,
+     expiry:selected.args[1],flatFee:base.lineFlatFee,basisPoints:base.lineBasisPoints,status:1},salt:base.newSalt,priorBook:base.bookOpening,priorSalt:base.salt,hasPreviousBook:base.hasPreviousBook,terms:base.acceptedTerms};
+    if(selected.args[0]===0n)financial.enrollment=enrollment;
+    else{financial.book=enrollment.book;financial.salt=enrollment.salt;financial.terms=enrollment.terms;financial.enrolled=true;financial.enrollment=null;}
+   }
+   if(circuit==='acknowledgeRepayment'){
+    financial.book={...f.book,outstanding:f.book.outstanding-base.repayAmount,epoch:f.book.epoch+1n};financial.salt=base.newSalt;
+    financial.paymentReceipts={...(f.paymentReceipts??{}),[hex(base.paymentRef)]:{amount:base.repayAmount,paymentRef:base.paymentRef,receiptNonce:base.receiptNonce,receiptExpiry:selected.args[0],operationId}};
+   }
    if(circuit==='setStatus'){financial.book={...f.book,status:base.requestedStatus,epoch:f.book.epoch+1n};financial.salt=base.newSalt;}
    if(circuit==='postQuote')financial.offers[actor]={Q:offerCommit({merchant:roleHash('merchant',f.points[actor]),binding:base.quoteFacilityBinding,invoice:base.invoiceId,amount:base.quoteAmount,expiry:selected.args[0],nonce:base.quoteNonce,domain}),binding:base.quoteFacilityBinding,bindingSalt:base.quoteBindingSalt,merchant:roleHash('merchant',f.points[actor]),invoice:base.invoiceId,nonce:base.quoteNonce,amount:base.quoteAmount,expiry:selected.args[0]};
    if(circuit==='draw'){
@@ -210,7 +248,7 @@ async function worker(config,action,payload){
   const restored=contract.circuits[pending.circuit](ctx,...pending.circuitArgs),restoredState=stateBytes(restored.context.currentQueryContext.state);
   assert.deepEqual(restoredState,pending.candidate.publicState);assert.deepEqual(restored.context.currentPrivateState,pending.candidate.privateState);
   const root=ledger(restored.context.currentQueryContext.state),book=pending.candidate.financial.book;
-  if(['draw','redeemDraw','setStatus'].includes(pending.circuit))assert(root.books.findPathForLeaf(commit(book,pending.candidate.financial.salt)));
+  if(['draw','redeemDraw','setStatus','acknowledgeRepayment'].includes(pending.circuit)||pending.circuit==='openLine'&&pending.circuitArgs[0]===1n)assert(root.books.findPathForLeaf(commit(book,pending.candidate.financial.salt)));
   if(action==='prove'){
    assert(config.localProof);assert.equal(resolve(config.localProof.managedDir),dir);assert.deepEqual(Object.keys(payload).sort(),['operationId','publicLedgerState'].sort());
    const proof=await proveRestoredCoordinator({config:config.localProof,scope:config.scope,directory:config.directory,password:config.password,pending,restored,initialQueryContext,publicLedgerState:payload.publicLedgerState,

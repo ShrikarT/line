@@ -129,6 +129,9 @@ jobs:
       - name: Recover governance and withdrawals through owner approval services
         run: npm run owner:coordinator:compact -- --governance
 
+      - name: Recover repayment and bilateral closed-book reopening
+        run: npm run owner:coordinator:compact -- --lifecycle
+
       - name: Decode source-bound public privacy pairs and check wire-size findings
         env:
           CARGO_PROFILE_DEV_DEBUG: "0"
