@@ -1,5 +1,9 @@
 # Engineering status and acceptance evidence
 
+## Remaining work reopened — 13 October 2026
+
+The owner reopened all remaining product/submission work. The [continuation ledger](LEFTOVERS_IMPLEMENTATION_2026-10-13.md) keeps all seven acceptance areas open and records the current rail recommendation and credential dependency. Docker execution isolation is now available for the focused generated approval check. The new twelve-circuit address-bound Compact variant compiles with 0.31.1 and passes intended-address, copied-domain other-address, fresh-domain and same-instance replay controls. This is generated execution only; matching owner/service ABI, full lifecycle/native proof, network migration, custody and settlement remain open. Existing canonical and v1 private-offer sources/helpers are unchanged, so their earlier evidence retains its exact scope.
+
 Audit handoff: delivery `d436507` passes [PR CI](https://github.com/ShrikarT/line/actions/runs/38402287307) and [push CI](https://github.com/ShrikarT/line/actions/runs/38402278470). The [closeout](AUDIT_CLOSEOUT_2026-10-13.md) preserves verification scope, the incomplete supplemental security investigation and the decisions/evidence requiring the owner. Remaining product gates are not inferred complete.
 
 ## Complete local native lifecycle — 13 October 2026 (IST)
