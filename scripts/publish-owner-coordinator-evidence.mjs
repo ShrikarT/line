@@ -54,5 +54,5 @@ if(repeat)keys.push('retainedClaims');if(addressed)keys.push('approvalABI','cont
 const published=Object.fromEntries(keys.map(k=>[k,r[k]]));
 published.gitNormalizedScriptFingerprints=Object.fromEntries(helpers.map(p=>[p,sha(readFileSync(p,'utf8').replaceAll('\r\n','\n'))]));
 published.fingerprintScope='Runtime hashes identify exact files executed. LF-normalized hashes correlate Git source and do not establish another run.';
-writeFileSync(process.argv[3]??'docs/private-signed-2026-10-11-evidence/owner-coordinator-recovery.json',JSON.stringify(published,null,2)+'\n');
+writeFileSync(process.argv[3]??'docs/private-signed-2026-10-11-evidence/owner-coordinator-recovery.json',JSON.stringify(published,null,2)+'\n',{flag:addressed?'wx':'w'});
 console.log(JSON.stringify({publishedCalls:r.traces.length,abruptExits:r.crashes.length,executionWorkers:r.coordinatorProcessInvocations,nativeProofs:false,networkSubmitted:false}));
