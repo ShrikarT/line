@@ -1,5 +1,7 @@
 # Remaining compensation integration requirements
 
+Continuation: [all-twelve generated compensation/recovery](COORDINATOR_COMPENSATION_2026-10-13.md) now implements all three modes, note-bound encrypted owner receipt admission, saved refund openings and a strictly preview-only clock. Its 30-call/92-exit/82-control result is generated-only. Native/network/real-receipt/privacy/independent-custody requirements below remain open; the original planning baseline is preserved.
+
 `cancelOrExpireNote` remains the last undispatched private-worker name after the repayment/reopening implementation. This is a source-based implementation plan, not completed execution evidence. Preserve the twelve existing circuit names and the exact Compact hashes, quantities and authority rules.
 
 | Mode | Required authority and state | Private custody to retain | Accounting consequence |

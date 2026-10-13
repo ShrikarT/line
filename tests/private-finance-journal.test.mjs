@@ -10,6 +10,17 @@ function fixture(){
  const operation={operationId:'purchase:1',circuit:'draw',circuitArgs:[bytes(),1800000300n],witnesses:{drawAmount:15n,drawFee:1n,newSalt:candidate.financial.bookSalt},before:initial,candidate};
  return {owner,initial,candidate,operation};
 }
+
+test('preview clock advances durably without changing ledger/openings and rejects unresolved transitions',async()=>{
+ const x=fixture();x.initial.financial.unixSeconds=100;let j=await PrivateFinanceJournal.open({...x.owner,create:true});await j.initialize(x.initial);
+ await j.advanceSyntheticTime(100,200);assert.equal(await j.advanceSyntheticTime(100,200),200);
+ const advanced=j.snapshot().confirmed;assert.deepEqual(advanced.publicState,x.initial.publicState);assert.deepEqual(advanced.privateState,x.initial.privateState);
+ assert.equal(advanced.financial.unixSeconds,200);await j.close();j=await PrivateFinanceJournal.open(x.owner);
+ try{assert.equal(j.snapshot().confirmed.financial.unixSeconds,200);await assert.rejects(j.advanceSyntheticTime(100,300));await assert.rejects(j.advanceSyntheticTime(200,199));
+  const op={...x.operation,before:advanced};await j.stageAuthorization({...op,descriptor:{name:'draw'},semanticRequest:{operationId:op.operationId}});
+  await assert.rejects(j.advanceSyntheticTime(200,300));await j.prepare(op);await assert.rejects(j.advanceSyntheticTime(200,300));assert.equal(j.snapshot().confirmed.financial.unixSeconds,200);
+ }finally{await j.close();}
+});
 test('prepared witness/salt checkpoint survives independent storage processes without advancing early',async()=>{
  const x=fixture();const first=await financeCommand(x.owner,'initialize',x.initial);
  const prepared=await financeCommand(x.owner,'prepare',x.operation);assert.notEqual(first.pid,prepared.pid);

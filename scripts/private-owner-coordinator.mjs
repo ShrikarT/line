@@ -16,6 +16,7 @@ import {encodeVaultJson as wire,decodeVaultJson as unwire} from '../src/lib/secu
 import {hash,tag,roleHash,zero} from './private-offer-signers.mjs';
 import {facilityBinding,offerCommit} from './private-offer-encoding.mjs';
 import {commit} from './private-pool-spike.mjs';
+import {refundCommit} from '../src/lib/line/encoding.ts';
 import {initializeCoordinatorProofLedger,proveRestoredCoordinator} from './private-coordinator-proving.mjs';
 import {startWorkerGuardian} from './private-worker-guardian.mjs';
 const self=fileURLToPath(import.meta.url),SOURCE='contracts/experimental/line-private-offer.compact',sha=b=>createHash('sha256').update(b).digest('hex');
@@ -62,7 +63,7 @@ export function coordinatorSelectClaim(financial,kind,merchant,selector){
  assert.deepEqual(record[key],new Uint8Array(Buffer.from(selector??hex(record[key]),'hex')));return structuredClone(record);
 }
 export function coordinatorCommand(config,action,payload){
- assert(['initialize','prepare','restore','prove','confirm','status'].includes(action));const body=wire({action,payload});assert(Buffer.byteLength(body)<=2*1024*1024);
+ assert(['initialize','prepare','restore','prove','confirm','status','advanceSyntheticTime'].includes(action));const body=wire({action,payload});assert(Buffer.byteLength(body)<=2*1024*1024);
  const child=fork(self,['--worker'],{execArgv:['--experimental-strip-types'],stdio:['ignore','ignore','pipe','ipc'],detached:process.platform!=='win32',windowsHide:true,
   env:{PATH:process.env.PATH,SystemRoot:process.env.SystemRoot,LINE_COORDINATOR_TEST_CONFIG:wire(config)}});
  return new Promise((yes,no)=>{
@@ -122,6 +123,11 @@ async function worker(config,action,payload){
   }
   journal=await PrivateFinanceJournal.open({directory:config.directory,password:config.password,scope:config.scope});
   const snapshot=journal.snapshot();
+  if(action==='advanceSyntheticTime'){
+   assert(config.allowSyntheticTimeAdvance===true&&config.scope.networkId==='synthetic-preview'&&!config.localProof);
+   assert.deepEqual(Object.keys(payload).sort(),['from','to'].sort());const unixSeconds=await journal.advanceSyntheticTime(payload.from,payload.to);
+   return {unixSeconds,syntheticTime:true,networkFinalityVerified:false};
+  }
   if(action==='status')return {revision:snapshot.revision,authorizationOperation:snapshot.authorizationIntent?.operationId??null,pendingOperation:snapshot.pending?.operationId??null,completedOperations:snapshot.completed.map(x=>x.operationId)};
   if(action==='confirm'){
    await journal.confirm(payload.operationId,payload.observedPublicState);
@@ -138,6 +144,7 @@ async function worker(config,action,payload){
    assert(typeof operationId==='string'&&/^[a-zA-Z0-9][a-zA-Z0-9:._-]{0,127}$/.test(operationId),'Operation ID must match the approval owner namespace.');
    const allowedKeys=['operationId','actor','circuit',...(['fundReserve','withdrawUnencumberedReserve','postQuote','acknowledgeRepayment'].includes(circuit)?['amount']:[]),...(['registerMerchant','disableMerchant','draw'].includes(circuit)?['merchant']:[]),...(circuit==='setStatus'?['status']:[]),
     ...(circuit==='acknowledgeRepayment'?['paymentRef','receiptExpiry']:[]),...(circuit==='openLine'&&Object.hasOwn(payload,'facility')?['facility']:[]),
+    ...(circuit==='cancelOrExpireNote'?['merchant','mode','receiptExpiry',...(payload.mode===2n?['paymentRef']:[]),...(Object.hasOwn(payload,'noteCommit')?['noteCommit']:[])]:[]),
     ...(circuit==='draw'&&Object.hasOwn(payload,'quoteCommit')?['quoteCommit']:[]),...(circuit==='redeemDraw'&&Object.hasOwn(payload,'noteCommit')?['noteCommit']:[])];
    assert.deepEqual(Object.keys(payload).sort(),allowedKeys.sort());
    if(snapshot.completed.some(x=>x.operationId===operationId)){
@@ -145,7 +152,7 @@ async function worker(config,action,payload){
     assert.deepEqual(f.requests[operationId],payload,'Completed operation cannot change its semantic request.');
     return {operationId,alreadyConfirmed:true};
    }
-   assert(config.clients[actor]);assert(['registerMerchant','disableMerchant','fundReserve','withdrawUnencumberedReserve','withdrawFees','openLine','postQuote','draw','redeemDraw','setStatus','acknowledgeRepayment'].includes(circuit));
+   assert(config.clients[actor]);assert(['registerMerchant','disableMerchant','fundReserve','withdrawUnencumberedReserve','withdrawFees','openLine','postQuote','draw','redeemDraw','setStatus','acknowledgeRepayment','cancelOrExpireNote'].includes(circuit));
    let args=[],values={},selectedOffer;
    if(circuit==='registerMerchant'||circuit==='disableMerchant'){assert.equal(actor,'issuer');assert(['merchantA','merchantB'].includes(payload.merchant));args=[roleHash('merchant',f.points[payload.merchant])];}
    if(circuit==='fundReserve'){assert.equal(actor,'issuer');args=[payload.amount];}
@@ -205,8 +212,32 @@ async function worker(config,action,payload){
     assert(opening&&!opening.meta.redeemed&&!opening.meta.cancelled,'Claim is unavailable or already spent.');args=[note.D,note.expiry];
     values={noteMetaOpening:opening.meta,noteMetaSalt:opening.salt,noteGeneration:note.generation,noteIdentity:note.identity??f.book.identity,noteQuoteCommit:note.Q,quoteMerchantPk:note.merchant,redeemAmount:note.amount,noteNonce:note.nonce,noteSalt:note.salt};
    }
+   if(circuit==='cancelOrExpireNote'){
+    assert([0n,1n,2n].includes(payload.mode)&&u64(payload.receiptExpiry));
+    const note=coordinatorSelectClaim(f,'note',payload.merchant,payload.noteCommit),opening=before.privateState.notes[hex(note.D)];
+    assert(opening&&!opening.meta.redeemed,'Claim is unavailable or redeemed.');const meta=opening.meta;
+    assert.deepEqual(note.identity??f.book.identity,f.book.identity,'Claim belongs to another borrower.');
+    const cost=meta.amount+meta.fee;assert(u64(cost));
+    values={noteMetaOpening:meta,noteMetaSalt:opening.salt,noteGeneration:note.generation,noteIdentity:note.identity??f.book.identity,noteQuoteCommit:note.Q,
+     quoteMerchantPk:note.merchant,noteNonce:note.nonce,noteSalt:note.salt,bookOpening:f.book,salt:f.salt,newSalt:bytes(),bookPath:v.books.findPathForLeaf(commit(f.book,f.salt))??emptyPath(),repayAmount:0n,paymentRef:zero};
+    if(payload.mode===0n)assert(!meta.cancelled&&BigInt(f.unixSeconds)>=meta.expiry,'Note has not expired or is already cancelled.');
+    if(payload.mode===1n){
+     assert(['issuer','agent'].includes(actor)&&!meta.compensationAllocated&&(meta.cancelled||BigInt(f.unixSeconds)>=meta.expiry));
+     assert(note.generation<=f.book.generation&&f.book.epoch<U64_MAX);assert(values.bookPath.leaf instanceof Uint8Array&&hex(values.bookPath.leaf)===hex(commit(f.book,f.salt)));
+    }
+    if(payload.mode===2n){
+     assert.equal(actor,'issuer');assert(meta.cancelled&&meta.compensationAllocated&&!meta.refundAcknowledged&&payload.receiptExpiry>BigInt(f.unixSeconds));
+     const refund=f.refunds?.[hex(note.D)];assert(refund,'Allocated refund opening is unavailable.');
+     assert(payload.paymentRef instanceof Uint8Array&&payload.paymentRef.length===32&&payload.paymentRef.some(n=>n!==0));
+     assert(!v.nullifiers.member(hash([tag('line:v2:payment'),f.nullifierKey,payload.paymentRef,domain])),'Payment reference has already been consumed.');
+     assert.deepEqual(refundCommit(refund.preimage,refund.salt),meta.refundCommitment,'Saved refund opening differs.');
+     values.salt=refund.salt;values.repayAmount=refund.preimage.amount;values.paymentRef=payload.paymentRef;
+    }
+    args=[note.D,payload.mode,payload.receiptExpiry];
+   }
    const full={nullifierKey:f.nullifierKey,reserveOpening:before.privateState.reserve.book,reserveSalt:before.privateState.reserve.salt,newReserveSalt:bytes(),newQuoteMetaSalt:bytes(),newNoteMetaSalt:bytes(),currentBookRoot:v.books.root(),...values};
    const descriptor={name:circuit,args,domain,privateFinance:true,values:Object.fromEntries((SELECTED[circuit]??[]).filter(k=>Object.hasOwn(full,k)).map(k=>[k,full[k]])),...(['fundReserve','withdrawUnencumberedReserve','withdrawFees'].includes(circuit)?{reserveCommit:v.reserveCommit}:{}),...(circuit==='withdrawFees'?{feeReserve:before.privateState.reserve.book.feeReserve}:{})};
+   if(circuit==='cancelOrExpireNote')descriptor.values=Object.fromEntries((payload.mode===0n?[]:payload.mode===1n?['bookOpening','salt','newSalt']:['repayAmount','paymentRef']).map(k=>[k,full[k]]));
    let base=full,selected=descriptor,circuitArgs=args;
    if(circuit==='fundReserve'||circuit==='withdrawUnencumberedReserve'){base.reserveAmount=args[0];circuitArgs=[];}
    if(circuit==='setStatus'){base.requestedStatus=args[0];circuitArgs=[];}
@@ -223,6 +254,14 @@ async function worker(config,action,payload){
    const context=RT.createCircuitContext(config.scope.contractAddress,COIN,RT.ContractState.deserialize(before.publicState).data,structuredClone(before.privateState),undefined,undefined,f.unixSeconds);
    const result=contract.circuits[circuit](context,...circuitArgs),financial=coordinatorRetainClaims(f);
    financial.requests={...financial.requests,[operationId]:structuredClone(payload)};
+   if(circuit==='cancelOrExpireNote'&&selected.args[1]===1n){
+    const cost=base.noteMetaOpening.amount+base.noteMetaOpening.fee,same=base.noteGeneration===base.bookOpening.generation;
+    const amount=same?(cost>base.bookOpening.outstanding?cost-base.bookOpening.outstanding:0n):cost;
+    const preimage={domain,lineGeneration:base.noteGeneration,identity:base.noteIdentity,noteCommit:selected.args[0],amount};
+    financial.refunds={...(financial.refunds??{}),[hex(selected.args[0])]:{preimage,salt:base.newSalt}};
+    financial.book={...base.bookOpening,outstanding:same?(base.bookOpening.outstanding>cost?base.bookOpening.outstanding-cost:0n):base.bookOpening.outstanding,epoch:base.bookOpening.epoch+1n};financial.salt=base.newSalt;
+    assert.deepEqual(refundCommit(preimage,base.newSalt),result.context.currentPrivateState.notes[hex(selected.args[0])].meta.refundCommitment);
+   }
    if(circuit==='openLine'){
     const enrollment={book:{...base.bookOpening,domain,identity:base.enrollmentIdentity,limit:base.lineLimit,outstanding:0n,epoch:0n,generation:base.hasPreviousBook?base.bookOpening.generation+1n:1n,
      expiry:selected.args[1],flatFee:base.lineFlatFee,basisPoints:base.lineBasisPoints,status:1},salt:base.newSalt,priorBook:base.bookOpening,priorSalt:base.salt,hasPreviousBook:base.hasPreviousBook,terms:base.acceptedTerms};
@@ -250,7 +289,7 @@ async function worker(config,action,payload){
   const restored=contract.circuits[pending.circuit](ctx,...pending.circuitArgs),restoredState=stateBytes(restored.context.currentQueryContext.state);
   assert.deepEqual(restoredState,pending.candidate.publicState);assert.deepEqual(restored.context.currentPrivateState,pending.candidate.privateState);
   const root=ledger(restored.context.currentQueryContext.state),book=pending.candidate.financial.book;
-  if(['draw','redeemDraw','setStatus','acknowledgeRepayment'].includes(pending.circuit)||pending.circuit==='openLine'&&pending.circuitArgs[0]===1n)assert(root.books.findPathForLeaf(commit(book,pending.candidate.financial.salt)));
+  if(['draw','redeemDraw','setStatus','acknowledgeRepayment'].includes(pending.circuit)||pending.circuit==='openLine'&&pending.circuitArgs[0]===1n||pending.circuit==='cancelOrExpireNote'&&pending.circuitArgs[1]===1n)assert(root.books.findPathForLeaf(commit(book,pending.candidate.financial.salt)));
   if(action==='prove'){
    assert(config.localProof);assert.equal(resolve(config.localProof.managedDir),dir);assert.deepEqual(Object.keys(payload).sort(),['operationId','publicLedgerState'].sort());
    const proof=await proveRestoredCoordinator({config:config.localProof,scope:config.scope,directory:config.directory,password:config.password,pending,restored,initialQueryContext,publicLedgerState:payload.publicLedgerState,

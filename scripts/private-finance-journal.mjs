@@ -81,6 +81,16 @@ export class PrivateFinanceJournal {
   await this.#publish({...this.#record,revision:this.#record.revision+1,confirmed:checkpoint(initial)});
  }
  snapshot(){this.#available();return clone(this.#record);}
+ async advanceSyntheticTime(from,to){
+  this.#mutation();assert.equal(this.#scope.networkId,'synthetic-preview','Synthetic time cannot enter the network journal.');
+  assert(this.#record.confirmed&&!this.#record.pending&&!this.#record.authorizationIntent,'Unresolved operations block clock changes.');
+  assert(Number.isSafeInteger(from)&&from>=0&&Number.isSafeInteger(to)&&to>from);
+  const before=this.#record.confirmed,history=before.financial.syntheticClockTransitions??[];
+  if(history.some(x=>x.from===from&&x.to===to))return before.financial.unixSeconds;
+  assert.equal(before.financial.unixSeconds,from,'Synthetic clock predecessor changed.');assert(history.length<256);
+  const confirmed=checkpoint({...before,financial:{...before.financial,unixSeconds:to,syntheticClockTransitions:[...history,{from,to}]}});
+  await this.#publish({...this.#record,revision:this.#record.revision+1,confirmed});return to;
+ }
  async stageAuthorization({operationId,circuit,circuitArgs,witnesses,descriptor,semanticRequest,before}){
   this.#mutation();assert(!this.#record.pending,'An unresolved financial candidate blocks authorization.');
   assert(typeof operationId==='string'&&/^[a-zA-Z0-9:._-]{1,128}$/.test(operationId));assert(names.has(circuit)&&Array.isArray(circuitArgs));

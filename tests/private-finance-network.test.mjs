@@ -49,6 +49,7 @@ async function bootstrap(x){const journal=await PrivateFinanceJournal.open({...x
 test('Preprod forbids caller-supplied bootstrap and confirmation',async t=>{
  const x=fixture(t),j=await PrivateFinanceJournal.open({...x.owner,create:true});try{
   await assert.rejects(j.initialize(x.initial),/finalized receipt/);await assert.rejects(j.confirm('purchase:network:1',x.candidate.publicState),/internally fetched/);
+  await assert.rejects(j.advanceSyntheticTime(100,200),/Synthetic time cannot enter/);assert.equal(x.services.requests.length,0);
   assert.equal(j.snapshot().confirmed,null);assert.equal(j.snapshot().revision,0);
  }finally{await j.close();}
 });
