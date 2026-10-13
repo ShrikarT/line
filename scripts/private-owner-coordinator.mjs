@@ -28,6 +28,7 @@ const SELECTED={openLine:['enrollmentIdentity','acceptedTerms','hasPreviousBook'
  acknowledgeRepayment:['bookOpening','salt','newSalt','repayAmount','paymentRef','receiptNonce']};
 const U64_MAX=(1n<<64n)-1n;
 const u64=value=>typeof value==='bigint'&&value>=0n&&value<=U64_MAX;
+export function coordinatorQuoteLifetimeSeconds(config){return config.localProof?2700:900;}
 export function coordinatorDrawFee(amount,flatFee,basisPoints){
  assert(u64(amount)&&amount>0n&&u64(flatFee)&&u64(basisPoints)&&basisPoints<=10000n);
  const fee=flatFee+(amount*basisPoints+9999n)/10000n;
@@ -195,7 +196,7 @@ async function worker(config,action,payload){
     args=[payload.receiptExpiry];values={bookOpening:f.book,salt:f.salt,newSalt:bytes(),bookPath:v.books.findPathForLeaf(commit(f.book,f.salt)),repayAmount:payload.amount,paymentRef:payload.paymentRef,receiptNonce:bytes()};assert(values.bookPath);
    }
    if(circuit==='postQuote'){
-    assert(['merchantA','merchantB'].includes(actor));const merchant=roleHash('merchant',f.points[actor]);const ttl=config.localProof?2700:900;args=[BigInt(f.unixSeconds+ttl)];
+    assert(['merchantA','merchantB'].includes(actor));const merchant=roleHash('merchant',f.points[actor]);const ttl=coordinatorQuoteLifetimeSeconds(config);args=[BigInt(f.unixSeconds+ttl)];
     const offerBinding=coordinatorOfferBinding(f.book);
     values={quoteFacilityBinding:offerBinding.binding,invoiceId:bytes(),quoteAmount:payload.amount,quoteNonce:bytes(),quoteBindingSalt:offerBinding.bindingSalt,enabledMerchantPath:v.enabledMerchantTree.findPathForLeaf(merchant)};
     assert(values.enabledMerchantPath,'Supplier is not enabled.');

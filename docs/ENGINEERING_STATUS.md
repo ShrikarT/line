@@ -1,5 +1,11 @@
 # Engineering status and acceptance evidence
 
+## Current verified snapshot — 13 October 2026 (IST)
+
+`94b2a98` passes both push and PR CI; local regression is **546 tests / 60 suites**. The all-twelve generated lifecycle completes 30 calls, 92 deliberate exits and 82 controls. Two new integrated native attempts each stopped after seven separately verified calls and remain incomplete. Diagnostics identify a fixture expiry mismatch: native quotes last 2,700 seconds, but expiry was attempted after 901 seconds. The corrected fixture shares the worker lifetime and scales the bilateral initial term, reopened term, receipts and policy horizons. Its final 546-test regression passes; fresh lifecycle/native verification is in progress. [Failure and diagnostic scope](COORDINATOR_NATIVE_TIME_2026-10-13.md).
+
+The [local eight-slide review deck](../artifacts/wave2/line-wave2.html) has verified desktop/phone bounds, keyboard navigation and persistent text edits. It is a review artifact, not a narrated video or submitted entry. Reported canonical Preprod deployment remains separate from the undeployed privacy candidate; independent receipt reconciliation, authentic settlement, independent custody, full-history privacy and external customer evidence remain open.
+
 ## Native lifecycle/time preparation — 13 October 2026 (IST)
 
 The [native-time continuation](COORDINATOR_NATIVE_TIME_2026-10-13.md) extends the driver to target thirty all-twelve calls, exact compensation modes and monotonic saved execution time. Proof cache time must match the encrypted pending packet; source/key/helper/executable and actual decoded-action publication guards remain enforced. Local native configuration may use the strictly synthetic clock; Preprod refusal and unresolved-operation guards remain. Full local regression passes **546 tests / 60 suites**, compile/zero managed drift, build and scans pass. The new fresh prerequisite/native execution remains pending, with no completed result inferred. `db93d67` push CI passes; PR CI fails a separate raw-cell test alignment boundary. The deterministic `BYTES32.toValue` fixture correction passes fourteen checkout checks. Earlier generated/native scopes remain exact historical evidence, not relabeled as this new native attempt.
