@@ -18,7 +18,7 @@ import {authorize as authorizeLifecycle} from './approval-owner-lifecycle-policy
 import {createCompensationPolicy} from './approval-owner-compensation-policy.mjs';
 import {OwnerReceiptRegistry} from './owner-receipt-registry.mjs';
 import {startApprovalOwnerService} from './approval-owner-service.mjs';
-import {coordinatorCommand} from './private-owner-coordinator.mjs';
+import {coordinatorCommand,coordinatorQuoteLifetimeSeconds} from './private-owner-coordinator.mjs';
 import {tlsFixture} from '../tests/fixtures/approval-service-tls.mjs';
 import {roleHash} from './private-offer-signers.mjs';
 const SOURCE='contracts/experimental/line-private-offer.compact',sha=b=>createHash('sha256').update(b).digest('hex'),bytes=()=>new Uint8Array(randomBytes(32));
@@ -45,10 +45,13 @@ const owners={},services={},labels={issuer:'issuer',agent:'agent',merchantA:'mer
 const config={managedDir,sourceSha256:sourceHash,executableSha256:sha(readFileSync(join(managedDir,'contract/index.js'))),directory:join(work,'private-financial-state'),password:Buffer.from(bytes()).toString('hex')};
 if(localProof)config.localProof=localProof;
 const command=async(action,payload)=>{const response=await coordinatorCommand(config,action,payload);processes.push(response.pid);return response;};
-let receiptRegistry,receiptOptions,syntheticNow;
+let receiptRegistry,receiptOptions,syntheticNow,fixtureStage='initialization';
 const receiptAuthority={get binding(){return receiptRegistry.binding;},get:ref=>receiptRegistry.get(ref)};
 try{
- const now=Math.floor(Date.now()/1000);
+ const now=Math.floor(Date.now()/1000),expiryStep=coordinatorQuoteLifetimeSeconds(config)+1;
+ // Native quotes have a longer proving margin. Advance past that actual
+ // lifetime and extend later facility/receipt/policy horizons together.
+ const timingScale=compensation?coordinatorQuoteLifetimeSeconds(config)/900:1;
  syntheticNow=now;if(compensation)config.allowSyntheticTimeAdvance=true;
  for(const [label,role]of Object.entries(labels))owners[label]=new DurableApprovalSigner({directory:join(work,label),encryptionKey:bytes(),custodyId:label+'-owner',role,authorize:role==='merchant'?authorizePerOffer:compensation?createCompensationPolicy(role==='issuer'?receiptAuthority:undefined):lifecycle?authorizeLifecycle:governance&&role==='issuer'?authorizeGovernance:authorize,create:true,approvalABI:'line-private-offer/v1',...(lifecycle||compensation?{clock:()=>syntheticNow}:{})});
  const points=Object.fromEntries(Object.entries(owners).map(([label,s])=>[label,s.publicKey])),terms=bytes(),newTerms=bytes(),receiptA=bytes(),receiptB=bytes();
@@ -57,7 +60,7 @@ try{
  if(compensation){receiptOptions={directory:join(work,'issuer-receipts'),password:Buffer.from(bytes()).toString('hex'),scope:{custodyId:'issuer-owner-receipts',domain,beneficiaryIdentity:identity,denomination:'synthetic-units'}};receiptRegistry=await OwnerReceiptRegistry.open({...receiptOptions,create:true});}
  assert.deepEqual(Object.keys(initialized.value).sort(),['scope','domain','identity','binding','expiry',...(localProof?['proofGenesis']:[])].sort());
  await onInitialized({scope,now,proofGenesis:initialized.value.proofGenesis});
- const merchantA=roleHash('merchant',points.merchantA),merchantB=roleHash('merchant',points.merchantB),common={domain,maxAuthorizedCost:500n,validBefore:BigInt(now+7200)};
+ const merchantA=roleHash('merchant',points.merchantA),merchantB=roleHash('merchant',points.merchantB),common={domain,maxAuthorizedCost:500n,validBefore:BigInt(now+7200*timingScale)};
  const lifecycleConfig=lifecycle||compensation?{lifecycleMode:'owner-records',acceptedTermsCatalog:[terms,newTerms],denomination:'synthetic-units',receipts:compensation?[]:[
   {paymentRef:receiptA,amount:17n,domain,beneficiaryIdentity:identity,denomination:'synthetic-units'},
   {paymentRef:receiptB,amount:16n,domain,beneficiaryIdentity:identity,denomination:'synthetic-units'}]}:{};
@@ -68,22 +71,23 @@ try{
   services[label]=await startApprovalOwnerService({signer:owners[label],role,approvalABI:'line-private-offer/v1',domain,...tls.material('server'),allowedClients:[tls.fingerprint('caller')]});
   config.clients[label]={url:'https://127.0.0.1:'+services[label].port+'/',...tls.material('caller'),expectedServerFingerprint:tls.fingerprint('server'),expectedRole:role,expectedPublicKey:points[label],expectedDomain:domain};
  }
+ const initialFacility=timingScale===1?{}:{facility:{limit:100n,expiry:BigInt(now+3600*timingScale),flatFee:1n,basisPoints:100n,terms}};
  const setup=[{actor:'issuer',circuit:'registerMerchant',merchant:'merchantB'},{actor:'issuer',circuit:'fundReserve',amount:200n},
-  {actor:'agent',circuit:'openLine'},{actor:'issuer',circuit:'openLine'}];
- const newFacility={limit:80n,expiry:BigInt(now+5000),flatFee:0n,basisPoints:100n,terms:newTerms},receiptExpiry=BigInt(now+6000);
+  {actor:'agent',circuit:'openLine',...initialFacility},{actor:'issuer',circuit:'openLine',...initialFacility}];
+ const newFacility={limit:80n,expiry:BigInt(now+5000*timingScale),flatFee:0n,basisPoints:100n,terms:newTerms},receiptExpiry=BigInt(now+6000*timingScale);
  const refundA=bytes(),refundB=bytes(),refundZero=bytes();
  const comp=(actor,merchant,noteIndex,mode,paymentRef)=>()=>({actor,circuit:'cancelOrExpireNote',merchant,noteCommit:noteIds[noteIndex],mode,receiptExpiry:mode===2n?receiptExpiry:0n,...(mode===2n?{paymentRef}:{})});
  const admit=(purpose,paymentRef,amount,noteIndex,reopen=false)=>()=>({kind:'receipt',record:{purpose,paymentRef,amount,domain,beneficiaryIdentity:identity,denomination:'synthetic-units',evidenceClass:'synthetic-fixture',...(purpose==='refund'?{noteCommit:new Uint8Array(Buffer.from(noteIds[noteIndex],'hex'))}:{})},reopen});
  const itinerary=compensation?[...setup,{actor:'merchantA',circuit:'postQuote',amount:15n},{actor:'agent',circuit:'draw',merchant:'merchantA'},
   admit('repayment',receiptA,7n),{actor:'issuer',circuit:'acknowledgeRepayment',amount:7n,paymentRef:receiptA,receiptExpiry},
-  {kind:'clock',to:now+901},comp('issuer','merchantA',0,0n),comp('agent','merchantA',0,1n),
+  {kind:'clock',to:now+expiryStep},comp('issuer','merchantA',0,0n),comp('agent','merchantA',0,1n),
   {actor:'merchantB',circuit:'postQuote',amount:15n},{actor:'agent',circuit:'draw',merchant:'merchantB'},
   admit('refund',refundA,7n,0,true),comp('issuer','merchantA',0,2n,refundA),
   admit('repayment',receiptB,17n),{actor:'issuer',circuit:'acknowledgeRepayment',amount:17n,paymentRef:receiptB,receiptExpiry},
   {actor:'issuer',circuit:'setStatus',status:3},{actor:'agent',circuit:'openLine',facility:newFacility},{actor:'issuer',circuit:'openLine',facility:newFacility},
-  {kind:'clock',to:now+1802},{actor:'merchantA',circuit:'postQuote',amount:10n},{actor:'agent',circuit:'draw',merchant:'merchantA'},
+  {kind:'clock',to:now+2*expiryStep},{actor:'merchantA',circuit:'postQuote',amount:10n},{actor:'agent',circuit:'draw',merchant:'merchantA'},
   comp('issuer','merchantB',1,1n),admit('refund',refundB,17n,1),comp('issuer','merchantB',1,2n,refundB),
-  {kind:'clock',to:now+2703},comp('agent','merchantA',2,1n),
+  {kind:'clock',to:now+3*expiryStep},comp('agent','merchantA',2,1n),
   {actor:'merchantB',circuit:'postQuote',amount:10n},{actor:'agent',circuit:'draw',merchant:'merchantB'},{actor:'merchantB',circuit:'redeemDraw'},
   admit('refund',refundZero,0n,2),comp('issuer','merchantA',2,2n,refundZero),
   {actor:'issuer',circuit:'withdrawFees'},{actor:'issuer',circuit:'withdrawUnencumberedReserve',amount:10n},{actor:'issuer',circuit:'disableMerchant',merchant:'merchantA'},
@@ -115,7 +119,9 @@ try{
  for(const [i,entry]of itinerary.entries()){
   const request=typeof entry==='function'?entry():entry;
   if(request.kind==='clock'){
+   fixtureStage='synthetic-clock-advance';
    const from=syntheticNow,advanced=await command('advanceSyntheticTime',{from,to:request.to});assert.equal(advanced.value.syntheticTime,true);assert.equal(advanced.value.networkFinalityVerified,false);
+   fixtureStage='synthetic-clock-retry';
    const retry=await command('advanceSyntheticTime',{from,to:request.to});assert.deepEqual(retry.value,advanced.value);syntheticNow=advanced.value.unixSeconds;continue;
   }
   if(request.kind==='receipt'){
@@ -126,6 +132,7 @@ try{
    const idle=await command('status',{});assert.equal(idle.value.authorizationOperation,null);assert.equal(idle.value.pendingOperation,null);controls.push({check:'repayment-reference-cannot-acknowledge-zero-refund',rejected:true});
   }
   const operationId='coordinator:'+i;let prepared;
+  fixtureStage=request.circuit+':prepare';
   const recovery=request.circuit==='draw'||(governance||lifecycle||compensation)&&['setStatus','withdrawUnencumberedReserve','withdrawFees','disableMerchant'].includes(request.circuit)||(lifecycle||compensation)&&['acknowledgeRepayment','openLine','cancelOrExpireNote'].includes(request.circuit);
   if(recovery){
    config.testCrashBeforeApproval=true;
@@ -155,6 +162,7 @@ try{
    if(compensation&&request.circuit==='draw'){await assert.rejects(command('advanceSyntheticTime',{from:syntheticNow,to:syntheticNow+1}));controls.push({check:'pending-candidate-blocks-synthetic-time-change',rejected:true});}
    const again=await command('restore',{operationId});assert.equal(again.value.fingerprint,restored.value.fingerprint);
   }
+  fixtureStage=request.circuit+':before-native-hook';
   await onBeforeConfirm({operationId,request,prepared:restored.value,prove:async(publicLedgerState,{crashAfterPublication=false,crashDuringProve=false}={})=>{
    if(crashAfterPublication)config.testCrashAfterProofPublication=true;
    if(crashDuringProve)config.testCrashDuringNativeProve=true;
@@ -163,6 +171,7 @@ try{
     if(crashDuringProve&&error.interruptedDuringNativeProve){assert.equal(error.ownedProcessesStopped,true);crashes.push({stage:'during-native-prove-after-key-load',workerPid:error.workerPid,ownedProcessesStopped:true});}throw error;}
    finally{delete config.testCrashAfterProofPublication;delete config.testCrashDuringNativeProve;}
   }});
+  fixtureStage=request.circuit+':confirm-and-retry';
   if(recovery){
    config.testCrashAfterConfirm=true;
    try{await command('confirm',{operationId,observedPublicState:restored.value.publicState});assert.fail('Expected confirmed-publication process exit.');}
@@ -236,6 +245,7 @@ try{
   networkSubmitted:false,authenticAssetSettlement:false,cryptographicProofsGenerated:Boolean(localProof),nativeProofVerificationPerformed:Boolean(localProof),independentAdministrativeCustody:false,fullHistoryPrivacyPassed:false,
   evidenceScope:compensation?'Thirty generated calls across all twelve names and three compensation modes, partial/earlier-generation/zero-cash obligations, both allocation roles, saved refund salt after later draws, receipt-registry reopen and cross-mode reference rejection; ninety-two exits. Explicit synthetic clock advances and owner receipt admission; no native proof, finalized network, real payout, independent custody or full-history privacy claim.':lifecycle?'Twenty-three generated calls across eleven names, synthetic owner-record repayment in default/open states, zero-debt closure and bilateral reopening with changed terms, original-generation claim redemption and stale quote/payment controls; fifty-six exits. Same-host synthetic owners/time and caller-trusted observation; no compensation, authentic payment, native proof, network or full-history privacy claim.':governance?'Fifteen generated calls across ten names, default/resume with debt, bounded reserve/fee withdrawals and merchant disable before redemption; twenty-eight exits and exact recovery/retries. Synthetic same-host owners and caller-trusted observation; no repayment/compensation/reopening, native proof, network or payout claim.':repeatSupplier?'Thirteen restored Compact calls with two quotes and draws at Merchant A, selection/redemption of older archived claims after newer purchases, Merchant B separation and twelve generated publication/approval exits. Native proving, when selected, adds its separately recorded interruption/proof controls. Synthetic same-host configuration; no network or asset claim.':'Ten generated Compact calls in separate execution-worker processes, restoring write-ahead authorization intents and private prepared packets through four mTLS services, with eight abrupt publication/approval exits and exact completed retries. Same-host synthetic owner harness and caller-trusted candidate observations; no network receipt/proof/asset/independent-administration claim.'};
  writeFileSync(join(work,'evidence.json'),JSON.stringify(report,null,2)+'\n');await onComplete(report);console.log(JSON.stringify({calls:traces.length,controls:controls.length,abruptExits:crashes.length,workerInvocations:processes.length+crashes.length,report:join(work,'evidence.json')}));return report;
-}finally{for(const service of Object.values(services))await service.close();for(const signer of Object.values(owners))signer.close();if(receiptRegistry)await receiptRegistry.close();}
+}catch(error){error.coordinatorFixtureStage=fixtureStage;throw error;}
+finally{for(const service of Object.values(services))await service.close();for(const signer of Object.values(owners))signer.close();if(receiptRegistry)await receiptRegistry.close();}
 }
 if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url))await runRecoverableOwnerCoordinator({repeatSupplier:process.argv.includes('--repeat-supplier'),governance:process.argv.includes('--governance'),lifecycle:process.argv.includes('--lifecycle'),compensation:process.argv.includes('--compensation')});

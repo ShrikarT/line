@@ -95,4 +95,7 @@ try{
  for(const [p,h]of Object.entries(artifacts))assert.equal(sha(readFileSync(join(dir,p))),h.sha256);
  for(const [name,p]of [['verifier',verifier],['checker',checker],['prover',prover],['guardian',guardian]])assert.equal(sha(readFileSync(p)),executables[name]);
  complete=true;checkpoint();console.log(JSON.stringify({complete:true,contractCalls:traces.length-1,abruptExits:fixture.crashes.length,activeProverInterruptions:cacheControls.length,corruptedDrawRejections:negativeChecks.length,report:join(work,'verification.json')}));
-}catch(error){failure={stage,errorClass:error.name,category:'coordinator_proving_or_verification_failed',...(error.coordinatorProofStage?{workerStage:error.coordinatorProofStage}:{})};checkpoint();console.error('Restored coordinator native proof run failed: '+(error.coordinatorProofStage??stage));process.exitCode=1;}
+}catch(error){failure={stage,errorClass:error.name,category:'coordinator_proving_or_verification_failed',...(error.coordinatorProofStage?{workerStage:error.coordinatorProofStage}:{}),
+ ...(error.coordinatorFixtureStage?{fixtureStage:error.coordinatorFixtureStage}:{}),...(typeof error.operator==='string'?{assertionOperator:error.operator}:{}),
+ sourceFrames:String(error.stack??'').split('\n').filter(line=>/^\s+at /.test(line)&&/scripts[\/\\](?:private-coordinator-proof|recoverable-owner-coordinator)\.mjs:\d+/.test(line)).slice(0,4)};
+ checkpoint();console.error('Restored coordinator native proof run failed: '+(error.coordinatorProofStage??error.coordinatorFixtureStage??stage));process.exitCode=1;}
