@@ -4,6 +4,8 @@ Snapshot: **13 October 2026, IST**. Repository: [ShrikarT/line](https://github.c
 
 ## Verdict
 
+**Current coordinator continuation:** the [explicit addressed v2 coordinator](COORDINATOR_ADDRESS_BOUND_2026-10-13.md) now passes 30 isolated generated calls across all twelve names, 92 deliberate exits, 82 controls and 268 workers. A source-reviewed evidence overwrite defect is fixed and its actual new-file/preservation controls pass. Native v2 proofs, network execution, settlement and the remaining product gates are still open. Earlier native reports retain their original helper revisions.
+
 **Subsequent implementation:** the owner reopened all remaining product work after this audit handoff. See the [implementation ledger](LEFTOVERS_IMPLEMENTATION_2026-10-13.md). Address-bound Compact and owner/TLS v2 now have isolated generated controls; whole coordinator/native/network execution is pending. The native results below remain bound to their recorded earlier helpers and are not evidence for the new v2 owner revisions.
 
 **Handoff:** the report and authorized fixes are verified. Delivery `d436507` passes [PR CI](https://github.com/ShrikarT/line/actions/runs/38402287307) and [push CI](https://github.com/ShrikarT/line/actions/runs/38402278470). See [audit closeout](AUDIT_CLOSEOUT_2026-10-13.md) for the limited copied-domain approval investigation and the explicit owner-input list. This closes the audit assignment, not the remaining product acceptance gates.
