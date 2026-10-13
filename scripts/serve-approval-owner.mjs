@@ -15,7 +15,7 @@ try{
  assert(process.argv[2],'Provide an owner-controlled profile file.');
  const profilePath=resolve(process.argv[2]),bytes=readFileSync(profilePath);assert(bytes.length<=128*1024);
  const profile=decodeVaultJson(bytes.toString('utf8')),base=dirname(profilePath),file=p=>resolve(base,p);
- assert(profile.version===1&&profile.approvalABI==='line-private-offer/v1');
+ assert(profile.version===1&&['line-private-offer/v1','line-private-offer/v2'].includes(profile.approvalABI));
  const policyPath=file(profile.policyModule),policyBytes=readFileSync(policyPath);
  assert.equal(createHash('sha256').update(policyBytes).digest('hex'),profile.policyModuleSha256,'Owner policy source changed.');
  const {authorize}=await import(pathToFileURL(policyPath).href);assert.equal(typeof authorize,'function');

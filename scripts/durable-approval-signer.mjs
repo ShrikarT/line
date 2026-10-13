@@ -12,9 +12,11 @@ import * as RT from '@midnight-ntwrk/compact-runtime';
 import { encodeVaultJson, decodeVaultJson } from '../src/lib/security/vault-codec.ts';
 import { ORDER, words, actionBody, approvalMessage, challenge, roleHash } from './signed-pool-signers.mjs';
 import {offerCommit} from './private-offer-encoding.mjs';
+import {ADDRESS_BOUND_APPROVAL_ABI,addressedApprovalMessage,isContractAddress} from './address-bound-approval.mjs';
 
 const FORMAT='line:software-approval-store/v1';
 const LEGACY_ABI='line-private-enrollment/v1',OFFER_ABI='line-private-offer/v1';
+const isOfferABI=abi=>abi===OFFER_ABI||abi===ADDRESS_BOUND_APPROVAL_ABI;
 const byte32=v=>v instanceof Uint8Array&&v.length===32;
 const uint64=v=>typeof v==='bigint'&&v>=0n&&v<=18446744073709551615n;
 const status=v=>Number.isInteger(v)&&v>=0&&v<=3;
@@ -49,7 +51,7 @@ export class DurableApprovalSigner {
  #directory;#file;#lock;#lease;#key;#aad;#state;#authorize;#clock;#approvalABI;#policyModuleSha256;#uncertain=false;#closed=false;
  constructor({directory,encryptionKey,custodyId,role,authorize,policyModuleSha256,create=false,clock=()=>Math.floor(Date.now()/1000),approvalABI=LEGACY_ABI}){
   assert(['issuer','agent','merchant','permissionless'].includes(role));
-  assert([LEGACY_ABI,OFFER_ABI].includes(approvalABI),'Unsupported owner-selected approval ABI.');
+  assert([LEGACY_ABI,OFFER_ABI,ADDRESS_BOUND_APPROVAL_ABI].includes(approvalABI),'Unsupported owner-selected approval ABI.');
   this.#approvalABI=approvalABI;
   assert(encryptionKey instanceof Uint8Array&&encryptionKey.length===32);
   assert(typeof custodyId==='string'&&/^[a-zA-Z0-9][a-zA-Z0-9:._-]{0,127}$/.test(custodyId));
@@ -81,9 +83,11 @@ export class DurableApprovalSigner {
  }
  get publicKey(){this.#live();return RT.ecMulGenerator(this.#state.scalar);}
  get ownerScope(){this.#live();return {role:this.#state.role,approvalABI:this.#approvalABI,
-  domain:this.#state.binding?new Uint8Array(this.#state.binding.config.domain):undefined};}
+  domain:this.#state.binding?new Uint8Array(this.#state.binding.config.domain):undefined,
+  ...(this.#approvalABI===ADDRESS_BOUND_APPROVAL_ABI?{contractAddress:this.#state.binding?.config.contractAddress}:{})};}
  bindPolicy(config){
   this.#live();assert(config.domain instanceof Uint8Array&&config.domain.length===32);
+  if(this.#approvalABI===ADDRESS_BOUND_APPROVAL_ABI)assert(isContractAddress(config.contractAddress),'Pin the deployed contract address before authorizing.');
   assert(typeof config.maxAuthorizedCost==='bigint'&&config.maxAuthorizedCost>=0n&&config.maxAuthorizedCost<=18446744073709551615n);
   const binding={config:clone(config),policyCodeSha256:digest(this.#authorize.toString())};
   if(this.#policyModuleSha256!==undefined)binding.policyModuleSha256=this.#policyModuleSha256;
@@ -98,15 +102,18 @@ export class DurableApprovalSigner {
    !(request.domain instanceof Uint8Array)||!Buffer.from(request.domain).equals(Buffer.from(config.domain))||
    !Array.isArray(request.args)||!isRecord(request.values)||
    request.authorizationNonce!==undefined||request.challengeLiftForTest!==undefined)reject();
+  if(this.#approvalABI===ADDRESS_BOUND_APPROVAL_ABI&&
+   (!isContractAddress(request.contractAddress)||request.contractAddress!==config.contractAddress))reject();
   if(forbidden.some(key=>Object.hasOwn(request.values,key)))reject();
   if(request.args.length!==ARG_TYPES[request.name].length||request.args.some((v,i)=>!ARG_TYPES[request.name][i](v)))reject();
   if(Object.hasOwn(request,'reserveCommit')&&!byte32(request.reserveCommit))reject();
   if(Object.hasOwn(request,'feeReserve')&&!uint64(request.feeReserve))reject();
   const topFields=new Set(['name','args','domain','privateFinance','values']);
+  if(this.#approvalABI===ADDRESS_BOUND_APPROVAL_ABI)topFields.add('contractAddress');
   if(['fundReserve','withdrawUnencumberedReserve','withdrawFees'].includes(request.name))topFields.add('reserveCommit');
   if(request.name==='withdrawFees')topFields.add('feeReserve');
   if(Object.keys(request).some(key=>!topFields.has(key)))reject();
-  const allowedValues=new Set(request.name==='postQuote'&&this.#approvalABI===OFFER_ABI?
+  const allowedValues=new Set(request.name==='postQuote'&&isOfferABI(this.#approvalABI)?
    ['quoteFacilityBinding','invoiceId','quoteAmount','quoteNonce']:request.name==='cancelOrExpireNote'?
    request.args[1]===0n?[]:request.args[1]===1n?['bookOpening','salt','newSalt']:['repayAmount','paymentRef']:VALUE_FIELDS[request.name]);
   if(Object.keys(request.values).some(key=>!allowedValues.has(key)))reject();
@@ -137,11 +144,12 @@ export class DurableApprovalSigner {
     decision.reservationCost!==request.values.drawAmount+request.args[2]))reject();
   if(saved)return clone(saved.response);
   if(Object.keys(this.#state.operations).length>=MAX_OPERATIONS||this.#state.approvedCost+decision.reservationCost>config.maxAuthorizedCost)reject();
-  let operation;try{operation=request.name==='postQuote'&&this.#approvalABI===OFFER_ABI?
+  let operation;try{operation=request.name==='postQuote'&&isOfferABI(this.#approvalABI)?
    [7,offerCommit({merchant:roleHash('merchant',this.publicKey),binding:request.values.quoteFacilityBinding,
     invoice:request.values.invoiceId,amount:request.values.quoteAmount,expiry:request.args[0],nonce:request.values.quoteNonce,domain:request.domain})]:
    actionBody(this.publicKey,request);}catch{reject();}if(!operation)reject();
-  const [op,body]=operation,nonce=new Uint8Array(randomBytes(32)),message=approvalMessage(request.domain,op,body,nonce);
+  const [op,body]=operation,nonce=new Uint8Array(randomBytes(32)),message=this.#approvalABI===ADDRESS_BOUND_APPROVAL_ABI?
+   addressedApprovalMessage(request.domain,request.contractAddress,op,body,nonce):approvalMessage(request.domain,op,body,nonce);
   const r=scalar(),announcement=RT.ecMulGenerator(r),h=challenge(message,this.publicKey,announcement),remainder=h%ORDER,quotient=h/ORDER;
   const response={rolePublicKey:this.publicKey,roleApproval:{announcement,response:words((r+remainder*this.#state.scalar)%ORDER)},
    authorizationNonce:nonce,challengeQuotient:quotient,challengeRemainder:words(remainder),challengeWords:words(h),
