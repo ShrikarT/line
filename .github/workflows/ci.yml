@@ -82,7 +82,14 @@ jobs:
       - name: Compact simulator tests
         run: npm run compact:test
 
+      - name: Compile and verify address-bound approval candidate
+        run: |
+          node scripts/compile-compact.mjs --skip-zk contracts/experimental/line-private-offer-addressed.compact .compact-keys/address-bound-managed
+          node --experimental-strip-types scripts/address-bound-approval-check.mjs .compact-keys/address-bound-managed
+
       - name: TypeScript reference + encoding + demo + MCP tests
+        env:
+          COMPACT_ADDRESS_MANAGED_DIR: .compact-keys/address-bound-managed
         run: npm test
 
       - name: Compiled independent-key opening experiment

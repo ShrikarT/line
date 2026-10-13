@@ -7,19 +7,22 @@ import {createServer,request as httpsRequest} from 'node:https';
 import {createHash,timingSafeEqual} from 'node:crypto';
 import {checkServerIdentity} from 'node:tls';
 import {REQUEST_BYTES,RESPONSE_BYTES,encodeApprovalFrame,decodeApprovalFrame} from './approval-service-frame.mjs';
+import {ADDRESS_BOUND_APPROVAL_ABI,isContractAddress} from './address-bound-approval.mjs';
 const fingerprint=raw=>createHash('sha256').update(raw).digest('hex'); // TLS certificate identity only.
 const DENIED='Approval could not be authorized.',UNCERTAIN='Approval response is uncertain; retry only the identical operation.';
 const keys=(value,names)=>value&&typeof value==='object'&&!Array.isArray(value)&&Object.keys(value).sort().join('|')===[...names].sort().join('|');
 const same=(a,b)=>a instanceof Uint8Array&&b instanceof Uint8Array&&a.length===b.length&&timingSafeEqual(a,b);
 
 export async function startApprovalOwnerService({signer,role,approvalABI,domain,key,cert,ca,allowedClients,host='127.0.0.1',port=0}){
- assert(['issuer','agent','merchant','permissionless'].includes(role));assert.equal(approvalABI,'line-private-offer/v1');
+ assert(['issuer','agent','merchant','permissionless'].includes(role));assert(['line-private-offer/v1',ADDRESS_BOUND_APPROVAL_ABI].includes(approvalABI));
  assert(domain instanceof Uint8Array&&domain.length===32);assert(signer&&typeof signer.approve==='function');
  const scope=signer.ownerScope;assert.equal(scope.role,role);assert.equal(scope.approvalABI,approvalABI);assert(same(scope.domain,domain),'Owner must bind this domain before serving approvals.');
+ if(approvalABI===ADDRESS_BOUND_APPROVAL_ABI)assert(isContractAddress(scope.contractAddress),'Owner must pin the deployed contract address.');
  assert(Array.isArray(allowedClients)&&allowedClients.length>0&&allowedClients.every(x=>/^[0-9a-f]{64}$/.test(x)));
  assert(Number.isInteger(port)&&port>=0&&port<=65535);
  const permitted=new Set(allowedClients),sockets=new Set();let stopping=false;
- const identity={version:1,role,approvalABI,domain:new Uint8Array(domain),publicKey:signer.publicKey};
+ const identity={version:1,role,approvalABI,domain:new Uint8Array(domain),publicKey:signer.publicKey,
+  ...(approvalABI===ADDRESS_BOUND_APPROVAL_ABI?{contractAddress:scope.contractAddress}:{})};
  const reply=(res,body,status=200)=>{if(res.destroyed)return;res.writeHead(status,{'content-type':'application/octet-stream','content-length':String(RESPONSE_BYTES),'cache-control':'no-store'});res.end(encodeApprovalFrame(body,RESPONSE_BYTES));};
  const server=createServer({key,cert,ca,requestCert:true,rejectUnauthorized:true,minVersion:'TLSv1.3'},async(req,res)=>{
   try{
@@ -47,9 +50,11 @@ export async function startApprovalOwnerService({signer,role,approvalABI,domain,
  };
 }
 
-export function approvalOwnerClient({url,key,cert,ca,expectedServerFingerprint,expectedRole,expectedPublicKey,expectedDomain,timeoutMs=10_000}){
+export function approvalOwnerClient({url,key,cert,ca,expectedServerFingerprint,expectedRole,expectedPublicKey,expectedDomain,expectedApprovalABI='line-private-offer/v1',expectedContractAddress,timeoutMs=10_000}){
  const target=new URL(url);assert(target.protocol==='https:'&&!target.username&&!target.password&&!target.search&&!target.hash&&target.pathname==='/');
  assert(['issuer','agent','merchant','permissionless'].includes(expectedRole));assert(expectedDomain instanceof Uint8Array&&expectedDomain.length===32);
+ assert(['line-private-offer/v1',ADDRESS_BOUND_APPROVAL_ABI].includes(expectedApprovalABI));
+ if(expectedApprovalABI===ADDRESS_BOUND_APPROVAL_ABI)assert(isContractAddress(expectedContractAddress),'Pin the deployed contract address.');
  assert(typeof expectedServerFingerprint==='string'&&/^[0-9a-f]{64}$/.test(expectedServerFingerprint),'Pin the owner TLS leaf certificate.');
  assert(Number.isSafeInteger(timeoutMs)&&timeoutMs>0&&timeoutMs<=60_000);
  async function call(path,message){
@@ -77,10 +82,12 @@ export function approvalOwnerClient({url,key,cert,ca,expectedServerFingerprint,e
  let verifiedIdentity;
  const client={
   async identity(){const {identity}=await call('/v1/identity',{version:1});
-   assert(keys(identity,['version','role','approvalABI','domain','publicKey']));assert.equal(identity.version,1);assert.equal(identity.role,expectedRole);
-   assert.equal(identity.approvalABI,'line-private-offer/v1');assert(same(identity.domain,expectedDomain));matches(identity.publicKey);return identity;
+   assert(keys(identity,['version','role','approvalABI','domain','publicKey',...(expectedApprovalABI===ADDRESS_BOUND_APPROVAL_ABI?['contractAddress']:[])]));assert.equal(identity.version,1);assert.equal(identity.role,expectedRole);
+   assert.equal(identity.approvalABI,expectedApprovalABI);assert(same(identity.domain,expectedDomain));matches(identity.publicKey);
+   if(expectedApprovalABI===ADDRESS_BOUND_APPROVAL_ABI)assert.equal(identity.contractAddress,expectedContractAddress,'Approval owner contract address mismatch.');return identity;
   },
   async approve(message){assert(keys(message,['operationId','descriptor']));assert(same(message.descriptor?.domain,expectedDomain),'Approval domain mismatch.');
+   if(expectedApprovalABI===ADDRESS_BOUND_APPROVAL_ABI)assert.equal(message.descriptor?.contractAddress,expectedContractAddress,'Approval contract address mismatch.');
    if(!verifiedIdentity){verifiedIdentity=client.identity().catch(error=>{verifiedIdentity=undefined;throw error;});}await verifiedIdentity;
    const {approval}=await call('/v1/approve',message);
    assert(keys(approval,['rolePublicKey','roleApproval','authorizationNonce','challengeQuotient','challengeRemainder','challengeWords','challengeCarry']));
