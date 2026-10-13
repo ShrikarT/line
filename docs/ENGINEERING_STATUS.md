@@ -1,5 +1,7 @@
 # Engineering status and acceptance evidence
 
+Audit handoff: delivery `d436507` passes [PR CI](https://github.com/ShrikarT/line/actions/runs/38402287307) and [push CI](https://github.com/ShrikarT/line/actions/runs/38402278470). The [closeout](AUDIT_CLOSEOUT_2026-10-13.md) preserves verification scope, the incomplete supplemental security investigation and the decisions/evidence requiring the owner. Remaining product gates are not inferred complete.
+
 ## Complete local native lifecycle — 13 October 2026 (IST)
 
 The [corrected native report](COORDINATOR_NATIVE_TIME_2026-10-13.md) completes **30 contract calls across all twelve circuits**, **100 deliberate exits, 82 controls, four contained active-prover interruptions, four exact proven-byte recoveries and four corrupted-proof rejections**, with 310 counted worker invocations. Thirty-one saved transactions, including synthetic deployment, pass separate Rust verification and continuous synthetic ledger application; publication decodes their actual actions and saved times. Both prior seven-call failures remain preserved. This closes the complete local native lifecycle gap for the current helper/key path, while fee-funded network finality, authentic payments/settlement, independent operators, full-history privacy and fleet operation remain open.
