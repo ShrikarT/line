@@ -24,7 +24,7 @@ export function CheckoutPage() {
   const [session, setSession] = useState<Session | null>(null);
   const [view, setView] = useState<View | null>(null);
   const [receipts, setReceipts] = useState<Receipt[]>([]);
-  const [limit, setLimit] = useState("40");
+  const [limit, setLimit] = useState("60");
   const [reserve, setReserve] = useState("200");
   const [repayment, setRepayment] = useState("25");
   const [document, setDocument] = useState(DEFAULT_DOCUMENT);
@@ -125,18 +125,31 @@ export function CheckoutPage() {
   const durability = view?.durability ?? session?.durability ?? serverDurability;
   return (
     <Shell evaluation>
-      <div className="mb-8 max-w-3xl space-y-3">
-        <p className="text-xs uppercase tracking-wide text-subtle">API procurement evaluation</p>
-        <h1 className="font-display text-3xl tracking-tight md:text-4xl">Give an agent a task. Verify every purchase.</h1>
-        <p className="text-muted">Merchant A analyzes your document. Merchant B estimates processing size. A deterministic agent purchases both through separate capabilities, while the issuer controls credit and repayment acknowledgements.</p>
-        <p className="border-l-2 border-accent pl-3 text-sm text-muted">Generated Compact executes locally. No ZK proofs are submitted, no tokens move, and all roles share one evaluation server. New purchases close after 30 minutes; debt and pending claims remain available for reconciliation. Leaving or reloading this page drops the browser capabilities and retry IDs.</p>
-        <p className="text-sm text-muted" aria-label="Checkout recovery mode">{durability === "encrypted-disk" ? "Server recovery: encrypted checkpoints. A restart can recover this session before expiry with the same source version and storage password. Keep this page open to retain its capabilities and exact retry IDs." : durability === "volatile" ? "Server recovery: volatile memory. Restarting the server loses this evaluation, its credit book and retry journal." : "Server recovery: configuration not yet confirmed."}</p>
+      <div className="mb-8 grid gap-6 lg:grid-cols-[1fr_auto] lg:items-end">
+        <div className="max-w-2xl flex flex-col gap-3">
+          <p className="text-xs font-semibold uppercase tracking-widest text-navy">Interactive purchasing demo</p>
+          <h1 className="font-display text-4xl font-semibold tracking-tight md:text-5xl">One task. Two merchants.<br />Your rules.</h1>
+          <p className="max-w-xl text-muted">Give an agent credit to buy document analysis and a processing estimate. Follow each quote, clearance and delivery as it happens.</p>
+          <div className="flex flex-wrap gap-2 text-xs text-muted"><span className="rounded-full border border-border bg-elevated px-3 py-1">No wallet needed</span><span className="rounded-full border border-border bg-elevated px-3 py-1">Local Compact execution</span><span className="rounded-full border border-border bg-elevated px-3 py-1">Demo units, no token transfers</span></div>
+        </div>
+        <div className="rounded-xl border border-border bg-elevated p-4 text-sm" aria-live="polite">
+          <p className="text-xs uppercase tracking-wide text-muted">Current step</p>
+          <p className="mt-2 font-semibold">{busy ? "Working on your request…" : !issued ? "1. Authorize the credit line" : receipts.length === 0 ? "2. Run the agent’s task" : receipts.every(r => r.outcome === "delivered") ? "3. Both merchants delivered" : "3. Review clearance and recovery"}</p>
+        </div>
       </div>
+      <ol className="mb-6 grid gap-3 sm:grid-cols-3" aria-label="Purchase workflow">
+        {[{label:"Issuer authorizes",complete:issued},{label:"Agent purchases",complete:receipts.length > 0},{label:"Merchants deliver",complete:receipts.length === 2 && receipts.every(r => r.outcome === "delivered")}].map((step,index) => <li key={step.label} className="flex items-center gap-3 rounded-lg border border-border bg-elevated p-4"><span className={step.complete ? "flex size-8 items-center justify-center rounded-full bg-navy text-cream" : "flex size-8 items-center justify-center rounded-full bg-subtle-fill text-muted"}>{step.complete ? "✓" : index + 1}</span><span className="text-sm font-medium">{step.label}</span></li>)}
+      </ol>
+      {!issued && <fieldset className="mb-6 flex flex-wrap gap-3 rounded-xl border border-border bg-elevated p-4" disabled={busy}>
+        <legend className="px-2 text-sm font-semibold">Choose your demo</legend>
+        <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-border px-4 py-3 text-sm"><input type="radio" name="scenario" checked={limit === "60"} onChange={() => setLimit("60")} />Complete both purchases<span className="text-xs text-muted">60 unit line</span></label>
+        <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-border px-4 py-3 text-sm"><input type="radio" name="scenario" checked={limit === "40"} onChange={() => setLimit("40")} />Decline and recovery<span className="text-xs text-muted">40 unit line</span></label>
+      </fieldset>}
       {error && <p role="alert" className="mb-4 rounded-md border border-danger/40 p-3 text-sm text-danger">{error}{attempt && " Retry the same plan to retain its request IDs."}</p>}
       {notice && <p role="status" className="mb-4 rounded-md border border-border p-3 text-sm">{notice}</p>}
       <div className="grid gap-6 lg:grid-cols-2">
-        <Panel kicker="Issuer capability" title="Authorize the facility">
-          <p className="text-sm text-muted">Start with a 40-unit limit: analysis costs 25, processing estimate costs 20. The second purchase should decline until the issuer acknowledges repayment.</p>
+        <Panel kicker="01 / Issuer" title="Set the spending line">
+          <p className="text-sm text-muted">Two services cost 45 units in total. The issuer sets the limit; the agent cannot change it.</p>
           <div className="grid grid-cols-2 gap-3">
             <label className="space-y-2 text-sm">Credit limit<input aria-label="Credit limit" type="number" min="1" max="1000000" value={limit} disabled={busy || issued} onChange={e => setLimit(e.target.value)} className={field} /></label>
             <label className="space-y-2 text-sm">Accounting reserve<input aria-label="Accounting reserve" type="number" min="1" max="1000000" value={reserve} disabled={busy || issued} onChange={e => setReserve(e.target.value)} className={field} /></label>
@@ -160,13 +173,14 @@ export function CheckoutPage() {
             </div>)}
           </div>}
         </Panel>
-        <Panel kicker="Agent capability" title="Buy the services">
+        <Panel kicker="02 / Agent" title="Give the agent a task">
           <label className="block space-y-2 text-sm">Document<textarea aria-label="Document" rows={6} maxLength={8000} value={document} disabled={busy || Boolean(attempt)} onChange={e => setDocument(e.target.value)} className={field} /></label>
-          <p className="text-sm text-muted">Plan: buy document analysis from Merchant A for 25 units, then processing estimate from Merchant B for 20 units. This policy agent uses fixed steps, not an LLM.</p>
+          <div className="grid gap-2 sm:grid-cols-2"><div className="rounded-lg border border-border bg-bg p-3 text-sm"><p className="font-medium">Merchant A</p><p className="text-muted">Document analysis · 25 units</p></div><div className="rounded-lg border border-border bg-bg p-3 text-sm"><p className="font-medium">Merchant B</p><p className="text-muted">Processing estimate · 20 units</p></div></div>
           <Button disabled={busy || !issued || !document.trim()} onClick={run}>{busy ? "Executing…" : attempt ? "Retry the same purchase plan" : lastPlan?.document === document && receipts.some(receipt => receipt.outcome === "declined") ? "Retry declined purchase" : "Run agent purchase plan"}</Button>
           <p className="text-xs text-subtle">The agent endpoint can buy catalog services. Its token cannot fund the reserve, change its limit or acknowledge repayments.</p>
         </Panel>
       </div>
+      {receipts.length === 0 && <div className="mt-6 rounded-xl border border-dashed border-border p-6 text-center"><p className="font-medium">Your service results will appear here</p><p className="mt-2 text-sm text-muted">{issued ? "Run the purchase plan to see both merchants respond." : "Open a credit line above, then run the agent’s task."}</p></div>}
       {receipts.length > 0 && <div className="mt-6 grid gap-6 lg:grid-cols-2" aria-label="Purchase results">
         {receipts.map(receipt => <Panel key={receipt.orderId} kicker={`${receipt.merchant} · ${receipt.amount} evaluation units`} title={receipt.outcome === "delivered" ? "Service delivered" : receipt.outcome === "compensated" ? "Expired claim compensated" : receipt.outcome === "expired" ? "Quote expired" : receipt.outcome === "pending" ? "Purchase pending" : "Purchase declined"}>
           {receipt.message && <p className="text-danger">{receipt.message}</p>}
@@ -176,6 +190,7 @@ export function CheckoutPage() {
           <p className="text-xs text-subtle">Payout: not connected. Claim redemption is an accounting transition.</p>
         </Panel>)}
       </div>}
+      <details className="mt-6 rounded-xl border border-border bg-elevated p-4"><summary className="cursor-pointer text-sm font-medium">Demo scope and recovery</summary><div className="mt-4 flex flex-col gap-3 text-sm text-muted"><p>This policy agent uses fixed steps. Generated Compact executes locally; no ZK proof is submitted and no tokens move. All roles share one evaluation server. New purchases close after 30 minutes; debt and pending claims remain available for reconciliation.</p><p>Keep this page open. Leaving or reloading drops browser capabilities and retry IDs.</p><p aria-label="Checkout recovery mode">{durability === "encrypted-disk" ? "Server recovery: encrypted checkpoints. A restart can recover this session before expiry with the same source version and storage password." : durability === "volatile" ? "Server recovery: volatile memory. Restarting the server loses this evaluation, its credit book and retry journal." : "Server recovery: configuration not yet confirmed."}</p></div></details>
       {view && <div className="mt-6"><Panel kicker="Public ledger view" title="What an observer can see">
         <dl className="grid grid-cols-2 gap-3 text-sm md:grid-cols-4">
           <div><dt className="text-subtle">Total reserve</dt><dd>{view.totalReserve}</dd></div><div><dt className="text-subtle">Encumbered</dt><dd>{view.encumberedReserve}</dd></div><div><dt className="text-subtle">Claims redeemed</dt><dd>{view.redeemedReserve}</dd></div><div><dt className="text-subtle">Services delivered</dt><dd>{view.deliveries}</dd></div>
