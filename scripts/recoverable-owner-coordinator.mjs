@@ -25,7 +25,7 @@ const SOURCE='contracts/experimental/line-private-offer.compact',sha=b=>createHa
 export async function runRecoverableOwnerCoordinator({compiledDir,localProof,repeatSupplier=false,governance=false,lifecycle=false,compensation=false,onInitialized=async()=>{},onBeforeConfirm=async()=>{},onComplete=async()=>{}}={}){
 assert(!governance||!repeatSupplier&&!localProof,'Governance has a separate generated-only fixture.');
 assert(!lifecycle||!repeatSupplier&&!localProof&&!governance,'Lifecycle has a separate generated-only fixture.');
-assert(!compensation||!repeatSupplier&&!localProof&&!governance&&!lifecycle,'Compensation has a separate generated-only fixture.');
+assert(!compensation||!repeatSupplier&&!governance&&!lifecycle,'Compensation has a separate fixture.');
 mkdirSync('.compact-keys',{recursive:true});const work=mkdtempSync(resolve('.compact-keys/recoverable-owner-coordinator-')),managedDir=compiledDir?resolve(compiledDir):join(work,'managed');
 const portable=p=>relative(process.cwd(),p).split(sep).join('/');
 if(!compiledDir)
@@ -179,7 +179,7 @@ try{
  }
  const expectedCalls=compensation?30:lifecycle?23:governance?15:repeatSupplier?13:10,expectedRecovery=compensation?23:lifecycle?14:governance?7:repeatSupplier?3:2;
  const status=await command('status',{});assert.equal(status.value.authorizationOperation,null);assert.equal(status.value.pendingOperation,null);assert.equal(status.value.completedOperations.length,expectedCalls);
- assert.equal(traces.length,expectedCalls);assert.equal(controls.length,expectedRecovery*3+(compensation?5:0));assert.equal(crashes.length,expectedRecovery*(localProof?6:4));
+ assert.equal(traces.length,expectedCalls);assert.equal(controls.length,expectedRecovery*3+(compensation?5:0));assert.equal(crashes.length,expectedRecovery*4+(localProof?traces.filter(t=>t.circuit==='draw').length*2:0));
  if(compensation){
   for(const request of [comp('issuer','merchantA',0,0n)(),comp('agent','merchantA',0,1n)(),comp('issuer','merchantA',0,2n,bytes())(),
    comp('issuer','merchantB',3,0n)(),comp('issuer','merchantB',0,0n)(),
@@ -229,7 +229,7 @@ try{
    explicitSelectorsVerifiedByCompact:true,spentAndForeignSelectorsRejectedBeforeAuthorization:true,fullHistoryPrivacyPassed:false};
  }
  for(const [p,h]of Object.entries(fingerprints))assert.equal(sha(readFileSync(p)),h);assert.equal(sha(readFileSync(SOURCE)),sourceHash);
- const report={schema:compensation?'line-recoverable-owner-coordinator/compensation/v1':lifecycle?'line-recoverable-owner-coordinator/lifecycle/v1':governance?'line-recoverable-owner-coordinator/governance/v1':repeatSupplier?(localProof?'line-recoverable-owner-coordinator/repeat-supplier-native-fixture/v1':'line-recoverable-owner-coordinator/repeat-supplier/v1'):localProof?'line-recoverable-owner-coordinator/native-fixture/v1':'line-recoverable-owner-coordinator/v1',createdAt:new Date().toISOString(),sourceSha256:sourceHash,scriptFingerprints:fingerprints,...(retainedClaims?{retainedClaims}:{}),
+ const report={schema:compensation?(localProof?'line-recoverable-owner-coordinator/compensation-native-fixture/v1':'line-recoverable-owner-coordinator/compensation/v1'):lifecycle?'line-recoverable-owner-coordinator/lifecycle/v1':governance?'line-recoverable-owner-coordinator/governance/v1':repeatSupplier?(localProof?'line-recoverable-owner-coordinator/repeat-supplier-native-fixture/v1':'line-recoverable-owner-coordinator/repeat-supplier/v1'):localProof?'line-recoverable-owner-coordinator/native-fixture/v1':'line-recoverable-owner-coordinator/v1',createdAt:new Date().toISOString(),sourceSha256:sourceHash,scriptFingerprints:fingerprints,...(retainedClaims?{retainedClaims}:{}),
   artifacts:Object.fromEntries(['contract/index.js','compiler/contract-info.json'].map(p=>[p,sha(readFileSync(join(managedDir,p)))])),freshCompilation:!compiledDir,
   traces,controls,crashes:crashes.map(({workerPid,...metadata})=>metadata),coordinatorProcessInvocations:processes.length+crashes.length,wholeExecutionWorkerReconstructed:true,coordinatorWitnessesReturnedToHarness:false,
   owners:4,merchants:2,nonzeroBasisPointPolicyExercised:true,financialCheckpointDurable:true,authorizationIntentPersistedBeforeOwnerRPC:true,preparedCandidatePersistedBeforeResponse:true,preparedPacketReloadedWithoutFreshApproval:true,

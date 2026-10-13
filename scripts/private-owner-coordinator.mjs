@@ -124,7 +124,7 @@ async function worker(config,action,payload){
   journal=await PrivateFinanceJournal.open({directory:config.directory,password:config.password,scope:config.scope});
   const snapshot=journal.snapshot();
   if(action==='advanceSyntheticTime'){
-   assert(config.allowSyntheticTimeAdvance===true&&config.scope.networkId==='synthetic-preview'&&!config.localProof);
+   assert(config.allowSyntheticTimeAdvance===true&&config.scope.networkId==='synthetic-preview');
    assert.deepEqual(Object.keys(payload).sort(),['from','to'].sort());const unixSeconds=await journal.advanceSyntheticTime(payload.from,payload.to);
    return {unixSeconds,syntheticTime:true,networkFinalityVerified:false};
   }

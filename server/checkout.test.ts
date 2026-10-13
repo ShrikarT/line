@@ -18,12 +18,18 @@ describe("generated Compact product checkout", () => {
     const access = engine as unknown as { transition(ps: PrivateState, op: CircuitCall): Promise<unknown> }, transition = access.transition.bind(engine);
     access.transition = async (ps, op) => { if (op.name === "redeemDraw") throw new CheckoutError(503, "Merchant unavailable"); return transition(ps, op); };
     await assert.rejects(engine.purchase("text-analysis", "bound refund receipt", "bound-refund-order"), /Merchant unavailable/);
-    const incoming = "bound-incoming-receipt";
+    const domain = Buffer.from(engine.publicView().domain, "hex");
+    let incoming = "";
+    let incomingNullifier: Uint8Array = new Uint8Array(32);
+    for (let attempt = 0; attempt < 65536; attempt++) {
+      incoming = `bound-incoming-receipt-${attempt}`;
+      incomingNullifier = paymentNullifier(saved.issuerKey, canonicalPaymentReferenceBytes(incoming), domain);
+      if (incomingNullifier[31] === 0) break;
+    }
+    assert.equal(incomingNullifier[31], 0, "Exercise normalized replacement-cell bytes");
     await engine.acknowledge(10, incoming); now += 600;
     assert.equal((await engine.purchase("text-analysis", "bound refund receipt", "bound-refund-order")).outcome, "compensated");
     const allocated = copy(saved), D = allocated.orders[0][1].D as Uint8Array;
-    const domain = Buffer.from(engine.publicView().domain, "hex");
-    const incomingNullifier = paymentNullifier(saved.issuerKey, canonicalPaymentReferenceBytes(incoming), domain);
     // Exercise normalized ledger keys deterministically: raw Cells trim trailing
     // zero bytes even though the Compact key type is Bytes<32>.
     let outgoing = "";
@@ -56,7 +62,7 @@ describe("generated Compact product checkout", () => {
     const forgeNoteReceipt = (snapshot: any, receipt: Uint8Array) => editMapEntry(snapshot, D, value => {
       const cell = value.asCell();
       assert.equal(cell.value.length, 11, "NoteMeta layout must match generated Compact schema");
-      return RT.StateValue.newCell({ ...cell, value: cell.value.map((part, index) => index === 10 ? (receipt.every(byte => byte === 0) ? new Uint8Array(0) : receipt) : part) });
+      return RT.StateValue.newCell({ ...cell, value: cell.value.map((part, index) => index === 10 ? BYTES32.toValue(receipt)[0] : part) });
     });
     assert.equal(CheckoutEvaluation.recover(allocated, storage, { clock: () => now }).issuerView().refunds[0].reported, false);
     const premature = copy(allocated); forgeNoteReceipt(premature, incomingNullifier);
