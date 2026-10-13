@@ -8,6 +8,8 @@ The private-offer Compact source exports exactly twelve names. Its completed ori
 
 The original review found six dispatch names in `scripts/private-owner-coordinator.mjs`. The [subsequent governance implementation](COORDINATOR_GOVERNANCE_2026-10-13.md) now dispatches ten and verifies fifteen generated calls with 28 exits and 27 controls. Original ten-call and thirteen-call repeated-supplier/native scopes still cover their historical six names. New governance has no native/network proof claim. Repayment, compensation and reopening remain unintegrated.
 
+The [later repayment/reopening implementation](COORDINATOR_REPAYMENT_REOPENING_2026-10-13.md) extends current dispatch to **eleven names**, verifying 23 generated calls, 56 exits and 49 controls. Exact synthetic owner-record matching, closure/reopening with new terms, old-generation redemption and cross-generation spent-reference denial pass. The initial wrong-order preflight failure is retained and the corrected scope is published separately. Compensation remains the missing name; native/network/real-payment evidence, denied-intent resolution and historical missing-packet migration remain separate gaps. Earlier paragraphs identify their earlier inspection scopes.
+
 | Circuit | Required authority | Current coordinator | Supplied owner policy | Missing integrated evidence |
 |---|---|---|---|---|
 | `registerMerchant` | Issuer | Supported | Selected merchant identifiers | Independently administered onboarding and finalized registration |
@@ -15,13 +17,13 @@ The original review found six dispatch names in `scripts/private-owner-coordinat
 | `fundReserve` | Issuer | Supported | Bounded amount | Authenticated deposit receipt, denomination and actual asset backing |
 | `withdrawUnencumberedReserve` | Issuer | Generated recovery supported | Separately opted-in amount/budget bounds | Native/network proof and real payout receipt; saved exact amount/commitment and all six lock classes covered locally |
 | `withdrawFees` | Issuer | Generated recovery supported | Separately opted-in fee/budget bounds | Native/network proof and real payout receipt; saved exact earned fees/commitment and recovery covered locally |
-| `openLine` | Agent consent then issuer acceptance | Supported for first generation | Issuer example denies previous-book enrollment; agent policy has a reopening predicate | Closed predecessor selection, generation/nullifier continuity, old claims, durable reopen and new terms |
+| `openLine` | Agent consent then issuer acceptance | Generated first/reopened enrollment recovery supported | Explicit lifecycle terms catalog and own closed predecessor; original issuer policy still denies reopening | Native/network proof, real terms/asset integration and migration of missing old enrollment packets; generation-two new terms and old-claim redemption covered locally |
 | `postQuote` | Supplier | Supported | Fixed binding or separately opted-in per-offer mode | Independent supplier service/customer scope, concurrency and complete observer history |
 | `draw` | Agent | Supported | Own book, merchant, amount/fee/time and cumulative budget | Actual wallet/proving/finality flow, parallel stale-path recovery and observer outcomes |
 | `redeemDraw` | Supplier | Supported, including archived selection | Own authenticated supplier, price/time limits | Authentic delivery/payment and expiry/uncertain network recovery |
 | `cancelOrExpireNote` | Authenticated expiry; authorized borrower/issuer allocation; issuer refund acknowledgment | Not dispatched | Example policies deny; signer distinguishes action modes | Original note/book/refund openings, all three modes, durable expiry/credit/cash/zero-obligation acknowledgment and replay controls |
-| `acknowledgeRepayment` | Issuer | Not dispatched | Example denies | Exact privately retained amount/reference/nonce, owner-authenticated receipt, debt rotation, duplicate payment handling and recovery |
-| `setStatus` | Issuer | Generated default/resume recovery supported | Separately opted-in statuses and own-book constraints | Integrated successful zero-debt closure/reopen plus native/network evidence; debt-bearing closure rejects before intent |
+| `acknowledgeRepayment` | Issuer | Generated recovery supported | Separate owner-record reference/amount/domain/facility/denomination matches; original policies deny | Actual receipt admission/settlement, denied-intent resolution and native/network evidence; debt rotation, persisted nonce and duplicate reference controls pass locally |
+| `setStatus` | Issuer | Generated default/resume/zero-debt closure recovery supported | Separately opted-in statuses and own-book constraints | Native/network lifecycle proof and independently operated owners; debt-bearing closure denies, zero-debt closure/reopen covered locally |
 
 Contract references: `contracts/experimental/line-private-offer.compact:294` through `:535`. Signer tuple/role/value definitions: `scripts/durable-approval-signer.mjs:23` through `:39`, with compensation-mode restrictions at `:103` and `:119`. Policies: `scripts/approval-owner-example-policy.mjs`, `scripts/approval-owner-per-offer-policy.mjs` and `scripts/durable-approval-actor.mjs`.
 
@@ -40,6 +42,6 @@ These requirements preserve the full credit/checkout destination. They do not au
 
 ## Hackathon implication
 
-Line can demonstrate substantial local engineering: exact accounting, real proof verification, role-separated approval interfaces, fresh opaque offers and recovered older claims. The reported canonical flow executes eight names; new generated governance covers ten; historical native coordinator recovery covers six; the original private-offer native fixture covers twelve. These are distinct scopes.
+Line can demonstrate substantial local engineering: exact accounting, real proof verification, role-separated approval interfaces, fresh opaque offers and recovered older claims. Reported canonical flow covers eight names; new generated lifecycle covers eleven; governance covers ten; historical native coordinator recovery covers six; original private-offer native fixtures cover twelve. These are distinct scopes.
 
 For the submission, provide one evidence matrix and show the exact lane being demonstrated. Keep private revolving credit and full settlement as the destination, but do not call the newer coordinator a complete credit lifecycle or imply that a local native proof paid a supplier. Freeze the deck/video/source package while prioritizing the missing lifecycle integration and external receipt/settlement/customer evidence. The compiling-contract event requirement and the project's full privacy release gate remain separate.

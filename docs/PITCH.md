@@ -1,5 +1,7 @@
 # Line pitch and demonstration evidence
 
+Current continuation: [repayment/reopening recovery](COORDINATOR_REPAYMENT_REOPENING_2026-10-13.md) verifies 23 generated calls across eleven names, 56 deliberate exits and 49 controls, including changed terms and old-generation redemption. Receipt records and time are synthetic. Compensation and native/network proof of this new path remain open; the older scopes below are historical, not relabeled as the current implementation.
+
 Latest continuation: [recoverable governance](COORDINATOR_GOVERNANCE_2026-10-13.md) adds fifteen generated calls across ten names with twenty-eight deliberate exits and twenty-seven controls. Historical archived-claim native evidence below retains its six-name scope. Integrated repayment, compensation, reopening and native/network proof of this governance path remain open.
 
 Current submission reference: [13 October consolidated audit](AUDIT_REPORT_2026-10-13.md). The [private-offer source](PRIVATE_OFFER_2026-10-11.md) verifies 65 local contract calls across all twelve names. The newer [archived-claim coordinator](CLAIM_ARCHIVE_2026-10-13.md) has 13 generated calls and separate continuous native artifact revalidation across six names, preserving its original reporting-count failure. Fresh per-offer bindings, owner interfaces and recovery are substantial Wave 2 progress. These scopes are not the deployed canonical contract, independent institutional custody, full-history privacy, complete all-twelve runtime or authentic settlement.
