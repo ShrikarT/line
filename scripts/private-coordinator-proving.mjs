@@ -66,12 +66,13 @@ export async function proveRestoredCoordinator({config,scope,directory,password,
  stage='cache-open';store=await EncryptedCheckoutStore.openBound(coordinatorProofDirectory(directory,pending.operationId),password,binding);
  stage='public-predecessor';
   const rows=await store.loadAll();assert(rows.length<=1);const seconds=pending.before.financial.unixSeconds;
+  assert(Number.isSafeInteger(seconds)&&seconds>=0&&Number.isFinite(new Date((seconds+3600)*1000).getTime()),'Invalid saved execution time.');
   const local=L.LedgerState.deserialize(publicLedgerState),current=local.index(scope.contractAddress);
   assert(current);assert.deepEqual(current.data.state.encode(),RT.ContractState.deserialize(pending.before.publicState).data.state.encode());
   const zk=new NodeZkConfigProvider(dir);assert.deepEqual(new Uint8Array(current.operation(pending.circuit).verifierKey),new Uint8Array(await zk.getVerifierKey(pending.circuit)));
   let record;
   if(rows.length){
-   record=rows[0];assert.equal(record.schema,'line-private-coordinator-proof/v1');assert.equal(record.operationFingerprint,pending.fingerprint);assert.equal(record.predecessorSha256,predecessorHash);
+   record=rows[0];assert.equal(record.schema,'line-private-coordinator-proof/v1');assert.equal(record.operationFingerprint,pending.fingerprint);assert.equal(record.predecessorSha256,predecessorHash);assert.equal(record.seconds,seconds,'Cached execution time differs.');
    assert.equal(sha(record.transaction),record.transactionSha256);
    const proven=L.Transaction.deserialize('signature','proof','binding',record.transaction),next=verifiedApply(config,local,proven,seconds,'restored-'+pending.operationId.replaceAll(':','-'));
    assert.deepEqual(next.serialize(),record.publicLedgerState);assert.deepEqual(next.index(scope.contractAddress).data.state.encode(),RT.ContractState.deserialize(pending.candidate.publicState).data.state.encode());

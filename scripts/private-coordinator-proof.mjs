@@ -13,8 +13,10 @@ const sha=b=>createHash('sha256').update(b).digest('hex'),json=p=>JSON.parse(rea
 const [keyDir,freshDir]=process.argv.slice(2);assert(keyDir&&freshDir,'Provide full keys and fresh generated coordinator bindings.');
 const dir=resolve(keyDir),checkedDir=resolve(freshDir),checkedPath=join(dirname(checkedDir),'evidence.json'),checked=json(checkedPath),sourceHash=sha(readFileSync(SOURCE));
 const repeatSupplier=checked.schema==='line-recoverable-owner-coordinator/repeat-supplier/v1';
-assert([ 'line-recoverable-owner-coordinator/v1','line-recoverable-owner-coordinator/repeat-supplier/v1'].includes(checked.schema));
-assert.equal(checked.freshCompilation,true);assert.equal(checked.traces.length,repeatSupplier?13:10);assert.equal(checked.controls.length,repeatSupplier?12:6);assert.equal(checked.crashes.length,repeatSupplier?12:8);assert.equal(checked.sourceSha256,sourceHash);
+const compensation=checked.schema==='line-recoverable-owner-coordinator/compensation/v1',expectedCalls=compensation?30:repeatSupplier?13:10,expectedDraws=compensation?4:repeatSupplier?3:2;
+assert([ 'line-recoverable-owner-coordinator/v1','line-recoverable-owner-coordinator/repeat-supplier/v1','line-recoverable-owner-coordinator/compensation/v1'].includes(checked.schema));
+assert.equal(checked.freshCompilation,true);assert.equal(checked.traces.length,expectedCalls);assert.equal(checked.controls.length,compensation?82:repeatSupplier?12:6);assert.equal(checked.crashes.length,compensation?92:repeatSupplier?12:8);assert.equal(checked.sourceSha256,sourceHash);
+if(compensation)assert.equal(new Set(checked.traces.map(t=>t.circuit)).size,12);
 if(repeatSupplier)assert.equal(checked.retainedClaims.olderNoteRedeemedAfterNewerDraw,true);
 for(const [p,h]of Object.entries(checked.scriptFingerprints))assert.equal(sha(readFileSync(p)),h,'Fresh coordinator helper changed.');
 for(const [p,h]of Object.entries(checked.artifacts)){assert.equal(sha(readFileSync(join(checkedDir,p))),h);assert.equal(sha(readFileSync(join(dir,p))),h);}
@@ -32,12 +34,12 @@ const scriptFingerprints=Object.fromEntries(helpers.map(p=>[p,sha(readFileSync(p
 const localProof={managedDir:dir,keyManifestSha256:sha(readFileSync(manifestPath)),verifier,checker,prover,guardian,nativeExecutables:executables,
  parameterCache:process.argv[4]?resolve(process.argv[4]):join(work,'public-parameters'),publicArtifactsDirectory:join(work,'worker-public-artifacts')};
 const traces=[],negativeChecks=[],cacheControls=[];let local=L.LedgerState.blank('preview'),stage='initialization',complete=false,fixture,failure,scope,containmentMode=null;
-const report=()=>({schema:repeatSupplier?'line-private-coordinator-native-proof/repeat-supplier/v1':'line-private-coordinator-native-proof/v2',createdAt:new Date().toISOString(),complete,sourceSha256:sourceHash,artifacts,scriptFingerprints,nativeExecutables:executables,...(repeatSupplier?{retainedClaims:checked.retainedClaims}:{}),
- keyManifestSha256:localProof.keyManifestSha256,generatedPrerequisiteSha256:sha(readFileSync(checkedPath)),...(repeatSupplier?{generatedPrerequisiteWorkerInvocations:checked.coordinatorProcessInvocations}:{}),traces,negativeChecks,cacheControls,
+const report=()=>({schema:compensation?'line-private-coordinator-native-proof/compensation/v1':repeatSupplier?'line-private-coordinator-native-proof/repeat-supplier/v1':'line-private-coordinator-native-proof/v2',createdAt:new Date().toISOString(),complete,sourceSha256:sourceHash,artifacts,scriptFingerprints,nativeExecutables:executables,...(repeatSupplier?{retainedClaims:checked.retainedClaims}:{}),
+ keyManifestSha256:localProof.keyManifestSha256,generatedPrerequisiteSha256:sha(readFileSync(checkedPath)),...(repeatSupplier||compensation?{generatedPrerequisiteWorkerInvocations:checked.coordinatorProcessInvocations}:{}),traces,negativeChecks,cacheControls,
  owners:4,merchants:2,financialCheckpointDurable:true,completeExecutionWorkerRestart:true,coordinatorWitnessesReturnedToHarness:false,proofWorkerContainmentRequired:true,containmentMode,
  abruptExits:fixture?.crashes??[],generatedRecoveryControls:fixture?.controls??[],coordinatorProcessInvocations:fixture?.coordinatorProcessInvocations??null,
- syntheticLedger:true,syntheticTime:true,feeBalancingEnabled:false,networkSubmitted:false,authenticAssetSettlement:false,independentAdministrativeCustody:false,fullHistoryPrivacyPassed:false,allTwelveCircuitsCoveredByThisReport:false,
- ...(failure?{failure}:{}),evidenceScope:repeatSupplier?'Thirteen restored calls include two unsettled Merchant A quotes/draws, older quote selection and older note redemption after a newer draw, plus Merchant B separation. Native proving runs inside the financial worker with separate Rust verification before synthetic state advances. Same-host synthetic custody and caller-trusted confirmation; no network, assets, compensation or full-history privacy claim.':'This lane targets ten restored worker calls, four mTLS owners and two merchants, with native proving inside the financial worker and separate Rust verification before synthetic state advances. Actual coverage is established only by traces and the complete flag. Same-host synthetic custody and caller-trusted confirmation; no network finality, assets or full-history privacy claim.'});
+ syntheticLedger:true,syntheticTime:true,feeBalancingEnabled:false,networkSubmitted:false,authenticAssetSettlement:false,independentAdministrativeCustody:false,fullHistoryPrivacyPassed:false,allTwelveCircuitsCoveredByThisReport:complete&&compensation&&new Set(traces.slice(1).map(t=>t.circuit)).size===12,
+ ...(failure?{failure}:{}),evidenceScope:compensation?'Targets thirty restored calls across all twelve names and three compensation modes, both allocation roles, partial/full/zero obligations and saved refund openings after later draws. Each transaction uses its saved synthetic execution time and separate Rust verification before strict synthetic ledger replay. Actual completion is established by traces/complete only; no fee balancing, finalized network, actual receipt/payout, independent administration or full-history privacy claim.':repeatSupplier?'Thirteen restored calls include two unsettled Merchant A quotes/draws, older quote selection and older note redemption after a newer draw, plus Merchant B separation. Native proving runs inside the financial worker with separate Rust verification before synthetic state advances. Same-host synthetic custody and caller-trusted confirmation; no network, assets, compensation or full-history privacy claim.':'This lane targets ten restored worker calls, four mTLS owners and two merchants, with native proving inside the financial worker and separate Rust verification before synthetic state advances. Actual coverage is established only by traces and the complete flag. Same-host synthetic custody and caller-trusted confirmation; no network finality, assets or full-history privacy claim.'});
 const checkpoint=()=>writeFileSync(join(work,'verification.json'),JSON.stringify(report(),null,2)+'\n');
 function verify(tx,name,seconds){
  const statePath=join(work,`${traces.length}-${name}.public-state.bin`),txPath=join(work,`${traces.length}-${name}.proven-public-tx.bin`);
@@ -49,11 +51,11 @@ function apply(tx,name,actor,seconds,expectedLedger){
  const strict=new L.WellFormedStrictness();strict.enforceBalancing=false;strict.verifyNativeProofs=true;strict.verifyContractProofs=true;strict.enforceLimits=true;strict.verifySignatures=true;
  const t=BigInt(seconds),formed=tx.wellFormed(local,strict,new Date(seconds*1000)),[next,outcome]=local.apply(formed,new L.TransactionContext(local,{secondsSinceEpoch:t,secondsSinceEpochErr:0,parentBlockHash:'0'.repeat(64),lastBlockTime:t-1n}));
  assert.equal(outcome.type,'success');assert.deepEqual(next.serialize(),expectedLedger);local=next;
- traces.push({circuit:name,actor,proofVerifiedInSeparateRustProcess:true,transactionSha256:sha(tx.serialize()),bytes:tx.serialize().length});checkpoint();
+ traces.push({circuit:name,actor,seconds,proofVerifiedInSeparateRustProcess:true,transactionSha256:sha(tx.serialize()),bytes:tx.serialize().length});checkpoint();
  console.log(JSON.stringify({circuit:name,acceptedContractProofs:traces.length-1,restoredWorkerNativeVerificationPassed:true}));
 }
 try{
- checkpoint();await runRecoverableOwnerCoordinator({compiledDir:dir,localProof,repeatSupplier,
+ checkpoint();await runRecoverableOwnerCoordinator({compiledDir:dir,localProof,repeatSupplier,compensation,
   async onInitialized({scope:actual,proofGenesis,now}){
    scope=actual;assert.equal(proofGenesis.address,scope.contractAddress);const tx=L.Transaction.deserialize('signature','proof','binding',proofGenesis.transaction);
    apply(tx,'syntheticDeployment','fixture',now,proofGenesis.publicLedgerState);
@@ -80,10 +82,12 @@ try{
     assert.equal(bad.status,1);assert.match(bad.stderr+bad.stdout,/NATIVE_WELL_FORMED_REJECTED:.*proof/i);negativeChecks.push({circuit:'draw',decodableProofCorruption:true,rejectedByNativeCryptographicVerifier:true});
    }
    apply(tx,request.circuit,request.actor,p.seconds,p.publicLedgerState);traces.at(-1).provingDurationMs=p.provingDurationMs;traces.at(-1).preparedFingerprint=p.fingerprint;
+   if(request.circuit==='cancelOrExpireNote')traces.at(-1).compensationMode=Number(request.mode);
    traces.at(-1).nativeChecks=p.checks;assert.deepEqual(local.index(scope.contractAddress).data.state.encode(),RT.ContractState.deserialize(prepared.publicState).data.state.encode());checkpoint();
   },async onComplete(r){fixture=r;}
  });
- assert.equal(traces.length,repeatSupplier?14:11);assert.equal(negativeChecks.length,repeatSupplier?3:2);assert.equal(cacheControls.length,repeatSupplier?3:2);assert.equal(fixture.crashes.length,repeatSupplier?18:12);assert.equal(fixture.controls.length,repeatSupplier?12:6);
+ assert.equal(traces.length,expectedCalls+1);assert.equal(negativeChecks.length,expectedDraws);assert.equal(cacheControls.length,expectedDraws);assert.equal(fixture.crashes.length,compensation?100:repeatSupplier?18:12);assert.equal(fixture.controls.length,compensation?82:repeatSupplier?12:6);
+ if(compensation){assert.equal(new Set(traces.slice(1).map(t=>t.circuit)).size,12);assert.deepEqual(traces.filter(t=>t.circuit==='cancelOrExpireNote').map(t=>t.compensationMode),[0,1,2,1,2,1,2]);assert(traces.every((t,i)=>i===0||t.seconds>=traces[i-1].seconds));}
  // One successful prove per call; each draw adds two deliberate proving exits
  // and one extra successful exact-byte retry. Rejected controls are uncounted.
  assert.equal(fixture.coordinatorProcessInvocations,checked.coordinatorProcessInvocations+checked.traces.length+cacheControls.length*3);
