@@ -1,6 +1,12 @@
 # Engineering status and acceptance evidence
 
-## Current verified snapshot — 13 October 2026 (IST)
+## Complete local native lifecycle — 13 October 2026 (IST)
+
+The [corrected native report](COORDINATOR_NATIVE_TIME_2026-10-13.md) completes **30 contract calls across all twelve circuits**, **100 deliberate exits, 82 controls, four contained active-prover interruptions, four exact proven-byte recoveries and four corrupted-proof rejections**, with 310 counted worker invocations. Thirty-one saved transactions, including synthetic deployment, pass separate Rust verification and continuous synthetic ledger application; publication decodes their actual actions and saved times. Both prior seven-call failures remain preserved. This closes the complete local native lifecycle gap for the current helper/key path, while fee-funded network finality, authentic payments/settlement, independent operators, full-history privacy and fleet operation remain open.
+
+Final local regression passes **546 tests / 60 suites**, compile/zero drift, build and scans. Correction `de2ecfb` and evidence `37326b3` both pass push/PR CI. The deck now reflects completed local native execution. Its approved [narrated review](../artifacts/wave2/line-review-video/README.md) is rendered locally at 204.7 seconds, 1080p/30 fps with H.264/AAC. Full decode, audio-signal checks and all eight rendered midpoint inspections pass. Nine composition-structure lint warnings remain documented; runtime/layout/motion errors are zero and 54 contrast checks pass AA. This is an evidence presentation, not live application footage. No publication or entrant submission is claimed.
+
+## Earlier expiry-correction snapshot — 13 October 2026 (IST)
 
 `94b2a98` passes both push and PR CI. Correction `de2ecfb` passes **546 tests / 60 suites**, build/typecheck, canonical compile, zero drift across 16 managed artifacts and secret-pattern scanning. Its final fresh generated lifecycle completes 30 calls, 92 deliberate exits and 82 controls; the published helper-bound report is refreshed. Two new integrated native attempts each stopped after seven separately verified calls and remain incomplete. Diagnostics identify a fixture expiry mismatch: native quotes last 2,700 seconds, but expiry was attempted after 901 seconds. The corrected fixture shares the worker lifetime and scales the bilateral initial term, reopened term, receipts and policy horizons. The corrected native attempt and new CI are running. [Failure and diagnostic scope](COORDINATOR_NATIVE_TIME_2026-10-13.md).
 

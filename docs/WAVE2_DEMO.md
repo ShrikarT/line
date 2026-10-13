@@ -1,5 +1,9 @@
 # Line Wave 2 demonstration
 
+Current verified scope, 13 October: the [corrected integrated native lifecycle](COORDINATOR_NATIVE_TIME_2026-10-13.md) completes **30 calls across all twelve circuits, 100 deliberate exits, 82 controls and four proof corruption/interruption checks**, through four owners and two suppliers. The generated lane completes 30 calls/92 exits/82 controls. This closes the local integrated lifecycle gap; it does not establish fee-funded network finality, authentic asset settlement, independent administration, full-history privacy or fleet operation. The [deck](../artifacts/wave2/line-wave2.html) is rendered and the approved [narrated review](../artifacts/wave2/line-review-video/README.md) is rendered and verified locally at 204.7 seconds, 1080p/30 fps with narration. It explains evidence; no live application recording, published video or submitted entry is claimed.
+
+Earlier experiment/checkpoint descriptions below retain their historical source/helper scopes.
+
 Latest evidence: [enrollment](PRIVATE_ENROLLMENT_2026-10-11.md) verifies 52 local contract calls across all twelve names; [durable agent integration](DURABLE_ACTOR_2026-10-11.md) verifies six calls through two process restarts. These distinct synthetic runs are not the deployed canonical contract, independent institutional custody, complete financial recovery, full-history privacy or asset settlement.
 
 Updated: 11 October 2026. This guide separates the executable local checkout, reported canonical Preprod deployment, source-bound proof experiments and required production acceptance. Product requirements remain in [PRODUCT_DIRECTION.md](PRODUCT_DIRECTION.md).

@@ -1,0 +1,68 @@
+{
+  "complete": true,
+  "artifact": "../line-review.mp4",
+  "bytes": 9863848,
+  "sha256": "e00f768103fb34ccd077bc395f4c40cf1ced2a21ff57e7f8911867a3c972c25b",
+  "compositionDurationSeconds": 204.674,
+  "durationSeconds": 204.7,
+  "video": {
+    "codec": "h264",
+    "width": 1920,
+    "height": 1080,
+    "frameRate": "30/1",
+    "frames": "6141"
+  },
+  "audio": {
+    "codec": "aac",
+    "sampleRate": "48000",
+    "channels": 2,
+    "meanVolumeDb": -25.4,
+    "maxVolumeDb": -1.5
+  },
+  "fullDecodePass": true,
+  "sceneSamples": [
+    {
+      "scene": "scene-1",
+      "seconds": 12.085
+    },
+    {
+      "scene": "scene-2",
+      "seconds": 36.576
+    },
+    {
+      "scene": "scene-3",
+      "seconds": 60.492
+    },
+    {
+      "scene": "scene-4",
+      "seconds": 84.919
+    },
+    {
+      "scene": "scene-5",
+      "seconds": 111.692
+    },
+    {
+      "scene": "scene-6",
+      "seconds": 141.004
+    },
+    {
+      "scene": "scene-7",
+      "seconds": 168.93
+    },
+    {
+      "scene": "scene-8",
+      "seconds": 193.036
+    }
+  ],
+  "visualInspection": "passed: all eight rendered scene midpoints inspected; readable content and no visible clipping, overlap or blank scene",
+  "scope": "Narrated evidence review with local synthetic voice; not live application footage, a network execution, payment, publication or submission.",
+  "render": {
+    "cli": "0.8.152",
+    "workers": 1,
+    "quality": "delivery",
+    "capture": "screenshot",
+    "gpu": "hardware",
+    "elapsedSeconds": 341.8,
+    "audioLoweredDb": 0.9
+  }
+}
