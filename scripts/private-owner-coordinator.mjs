@@ -135,11 +135,13 @@ async function worker(config,action,payload){
   if(action==='prepare'){
    assert(!pending,'Unresolved operation blocks preparation.');
    const {operationId,actor,circuit}=payload,before=snapshot.confirmed,f=before.financial,v=ledger(RT.ContractState.deserialize(before.publicState).data),domain=f.book.domain;
+   assert(typeof operationId==='string'&&/^[a-zA-Z0-9][a-zA-Z0-9:._-]{0,127}$/.test(operationId),'Operation ID must match the approval owner namespace.');
    const allowedKeys=['operationId','actor','circuit',...(['fundReserve','withdrawUnencumberedReserve','postQuote','acknowledgeRepayment'].includes(circuit)?['amount']:[]),...(['registerMerchant','disableMerchant','draw'].includes(circuit)?['merchant']:[]),...(circuit==='setStatus'?['status']:[]),
     ...(circuit==='acknowledgeRepayment'?['paymentRef','receiptExpiry']:[]),...(circuit==='openLine'&&Object.hasOwn(payload,'facility')?['facility']:[]),
     ...(circuit==='draw'&&Object.hasOwn(payload,'quoteCommit')?['quoteCommit']:[]),...(circuit==='redeemDraw'&&Object.hasOwn(payload,'noteCommit')?['noteCommit']:[])];
    assert.deepEqual(Object.keys(payload).sort(),allowedKeys.sort());
    if(snapshot.completed.some(x=>x.operationId===operationId)){
+    assert(Object.hasOwn(f.requests,operationId),'Completed request metadata is unavailable.');
     assert.deepEqual(f.requests[operationId],payload,'Completed operation cannot change its semantic request.');
     return {operationId,alreadyConfirmed:true};
    }
@@ -220,7 +222,7 @@ async function worker(config,action,payload){
    active={...base,...approval};
    const context=RT.createCircuitContext(config.scope.contractAddress,COIN,RT.ContractState.deserialize(before.publicState).data,structuredClone(before.privateState),undefined,undefined,f.unixSeconds);
    const result=contract.circuits[circuit](context,...circuitArgs),financial=coordinatorRetainClaims(f);
-   financial.requests[operationId]=structuredClone(payload);
+   financial.requests={...financial.requests,[operationId]:structuredClone(payload)};
    if(circuit==='openLine'){
     const enrollment={book:{...base.bookOpening,domain,identity:base.enrollmentIdentity,limit:base.lineLimit,outstanding:0n,epoch:0n,generation:base.hasPreviousBook?base.bookOpening.generation+1n:1n,
      expiry:selected.args[1],flatFee:base.lineFlatFee,basisPoints:base.lineBasisPoints,status:1},salt:base.newSalt,priorBook:base.bookOpening,priorSalt:base.salt,hasPreviousBook:base.hasPreviousBook,terms:base.acceptedTerms};
