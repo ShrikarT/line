@@ -1,5 +1,13 @@
 # Engineering status and acceptance evidence
 
+## Product demo priority — 14 October 2026
+
+The owner requested only the highest-priority work to get a running, polished product; extended audit/native work is deferred. The local app runs at `http://127.0.0.1:5174/`. The homepage now leads into a real two-service purchasing flow rather than unrelated zero-state counters and engineering dashboards. Default credit is 60 units, so both 25/20-unit purchases deliver; an explicit 40-unit scenario retains decline, issuer acknowledgement and exact retry. The UI has actual progress, empty states, keyboard focus, responsive layouts and a bundled licensed Manrope font, eliminating external font requests. No contract, accounting or settlement behavior changes.
+
+Build/typecheck pass. All **21 browser checks** pass, including the new successful two-merchant default; the final homepage revision also passes all six relevant navigation/checkout checks. Desktop and 390px mobile screenshots have no document overflow; an actual mobile purchase returns both merchants' results with debt 45 and remaining capacity 15. Canonical managed bindings have zero drift. [Run the demo](DEMO_READY.md).
+
+The broader local parallel core run is **not green**: 542 discovered tests, 536 passing, five failures and one intentional compiled-owner skip. Failures include WSL/OpenSSL/compilation timeouts and two checkpoint commit errors in unmodified audit modules. A serial targeted recheck is recorded separately; these results do not certify all core tests. Prior backend implementation `6d5e07a` passes both complete CI runs, but that is separate from this UI revision. Native-admission work is preserved in the named Git stash `Deferred native admission work for product demo priority`; the owned Linux native build container was deliberately stopped. No public deployment, merge or funded transaction is performed.
+
 ## Remaining work reopened — 13 October 2026
 
 The fresh isolated addressed **all-twelve generated lifecycle now passes 30 calls, 92 exits, 82 controls and 268 workers**, with 28 helper fingerprints. Actual v2 metadata publication accepts a new file and preserves an existing sentinel under rejected overwrite. [Exact scope and retained harness failures](COORDINATOR_ADDRESS_BOUND_2026-10-13.md); [standards/spec review and resolved findings](COORDINATOR_ADDRESS_BOUND_REVIEW_2026-10-13.md). This supersedes only the pending generated all-twelve scope in the checkpoint below. New native/network/asset/independent-administration/full-history privacy evidence remains open; CI is still separate.
