@@ -1,5 +1,7 @@
 # Midnight Preprod connection
 
+**14 October update:** the owner-supplied signer/token now establish an actual two-merchant Preprod checkout, repayment and backend restart on a fresh canonical instance: 22 independently verified finalized transactions. Prior credential/deployment blockers below are historical. [Current evidence, fixes, scope and remaining decisions](LIVE_PREPROD_CHECKOUT_2026-10-14.md). Website deployment and wider investigation remain deferred.
+
 The app is running from `C:\Users\Shrikar\line-audit-review` at http://127.0.0.1:5174/. No website deployment is required for this work.
 
 ## Prepared locally
