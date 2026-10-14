@@ -16,7 +16,7 @@ const NAV = [
   { to: "/roadmap", label: "Roadmap" },
 ];
 
-export function Shell({ children, evaluation = false, hideVault = false }: { children: React.ReactNode; evaluation?: boolean; hideVault?: boolean }) {
+export function Shell({ children, evaluation = false, evaluationMode = "local", hideVault = false }: { children: React.ReactNode; evaluation?: boolean; evaluationMode?: "local" | "preprod"; hideVault?: boolean }) {
   const pathname = typeof window !== "undefined" ? window.location.pathname : "/";
   const [showNetworkSetup, setShowNetworkSetup] = useState(false);
   const runtime = getRuntime();
@@ -48,7 +48,7 @@ export function Shell({ children, evaluation = false, hideVault = false }: { chi
               </span>
             </a>
 
-            {evaluation ? <span className="border border-border px-2.5 py-1 text-xs text-muted">Generated Compact · local evaluation</span> : <button
+            {evaluation ? <span className="border border-border px-2.5 py-1 text-xs text-muted">{evaluationMode === "preprod" ? "Midnight Preprod · live proofs" : "Generated Compact · local evaluation"}</span> : <button
               onClick={() => (isNetwork ? setShowNetworkSetup(!showNetworkSetup) : handleToggleMode())}
               className={cn(
                 "inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-mono transition-colors border",

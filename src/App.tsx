@@ -8,6 +8,7 @@ import { LabPage } from "@/pages/lab.tsx";
 import { CircuitsPage } from "@/pages/circuits.tsx";
 import { RoadmapPage } from "@/pages/roadmap.tsx";
 import { CheckoutPage } from "@/pages/checkout.tsx";
+import { PreprodPage } from "@/pages/preprod.tsx";
 
 const PAGES: Record<string, ComponentType> = {
   "/": Home,
@@ -19,6 +20,7 @@ const PAGES: Record<string, ComponentType> = {
   "/circuits": CircuitsPage,
   "/roadmap": RoadmapPage,
   "/checkout": CheckoutPage,
+  "/preprod": PreprodPage,
 };
 
 export function App() {

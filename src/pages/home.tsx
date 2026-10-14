@@ -19,10 +19,10 @@ export function Home() {
               <h1 className="max-w-2xl font-display text-4xl font-semibold tracking-tight sm:text-5xl lg:text-6xl">Credit for agents.<br />Control for your team.</h1>
               <p className="max-w-xl text-base text-cream/80 sm:text-lg">Give an agent a spending line across API suppliers. Set the rules, follow every purchase, and see both merchants deliver in one interactive demo.</p>
               <div className="flex flex-wrap items-center gap-4">
-                <a href="/checkout" className="inline-flex min-h-12 items-center justify-center rounded-md bg-accent px-5 text-base font-semibold text-accent-fg transition-opacity hover:opacity-90 active:scale-[0.98]">Try API checkout <span aria-hidden="true" className="ml-3">→</span></a>
-                <span className="text-sm text-cream/80">No wallet needed</span>
+                <a href="/preprod" className="inline-flex min-h-12 items-center justify-center rounded-md bg-accent px-5 text-base font-semibold text-accent-fg transition-opacity hover:opacity-90 active:scale-[0.98]">Open live Preprod checkout <span aria-hidden="true" className="ml-3">→</span></a>
+                <a href="/checkout" className="text-sm text-cream/80 underline">Quick local demo</a>
               </div>
-              <p className="text-xs text-cream/80">Generated Compact runs locally. Demo units only; no proof submission or token transfers.</p>
+              <p className="text-xs text-cream/80">Live checkout submits Compact proofs on Midnight Preprod. Service prices are test accounting units; no merchant token payouts.</p>
             </div>
             <div className="rounded-xl border border-cream/20 bg-charcoal p-6">
               <div className="mb-6 flex items-center justify-between gap-3"><span className="text-xs font-semibold uppercase tracking-widest text-pink">The purchasing plan</span><span className="rounded-full border border-cream/20 px-3 py-1 text-xs">2 suppliers</span></div>
