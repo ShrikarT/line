@@ -3,6 +3,7 @@ import { Panel, Button, FlashBar } from "./ui";
 import { getAvailableWallets, type WalletInfo } from "@/lib/runtime/wallet";
 import { getRuntime, setRuntime, MidnightNetworkRuntime, LocalDevelopmentRuntime } from "@/lib/runtime";
 import { sanitizeServiceError } from "@/lib/runtime/endpoints";
+import { useAppStore } from "@/app/store";
 
 interface NetworkSetupProps { onConnected?: () => void; onSwitchToLocal?: () => void }
 
@@ -20,7 +21,19 @@ export function NetworkSetupScreen({ onConnected, onSwitchToLocal }: NetworkSetu
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const busy = connecting || joiningContract;
-  useEffect(() => { setWallets(getAvailableWallets()); }, []);
+  useEffect(() => {
+    setWallets(getAvailableWallets());
+    const controller = new AbortController();
+    void fetch("/api/line/network-session", { method: "POST", headers: { "X-Line-Session": "network-setup" }, signal: controller.signal })
+      .then(async response => {
+        if (!response.ok) return;
+        const config = await response.json();
+        if (config.networkId === "preprod" && typeof config.blockfrostProjectId === "string") {
+          setProjectToken(current => current || config.blockfrostProjectId);
+        }
+      }).catch(() => { /* Manual token input remains available outside local setup. */ });
+    return () => controller.abort();
+  }, []);
 
   const handleConnectWallet = async () => {
     setConnecting(true); setErrorMsg(null); setSuccessMsg(null); setConnectedWalletName(null);
@@ -41,7 +54,8 @@ export function NetworkSetupScreen({ onConnected, onSwitchToLocal }: NetworkSetu
       const runtime = getRuntime();
       if (!(runtime instanceof MidnightNetworkRuntime) || !runtime.isWalletConnected()) throw new Error("Connect a wallet for this network first.");
       const status = await runtime.joinContract(contractAddressInput.trim());
-      setSuccessMsg(`Line contract state loaded: ${status.contractDomain.slice(0, 12)}?`);
+      await useAppStore.getState().refreshStatus();
+      setSuccessMsg(`Line contract state loaded: ${status.contractDomain.slice(0, 12)}...`);
       onConnected?.();
     } catch (err) { setErrorMsg(sanitizeServiceError(err instanceof Error ? err.message : String(err))); }
     finally { setJoiningContract(false); }

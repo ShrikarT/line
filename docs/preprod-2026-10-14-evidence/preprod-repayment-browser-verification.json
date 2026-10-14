@@ -1,0 +1,31 @@
+{
+  "checkedAt": "2026-10-14T12:56:41.727Z",
+  "contractAddress": "8990864c6f80c517c7458fa9b2526d3500f3a9814399fc836097ee409da9bed0",
+  "actualNodeWallet": true,
+  "actualPreprodTransactions": true,
+  "receipt": {
+    "schema": "line-live-checkout-operation/v1",
+    "id": "6da8691a-c48c-415c-bd16-e4542704b85b-repay",
+    "kind": "call",
+    "name": "acknowledgeRepayment",
+    "contractAddress": "8990864c6f80c517c7458fa9b2526d3500f3a9814399fc836097ee409da9bed0",
+    "txId": "0038b7533106b4ca48a1957b974429f1bb7898ca6618d688cccfbd878806208ec9",
+    "txHash": "2c33fbb9f9ec03107e4e4f77a2024fca7d7467e9124fcab464b6e2ca21b20e5a",
+    "disposition": "confirmed-success",
+    "createdAt": "2026-10-14T12:56:06.003Z",
+    "extrinsicHash": "0x22d10363eb937ba9781abdb130cd72c48198560c61758045b51c91fdfa14a328",
+    "blockHeight": 2977456,
+    "finalizedHead": {
+      "hash": "d8152ecf743d130668d2228c85063549cd028eaeac0c1fb1e5653a87f3d6a2c8",
+      "height": 2977456
+    },
+    "feePaid": "1",
+    "verifiedAt": "2026-10-14T12:56:35.622Z"
+  },
+  "outstanding": 0,
+  "remaining": 60,
+  "reloadPreservedReceipts": true,
+  "repeatPurchaseAvailable": true,
+  "browserErrors": [],
+  "cashRepaymentVerified": false
+}

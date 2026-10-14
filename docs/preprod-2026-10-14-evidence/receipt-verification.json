@@ -1,0 +1,555 @@
+{
+  "schema": "line-preprod-receipt-check/v1",
+  "createdAt": "2026-10-14T02:54:38.408Z",
+  "network": "preprod",
+  "sourceSha256": "35ebd14e19ce682230b685f6f3729923a9c56b0719eb17a684e44e4a39c73eff",
+  "reportedEvidenceSha256": "87b748e92d005c1081c7b9a51ad18e064ccd72718ce4bf01fef5dd92463af61d",
+  "contractAddress": "b2254962147c9cc2e5b9fbcf39f8a4e0d1f149b7801a651df2e41dda1e4410d9",
+  "readerFingerprints": {
+    "scripts/verify-preprod-receipts.mjs": "16ddaebf585fa85f44bb5991c802cf91e646f91c93cf19fee88b68fa4ff37eb0",
+    "scripts/finalized-contract-receipt.mjs": "c45c077ed11a7b15f891320f5e86a2de4be69fc5a80fcf94626a047e7d722db2",
+    "src/lib/runtime/endpoints.ts": "198afd83fd314ad92924224a85b3e6c6d97c5098b89d56bf051e536cc11cfcde"
+  },
+  "complete": true,
+  "networkMetadataIndependentlyRequeried": true,
+  "allTwelveExecuted": false,
+  "privateCandidateDeployed": false,
+  "authenticSettlementEstablished": false,
+  "checks": [
+    {
+      "kind": "deploy",
+      "name": "deploy",
+      "txHash": "ff9979c39d98137421f75d18e835fc8715c867c29cc9b27cbfc44ca6b6c97528",
+      "blockHeight": 2923936,
+      "rpcBlockHash": "086fffbd8ff20aa2c81200fe34cccd81f798ec14351f9500d1632706ffd8f903",
+      "finalizedHead": {
+        "hash": "e82e8c523dded126d36e2d66d22fe951d14d1f73190c2bb5fda1085320d485d3",
+        "height": 2971438
+      },
+      "transactionStatus": "SUCCESS",
+      "entryPoint": null,
+      "rawTransactionSha256": "ff9979c39d98137421f75d18e835fc8715c867c29cc9b27cbfc44ca6b6c97528",
+      "stateSha256": "4ad7fa1f9c16949b7db4c8f44b4a178bc53b5f8ccf2ee9be639fe5c76d32aeb3",
+      "registeredCircuitCount": 1,
+      "paidDustFees": "1",
+      "publicAccounting": {
+        "T": "0",
+        "E": "0",
+        "R": "0",
+        "F": "0",
+        "P": "0",
+        "U": "0",
+        "X": "0"
+      }
+    },
+    {
+      "kind": "key-registration",
+      "name": "disableMerchant",
+      "txHash": "e7db093b16232fbec89b845068260ec67e8bfc64cf37551b67a0c54a648596f0",
+      "blockHeight": 2923941,
+      "rpcBlockHash": "bcafab53db30b9f6c2cade7ebc367c7d8946e9b46dcbe19bceae832ed3cb3749",
+      "finalizedHead": {
+        "hash": "e82e8c523dded126d36e2d66d22fe951d14d1f73190c2bb5fda1085320d485d3",
+        "height": 2971438
+      },
+      "transactionStatus": "SUCCESS",
+      "entryPoint": null,
+      "rawTransactionSha256": "e7db093b16232fbec89b845068260ec67e8bfc64cf37551b67a0c54a648596f0",
+      "stateSha256": "ac31f83b3c39ed14ea86f1112ebf7f708bcf58cf84eb13e14389cfc0e0ccf2a5",
+      "registeredCircuitCount": 2,
+      "paidDustFees": "1",
+      "publicAccounting": {
+        "T": "0",
+        "E": "0",
+        "R": "0",
+        "F": "0",
+        "P": "0",
+        "U": "0",
+        "X": "0"
+      }
+    },
+    {
+      "kind": "key-registration",
+      "name": "fundReserve",
+      "txHash": "7c67c424d34eb14451c52edaf1b97e4528ccc5a6be1016f0fc12e2d04c223b13",
+      "blockHeight": 2923950,
+      "rpcBlockHash": "8cbbd97bd93e104a0239385575e10ea2786b6fca59be81ad1693f1a6932158cf",
+      "finalizedHead": {
+        "hash": "e82e8c523dded126d36e2d66d22fe951d14d1f73190c2bb5fda1085320d485d3",
+        "height": 2971438
+      },
+      "transactionStatus": "SUCCESS",
+      "entryPoint": null,
+      "rawTransactionSha256": "7c67c424d34eb14451c52edaf1b97e4528ccc5a6be1016f0fc12e2d04c223b13",
+      "stateSha256": "40cc8c505d1e410fc1041174dff4f5ecd99e6b9be5742ff381e1ff01f19ef057",
+      "registeredCircuitCount": 3,
+      "paidDustFees": "1",
+      "publicAccounting": {
+        "T": "0",
+        "E": "0",
+        "R": "0",
+        "F": "0",
+        "P": "0",
+        "U": "0",
+        "X": "0"
+      }
+    },
+    {
+      "kind": "key-registration",
+      "name": "withdrawUnencumberedReserve",
+      "txHash": "ad55be7972f9297cfd4aa5ce6b4d5e71a1777b0ace45deda22b1905351b02149",
+      "blockHeight": 2923955,
+      "rpcBlockHash": "caa5894f2c23188557663b033e0874580a73670ee373cfc5e95fde4277e59243",
+      "finalizedHead": {
+        "hash": "29d9663cfe60e31583e9f316ff3e7a37f601e0c6d1e6fc2847fe0f7828135283",
+        "height": 2971439
+      },
+      "transactionStatus": "SUCCESS",
+      "entryPoint": null,
+      "rawTransactionSha256": "ad55be7972f9297cfd4aa5ce6b4d5e71a1777b0ace45deda22b1905351b02149",
+      "stateSha256": "cf9a6f88d47fd293fcf0f86e17b7a68ea1f0ae0aff298850ec4417b7b015a7c4",
+      "registeredCircuitCount": 4,
+      "paidDustFees": "1",
+      "publicAccounting": {
+        "T": "0",
+        "E": "0",
+        "R": "0",
+        "F": "0",
+        "P": "0",
+        "U": "0",
+        "X": "0"
+      }
+    },
+    {
+      "kind": "key-registration",
+      "name": "withdrawFees",
+      "txHash": "28ccf8f1d41eb7e3ccf2f8b0bbe3fd6ea93caf5cda705a5a12dae782e4d43424",
+      "blockHeight": 2923960,
+      "rpcBlockHash": "edd1c2724944174aa98757935b83d6282a565870abfc20a53d996bc031db7328",
+      "finalizedHead": {
+        "hash": "29d9663cfe60e31583e9f316ff3e7a37f601e0c6d1e6fc2847fe0f7828135283",
+        "height": 2971439
+      },
+      "transactionStatus": "SUCCESS",
+      "entryPoint": null,
+      "rawTransactionSha256": "28ccf8f1d41eb7e3ccf2f8b0bbe3fd6ea93caf5cda705a5a12dae782e4d43424",
+      "stateSha256": "34fa73d04ad963ec11b1aa6eaf43d55f33aa5ad852a3b13ba951749290eb91fc",
+      "registeredCircuitCount": 5,
+      "paidDustFees": "1",
+      "publicAccounting": {
+        "T": "0",
+        "E": "0",
+        "R": "0",
+        "F": "0",
+        "P": "0",
+        "U": "0",
+        "X": "0"
+      }
+    },
+    {
+      "kind": "key-registration",
+      "name": "openLine",
+      "txHash": "964196bbe2488c40d6cb80655234ad50b2a6aa58b7df5d93bff50a1a7dd43984",
+      "blockHeight": 2923966,
+      "rpcBlockHash": "6f9956542a9c70a916e72d21101c3cab378a257356589314b40cbe7e6f0176d6",
+      "finalizedHead": {
+        "hash": "29d9663cfe60e31583e9f316ff3e7a37f601e0c6d1e6fc2847fe0f7828135283",
+        "height": 2971439
+      },
+      "transactionStatus": "SUCCESS",
+      "entryPoint": null,
+      "rawTransactionSha256": "964196bbe2488c40d6cb80655234ad50b2a6aa58b7df5d93bff50a1a7dd43984",
+      "stateSha256": "4b9181e43217a65757db4539345326ebd73df5ce77cfa316ef7506fd1871e542",
+      "registeredCircuitCount": 6,
+      "paidDustFees": "1",
+      "publicAccounting": {
+        "T": "0",
+        "E": "0",
+        "R": "0",
+        "F": "0",
+        "P": "0",
+        "U": "0",
+        "X": "0"
+      }
+    },
+    {
+      "kind": "key-registration",
+      "name": "postQuote",
+      "txHash": "30cfa1c5fccf96e3591c6cbf1a43125d12874ca187ade0a15ca13b1379d572fe",
+      "blockHeight": 2923971,
+      "rpcBlockHash": "e637c325f31302d13e34b3054a3d172ca31769df66723ec8a7181504c23fc5f4",
+      "finalizedHead": {
+        "hash": "29d9663cfe60e31583e9f316ff3e7a37f601e0c6d1e6fc2847fe0f7828135283",
+        "height": 2971439
+      },
+      "transactionStatus": "SUCCESS",
+      "entryPoint": null,
+      "rawTransactionSha256": "30cfa1c5fccf96e3591c6cbf1a43125d12874ca187ade0a15ca13b1379d572fe",
+      "stateSha256": "c0b8d1ae18a04e8e758c70e3c8bdf50c79df40173f64e9b2edf147c5077fd5f5",
+      "registeredCircuitCount": 7,
+      "paidDustFees": "1",
+      "publicAccounting": {
+        "T": "0",
+        "E": "0",
+        "R": "0",
+        "F": "0",
+        "P": "0",
+        "U": "0",
+        "X": "0"
+      }
+    },
+    {
+      "kind": "key-registration",
+      "name": "draw",
+      "txHash": "e7880c51f4641b06305fd3e6f065ad0c73ad8619cd833aa39ae75c3fe862c4b9",
+      "blockHeight": 2923977,
+      "rpcBlockHash": "4c2a748185c049347cea007b2e30fa6cf0c77a1bd644ba75c75893b710582a4b",
+      "finalizedHead": {
+        "hash": "ac503f6e70888eedf501301938649283c905ccee8c1d0cecb515cf3f065fc845",
+        "height": 2971440
+      },
+      "transactionStatus": "SUCCESS",
+      "entryPoint": null,
+      "rawTransactionSha256": "e7880c51f4641b06305fd3e6f065ad0c73ad8619cd833aa39ae75c3fe862c4b9",
+      "stateSha256": "d310bcab7523f9187cc286f98cc0a57e6278452b8e78d987c31feb68e72c9b20",
+      "registeredCircuitCount": 8,
+      "paidDustFees": "1",
+      "publicAccounting": {
+        "T": "0",
+        "E": "0",
+        "R": "0",
+        "F": "0",
+        "P": "0",
+        "U": "0",
+        "X": "0"
+      }
+    },
+    {
+      "kind": "key-registration",
+      "name": "redeemDraw",
+      "txHash": "725b7041655e9c3a13a75aec93593d0ffd6c293166fe08581ff13915975123ad",
+      "blockHeight": 2923985,
+      "rpcBlockHash": "2609dca84c49d905c5eed6a71989941789a0ce1a0c600a9ba7d8fe38e4fc7ed0",
+      "finalizedHead": {
+        "hash": "ac503f6e70888eedf501301938649283c905ccee8c1d0cecb515cf3f065fc845",
+        "height": 2971440
+      },
+      "transactionStatus": "SUCCESS",
+      "entryPoint": null,
+      "rawTransactionSha256": "725b7041655e9c3a13a75aec93593d0ffd6c293166fe08581ff13915975123ad",
+      "stateSha256": "ea806ff33b3df29f89a81d60f40c16bdcc05fa7a83729845fbc16e74cf1aa1f8",
+      "registeredCircuitCount": 9,
+      "paidDustFees": "1",
+      "publicAccounting": {
+        "T": "0",
+        "E": "0",
+        "R": "0",
+        "F": "0",
+        "P": "0",
+        "U": "0",
+        "X": "0"
+      }
+    },
+    {
+      "kind": "key-registration",
+      "name": "cancelOrExpireNote",
+      "txHash": "8f91bdedd0386e61a1e9ea31af07ae8c64f79bf5b5dc289bb9077df83959a6bb",
+      "blockHeight": 2923992,
+      "rpcBlockHash": "6a8a1f8569463bb9564ed40e52550bc170962e99a067dfc3a346991e6268c294",
+      "finalizedHead": {
+        "hash": "ac503f6e70888eedf501301938649283c905ccee8c1d0cecb515cf3f065fc845",
+        "height": 2971440
+      },
+      "transactionStatus": "SUCCESS",
+      "entryPoint": null,
+      "rawTransactionSha256": "8f91bdedd0386e61a1e9ea31af07ae8c64f79bf5b5dc289bb9077df83959a6bb",
+      "stateSha256": "c9616e2081d56a433606960e716a7fed2463abbee04ba2fc90d7cfab29840ec6",
+      "registeredCircuitCount": 10,
+      "paidDustFees": "1",
+      "publicAccounting": {
+        "T": "0",
+        "E": "0",
+        "R": "0",
+        "F": "0",
+        "P": "0",
+        "U": "0",
+        "X": "0"
+      }
+    },
+    {
+      "kind": "key-registration",
+      "name": "acknowledgeRepayment",
+      "txHash": "fbb8e368381a6c547a96899251c22f6d034d1ac070cbe726d958807e1ebc574c",
+      "blockHeight": 2923998,
+      "rpcBlockHash": "a94814817c1beb71aa9dacd528a9df134d63f18a0a89a29dac1de84bf5c41113",
+      "finalizedHead": {
+        "hash": "ac503f6e70888eedf501301938649283c905ccee8c1d0cecb515cf3f065fc845",
+        "height": 2971440
+      },
+      "transactionStatus": "SUCCESS",
+      "entryPoint": null,
+      "rawTransactionSha256": "fbb8e368381a6c547a96899251c22f6d034d1ac070cbe726d958807e1ebc574c",
+      "stateSha256": "d25b11abb71c8166a47afe71afc40b35ce87b2523af636ee5bd4f77da31f25f6",
+      "registeredCircuitCount": 11,
+      "paidDustFees": "1",
+      "publicAccounting": {
+        "T": "0",
+        "E": "0",
+        "R": "0",
+        "F": "0",
+        "P": "0",
+        "U": "0",
+        "X": "0"
+      }
+    },
+    {
+      "kind": "key-registration",
+      "name": "setStatus",
+      "txHash": "6ac11b767323350b4144f91e3f209b157e69262ff5df53009e0e6c95a6a39d6f",
+      "blockHeight": 2924004,
+      "rpcBlockHash": "8fdc01480f5f390461213fc10c4e7124db61831279fa0612aa6e8950a201ec5b",
+      "finalizedHead": {
+        "hash": "16a336b200afbdd3f42a8becf5469a2c218abf667fa9bd61610c0cbef9019fa5",
+        "height": 2971441
+      },
+      "transactionStatus": "SUCCESS",
+      "entryPoint": null,
+      "rawTransactionSha256": "6ac11b767323350b4144f91e3f209b157e69262ff5df53009e0e6c95a6a39d6f",
+      "stateSha256": "de2f9411e97ecc1cb34b0f8c60b8e32ad300a1c36efdc89040e92ae85ffffd1e",
+      "registeredCircuitCount": 12,
+      "paidDustFees": "1",
+      "publicAccounting": {
+        "T": "0",
+        "E": "0",
+        "R": "0",
+        "F": "0",
+        "P": "0",
+        "U": "0",
+        "X": "0"
+      }
+    },
+    {
+      "kind": "call",
+      "name": "fundReserve",
+      "txHash": "26cd6a2b4bf9913a8c0a2537d215997d31d4897bfa88defd179fd88d729d26e6",
+      "blockHeight": 2929747,
+      "rpcBlockHash": "cdb104a7280bd75bdd5808035205fb41162f926c27875d00cb0cc32a3ea66f8e",
+      "finalizedHead": {
+        "hash": "16a336b200afbdd3f42a8becf5469a2c218abf667fa9bd61610c0cbef9019fa5",
+        "height": 2971441
+      },
+      "transactionStatus": "SUCCESS",
+      "entryPoint": "fundReserve",
+      "rawTransactionSha256": "26cd6a2b4bf9913a8c0a2537d215997d31d4897bfa88defd179fd88d729d26e6",
+      "stateSha256": "4fa600709eb6773d3c968b9839dda242bcbbc780b09c20f705fa4463c35b4fc2",
+      "registeredCircuitCount": 12,
+      "paidDustFees": "1",
+      "publicAccounting": {
+        "T": "1000",
+        "E": "0",
+        "R": "0",
+        "F": "0",
+        "P": "0",
+        "U": "0",
+        "X": "0"
+      }
+    },
+    {
+      "kind": "call",
+      "name": "registerMerchant",
+      "txHash": "177c80674a5d3f9ab4938cfad6f2456d7a49f5db9d3848b775ea4fc7ffd5f9d0",
+      "blockHeight": 2929754,
+      "rpcBlockHash": "9b08ec39bf1fc087c237140dc237731dec79c362d1c0d0518f305ceacb0ad167",
+      "finalizedHead": {
+        "hash": "16a336b200afbdd3f42a8becf5469a2c218abf667fa9bd61610c0cbef9019fa5",
+        "height": 2971441
+      },
+      "transactionStatus": "SUCCESS",
+      "entryPoint": "registerMerchant",
+      "rawTransactionSha256": "177c80674a5d3f9ab4938cfad6f2456d7a49f5db9d3848b775ea4fc7ffd5f9d0",
+      "stateSha256": "8f87cb8bcf9a5fef3206ce774639bcc43dc584d919bebbf652aedd0725401b47",
+      "registeredCircuitCount": 12,
+      "paidDustFees": "1",
+      "publicAccounting": {
+        "T": "1000",
+        "E": "0",
+        "R": "0",
+        "F": "0",
+        "P": "0",
+        "U": "0",
+        "X": "0"
+      }
+    },
+    {
+      "kind": "call",
+      "name": "openLine",
+      "txHash": "a98d6669bfd96540b0e5e7e8f559b6b48ce3a72d8beef617ce77c9cd4d03881b",
+      "blockHeight": 2929762,
+      "rpcBlockHash": "e54d61d86dfd9cf0fa46e1ab56c43d79875dbdf9f8d38159c3fae795fde53d03",
+      "finalizedHead": {
+        "hash": "16a336b200afbdd3f42a8becf5469a2c218abf667fa9bd61610c0cbef9019fa5",
+        "height": 2971441
+      },
+      "transactionStatus": "SUCCESS",
+      "entryPoint": "openLine",
+      "rawTransactionSha256": "a98d6669bfd96540b0e5e7e8f559b6b48ce3a72d8beef617ce77c9cd4d03881b",
+      "stateSha256": "cfbdd30ce76dd4a52d0f14d1979218129c244b24970eb6afbedd91eb7db8be34",
+      "registeredCircuitCount": 12,
+      "paidDustFees": "1",
+      "publicAccounting": {
+        "T": "1000",
+        "E": "0",
+        "R": "0",
+        "F": "0",
+        "P": "0",
+        "U": "0",
+        "X": "0"
+      }
+    },
+    {
+      "kind": "call",
+      "name": "postQuote",
+      "txHash": "d88019c45dc9656ebcedcd9d2f01c5dc43a8dd0b766da0dcf037a37b673157e0",
+      "blockHeight": 2929769,
+      "rpcBlockHash": "036434ce0804dcc55993e64f672071fbad0ab28f2668681ea83c575a2066349e",
+      "finalizedHead": {
+        "hash": "87c4ce333f77f6c2aa158a70c8324223f02b6079bfead3688fb52cc43ac33d40",
+        "height": 2971442
+      },
+      "transactionStatus": "SUCCESS",
+      "entryPoint": "postQuote",
+      "rawTransactionSha256": "d88019c45dc9656ebcedcd9d2f01c5dc43a8dd0b766da0dcf037a37b673157e0",
+      "stateSha256": "25d9b2c1c1ab1e3457a1e8a46b7da90b84a5c6aa0a2aa88b6f2d32c9b282af5f",
+      "registeredCircuitCount": 12,
+      "paidDustFees": "1",
+      "publicAccounting": {
+        "T": "1000",
+        "E": "0",
+        "R": "0",
+        "F": "0",
+        "P": "0",
+        "U": "0",
+        "X": "0"
+      }
+    },
+    {
+      "kind": "call",
+      "name": "draw",
+      "txHash": "8ba4f33de34bd8b64cc853117491b921ecff591f7fd5cf77430ef0422a373b17",
+      "blockHeight": 2929778,
+      "rpcBlockHash": "dfea978abc7ceea613e086941fc2a8fa75d6557526ab5be07c64df699f383cdc",
+      "finalizedHead": {
+        "hash": "87c4ce333f77f6c2aa158a70c8324223f02b6079bfead3688fb52cc43ac33d40",
+        "height": 2971442
+      },
+      "transactionStatus": "SUCCESS",
+      "entryPoint": "draw",
+      "rawTransactionSha256": "8ba4f33de34bd8b64cc853117491b921ecff591f7fd5cf77430ef0422a373b17",
+      "stateSha256": "613fa531653042f3be6156e052699d4b38c2c197b23c695a3503a5c4af65cb12",
+      "registeredCircuitCount": 12,
+      "paidDustFees": "0",
+      "publicAccounting": {
+        "T": "1000",
+        "E": "100",
+        "R": "0",
+        "F": "0",
+        "P": "2",
+        "U": "0",
+        "X": "0"
+      }
+    },
+    {
+      "kind": "call",
+      "name": "redeemDraw",
+      "txHash": "b473e6a048d5d351233350c7a92e1318f7a79e1562b8cbdcafd12d383306ad1e",
+      "blockHeight": 2929786,
+      "rpcBlockHash": "e9925a09134ba91da25743d3baab8fc0a4bcbae1be9679d7ef2b138262bf2713",
+      "finalizedHead": {
+        "hash": "87c4ce333f77f6c2aa158a70c8324223f02b6079bfead3688fb52cc43ac33d40",
+        "height": 2971442
+      },
+      "transactionStatus": "SUCCESS",
+      "entryPoint": "redeemDraw",
+      "rawTransactionSha256": "b473e6a048d5d351233350c7a92e1318f7a79e1562b8cbdcafd12d383306ad1e",
+      "stateSha256": "7cffe793f103fa229a0d23d47f72877f45bb854358c94fc248825694384c2cd9",
+      "registeredCircuitCount": 12,
+      "paidDustFees": "1",
+      "publicAccounting": {
+        "T": "1000",
+        "E": "0",
+        "R": "100",
+        "F": "2",
+        "P": "0",
+        "U": "0",
+        "X": "0"
+      }
+    },
+    {
+      "kind": "call",
+      "name": "acknowledgeRepayment",
+      "txHash": "179f46cfa63d5e8289fe23c1d126f8f91b52dfca82d456aecf60565a96977cf6",
+      "blockHeight": 2929793,
+      "rpcBlockHash": "ec27cb46b352604a83a25af93ade5d7f85b9d92d6895b271e6b17d122afc64f1",
+      "finalizedHead": {
+        "hash": "87c4ce333f77f6c2aa158a70c8324223f02b6079bfead3688fb52cc43ac33d40",
+        "height": 2971442
+      },
+      "transactionStatus": "SUCCESS",
+      "entryPoint": "acknowledgeRepayment",
+      "rawTransactionSha256": "179f46cfa63d5e8289fe23c1d126f8f91b52dfca82d456aecf60565a96977cf6",
+      "stateSha256": "bbccfbda598d952c1d3d09107d1ec8a88c3666b81cb04c87474e96a407d45eaf",
+      "registeredCircuitCount": 12,
+      "paidDustFees": "1",
+      "publicAccounting": {
+        "T": "1000",
+        "E": "0",
+        "R": "100",
+        "F": "2",
+        "P": "0",
+        "U": "0",
+        "X": "0"
+      }
+    },
+    {
+      "kind": "call",
+      "name": "withdrawFees",
+      "txHash": "e0291939c52cf0ebf269429c77d95556f2be4a0bb48e3508e5f4f5c836e0bc24",
+      "blockHeight": 2929800,
+      "rpcBlockHash": "b20664a33a6b1da2d69def85fed448a54cd545e135fa006c91f27990437b140d",
+      "finalizedHead": {
+        "hash": "772a742da13f7ecd8e0342da8dbb269a493f6cf629aaf670b6b8a541ce89839a",
+        "height": 2971443
+      },
+      "transactionStatus": "SUCCESS",
+      "entryPoint": "withdrawFees",
+      "rawTransactionSha256": "e0291939c52cf0ebf269429c77d95556f2be4a0bb48e3508e5f4f5c836e0bc24",
+      "stateSha256": "b04f4b11494ba179043e76f1915f165d7bb2163a63c8750d7203380c8f84fe88",
+      "registeredCircuitCount": 12,
+      "paidDustFees": "1",
+      "publicAccounting": {
+        "T": "998",
+        "E": "0",
+        "R": "100",
+        "F": "0",
+        "P": "0",
+        "U": "0",
+        "X": "0"
+      }
+    }
+  ],
+  "trust": "Fresh Blockfrost indexer/RPC views over TLS; not an independently operated full node or a local re-verification of network proofs.",
+  "finalizedHead": {
+    "hash": "772a742da13f7ecd8e0342da8dbb269a493f6cf629aaf670b6b8a541ce89839a",
+    "height": 2971443
+  },
+  "executedCircuits": [
+    "fundReserve",
+    "registerMerchant",
+    "openLine",
+    "postQuote",
+    "draw",
+    "redeemDraw",
+    "acknowledgeRepayment",
+    "withdrawFees"
+  ]
+}
