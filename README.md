@@ -4,9 +4,21 @@
 
 Line's intended product lets organizations delegate revolving purchasing capacity to agents, lets merchants independently verify authorization and own single-use claims, and reconciles purchases with service delivery and actual payment. The first customer hypothesis is enterprise API/data/compute procurement. It is unvalidated: no customer interviews, pilots or revenue are established by this repository.
 
+**Current audit and Wave 2 evidence:** [13 October consolidated report](docs/AUDIT_REPORT_2026-10-13.md). Private-offer source has 65 historical local native-verified calls across twelve names. Current coordinator [generated compensation/recovery](docs/COORDINATOR_COMPENSATION_2026-10-13.md) covers all twelve names and three modes: 30 calls/92 exits/82 controls with synthetic owner receipts/time. Historical native coordinator recovery covers six names; reported canonical Preprod flow covers eight. Native/network proof of the new lifecycle, full-history privacy, independent custody, real settlement and customer demand remain open. Older descriptions retain their historical source scopes.
+
 The executable starting point is [`/checkout`](docs/PRODUCT_WALKTHROUGH.md): a deterministic agent buys document analysis and a processing estimate through compiler-generated Compact execution and local HTTP services. **This is a local evaluation, with no submitted ZK proofs, public-network finality or token payout.** Full fleet credit, historical confidentiality, funded settlement, independent custody, risk/default controls and durable recovery remain product requirements, with evidence gates in [the product direction](docs/PRODUCT_DIRECTION.md) and [roadmap](docs/ROADMAP.md).
 
+The [private-book pool experiment](docs/PRIVATE_POOL_2026-10-11.md) adds compiled two-borrower/key-separated feasibility checks. It still fails historical privacy and its real proof coverage is incomplete. The owner has authorized [a versioned amount/reserve disclosure redesign](docs/PRIVACY_REDESIGN_2026-10-11.md); neither the canonical contract nor checkout has migrated.
+
+The [signed private-finance candidate](docs/SIGNED_PRIVATE_FINANCE_2026-10-11.md) compiles and exercises all twelve names with committed reserve/note/quote state and external role approvals. Signing scalars stay in child signers; reserve openings stay with the trusted prover. The current lifecycle passes 38 accepted calls and 40 rejection controls. Current source `a8d14adf` passes 38 native-verified contract calls across all twelve names, including all five normal cancellation transitions; a separate Rust verifier rejects five corrupted draw proofs. The isolated zero-cash branch remains generated-only. Full-history privacy, durable institutional custody, network execution and migration remain open.
+
+The [merchant-membership prototype](docs/PRIVATE_MERCHANT_2026-10-11.md) replaces selected-merchant lookups with current-root proofs. Fresh generated execution passes 39 lifecycle calls / 55 rejection controls. Native verification covers those 39 calls and all seven isolated branches across all twelve circuits; a separate Rust verifier rejects six corrupted draws. The paired refund acknowledgments differ by one serialized byte, and complete observer privacy remains unproven. It is a separate experimental source, not the deployed contract or checkout. A separate [encrypted software signer](docs/DURABLE_APPROVAL_SIGNER_2026-10-11.md) preserves approvals across restart but is not yet integrated into that native lifecycle.
+
+New `main` reports a canonical Preprod deployment and eight circuit calls. [Independent receipt checks and recovery findings](docs/NETWORK_RECEIPT_AUDIT_2026-10-11.md) distinguish those reported calls from twelve verifier registrations and actual asset settlement. The read-only live check is pending a Preprod project token.
+
 ## Try the procurement evaluation
+
+The [consolidated 11 October audit](docs/FULL_AUDIT_2026-10-11.md) covers the latest deployment, product direction, code, privacy, custody, settlement and submission readiness. The [detailed update](docs/AUDIT_UPDATE_2026-10-11.md) retains current findings. A separate [local proof experiment](docs/LOCAL_PROOF_VERIFICATION_2026-10-11.md) generates and cryptographically verifies 19 contract proofs across all twelve circuits, with invalid-proof controls. It uses synthetic ledger state with fee balancing disabled; it establishes no network finality, independent canonical custody, historical privacy or asset payment. The checkout and consoles remain separate execution paths.
 
 Use **Node.js 22.18 or later** for native TypeScript stripping; the evaluated environment uses Node 26.7.0. A Compact compiler is needed to regenerate the contract, but the checked-in managed JavaScript supports the local evaluation.
 
@@ -101,10 +113,10 @@ Compact is the source of truth. Canonical code is [contracts/line.compact](contr
 | `/checkout` and `server/checkout-engine.ts` | Compiler-generated Compact circuits via the harness, with local service results |
 | `LocalDevelopmentRuntime` | TypeScript reference model in `src/lib/line/protocol.ts`, not generated Compact |
 | `InMemoryTestRuntime` | Isolated reference-model runtime for tests |
-| `MidnightNetworkRuntime` | Network integration code; working deploy/write lifecycle remains unconfirmed and audit-tracked |
+| `MidnightNetworkRuntime` | Browser network integration; its live lifecycle remains independently unverified. Separate canonical CLI deployment/call receipts are recorded in the audit |
 | `/lab` and scripted demo | Development/reference-model fixtures and attack illustrations |
 
-Existing `/issuer`, `/agent`, `/merchant`, `/explorer` and `/circuits` desks expose technical workflows. The shared store's role/session/recovery defects remain audit-tracked; choosing a page does not establish independent custody. The executable `/checkout` capability scopes are a separate evaluation path, not a claim that every legacy console defect is fixed.
+Existing `/issuer`, `/agent`, `/merchant`, `/explorer` and `/circuits` desks expose technical workflows. Runtime/session/recovery controls have regression coverage; choosing a page does not establish independent custody. The executable `/checkout` capability scopes remain a separate evaluation path with the limits recorded in the audit.
 
 ## Development checks
 
@@ -133,7 +145,7 @@ Do not reuse older generated artifacts or the historical 0.34 proving-key size/c
 
 `npm run mcp` and `npm run mcp:dev` currently invoke the local JSON-RPC simulator in `mcp/line-mcp.mjs`. Its demo tools include fixture seeding and issuer operations, and its state file can contain plaintext development private data. It is **not** a production role-isolated agent payment server. Use it only as development evidence; the intended agent integration must expose bounded purchasing capabilities and exclude issuer repayment/funding/status tools. [MCP reference](docs/MCP.md).
 
-Deployment/join/smoke scripts exist, but no confirmed public-network deployment or token payout is established here. The deployment script can attempt funded-wallet actions; **`npm run contract:deploy` is not a dry run**. Acceptance still requires compatible release assets, provider configuration, canonical role-key derivation, secure recoverable state and a confirmed receipt. Consult [the audit](docs/FULL_AUDIT_2026-10-07.md) alongside [deployment guidance](docs/DEPLOYMENT.md).
+The repository records canonical Preprod deployment, twelve registered verifier keys and eight circuit call receipts. Independent authenticated receipt/state/key reconciliation remains pending; these records do not deploy the experimental privacy candidates or prove token payouts. The deployment script can attempt funded-wallet actions; **`npm run contract:deploy` is not a dry run**. Acceptance still requires compatible release assets, provider configuration, canonical role-key derivation, secure recoverable state and receipt reconciliation. Consult [the current audit](docs/FULL_AUDIT_2026-10-11.md) alongside [deployment guidance](docs/DEPLOYMENT.md).
 
 As announced on 9 October, Midnight-hosted Preprod RPC/indexer endpoints shut down from **03:30 IST on 10 October 2026**. Use the configured Blockfrost Preprod endpoints and a matching project token; Preview has unchanged public endpoints. CLI/browser defaults and token handling must agree before network use. [Official endpoints and migration notice](https://docs.midnight.network/relnotes/network).
 
@@ -145,7 +157,7 @@ As announced on 9 October, Midnight-hosted Preprod RPC/indexer endpoints shut do
 - [Executable walkthrough](docs/PRODUCT_WALKTHROUGH.md) and [Wave demonstration](docs/WAVE2_DEMO.md)
 - [Pitch and evidence checklist](docs/PITCH.md)
 - [Architecture](docs/PRODUCT_ARCHITECTURE.md), [protocol](docs/PROTOCOL.md), [privacy](docs/PRIVACY.md), [security](docs/SECURITY.md)
-- [Full audit and reproductions](docs/FULL_AUDIT_2026-10-07.md), [engineering status](docs/ENGINEERING_STATUS.md)
+- [Current full audit](docs/FULL_AUDIT_2026-10-11.md), [historical reproductions](docs/FULL_AUDIT_2026-10-07.md), [engineering status](docs/ENGINEERING_STATUS.md)
 - [Development](docs/DEVELOPMENT.md), [deployment](docs/DEPLOYMENT.md), [MCP](docs/MCP.md)
 
 The [AKINDO Midnight wave](https://app.akindo.io/wave-hacks/jaMZjqPOBsLXvjdG) evaluates incremental evidence. Full requirements remain in scope beyond interim demonstrations: independent merchants/custody, durable checkout/recovery, correct repayment/refunds/expiry, history privacy, actual settlement, fleets/policies, risk/default economics, syndication/underwriting credentials and additional rails. No deadline substitutes for those acceptance gates.

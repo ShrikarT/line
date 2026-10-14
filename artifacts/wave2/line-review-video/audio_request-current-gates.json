@@ -1,0 +1,10 @@
+{
+  "provider": "kokoro",
+  "voice": "am_michael",
+  "lang": "en",
+  "speed": 1,
+  "bgm": { "mode": "none" },
+  "lines": [
+    { "id": "scene-7-current", "text": "The next release needs fee funded network verification, full history privacy review, and owners under independent administration. It also needs authentic deposits, service delivery, repayment, payout and refund evidence, plus a real buyer and supplier pilot. Proof counts cannot establish payment, secure custody or customer demand." }
+  ]
+}

@@ -1,0 +1,524 @@
+// Unproven merchant-membership prototype. Current-root paths replace selected-key lookups.
+// Experimental private-finance signed-role ABI. Privacy remains unproven.
+// Schnorr approvals keep signing scalars out of the book/reserve prover.
+// This candidate requires independent cryptographic review and real proofs.
+// This is NOT the canonical deployment or a passed historical-privacy gate.
+// Amounts and reserve books are committed. Deadlines, selected merchant,
+// action shape, sender and timing still require full observer-model analysis.
+// No asset custody or payment is implemented.
+pragma language_version 0.23;
+import CompactStandardLibrary;
+
+export enum Status { NONE, OPEN, DEFAULTED, CLOSED }
+export struct Book {
+  domain: Bytes<32>;
+  identity: Bytes<32>;
+  limit: Uint<64>;
+  outstanding: Uint<64>;
+  epoch: Uint<64>;
+  generation: Uint<64>;
+  expiry: Uint<64>;
+  flatFee: Uint<64>;
+  basisPoints: Uint<64>;
+  status: Status;
+}
+export struct QuoteMeta { expiry: Uint<64>; used: Boolean; }
+export struct DrawNotePreimage {
+  domain: Bytes<32>; lineGeneration: Uint<64>; identity: Bytes<32>;
+  quoteCommit: Bytes<32>; merchantPk: Bytes<32>; amount: Uint<64>;
+  fee: Uint<64>; noteNonce: Bytes<32>; expiry: Uint<64>;
+}
+export struct RefundPreimage {
+  domain: Bytes<32>; lineGeneration: Uint<64>; identity: Bytes<32>;
+  noteCommit: Bytes<32>; amount: Uint<64>;
+}
+export struct NoteMeta {
+  amount: Uint<64>; fee: Uint<64>; redeemed: Boolean; cancelled: Boolean;
+  expiry: Uint<64>; compensationAllocated: Boolean;
+  refundCommitment: Bytes<32>; cashRefundOwed: Boolean;
+  refundAcknowledged: Boolean; refundPaymentNullifier: Bytes<32>;
+}
+export sealed ledger issuer: Bytes<32>;
+export sealed ledger contractDomain: Bytes<32>;
+export sealed ledger nullifierKeyCommit: Bytes<32>;
+export ledger authorizations: Set<Bytes<32>>;
+export struct ReserveBook {
+  domain: Bytes<32>; epoch: Uint<64>;
+  totalReserve: Uint<64>; encumberedReserve: Uint<64>; redeemedReserve: Uint<64>;
+  feeReserve: Uint<64>; pendingFeeReserve: Uint<64>; refundReserve: Uint<64>; reportedRefundReserve: Uint<64>;
+}
+export ledger reserveCommit: Bytes<32>;
+export struct PrivateNoteState { domain: Bytes<32>; noteCommit: Bytes<32>; meta: NoteMeta; }
+export struct PrivateQuoteState { domain: Bytes<32>; quoteCommit: Bytes<32>; meta: QuoteMeta; }
+witness reserveOpening(): ReserveBook;
+witness reserveSalt(): Bytes<32>;
+witness newReserveSalt(): Bytes<32>;
+witness noteMetaOpening(): NoteMeta;
+witness noteMetaSalt(): Bytes<32>;
+witness newNoteMetaSalt(): Bytes<32>;
+witness quoteMetaOpening(): QuoteMeta;
+witness quoteMetaSalt(): Bytes<32>;
+witness newQuoteMetaSalt(): Bytes<32>;
+witness reserveAmount(): Uint<64>;
+witness lineFlatFee(): Uint<64>;
+witness lineBasisPoints(): Uint<64>;
+witness drawFee(): Uint<64>;
+witness requestedStatus(): Status;
+witness rememberReserve(book: ReserveBook, salt: Bytes<32>): [];
+witness rememberNote(note: Bytes<32>, meta: NoteMeta, salt: Bytes<32>): [];
+witness rememberQuote(quote: Bytes<32>, meta: QuoteMeta, salt: Bytes<32>): [];
+export ledger registeredMerchants: Map<Bytes<32>, Boolean>;
+export ledger merchantIndices: Map<Bytes<32>, Uint<64>>;
+export ledger merchantNextIndex: Uint<64>;
+export ledger registeredMerchantTree: MerkleTree<20, Bytes<32>>;
+export ledger enabledMerchantTree: MerkleTree<20, Bytes<32>>;
+witness registeredMerchantPath(): MerkleTreePath<20, Bytes<32>>;
+witness enabledMerchantPath(): MerkleTreePath<20, Bytes<32>>;
+
+
+
+
+
+
+
+// No per-borrower public identity, current commitment, generation or status.
+// Capacity is finite; safe archival/rollover is a separate acceptance gate.
+export ledger books: MerkleTree<20, Bytes<32>>;
+export ledger spentBooks: Set<Bytes<32>>;
+export ledger enrollments: Map<Bytes<32>, Boolean>;
+export ledger initialEnrollments: Set<Bytes<32>>;
+export ledger quotes: Map<Bytes<32>, Bytes<32>>;
+export ledger notes: Map<Bytes<32>, Bytes<32>>;
+export ledger nullifiers: Set<Bytes<32>>;
+export ledger actionClock: Counter;
+
+export struct ScalarWords { lo: Uint<128>; hi: Uint<128>; }
+export struct RoleApproval { announcement: JubjubPoint; response: ScalarWords; }
+witness rolePublicKey(): JubjubPoint;
+witness roleApproval(): RoleApproval;
+witness challengeQuotient(): Uint<4>;
+witness challengeRemainder(): ScalarWords;
+witness challengeWords(): ScalarWords;
+witness challengeCarry(): Uint<4>;
+witness authorizationNonce(): Bytes<32>;
+witness nullifierKey(): Bytes<32>;
+witness enrollmentIdentity(): Bytes<32>;
+witness acceptedTerms(): Bytes<32>;
+witness hasPreviousBook(): Boolean;
+witness bookOpening(): Book;
+witness bookPath(): MerkleTreePath<20, Bytes<32>>;
+witness lineLimit(): Uint<64>;
+witness salt(): Bytes<32>;
+witness newSalt(): Bytes<32>;
+witness invoiceId(): Bytes<32>;
+witness quoteNonce(): Bytes<32>;
+witness quoteAmount(): Uint<64>;
+witness quoteBuyer(): Bytes<32>;
+witness quoteGeneration(): Uint<64>;
+witness quoteFlatFee(): Uint<64>;
+witness quoteBasisPoints(): Uint<64>;
+witness drawAmount(): Uint<64>;
+witness quoteMerchantPk(): Bytes<32>;
+witness noteNonce(): Bytes<32>;
+witness noteSalt(): Bytes<32>;
+witness noteIdentity(): Bytes<32>;
+witness noteQuoteCommit(): Bytes<32>;
+witness noteGeneration(): Uint<64>;
+witness redeemAmount(): Uint<64>;
+witness repayAmount(): Uint<64>;
+witness receiptNonce(): Bytes<32>;
+witness paymentRef(): Bytes<32>;
+
+circuit issuerPublicKey(pk: JubjubPoint): Bytes<32> {
+  return persistentHash<Vector<2, Bytes<32>>>([pad(32, "line:issuer:pk"), upgradeFromTransient(transientHash<JubjubPoint>(pk))]);
+}
+circuit merchantPublicKey(pk: JubjubPoint): Bytes<32> {
+  return persistentHash<Vector<2, Bytes<32>>>([pad(32, "line:merchant:pk"), upgradeFromTransient(transientHash<JubjubPoint>(pk))]);
+}
+circuit agentId(pk: JubjubPoint): Bytes<32> {
+  return persistentHash<Vector<3, Bytes<32>>>([pad(32, "line:id"), contractDomain, upgradeFromTransient(transientHash<JubjubPoint>(pk))]);
+}
+circuit encodeU64(n: Uint<64>): Bytes<32> { return n as Bytes<32>; }
+circuit samePoint(a: JubjubPoint, b: JubjubPoint): Boolean {
+  return jubjubPointX(a) == jubjubPointX(b) && jubjubPointY(a) == jubjubPointY(b);
+}
+circuit scalarField(words: ScalarWords): Field {
+  const qLo = 221192506920607668564158609621008198839;
+  const qHi = 19261898452744832053602769315862690560;
+  assert(words.hi < qHi || (words.hi == qHi && words.lo < qLo), "approval scalar range");
+  return (words.hi as Field) * 340282366920938463463374607431768211456 + (words.lo as Field);
+}
+circuit approvalMessage(op: Uint<8>, body: Bytes<32>): Bytes<32> {
+  return persistentHash<Vector<5, Bytes<32>>>([pad(32, "line:signed:approval"), contractDomain, encodeU64(op as Uint<64>), body, authorizationNonce()]);
+}
+circuit requireApproval(message: Bytes<32>): [] {
+  const pk = rolePublicKey(); const sig = roleApproval(); const identity = ecMulGenerator(0);
+  assert(!samePoint(pk, identity) && !samePoint(sig.announcement, identity), "identity approval key/nonce");
+  // q itself is not an accepted EmbeddedFr scalar. Check [q]P through
+  // [q-1]P + P, with q-1 inside the supported scalar range.
+  const qLo = 221192506920607668564158609621008198839;
+  const qHi = 19261898452744832053602769315862690560;
+  const radix = 340282366920938463463374607431768211456;
+  const qm1 = (qHi as Field) * (radix as Field) + ((qLo - 1) as Field);
+  assert(samePoint(ecAdd(ecMul(pk, qm1), pk), identity), "approval key subgroup");
+  assert(samePoint(ecAdd(ecMul(sig.announcement, qm1), sig.announcement), identity), "approval nonce subgroup");
+  const response = scalarField(sig.response);
+  const challenge = degradeToTransient(persistentHash<Vector<3, Bytes<32>>>([message,
+    upgradeFromTransient(transientHash<JubjubPoint>(pk)), upgradeFromTransient(transientHash<JubjubPoint>(sig.announcement))]));
+  const quotient = challengeQuotient(); const remainder = challengeRemainder();
+  const reduced = scalarField(remainder);
+  const h = challengeWords(); const carry = challengeCarry();
+  // Both limbs are bounded; requiring the integer to be below the field prime
+  // excludes H+p even though it has the same Field representation as H.
+  const pLo = 111310594309268602877181240610339684353;
+  const pHi = 154095187621958656428822154526901524485;
+  assert(h.hi < pHi || (h.hi == pHi && h.lo < pLo), "approval canonical challenge");
+  assert((h.hi as Field) * (radix as Field) + (h.lo as Field) == challenge, "approval challenge words");
+  // Uint arithmetic below 248 bits checks integer carries without Field wrap.
+  assert(quotient * qLo + remainder.lo == h.lo + carry * radix, "approval low reduction");
+  assert(quotient * qHi + remainder.hi + carry == h.hi, "approval high reduction");
+  const lhs = ecMulGenerator(response);
+  const rhs = ecAdd(sig.announcement, ecMul(pk, reduced));
+  assert(samePoint(lhs, rhs), "approval signature");
+  const N = disclose(persistentHash<Vector<3, Bytes<32>>>([pad(32, "line:signed:used"), contractDomain, message]));
+  assert(!authorizations.member(N), "approval replay"); authorizations.insert(N);
+}
+circuit requireIssuer(message: Bytes<32>): [] {
+  assert(issuer == issuerPublicKey(rolePublicKey()), "not issuer"); requireApproval(message);
+}
+circuit stableNullifierKey(): Bytes<32> {
+  const k = nullifierKey();
+  assert(persistentHash<Vector<2, Bytes<32>>>([pad(32, "line:signed:nk"), k]) == nullifierKeyCommit, "nullifier key");
+  return k;
+}
+circuit bookCommit(b: Book, s: Bytes<32>): Bytes<32> { return persistentCommit<Book>(b, s); }
+circuit readBook(): Book {
+  const b = bookOpening();
+  assert(b.domain == contractDomain, "book domain");
+  const p = bookPath();
+  assert(p.leaf == bookCommit(b, salt()), "book leaf");
+  // Only the common root reaches the public query. Never disclose the path,
+  // input leaf, borrower identity, leaf index or private book opening.
+  assert(books.checkRoot(disclose(merkleTreePathRoot<20, Bytes<32>>(p))), "book current root");
+  const N = persistentHash<Vector<4, Bytes<32>>>([pad(32, "line:pool:book-spend"), contractDomain, bookCommit(b, salt()), salt()]);
+  assert(!spentBooks.member(disclose(N)), "book spent");
+  return b;
+}
+circuit consumeBook(b: Book): [] {
+  const N = persistentHash<Vector<4, Bytes<32>>>([pad(32, "line:pool:book-spend"), contractDomain, bookCommit(b, salt()), salt()]);
+  assert(!spentBooks.member(disclose(N)), "book spent");
+  spentBooks.insert(disclose(N));
+}
+circuit rotateBook(b: Book, balance: Uint<64>, nextStatus: Status): [] {
+  consumeBook(b);
+  assert(balance <= b.limit, "book capacity");
+  assert(b.epoch < 18446744073709551615, "book epoch overflow");
+  const next = Book {
+    domain: b.domain, identity: b.identity, limit: b.limit, outstanding: balance,
+    epoch: ((b.epoch + 1) as Uint<64>), generation: b.generation,
+    expiry: b.expiry, flatFee: b.flatFee, basisPoints: b.basisPoints, status: nextStatus
+  };
+  books.insert(disclose(bookCommit(next, newSalt())));
+}
+circuit quoteCommit(m: Bytes<32>, buyer: Bytes<32>, inv: Bytes<32>, a: Uint<64>, expiry: Uint<64>, nonce: Bytes<32>, generation: Uint<64>, flatFee: Uint<64>, basisPoints: Uint<64>): Bytes<32> {
+  return persistentHash<Vector<11, Bytes<32>>>([pad(32, "line:pool:quote"), m, buyer, inv, encodeU64(a), encodeU64(expiry), nonce, encodeU64(generation), contractDomain, encodeU64(flatFee), encodeU64(basisPoints)]);
+}
+circuit noteCommit(p: DrawNotePreimage, s: Bytes<32>): Bytes<32> { return persistentCommit<DrawNotePreimage>(p, s); }
+circuit refundCommit(p: RefundPreimage, s: Bytes<32>): Bytes<32> { return persistentCommit<RefundPreimage>(p, s); }
+circuit paymentNullifier(sk: Bytes<32>, ref: Bytes<32>): Bytes<32> {
+  return persistentHash<Vector<4, Bytes<32>>>([pad(32, "line:v2:payment"), sk, ref, contractDomain]);
+}
+circuit lockedReserve(r: ReserveBook): Uint<67> {
+  return r.encumberedReserve + r.redeemedReserve + r.feeReserve + r.pendingFeeReserve + r.refundReserve + r.reportedRefundReserve;
+}
+circuit readReserve(): ReserveBook {
+  const r = reserveOpening();
+  assert(r.domain == contractDomain, "reserve domain");
+  assert(persistentCommit<ReserveBook>(r, reserveSalt()) == reserveCommit, "reserve opening");
+  assert(lockedReserve(r) <= r.totalReserve, "reserve deficit"); return r;
+}
+circuit rotateReserve(r: ReserveBook, total: Uint<64>, encumbered: Uint<64>, redeemed: Uint<64>, earned: Uint<64>, pending: Uint<64>, refund: Uint<64>, reported: Uint<64>): [] {
+  assert(r.epoch < 18446744073709551615, "reserve epoch overflow");
+  const next = ReserveBook { domain: r.domain, epoch: ((r.epoch + 1) as Uint<64>), totalReserve: total,
+    encumberedReserve: encumbered, redeemedReserve: redeemed, feeReserve: earned,
+    pendingFeeReserve: pending, refundReserve: refund, reportedRefundReserve: reported };
+  assert(lockedReserve(next) <= next.totalReserve, "reserve deficit");
+  reserveCommit = disclose(persistentCommit<ReserveBook>(next, newReserveSalt()));
+  rememberReserve(next, newReserveSalt());
+}
+circuit noteMetaCommit(D: Bytes<32>, meta: NoteMeta, s: Bytes<32>): Bytes<32> {
+  return persistentCommit<PrivateNoteState>(PrivateNoteState { domain: contractDomain, noteCommit: D, meta: meta }, s);
+}
+circuit readNote(D: Bytes<32>): NoteMeta {
+  assert(notes.member(D), "note not found"); const meta = noteMetaOpening();
+  assert(noteMetaCommit(D, meta, noteMetaSalt()) == notes.lookup(D), "private note state"); return meta;
+}
+circuit writeNote(D: Bytes<32>, meta: NoteMeta): [] {
+  notes.insert(D, disclose(noteMetaCommit(D, meta, newNoteMetaSalt())));
+  rememberNote(D, meta, newNoteMetaSalt());
+}
+circuit quoteMetaCommit(Q: Bytes<32>, meta: QuoteMeta, s: Bytes<32>): Bytes<32> {
+  return persistentCommit<PrivateQuoteState>(PrivateQuoteState { domain: contractDomain, quoteCommit: Q, meta: meta }, s);
+}
+circuit readQuote(Q: Bytes<32>): QuoteMeta {
+  assert(quotes.member(Q), "quote not found"); const meta = quoteMetaOpening();
+  assert(quoteMetaCommit(Q, meta, quoteMetaSalt()) == quotes.lookup(Q), "private quote state"); return meta;
+}
+circuit writeQuote(Q: Bytes<32>, meta: QuoteMeta): [] {
+  quotes.insert(Q, disclose(quoteMetaCommit(Q, meta, newQuoteMetaSalt())));
+  rememberQuote(Q, meta, newQuoteMetaSalt());
+}
+circuit debtAfterCredit(b: Uint<64>, cost: Uint<64>): Uint<64> {
+  if (b >= cost) { return ((b - cost) as Uint<64>); } else { return 0; }
+}
+circuit cashRefundAmount(b: Uint<64>, cost: Uint<64>): Uint<64> {
+  if (b >= cost) { return 0; } else { return ((cost - b) as Uint<64>); }
+}
+
+constructor(issuerPk: Bytes<32>, initialMerchantPk: Bytes<32>, instanceNonce: Bytes<32>, stableKeyCommit: Bytes<32>) {
+  issuer = disclose(issuerPk); nullifierKeyCommit = disclose(stableKeyCommit);
+  contractDomain = persistentHash<Vector<5, Bytes<32>>>([pad(32, "line:private:merchant:domain"), disclose(issuerPk), disclose(initialMerchantPk), disclose(instanceNonce), disclose(stableKeyCommit)]);
+  registeredMerchants.insert(disclose(initialMerchantPk), true);
+  merchantIndices.insert(disclose(initialMerchantPk), 0); merchantNextIndex = 1;
+  registeredMerchantTree.insertIndex(disclose(initialMerchantPk), 0);
+  enabledMerchantTree.insertIndex(disclose(initialMerchantPk), 0);
+  const initial = ReserveBook { domain: contractDomain, epoch: 0, totalReserve: 0, encumberedReserve: 0,
+    redeemedReserve: 0, feeReserve: 0, pendingFeeReserve: 0, refundReserve: 0, reportedRefundReserve: 0 };
+  reserveCommit = disclose(persistentCommit<ReserveBook>(initial, reserveSalt()));
+  rememberReserve(initial, reserveSalt());
+}
+export circuit registerMerchant(merchantPk: Bytes<32>): [] {
+  const m = disclose(merchantPk); requireIssuer(approvalMessage(1, m));
+  assert(!registeredMerchants.member(m), "merchant already registered");
+  const index = merchantNextIndex; assert(index < 1048576, "merchant tree full");
+  registeredMerchantTree.insertIndex(m, index); enabledMerchantTree.insertIndex(m, index);
+  merchantIndices.insert(m, index); merchantNextIndex = ((index + 1) as Uint<64>);
+  registeredMerchants.insert(m, true); actionClock.increment(1);
+}
+export circuit disableMerchant(merchantPk: Bytes<32>): [] {
+  const m = disclose(merchantPk); requireIssuer(approvalMessage(2, m));
+  assert(registeredMerchants.member(m), "unknown merchant");
+  enabledMerchantTree.insertIndexDefault(merchantIndices.lookup(m));
+  registeredMerchants.insert(m, false); actionClock.increment(1);
+}
+export circuit fundReserve(): [] {
+  const r = readReserve(); const a = reserveAmount();
+  requireIssuer(approvalMessage(3, persistentHash<Vector<2, Bytes<32>>>([reserveCommit, encodeU64(a)])));
+  assert(a > 0, "zero fund"); const next = r.totalReserve + a;
+  assert(next <= 18446744073709551615, "reserve overflow");
+  rotateReserve(r, (next as Uint<64>), r.encumberedReserve, r.redeemedReserve, r.feeReserve, r.pendingFeeReserve, r.refundReserve, r.reportedRefundReserve);
+  actionClock.increment(1);
+}
+export circuit withdrawUnencumberedReserve(): [] {
+  const r = readReserve(); const a = reserveAmount();
+  requireIssuer(approvalMessage(4, persistentHash<Vector<2, Bytes<32>>>([reserveCommit, encodeU64(a)])));
+  assert(a > 0 && a <= r.totalReserve - lockedReserve(r), "amount exceeds unencumbered reserve");
+  rotateReserve(r, ((r.totalReserve - a) as Uint<64>), r.encumberedReserve, r.redeemedReserve, r.feeReserve, r.pendingFeeReserve, r.refundReserve, r.reportedRefundReserve);
+  actionClock.increment(1);
+}
+export circuit withdrawFees(): [] {
+  const r = readReserve(); const f = r.feeReserve;
+  requireIssuer(approvalMessage(5, persistentHash<Vector<2, Bytes<32>>>([reserveCommit, encodeU64(f)])));
+  assert(f > 0, "no fees");
+  rotateReserve(r, ((r.totalReserve - f) as Uint<64>), r.encumberedReserve, r.redeemedReserve, 0, r.pendingFeeReserve, r.refundReserve, r.reportedRefundReserve);
+  actionClock.increment(1);
+}
+export circuit openLine(action: Uint<8>, expiry: Uint<64>): [] {
+  const flatFee = lineFlatFee(); const basisPoints = lineBasisPoints();
+  const mode = disclose(action); assert(mode <= 1, "enrollment action");
+  const previous = disclose(hasPreviousBook());
+  const caller = rolePublicKey();
+  const identity = mode == 0 ? agentId(caller) : enrollmentIdentity();
+  assert(identity != default<Bytes<32>>, "enrollment identity");
+  const limit = lineLimit(); assert(limit > 0, "limit");
+  assert(kernel.blockTimeLessThan(disclose(expiry)), "expiry");
+  assert(basisPoints <= 10000, "fee rate");
+  const prior = previous ? readBook() : default<Book>;
+  if (previous) {
+    assert(prior.identity == identity && prior.status == Status.CLOSED && prior.outstanding == 0, "reopening predecessor");
+    assert(prior.generation < 18446744073709551615, "generation overflow");
+  }
+  const generation = previous ? ((prior.generation + 1) as Uint<64>) : 1;
+  const fresh = Book { domain: contractDomain, identity: identity, limit: limit, outstanding: 0, epoch: 0,
+    generation: generation, expiry: expiry, flatFee: flatFee, basisPoints: basisPoints, status: Status.OPEN };
+  const C0 = bookCommit(fresh, newSalt());
+  const predecessor = previous ? bookCommit(prior, salt()) : default<Bytes<32>>;
+  const request = disclose(persistentHash<Vector<5, Bytes<32>>>([pad(32, "line:pool:enroll"), contractDomain, C0, predecessor, acceptedTerms()]));
+  const message = approvalMessage(6, persistentHash<Vector<2, Bytes<32>>>([request, encodeU64(mode as Uint<64>)]));
+  // Keep the point/scalar gadgets outside conditional branches. Backend checks
+  // can otherwise evaluate inactive curve inputs even when JS execution passes.
+  requireApproval(message);
+  if (mode == 0) {
+    assert(!enrollments.member(request), "enrollment exists"); enrollments.insert(request, false);
+  } else {
+    assert(issuer == issuerPublicKey(caller), "not issuer");
+    assert(enrollments.member(request) && !enrollments.lookup(request), "agent consent missing or used");
+    if (previous) { consumeBook(prior); }
+    else {
+      const initial = disclose(persistentHash<Vector<4, Bytes<32>>>([pad(32, "line:pool:initial"), contractDomain, stableNullifierKey(), identity]));
+      assert(!initialEnrollments.member(initial), "initial line already issued"); initialEnrollments.insert(initial);
+    }
+    enrollments.insert(request, true); books.insert(disclose(C0));
+  }
+  actionClock.increment(1);
+}
+// Offers are merchant-authenticated. Draw verifies their exact private facility
+// generation and pricing against an issuer-approved committed book.
+export circuit postQuote(expiry: Uint<64>): [] {
+  const m = merchantPublicKey(rolePublicKey());
+  const merchantPath = enabledMerchantPath(); assert(merchantPath.leaf == m, "merchant path");
+  assert(enabledMerchantTree.checkRoot(disclose(merkleTreePathRoot<20, Bytes<32>>(merchantPath))), "merchant disabled or unregistered");
+  const amount = quoteAmount(); assert(amount > 0, "zero");
+  assert(kernel.blockTimeLessThan(disclose(expiry)), "expiry");
+  const Q = disclose(quoteCommit(m, quoteBuyer(), invoiceId(), amount, expiry, quoteNonce(), quoteGeneration(), quoteFlatFee(), quoteBasisPoints()));
+  requireApproval(approvalMessage(7, Q));
+  assert(!quotes.member(Q), "quote exists"); writeQuote(Q, QuoteMeta { expiry: expiry, used: false });
+  actionClock.increment(1);
+}
+export circuit draw(quoteCommitPublic: Bytes<32>, noteExpiry: Uint<64>): [] {
+  const b = readBook(); const r = readReserve(); assert(b.status == Status.OPEN, "Clearance could not be proven.");
+  // The public note deadline proves the private facility has not expired.
+  // Restrict new claims to that facility's term without publishing its expiry.
+  assert(noteExpiry <= b.expiry, "Clearance could not be proven.");
+  assert(agentId(rolePublicKey()) == b.identity, "Clearance could not be proven.");
+  const Q = disclose(quoteCommitPublic); assert(quotes.member(Q), "Clearance could not be proven.");
+  const meta = readQuote(Q); assert(!meta.used, "Clearance could not be proven.");
+  assert(kernel.blockTimeLessThan(disclose(meta.expiry)), "Clearance could not be proven.");
+  assert(noteExpiry == meta.expiry, "Clearance could not be proven.");
+  const m = quoteMerchantPk(); const merchantPath = registeredMerchantPath();
+  assert(merchantPath.leaf == m, "Clearance could not be proven.");
+  assert(registeredMerchantTree.checkRoot(disclose(merkleTreePathRoot<20, Bytes<32>>(merchantPath))), "Clearance could not be proven.");
+  const amount = drawAmount(); assert(amount > 0, "Clearance could not be proven.");
+  assert(disclose(quoteCommit(m, b.identity, invoiceId(), amount, meta.expiry, quoteNonce(), b.generation, b.flatFee, b.basisPoints)) == Q, "Clearance could not be proven.");
+  const f = drawFee(); assert(f >= b.flatFee, "Clearance could not be proven.");
+  const variableFee = f - b.flatFee;
+  if (b.basisPoints == 0) { assert(variableFee == 0, "Clearance could not be proven."); }
+  else {
+    assert(variableFee > 0, "Clearance could not be proven."); const numerator = amount * b.basisPoints;
+    assert((variableFee - 1) * 10000 < numerator && numerator <= variableFee * 10000, "Clearance could not be proven.");
+  }
+  const cost = amount + f; assert(b.outstanding + cost <= b.limit, "Clearance could not be proven.");
+  const locked = lockedReserve(r); assert(cost <= r.totalReserve - locked, "Clearance could not be proven.");
+  const N = disclose(persistentHash<Vector<5, Bytes<32>>>([pad(32, "line:pool:draw"), b.identity, Q, quoteNonce(), contractDomain]));
+  assert(!nullifiers.member(N), "Clearance could not be proven.");
+  const D = disclose(noteCommit(DrawNotePreimage { domain: contractDomain, lineGeneration: b.generation, identity: b.identity,
+    quoteCommit: Q, merchantPk: m, amount: amount, fee: f, noteNonce: noteNonce(), expiry: noteExpiry }, noteSalt()));
+  const body = persistentHash<Vector<7, Bytes<32>>>([Q, bookCommit(b, salt()), newSalt(), D, encodeU64(amount), encodeU64(f), encodeU64(noteExpiry)]);
+  requireApproval(approvalMessage(8, body));
+  assert(!notes.member(D), "Clearance could not be proven.");
+  writeQuote(Q, QuoteMeta { expiry: meta.expiry, used: true });
+  writeNote(D, NoteMeta { amount: amount, fee: f, redeemed: false, cancelled: false, expiry: meta.expiry,
+    compensationAllocated: false, refundCommitment: default<Bytes<32>>, cashRefundOwed: false,
+    refundAcknowledged: false, refundPaymentNullifier: default<Bytes<32>> });
+  nullifiers.insert(N);
+  rotateReserve(r, r.totalReserve, ((r.encumberedReserve + amount) as Uint<64>), r.redeemedReserve, r.feeReserve,
+    ((r.pendingFeeReserve + f) as Uint<64>), r.refundReserve, r.reportedRefundReserve);
+  rotateBook(b, ((b.outstanding + cost) as Uint<64>), b.status); actionClock.increment(1);
+}
+export circuit redeemDraw(noteCommitPublic: Bytes<32>, noteExpiry: Uint<64>): [] {
+  const D = disclose(noteCommitPublic); const meta = readNote(D); const r = readReserve();
+  assert(!meta.redeemed && !meta.cancelled, "note spent"); assert(kernel.blockTimeLessThan(disclose(meta.expiry)), "note expired");
+  const amount = redeemAmount(); assert(amount == meta.amount && noteExpiry == meta.expiry, "note terms");
+  const m = merchantPublicKey(rolePublicKey());
+  const p = DrawNotePreimage { domain: contractDomain, lineGeneration: noteGeneration(), identity: noteIdentity(),
+    quoteCommit: noteQuoteCommit(), merchantPk: m, amount: amount, fee: meta.fee, noteNonce: noteNonce(), expiry: noteExpiry };
+  assert(disclose(noteCommit(p, noteSalt())) == D, "note opening");
+  requireApproval(approvalMessage(9, persistentHash<Vector<3, Bytes<32>>>([D, encodeU64(noteExpiry), encodeU64(amount)])));
+  const N = disclose(persistentHash<Vector<4, Bytes<32>>>([pad(32, "line:pool:redeem"), noteNonce(), D, contractDomain]));
+  assert(!nullifiers.member(N), "redemption replay"); nullifiers.insert(N);
+  writeNote(D, NoteMeta { amount: meta.amount, fee: meta.fee, redeemed: true, cancelled: false, expiry: meta.expiry,
+    compensationAllocated: false, refundCommitment: default<Bytes<32>>, cashRefundOwed: false,
+    refundAcknowledged: false, refundPaymentNullifier: default<Bytes<32>> });
+  rotateReserve(r, r.totalReserve, ((r.encumberedReserve - meta.amount) as Uint<64>), ((r.redeemedReserve + meta.amount) as Uint<64>),
+    ((r.feeReserve + meta.fee) as Uint<64>), ((r.pendingFeeReserve - meta.fee) as Uint<64>), r.refundReserve, r.reportedRefundReserve);
+  actionClock.increment(1);
+}
+export circuit cancelOrExpireNote(noteCommitPublic: Bytes<32>, action: Uint<8>, receiptExpiry: Uint<64>): [] {
+  const D = disclose(noteCommitPublic); const mode = disclose(action); assert(mode <= 2, "compensation action");
+  const meta = readNote(D); const r = readReserve(); assert(!meta.redeemed, "note redeemed");
+  const cost = ((meta.amount + meta.fee) as Uint<64>);
+  const caller = rolePublicKey(); const callerIdentity = agentId(caller); const callerIssuer = issuerPublicKey(caller);
+  // Prepare every typed preimage before action selection. Only allocation
+  // validates/spends a book; unused inputs in other actions may be dummies.
+  const b = bookOpening(); const bSalt = salt(); const nextSalt = newSalt(); const path = bookPath();
+  const inputBook = bookCommit(b, bSalt); const inputRoot = merkleTreePathRoot<20, Bytes<32>>(path);
+  const N = persistentHash<Vector<4, Bytes<32>>>([pad(32, "line:pool:book-spend"), contractDomain, inputBook, bSalt]);
+  const owner = noteIdentity(); const generation = noteGeneration();
+  const p = DrawNotePreimage { domain: contractDomain, lineGeneration: generation, identity: owner,
+    quoteCommit: noteQuoteCommit(), merchantPk: quoteMerchantPk(), amount: meta.amount, fee: meta.fee,
+    noteNonce: noteNonce(), expiry: meta.expiry };
+  const originalNote = noteCommit(p, noteSalt());
+  const same = generation == b.generation;
+  const refundAmount = same ? cashRefundAmount(b.outstanding, cost) : cost;
+  const cashOwed = refundAmount > 0;
+  const balance = mode == 1 ? (same ? debtAfterCredit(b.outstanding, cost) : b.outstanding) : b.outstanding;
+  const next = Book { domain: b.domain, identity: b.identity, limit: b.limit, outstanding: balance,
+    epoch: ((b.epoch + (mode == 1 ? 1 : 0)) as Uint<64>), generation: b.generation, expiry: b.expiry,
+    flatFee: b.flatFee, basisPoints: b.basisPoints, status: b.status };
+  const nextBook = bookCommit(next, nextSalt);
+  const allocatedRp = RefundPreimage { domain: contractDomain, lineGeneration: generation, identity: owner, noteCommit: D, amount: refundAmount };
+  const allocatedRefund = refundCommit(allocatedRp, nextSalt);
+  const amount = repayAmount(); const ref = paymentRef();
+  const reportRp = RefundPreimage { domain: contractDomain, lineGeneration: generation, identity: owner, noteCommit: D, amount: amount };
+  const reportedRefund = refundCommit(reportRp, bSalt);
+  const P = paymentNullifier(stableNullifierKey(), ref);
+  const allocationBody = persistentHash<Vector<5, Bytes<32>>>([D, encodeU64(mode as Uint<64>), inputBook, nextSalt, encodeU64(receiptExpiry)]);
+  const refundBody = persistentHash<Vector<5, Bytes<32>>>([D, encodeU64(mode as Uint<64>), encodeU64(receiptExpiry), encodeU64(amount), ref]);
+  const body = mode == 1 ? allocationBody : mode == 2 ? refundBody : D;
+  requireApproval(approvalMessage(10, body));
+  if (mode == 0) {
+    const expired = !kernel.blockTimeLessThan(disclose(meta.expiry));
+    assert(!meta.cancelled && expired, "note not expired or already cancelled");
+  } else if (mode == 1) {
+    assert(!meta.compensationAllocated, "compensation replay");
+    const expired = !kernel.blockTimeLessThan(disclose(meta.expiry)); assert(meta.cancelled || expired, "note not expired");
+    assert(disclose(originalNote) == D, "compensation note opening");
+    assert(callerIssuer == issuer || callerIdentity == owner, "compensation authority");
+    assert(b.domain == contractDomain && path.leaf == inputBook, "compensation book opening");
+    assert(books.checkRoot(disclose(inputRoot)), "book current root");
+    assert(b.identity == owner && generation <= b.generation, "compensation book owner/generation");
+    assert(!spentBooks.member(disclose(N)), "book spent");
+    assert(balance <= b.limit && b.epoch < 18446744073709551615, "compensation book capacity/epoch");
+    spentBooks.insert(disclose(N)); books.insert(disclose(nextBook));
+  } else {
+    assert(meta.cancelled && meta.compensationAllocated && !meta.refundAcknowledged, "refund obligation");
+    assert(kernel.blockTimeLessThan(disclose(receiptExpiry)), "refund receipt expiry");
+    assert(meta.cashRefundOwed ? amount > 0 && amount <= cost : amount == 0, "refund amount");
+    assert(reportedRefund == meta.refundCommitment, "refund opening");
+    assert(ref != default<Bytes<32>>, "empty payment reference"); assert(callerIssuer == issuer, "not issuer");
+    assert(!nullifiers.member(disclose(P)), "payment used"); nullifiers.insert(disclose(P));
+  }
+  const expiryMove = mode == 0 || (mode == 1 && !meta.cancelled);
+  const releasedPrincipal = expiryMove ? meta.amount : 0; const releasedFee = expiryMove ? meta.fee : 0;
+  const expiredHold = expiryMove ? cost : 0;
+  const allocationRelease = mode == 1 && !cashOwed ? cost : 0;
+  const reportedHold = mode == 2 ? (meta.cashRefundOwed ? cost : 0) : 0;
+  // Zero-obligation acknowledgment moves no holds. All actions use the same
+  // typed reserve/note commitment helpers after their authorization checks.
+  rotateReserve(r, r.totalReserve, ((r.encumberedReserve - releasedPrincipal) as Uint<64>), r.redeemedReserve,
+    r.feeReserve, ((r.pendingFeeReserve - releasedFee) as Uint<64>),
+    ((r.refundReserve + expiredHold - allocationRelease - reportedHold) as Uint<64>), ((r.reportedRefundReserve + reportedHold) as Uint<64>));
+  writeNote(D, NoteMeta { amount: meta.amount, fee: meta.fee, redeemed: false, cancelled: true, expiry: meta.expiry,
+    compensationAllocated: mode != 0, refundCommitment: mode == 1 ? allocatedRefund : mode == 2 ? meta.refundCommitment : default<Bytes<32>>,
+    cashRefundOwed: mode == 1 ? cashOwed : mode == 2 ? meta.cashRefundOwed : false,
+    refundAcknowledged: mode == 2, refundPaymentNullifier: mode == 2 ? P : default<Bytes<32>> });
+  actionClock.increment(1);
+}
+export circuit acknowledgeRepayment(receiptExpiry: Uint<64>): [] {
+  const b = readBook(); assert(b.status == Status.OPEN || b.status == Status.DEFAULTED, "status");
+  const amount = repayAmount(); assert(amount > 0 && amount <= b.outstanding, "repayment range");
+  assert(kernel.blockTimeLessThan(disclose(receiptExpiry)), "receipt expiry");
+  const ref = paymentRef(); assert(ref != default<Bytes<32>>, "empty payment reference");
+  requireIssuer(approvalMessage(11, persistentHash<Vector<6, Bytes<32>>>([bookCommit(b, salt()), encodeU64(amount), encodeU64(receiptExpiry), ref, receiptNonce(), newSalt()])));
+  const P = disclose(paymentNullifier(stableNullifierKey(), ref)); assert(!nullifiers.member(P), "payment used");
+  const N = disclose(persistentHash<Vector<6, Bytes<32>>>([pad(32, "line:pool:receipt"), contractDomain, receiptNonce(), bookCommit(b, salt()), encodeU64(amount), ref]));
+  assert(!nullifiers.member(N), "receipt used"); nullifiers.insert(P); nullifiers.insert(N);
+  rotateBook(b, ((b.outstanding - amount) as Uint<64>), b.status); actionClock.increment(1);
+}
+export circuit setStatus(): [] {
+  const b = readBook(); const n = requestedStatus();
+  requireIssuer(approvalMessage(12, persistentHash<Vector<3, Bytes<32>>>([bookCommit(b, salt()), encodeU64(n as Uint<64>), newSalt()])));
+  assert(b.status != Status.NONE && b.status != Status.CLOSED && n != Status.NONE, "status");
+  if (n == Status.CLOSED) { assert(b.outstanding == 0, "closing debt"); }
+  rotateBook(b, b.outstanding, n); actionClock.increment(1);
+}

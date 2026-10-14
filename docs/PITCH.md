@@ -1,10 +1,22 @@
 # Line pitch and demonstration evidence
 
-Updated: 10 October 2026. [PRODUCT_DIRECTION.md](PRODUCT_DIRECTION.md) owns product decisions and readiness. This is a pitch specification with explicit present/target boundaries, not proof that planned features shipped.
+Current verified scope: the [corrected integrated native lifecycle](COORDINATOR_NATIVE_TIME_2026-10-13.md) completes **30 calls across all twelve circuits, 100 deliberate exits, 82 controls and four proof corruption/interruption checks**. The generated lane independently completes 30 calls/92 exits/82 controls. Both earlier seven-call native failures remain preserved. These are local synthetic ledger/time and owner records, with disabled fee balancing and same-host administration; finalized network receipts, actual settlement and full-history privacy remain open. The [rendered deck](../artifacts/wave2/line-wave2.html) now reflects this result; the approved [narrated review](../artifacts/wave2/line-review-video/README.md) is rendered and verified locally at 204.7 seconds, 1080p/30 fps with narration. It is an evidence presentation, not captured live operation or a submitted entry.
+
+The following paragraphs retain earlier checkpoints; their pending native scopes are superseded by the exact current report above.
+
+Latest scope: [all-twelve generated compensation/recovery](COORDINATOR_COMPENSATION_2026-10-13.md) completes 30 calls, 92 exits and 82 controls with both allocation roles, partial/full/zero obligations, saved refund salts and owner-local receipt admission. These records/time are synthetic; the new integrated path is not natively proved, network-confirmed or paid. Historical native scopes below retain their exact earlier helpers.
+
+Current continuation: [repayment/reopening recovery](COORDINATOR_REPAYMENT_REOPENING_2026-10-13.md) verifies 23 generated calls across eleven names, 56 deliberate exits and 49 controls, including changed terms and old-generation redemption. Receipt records and time are synthetic. Compensation and native/network proof of this new path remain open; the older scopes below are historical, not relabeled as the current implementation.
+
+Latest continuation: [recoverable governance](COORDINATOR_GOVERNANCE_2026-10-13.md) adds fifteen generated calls across ten names with twenty-eight deliberate exits and twenty-seven controls. Historical archived-claim native evidence below retains its six-name scope. Integrated repayment, compensation, reopening and native/network proof of this governance path remain open.
+
+Current submission reference: [13 October consolidated audit](AUDIT_REPORT_2026-10-13.md). The [private-offer source](PRIVATE_OFFER_2026-10-11.md) verifies 65 local contract calls across all twelve names. The newer [archived-claim coordinator](CLAIM_ARCHIVE_2026-10-13.md) has 13 generated calls and separate continuous native artifact revalidation across six names, preserving its original reporting-count failure. Fresh per-offer bindings, owner interfaces and recovery are substantial Wave 2 progress. These scopes are not the deployed canonical contract, independent institutional custody, full-history privacy, complete all-twelve runtime or authentic settlement.
+
+Updated: 13 October 2026. [PRODUCT_DIRECTION.md](PRODUCT_DIRECTION.md) owns product decisions and readiness. This is a pitch specification with explicit present/target boundaries, not a rendered submitted deck or proof that planned features shipped. Required artifacts and conflicting event dates are documented in [the current Wave 2 requirements review](WAVE2_REQUIREMENTS_2026-10-11.md).
 
 ## Opening
 
-**Line is a local protocol prototype exploring issuer-authorized purchasing for autonomous agents. Its destination is private credit clearance with merchant claims reconciled to service and payment evidence. No public deployment is verified. The current build proves local Compact accounting and single-use claims; it does not prove full purchase privacy, independent custody, service delivery, or asset settlement.**
+**Line lets an organization authorize an agent to buy services against credit and gives each supplier a single-use merchant claim. Its destination is private credit clearance with claims reconciled to service and payment evidence. The owner reports canonical Preprod deployment and eight executed calls; independent receipt reconciliation is pending. Local native verification covers all twelve canonical circuits and the separate private-finance candidate. Full historical privacy, independent institutional custody and authentic asset settlement remain open.**
 
 **Hypothetical buyer task, not customer evidence:** an enterprise agent buys data or compute to complete a task. Treasury controls exposure; the agent needs purchasing authority; each merchant needs valid authorization, reliable delivery/payment reconciliation and protection against repeated claims. The intended product takes this workflow through actual settlement and recovery. No observed buyer workflow is established yet.
 
@@ -12,7 +24,7 @@ Updated: 10 October 2026. [PRODUCT_DIRECTION.md](PRODUCT_DIRECTION.md) owns prod
 
 Enterprise platform teams can already use prepaid APIs, policy-controlled wallets or conventional billing. These are real controls and the baseline to beat.
 
-The customer segment is not selected. Compare production agent-platform operators buying for their own workflow, enterprise teams operating agents internally, and platforms integrating for a named customer-buyer. The enterprise-team segment remains an explicit hypothesis. No buyer evidence is established; use a clearly labeled hypothetical scenario unless a real workflow and buyer-owned harm are supported by consented evidence. A prior Midnight hackathon report describes the Latch project as implementing private AI-agent budgets, so Line's proposed distinction must be organization-level shared credit and accepted merchant settlement, not agent spending privacy alone. This is a published project description, not independently reproduced evidence. The current ledger exposes amounts and history, so do not promise full-book privacy today. No customer contacts or validation are established.
+The accepted initial customer hypothesis is enterprise teams whose agents buy APIs and compute. No buyer evidence is established; use a clearly labeled hypothetical scenario unless a real workflow and buyer-owned harm are supported by consented evidence. Compare policy wallets and conventional billing in customer discovery. A prior Midnight hackathon report describes the Latch project as implementing private AI-agent budgets, so Line's proposed distinction must be organization-level shared credit and accepted merchant settlement, not agent spending privacy alone. This is a published project description, not independently reproduced evidence. The deployed canonical ledger exposes amounts and history, so do not promise full-book privacy today. No customer contacts or validation are established.
 
 ## Slide 2 — The clearance and merchant claim
 
@@ -50,6 +62,8 @@ The full-product acceptance target (not the current Wave 2 demo script) is:
 Steps involving actual money, public network or full historical privacy remain open until independently evidenced. Fixture amounts are test credit units unless an asset/currency and scale are established. Do not present a scripted snapshot as a live funded purchase.
 
 ## Slide 5 — Evidence and adversarial checks
+
+Use the [demo evidence table](WAVE2_DEMO.md): generated browser checkout, reported canonical Preprod calls, canonical local native proofs, complete base experimental proofs, and complete merchant experimental proofs are separate paths. The merchant retry verifies 39 lifecycle calls plus all seven isolated branches across all twelve names, and rejects six corrupted draws in a separate Rust verifier. Its paired refund acknowledgments differ by one serialized byte; historical privacy remains unproven. Neither deployment registration nor local proof validity establishes a cash payout or an observer privacy guarantee. The separate encrypted software signer is not yet integrated into this native lifecycle.
 
 Show source commit, compiler/runtime/environment compatibility, the twelve circuit names, generated drift result, authorization/replay/compensation/recovery checks, deployed address if confirmed and payout receipt if paid. Keep raw evidence linked outside slides.
 

@@ -6,6 +6,36 @@ on:
   pull_request:
 
 jobs:
+  native-worker-ownership:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Build the worker guardian
+        env:
+          CARGO_PROFILE_DEV_DEBUG: "0"
+        run: cargo build --locked --manifest-path scripts/private-worker-guardian/Cargo.toml --target-dir .compact-keys/worker-guardian-target
+      - name: Verify actual process ownership and parent loss
+        run: node --test tests/worker-guardian.test.mjs
+
+  windows-checkpoint-acl:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - name: Install JavaScript dependencies
+        run: npm ci
+      - name: Check private directory ACLs without module discovery
+        run: node --experimental-strip-types --test --test-name-pattern="Windows checkpoint" server/checkout-durability.test.ts
+
   verify:
     runs-on: ubuntu-latest
     steps:
@@ -26,6 +56,8 @@ jobs:
           test "$(wc -c < LICENSE)" -ge 10000
 
       - name: Install project-pinned Compact toolchain
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           bash scripts/install-compact.sh
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
@@ -44,14 +76,89 @@ jobs:
       - name: Check for generated artifact drift
         run: git diff --exit-code contracts/managed/
 
+      - name: Compiler numeric-range regression probes
+        run: npm run compact:range:check
+
       - name: Compact simulator tests
         run: npm run compact:test
 
+      - name: Compile and verify address-bound approval candidate
+        run: |
+          node scripts/compile-compact.mjs --skip-zk contracts/experimental/line-private-offer-addressed.compact .compact-keys/address-bound-managed
+          node --experimental-strip-types scripts/address-bound-approval-check.mjs .compact-keys/address-bound-managed
+
       - name: TypeScript reference + encoding + demo + MCP tests
+        env:
+          COMPACT_ADDRESS_MANAGED_DIR: .compact-keys/address-bound-managed
         run: npm test
+
+      - name: Address-bound coordinator owner approvals and recovery
+        env:
+          COMPACT_ADDRESS_MANAGED_DIR: .compact-keys/address-bound-managed
+        run: node --experimental-strip-types --test tests/address-bound-coordinator.test.mjs
 
       - name: Compiled independent-key opening experiment
         run: npm run custody:spike
+
+      - name: Compiled private-book population experiment
+        run: npm run pool:spike
+
+      - name: Compiled signed-role approval controls
+        run: npm run signed:spike
+
+      - name: Compiled private-finance signed-role experiment
+        run: npm run privacy:spike
+
+      - name: Compiled private merchant-membership experiment
+        run: npm run merchant:spike
+
+      - name: Reachable refund public transcript comparison
+        run: npm run merchant:history
+
+      - name: Compiled private enrollment and duplicate-generation controls
+        run: npm run enrollment:spike
+
+      - name: Private supplier offers and financial binding controls
+        run: npm run offer:spike
+
+      - name: Durable agent approvals in freshly compiled Compact
+        run: npm run custody:compact
+      - name: Durable agent approvals with private supplier offers
+        run: npm run custody:offer:compact
+
+      - name: Recoverable private financial openings and candidates
+        run: npm run finance:compact
+
+      - name: Owner approval services and two-merchant Compact integration
+        run: npm run owner:service:compact
+
+      - name: Whole coordinator recovery through owner approval services
+        run: npm run owner:coordinator:compact
+
+      - name: Older claims survive repeated supplier purchases and restart
+        run: npm run owner:coordinator:compact -- --repeat-supplier
+
+      - name: Recover governance and withdrawals through owner approval services
+        run: npm run owner:coordinator:compact -- --governance
+
+      - name: Recover repayment and bilateral closed-book reopening
+        run: npm run owner:coordinator:compact -- --lifecycle
+
+      - name: Recover all twelve actions and all compensation modes
+        run: npm run owner:coordinator:compact -- --compensation
+
+      - name: Recover all twelve actions through address-bound owners
+        run: npm run owner:coordinator:addressed:compact
+
+      - name: Decode source-bound public privacy pairs and check wire-size findings
+        env:
+          CARGO_PROFILE_DEV_DEBUG: "0"
+        run: |
+          cargo build --locked --manifest-path scripts/native-public-components/Cargo.toml --target-dir .compact-keys/public-reader-target
+          node scripts/private-offer-wire-review.mjs tests/fixtures/private-offer-public-pairs .compact-keys/public-reader-target/debug/line-native-public-components
+
+      - name: Fail-closed network receipt metadata checks
+        run: npm run network:receipts:test
 
       - name: Typecheck
         run: npm run typecheck
@@ -67,3 +174,9 @@ jobs:
 
       - name: Frontend build
         run: npm run build
+
+      - name: Install browser for role and recovery verification
+        run: npx playwright install --with-deps chromium
+
+      - name: Browser checkout, custody and recovery tests
+        run: npm run test:e2e

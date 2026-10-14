@@ -1,6 +1,6 @@
 # Deployment and release operations
 
-Updated: 10 October 2026. Public Preprod is the integration target; no confirmed deployment or asset payout is established by this document. Local `/checkout` executes generated logic without submitting proofs or payments. [Readiness](PRODUCT_DIRECTION.md) needs separate network, funding, delivery and payout evidence.
+Updated: 11 October 2026. The repository now reports a canonical Preprod deployment and eight circuit calls, recorded below. Independent transaction/state/key verification is pending; no asset payout is established. Neither experimental privacy candidate is deployed by those receipts. Local `/checkout` executes generated logic without submitting proofs or payments. [Readiness](PRODUCT_DIRECTION.md) needs separate network, funding, delivery and payout evidence.
 
 ## Selected compatible stack
 
@@ -68,9 +68,11 @@ The public `indexer.preprod.midnight.network` endpoint was decommissioned 2026-1
 
 Append `?project_id=<PREPROD_PROJECT_TOKEN>` as the provider documents. A Mainnet token does not authenticate Preprod. Configure node/indexer/WebSocket consistently in browser and CLI. Treat token-containing URLs as credentials in logs/evidence; browser-delivered tokens are visible to that operator and require an intentional provider/proxy policy.
 
-## Verified Midnight Preprod Deployment & On-Chain Execution (11 October 2026)
+## Reported Midnight Preprod deployment and execution (11 October 2026)
 
-All 12 circuits have been deployed, registered, and executed on Midnight Preprod via incremental shell deployment and individual verifier key registration (`deployment-evidence.json`):
+`deployment-evidence.json` reports deployment with `registerMerchant`, registration of eleven additional verifier keys, and eight subsequent canonical circuit calls. Registration is not execution of all twelve circuits. Independent raw-transaction, finality, state and verifier-key checks are pending.
+
+[Independent receipt-check command and recovery findings](NETWORK_RECEIPT_AUDIT_2026-10-11.md) cover the newly added incremental script. The read-only command currently lacks a Preprod project token; local metadata tests do not validate live receipts.
 
 - **Contract Address:** `b2254962147c9cc2e5b9fbcf39f8a4e0d1f149b7801a651df2e41dda1e4410d9`
 - **Contract Shell Deploy:**
@@ -95,7 +97,7 @@ All 12 circuits have been deployed, registered, and executed on Midnight Preprod
 
 ### Full 8-Step On-Chain Circuit Flow Execution
 
-The complete multi-role circuit sequence was executed and confirmed on-chain:
+The deployment script recorded these eight reported confirmations. Roles share a mnemonic/process, and the accounting calls do not move settlement assets:
 
 | Step | Circuit | Transaction Hash | Block Height |
 |---|---|---|---|

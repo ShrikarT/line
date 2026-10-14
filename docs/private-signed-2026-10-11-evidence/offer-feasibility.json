@@ -1,0 +1,1205 @@
+{
+  "schema": "line-private-offer-feasibility/v1",
+  "createdAt": "2026-10-11T16:18:02.825Z",
+  "sourceSha256": "ae970672c048c48692ab690554c77285fec19d1943dc3b4574080970b7fa657d",
+  "artifactFingerprints": {
+    "contract/index.js": "23e5c49249dd0af5aef7e25625db197dd4d6d7244d324bbe6a876d49a1624683",
+    "compiler/contract-info.json": "10a94c9d83abde894552fb57960188ae6b15e29be4b424a59fc0ee0320cbcfc5"
+  },
+  "scriptFingerprints": {
+    "scripts/private-offer-spike.mjs": "24b63ec196052b7895b885b84ed2efc3da82e9103ab8dd88806052353aa4cf06",
+    "scripts/private-offer-signers.mjs": "80695e03759e98c7bda37ea909430e1b94c9ccabf9f2ef4c6defa3a1a5e2660e",
+    "scripts/private-offer-encoding.mjs": "e78ffe273c86f72f58733574287b3099530be96efbed37a6fe3d8c16a36a7f22",
+    "scripts/signed-pool-signers.mjs": "df077892d65f2736322be3e627e6ec9f1bcfa422f9369dcb2016d203ca5831a3",
+    "scripts/private-pool-spike.mjs": "be5b8a3e2f85a3bb3e45fabfaafe55b45f414f6999b3931a6fb4c33f01a04397",
+    "src/lib/line/encoding.ts": "fb2af647156d2a744c6fb031fe084aee25708a379a7db6412782ca9c2e232b5b",
+    "src/lib/security/vault-codec.ts": "7df485e705a4d64b2fb6ea262ca96dd5c11c509c32991b03e2dea94d09fb55f9"
+  },
+  "compiler": "0.31.1",
+  "runtime": "0.16.0",
+  "freshCompilation": true,
+  "cachedGeneratedBindings": false,
+  "sourceBindingVerifiedByThisRun": true,
+  "exportedCircuits": [
+    "registerMerchant",
+    "disableMerchant",
+    "fundReserve",
+    "withdrawUnencumberedReserve",
+    "withdrawFees",
+    "openLine",
+    "postQuote",
+    "draw",
+    "redeemDraw",
+    "cancelOrExpireNote",
+    "acknowledgeRepayment",
+    "setStatus"
+  ],
+  "canonicalModified": false,
+  "independentSignerProcesses": 6,
+  "signingScalarsInCoordinatorOrCircuitWitnesses": false,
+  "reserveOpeningsSentToSigners": false,
+  "privateBooksHeldByTrustedCoordinator": true,
+  "expirySignerFinancialOpenings": false,
+  "refundSignerBookOrReserveOpenings": false,
+  "syntheticSignerPolicy": true,
+  "durableInstitutionalCustody": false,
+  "currentRootOnly": true,
+  "publicAmountsAndReserveTotalsAbsent": true,
+  "fullHistoryPrivacyPassed": false,
+  "cryptographicProofsGenerated": false,
+  "networkSubmitted": false,
+  "authenticAssetSettlement": false,
+  "customerDemandValidated": false,
+  "selectedMerchantAbsentFromQuoteAndDrawView": true,
+  "selectedMerchantAbsentFromRedemptionView": true,
+  "noSeparateFacilityExpiryQueryInDraw": true,
+  "zeroObligationAcknowledgmentSupported": true,
+  "uniformAcknowledgmentSchedulingImplemented": false,
+  "publicPreviousBookFlag": false,
+  "generationSpecificIssuanceNullifiers": true,
+  "enrollmentComparisons": [
+    {
+      "phase": "consent",
+      "samePublicPredecessor": true,
+      "sameBookRoot": true,
+      "publicInputsEqual": true,
+      "publicOutputsEqual": true,
+      "transcriptEntries": {
+        "fresh": 70,
+        "reopened": 70
+      },
+      "differingLeaves": [
+        {
+          "path": "/38/push/value/content/value/0",
+          "fresh": {
+            "type": "string",
+            "characters": 64,
+            "hexEncoded": true
+          },
+          "reopened": {
+            "type": "string",
+            "characters": 64,
+            "hexEncoded": true
+          }
+        },
+        {
+          "path": "/49/push/value/content/value/0",
+          "fresh": {
+            "type": "string",
+            "characters": 64,
+            "hexEncoded": true
+          },
+          "reopened": {
+            "type": "string",
+            "characters": 64,
+            "hexEncoded": true
+          }
+        },
+        {
+          "path": "/53/push/value/content/value/0",
+          "fresh": {
+            "type": "string",
+            "characters": 64,
+            "hexEncoded": true
+          },
+          "reopened": {
+            "type": "string",
+            "characters": 64,
+            "hexEncoded": true
+          }
+        },
+        {
+          "path": "/59/push/value/content/value/0",
+          "fresh": {
+            "type": "string",
+            "characters": 64,
+            "hexEncoded": true
+          },
+          "reopened": {
+            "type": "string",
+            "characters": 64,
+            "hexEncoded": true
+          }
+        },
+        {
+          "path": "/63/push/value/content/value/0",
+          "fresh": {
+            "type": "string",
+            "characters": 64,
+            "hexEncoded": true
+          },
+          "reopened": {
+            "type": "string",
+            "characters": 64,
+            "hexEncoded": true
+          }
+        }
+      ],
+      "completeObserverEquivalence": false
+    },
+    {
+      "phase": "acceptance",
+      "samePublicPredecessor": false,
+      "sameBookRoot": true,
+      "publicInputsEqual": true,
+      "publicOutputsEqual": true,
+      "transcriptEntries": {
+        "fresh": 99,
+        "reopened": 99
+      },
+      "differingLeaves": [
+        {
+          "path": "/35/push/value/content/value/0",
+          "fresh": {
+            "type": "string",
+            "characters": 64,
+            "hexEncoded": true
+          },
+          "reopened": {
+            "type": "string",
+            "characters": 64,
+            "hexEncoded": true
+          }
+        },
+        {
+          "path": "/46/push/value/content/value/0",
+          "fresh": {
+            "type": "string",
+            "characters": 64,
+            "hexEncoded": true
+          },
+          "reopened": {
+            "type": "string",
+            "characters": 64,
+            "hexEncoded": true
+          }
+        },
+        {
+          "path": "/50/push/value/content/value/0",
+          "fresh": {
+            "type": "string",
+            "characters": 64,
+            "hexEncoded": true
+          },
+          "reopened": {
+            "type": "string",
+            "characters": 64,
+            "hexEncoded": true
+          }
+        },
+        {
+          "path": "/59/push/value/content/value/0",
+          "fresh": {
+            "type": "string",
+            "characters": 64,
+            "hexEncoded": true
+          },
+          "reopened": {
+            "type": "string",
+            "characters": 64,
+            "hexEncoded": true
+          }
+        },
+        {
+          "path": "/64/idx/path/0/value/value/0",
+          "fresh": {
+            "type": "string",
+            "characters": 64,
+            "hexEncoded": true
+          },
+          "reopened": {
+            "type": "string",
+            "characters": 64,
+            "hexEncoded": true
+          }
+        },
+        {
+          "path": "/68/push/value/content/value/0",
+          "fresh": {
+            "type": "string",
+            "characters": 64,
+            "hexEncoded": true
+          },
+          "reopened": {
+            "type": "string",
+            "characters": 64,
+            "hexEncoded": true
+          }
+        },
+        {
+          "path": "/72/push/value/content/value/0",
+          "fresh": {
+            "type": "string",
+            "characters": 64,
+            "hexEncoded": true
+          },
+          "reopened": {
+            "type": "string",
+            "characters": 64,
+            "hexEncoded": true
+          }
+        },
+        {
+          "path": "/77/push/value/content/value/0",
+          "fresh": {
+            "type": "string",
+            "characters": 64,
+            "hexEncoded": true
+          },
+          "reopened": {
+            "type": "string",
+            "characters": 64,
+            "hexEncoded": true
+          }
+        },
+        {
+          "path": "/82/push/value/content/value/0",
+          "fresh": {
+            "type": "string",
+            "characters": 64,
+            "hexEncoded": true
+          },
+          "reopened": {
+            "type": "string",
+            "characters": 64,
+            "hexEncoded": true
+          }
+        },
+        {
+          "path": "/90/push/value/content/value/0",
+          "fresh": {
+            "type": "string",
+            "characters": 64,
+            "hexEncoded": true
+          },
+          "reopened": {
+            "type": "string",
+            "characters": 64,
+            "hexEncoded": true
+          }
+        }
+      ],
+      "completeObserverEquivalence": false
+    }
+  ],
+  "acceptedIsolatedBranchCalls": 26,
+  "supplierRequests": [
+    {
+      "operation": "postQuote",
+      "keys": [
+        "invoiceId",
+        "quoteAmount",
+        "quoteFacilityBinding",
+        "quoteNonce"
+      ],
+      "privateBookOrFeePolicyIncluded": false
+    },
+    {
+      "operation": "postQuote",
+      "keys": [
+        "invoiceId",
+        "quoteAmount",
+        "quoteFacilityBinding",
+        "quoteNonce"
+      ],
+      "privateBookOrFeePolicyIncluded": false
+    },
+    {
+      "operation": "postQuote",
+      "keys": [
+        "invoiceId",
+        "quoteAmount",
+        "quoteFacilityBinding",
+        "quoteNonce"
+      ],
+      "privateBookOrFeePolicyIncluded": false
+    },
+    {
+      "operation": "postQuote",
+      "keys": [
+        "invoiceId",
+        "quoteAmount",
+        "quoteFacilityBinding",
+        "quoteNonce"
+      ],
+      "privateBookOrFeePolicyIncluded": false
+    },
+    {
+      "operation": "redeemDraw",
+      "keys": [
+        "redeemAmount"
+      ],
+      "privateBookOrFeePolicyIncluded": false
+    },
+    {
+      "operation": "postQuote",
+      "keys": [
+        "invoiceId",
+        "quoteAmount",
+        "quoteFacilityBinding",
+        "quoteNonce"
+      ],
+      "privateBookOrFeePolicyIncluded": false
+    },
+    {
+      "operation": "redeemDraw",
+      "keys": [
+        "redeemAmount"
+      ],
+      "privateBookOrFeePolicyIncluded": false
+    },
+    {
+      "operation": "postQuote",
+      "keys": [
+        "invoiceId",
+        "quoteAmount",
+        "quoteFacilityBinding",
+        "quoteNonce"
+      ],
+      "privateBookOrFeePolicyIncluded": false
+    },
+    {
+      "operation": "postQuote",
+      "keys": [
+        "invoiceId",
+        "quoteAmount",
+        "quoteFacilityBinding",
+        "quoteNonce"
+      ],
+      "privateBookOrFeePolicyIncluded": false
+    },
+    {
+      "operation": "postQuote",
+      "keys": [
+        "invoiceId",
+        "quoteAmount",
+        "quoteFacilityBinding",
+        "quoteNonce"
+      ],
+      "privateBookOrFeePolicyIncluded": false
+    },
+    {
+      "operation": "postQuote",
+      "keys": [
+        "invoiceId",
+        "quoteAmount",
+        "quoteFacilityBinding",
+        "quoteNonce"
+      ],
+      "privateBookOrFeePolicyIncluded": false
+    },
+    {
+      "operation": "postQuote",
+      "keys": [
+        "invoiceId",
+        "quoteAmount",
+        "quoteFacilityBinding",
+        "quoteNonce"
+      ],
+      "privateBookOrFeePolicyIncluded": false
+    },
+    {
+      "operation": "postQuote",
+      "keys": [
+        "invoiceId",
+        "quoteAmount",
+        "quoteFacilityBinding",
+        "quoteNonce"
+      ],
+      "privateBookOrFeePolicyIncluded": false
+    },
+    {
+      "operation": "postQuote",
+      "keys": [
+        "invoiceId",
+        "quoteAmount",
+        "quoteFacilityBinding",
+        "quoteNonce"
+      ],
+      "privateBookOrFeePolicyIncluded": false
+    },
+    {
+      "operation": "redeemDraw",
+      "keys": [
+        "redeemAmount"
+      ],
+      "privateBookOrFeePolicyIncluded": false
+    },
+    {
+      "operation": "redeemDraw",
+      "keys": [
+        "redeemAmount"
+      ],
+      "privateBookOrFeePolicyIncluded": false
+    },
+    {
+      "operation": "redeemDraw",
+      "keys": [
+        "redeemAmount"
+      ],
+      "privateBookOrFeePolicyIncluded": false
+    },
+    {
+      "operation": "redeemDraw",
+      "keys": [
+        "redeemAmount"
+      ],
+      "privateBookOrFeePolicyIncluded": false
+    },
+    {
+      "operation": "postQuote",
+      "keys": [
+        "invoiceId",
+        "quoteAmount",
+        "quoteFacilityBinding",
+        "quoteNonce"
+      ],
+      "privateBookOrFeePolicyIncluded": false
+    },
+    {
+      "operation": "postQuote",
+      "keys": [
+        "invoiceId",
+        "quoteAmount",
+        "quoteFacilityBinding",
+        "quoteNonce"
+      ],
+      "privateBookOrFeePolicyIncluded": false
+    },
+    {
+      "operation": "postQuote",
+      "keys": [
+        "invoiceId",
+        "quoteAmount",
+        "quoteFacilityBinding",
+        "quoteNonce"
+      ],
+      "privateBookOrFeePolicyIncluded": false
+    },
+    {
+      "operation": "redeemDraw",
+      "keys": [
+        "redeemAmount"
+      ],
+      "privateBookOrFeePolicyIncluded": false
+    },
+    {
+      "operation": "redeemDraw",
+      "keys": [
+        "redeemAmount"
+      ],
+      "privateBookOrFeePolicyIncluded": false
+    }
+  ],
+  "offerComparisons": [
+    {
+      "sameReachablePredecessor": true,
+      "continuousGeneratedCallsPerHistory": 5,
+      "supplierQuoteValuesExactlyEqual": true,
+      "quoteCommitExactlyEqual": true,
+      "privateDebts": [
+        "16",
+        "17"
+      ],
+      "privateRemainingCapacity": [
+        "84",
+        "93"
+      ],
+      "supplierKeys": [
+        "invoiceId",
+        "quoteAmount",
+        "quoteFacilityBinding",
+        "quoteNonce"
+      ],
+      "fullHistoryPrivacyPassed": false,
+      "cryptographicProofsGenerated": false,
+      "scope": "Finite supplier quote-request counterexample to exact debt inference when fee policy is confidential. No full transcript or external-side-information guarantee."
+    }
+  ],
+  "supplierPolicyChecks": [
+    {
+      "check": "supplier-denies-bookOpening",
+      "rejectedBySignerRequestBoundary": true,
+      "reachedCompact": false
+    },
+    {
+      "check": "supplier-denies-quoteGeneration",
+      "rejectedBySignerRequestBoundary": true,
+      "reachedCompact": false
+    },
+    {
+      "check": "supplier-denies-quoteFlatFee",
+      "rejectedBySignerRequestBoundary": true,
+      "reachedCompact": false
+    },
+    {
+      "check": "supplier-denies-quoteBindingSalt",
+      "rejectedBySignerRequestBoundary": true,
+      "reachedCompact": false
+    },
+    {
+      "check": "supplier-redemption-denies-borrower-identity",
+      "rejectedBySignerRequestBoundary": true,
+      "reachedCompact": false
+    }
+  ],
+  "supplierFeePolicyIncluded": false,
+  "supplierNumericGenerationIncluded": false,
+  "supplierBorrowerIdentityIncluded": false,
+  "isolatedGeneratedBranches": [
+    "last-second-draw",
+    "zero-cash-compensation",
+    "zero-obligation-acknowledgment",
+    "alternate-repayment-expiry-allocation-acknowledgment-history",
+    "duplicate-initial-consent-agent-a",
+    "duplicate-initial-consent-agent-b",
+    "fresh-enrollment-consent",
+    "reopen-enrollment-consent",
+    "fresh-enrollment-acceptance",
+    "reopen-enrollment-acceptance"
+  ],
+  "refundCounterfactual": {
+    "privateRepayments": [
+      "100",
+      "600"
+    ],
+    "privatePostAllocationDebts": [
+      "448",
+      "0"
+    ],
+    "privateCashAmounts": [
+      "0",
+      "52"
+    ],
+    "samePublicActionNames": true,
+    "acknowledgmentInputsExactlyEqual": true,
+    "acknowledgmentOutputsExactlyEqual": true,
+    "cashAmountWordAbsent": true,
+    "completeObserverEquivalence": false,
+    "nativeProofsGenerated": false
+  },
+  "residualRisks": [
+    "public registry, finite merchant sets and fixed-price catalogs",
+    "deadlines, public action shapes and timing",
+    "sender, DUST and prover metadata",
+    "trusted book/reserve prover and synthetic signer policy",
+    "finite population and side information"
+  ],
+  "traces": [
+    {
+      "actor": "issuer",
+      "circuit": "registerMerchant",
+      "signingScalarWitnesses": 0,
+      "reserveEpoch": "0"
+    },
+    {
+      "actor": "issuer",
+      "circuit": "fundReserve",
+      "signingScalarWitnesses": 0,
+      "reserveEpoch": "1"
+    },
+    {
+      "actor": "agent-a",
+      "circuit": "openLine",
+      "signingScalarWitnesses": 0,
+      "reserveEpoch": "1"
+    },
+    {
+      "actor": "issuer",
+      "circuit": "openLine",
+      "signingScalarWitnesses": 0,
+      "reserveEpoch": "1"
+    },
+    {
+      "actor": "agent-b",
+      "circuit": "openLine",
+      "signingScalarWitnesses": 0,
+      "reserveEpoch": "1"
+    },
+    {
+      "actor": "issuer",
+      "circuit": "openLine",
+      "signingScalarWitnesses": 0,
+      "reserveEpoch": "1"
+    },
+    {
+      "actor": "merchant-a",
+      "circuit": "postQuote",
+      "signingScalarWitnesses": 0,
+      "reserveEpoch": "1"
+    },
+    {
+      "actor": "merchant-b",
+      "circuit": "postQuote",
+      "signingScalarWitnesses": 0,
+      "reserveEpoch": "1"
+    },
+    {
+      "actor": "merchant-a",
+      "circuit": "postQuote",
+      "signingScalarWitnesses": 0,
+      "reserveEpoch": "1"
+    },
+    {
+      "actor": "merchant-a",
+      "circuit": "postQuote",
+      "signingScalarWitnesses": 0,
+      "reserveEpoch": "1"
+    },
+    {
+      "actor": "agent-a",
+      "circuit": "draw",
+      "signingScalarWitnesses": 0,
+      "reserveEpoch": "2"
+    },
+    {
+      "actor": "agent-b",
+      "circuit": "draw",
+      "signingScalarWitnesses": 0,
+      "reserveEpoch": "3"
+    },
+    {
+      "actor": "merchant-a",
+      "circuit": "redeemDraw",
+      "signingScalarWitnesses": 0,
+      "reserveEpoch": "4"
+    },
+    {
+      "actor": "issuer",
+      "circuit": "acknowledgeRepayment",
+      "signingScalarWitnesses": 0,
+      "reserveEpoch": "4"
+    },
+    {
+      "actor": "issuer",
+      "circuit": "setStatus",
+      "signingScalarWitnesses": 0,
+      "reserveEpoch": "4"
+    },
+    {
+      "actor": "issuer",
+      "circuit": "setStatus",
+      "signingScalarWitnesses": 0,
+      "reserveEpoch": "4"
+    },
+    {
+      "actor": "agent-a",
+      "circuit": "draw",
+      "signingScalarWitnesses": 0,
+      "reserveEpoch": "5"
+    },
+    {
+      "actor": "issuer",
+      "circuit": "acknowledgeRepayment",
+      "signingScalarWitnesses": 0,
+      "reserveEpoch": "5"
+    },
+    {
+      "actor": "issuer",
+      "circuit": "setStatus",
+      "signingScalarWitnesses": 0,
+      "reserveEpoch": "5"
+    },
+    {
+      "actor": "agent-a",
+      "circuit": "openLine",
+      "signingScalarWitnesses": 0,
+      "reserveEpoch": "5"
+    },
+    {
+      "actor": "issuer",
+      "circuit": "openLine",
+      "signingScalarWitnesses": 0,
+      "reserveEpoch": "5"
+    },
+    {
+      "actor": "merchant-a",
+      "circuit": "postQuote",
+      "signingScalarWitnesses": 0,
+      "reserveEpoch": "5"
+    },
+    {
+      "actor": "agent-a",
+      "circuit": "draw",
+      "signingScalarWitnesses": 0,
+      "reserveEpoch": "6"
+    },
+    {
+      "actor": "merchant-b",
+      "circuit": "postQuote",
+      "signingScalarWitnesses": 0,
+      "reserveEpoch": "6"
+    },
+    {
+      "actor": "agent-b",
+      "circuit": "draw",
+      "signingScalarWitnesses": 0,
+      "reserveEpoch": "7"
+    },
+    {
+      "actor": "issuer",
+      "circuit": "acknowledgeRepayment",
+      "signingScalarWitnesses": 0,
+      "reserveEpoch": "7"
+    },
+    {
+      "actor": "attacker",
+      "circuit": "cancelOrExpireNote",
+      "signingScalarWitnesses": 0,
+      "reserveEpoch": "8"
+    },
+    {
+      "actor": "issuer",
+      "circuit": "cancelOrExpireNote",
+      "signingScalarWitnesses": 0,
+      "reserveEpoch": "9"
+    },
+    {
+      "actor": "issuer",
+      "circuit": "cancelOrExpireNote",
+      "signingScalarWitnesses": 0,
+      "reserveEpoch": "10"
+    },
+    {
+      "actor": "agent-a",
+      "circuit": "cancelOrExpireNote",
+      "signingScalarWitnesses": 0,
+      "reserveEpoch": "11"
+    },
+    {
+      "actor": "issuer",
+      "circuit": "cancelOrExpireNote",
+      "signingScalarWitnesses": 0,
+      "reserveEpoch": "12"
+    },
+    {
+      "actor": "issuer",
+      "circuit": "disableMerchant",
+      "signingScalarWitnesses": 0,
+      "reserveEpoch": "12"
+    },
+    {
+      "actor": "merchant-b",
+      "circuit": "redeemDraw",
+      "signingScalarWitnesses": 0,
+      "reserveEpoch": "13"
+    },
+    {
+      "actor": "merchant-a",
+      "circuit": "redeemDraw",
+      "signingScalarWitnesses": 0,
+      "reserveEpoch": "14"
+    },
+    {
+      "actor": "issuer",
+      "circuit": "withdrawFees",
+      "signingScalarWitnesses": 0,
+      "reserveEpoch": "15"
+    },
+    {
+      "actor": "issuer",
+      "circuit": "withdrawUnencumberedReserve",
+      "signingScalarWitnesses": 0,
+      "reserveEpoch": "16"
+    },
+    {
+      "actor": "issuer",
+      "circuit": "acknowledgeRepayment",
+      "signingScalarWitnesses": 0,
+      "reserveEpoch": "16"
+    },
+    {
+      "actor": "issuer",
+      "circuit": "setStatus",
+      "signingScalarWitnesses": 0,
+      "reserveEpoch": "16"
+    },
+    {
+      "actor": "issuer",
+      "circuit": "setStatus",
+      "signingScalarWitnesses": 0,
+      "reserveEpoch": "16"
+    }
+  ],
+  "negativeChecks": [
+    {
+      "check": "agent-cannot-fund",
+      "rejectedByGeneratedCompact": true
+    },
+    {
+      "check": "agent-cannot-register-merchant",
+      "rejectedByGeneratedCompact": true
+    },
+    {
+      "check": "duplicate-merchant-registration",
+      "rejectedByGeneratedCompact": true
+    },
+    {
+      "check": "stale-enabled-root",
+      "rejectedByGeneratedCompact": true
+    },
+    {
+      "check": "wrong-enabled-merchant-leaf",
+      "rejectedByGeneratedCompact": true
+    },
+    {
+      "check": "unregistered-merchant-offer",
+      "rejectedByGeneratedCompact": true
+    },
+    {
+      "check": "reserve-overflow",
+      "rejectedByGeneratedCompact": true
+    },
+    {
+      "check": "forged-reserve-opening",
+      "rejectedByGeneratedCompact": true
+    },
+    {
+      "check": "stale-enrollment-root",
+      "rejectedByGeneratedCompact": true
+    },
+    {
+      "check": "missing-agent-consent",
+      "rejectedByGeneratedCompact": true
+    },
+    {
+      "check": "agent-cannot-accept",
+      "rejectedByGeneratedCompact": true
+    },
+    {
+      "check": "changed-limit-consent",
+      "rejectedByGeneratedCompact": true
+    },
+    {
+      "check": "changed-predecessor-consent",
+      "rejectedByGeneratedCompact": true
+    },
+    {
+      "check": "enrollment-replay",
+      "rejectedByGeneratedCompact": true
+    },
+    {
+      "check": "duplicate-initial-generation",
+      "rejectedByGeneratedCompact": true
+    },
+    {
+      "check": "open-predecessor-cannot-reopen",
+      "rejectedByGeneratedCompact": true
+    },
+    {
+      "check": "stale-enrollment-root",
+      "rejectedByGeneratedCompact": true
+    },
+    {
+      "check": "missing-agent-consent",
+      "rejectedByGeneratedCompact": true
+    },
+    {
+      "check": "agent-cannot-accept",
+      "rejectedByGeneratedCompact": true
+    },
+    {
+      "check": "changed-limit-consent",
+      "rejectedByGeneratedCompact": true
+    },
+    {
+      "check": "changed-predecessor-consent",
+      "rejectedByGeneratedCompact": true
+    },
+    {
+      "check": "enrollment-replay",
+      "rejectedByGeneratedCompact": true
+    },
+    {
+      "check": "duplicate-initial-generation",
+      "rejectedByGeneratedCompact": true
+    },
+    {
+      "check": "open-predecessor-cannot-reopen",
+      "rejectedByGeneratedCompact": true
+    },
+    {
+      "check": "claim-cannot-outlive-facility",
+      "rejectedByGeneratedCompact": true
+    },
+    {
+      "check": "altered-private-offer-binding-salt",
+      "rejectedByGeneratedCompact": true
+    },
+    {
+      "check": "private-offer-fee-underpayment",
+      "rejectedByGeneratedCompact": true
+    },
+    {
+      "check": "private-offer-fee-overcharge",
+      "rejectedByGeneratedCompact": true
+    },
+    {
+      "check": "private-offer-foreign-borrower",
+      "rejectedByGeneratedCompact": true
+    },
+    {
+      "check": "private-offer-stale-generation",
+      "rejectedByGeneratedCompact": true
+    },
+    {
+      "check": "private-offer-foreign-domain",
+      "rejectedByGeneratedCompact": true
+    },
+    {
+      "check": "note-deadline-exact-cutoff",
+      "rejectedByGeneratedCompact": true
+    },
+    {
+      "check": "stale-registered-merchant-root",
+      "rejectedByGeneratedCompact": true
+    },
+    {
+      "check": "wrong-registered-merchant-leaf",
+      "rejectedByGeneratedCompact": true
+    },
+    {
+      "check": "historic-singleton-root-rejected",
+      "rejectedByGeneratedCompact": true
+    },
+    {
+      "check": "wrong-agent",
+      "rejectedByGeneratedCompact": true
+    },
+    {
+      "check": "forged-private-limit",
+      "rejectedByGeneratedCompact": true
+    },
+    {
+      "check": "altered-quote-state",
+      "rejectedByGeneratedCompact": true
+    },
+    {
+      "check": "book-double-spend",
+      "rejectedByGeneratedCompact": true
+    },
+    {
+      "check": "wrong-merchant",
+      "rejectedByGeneratedCompact": true
+    },
+    {
+      "check": "altered-private-note-state",
+      "rejectedByGeneratedCompact": true
+    },
+    {
+      "check": "redemption-replay",
+      "rejectedByGeneratedCompact": true
+    },
+    {
+      "check": "payment-reference-replay",
+      "rejectedByGeneratedCompact": true
+    },
+    {
+      "check": "default-blocks-draw",
+      "rejectedByGeneratedCompact": true
+    },
+    {
+      "check": "debt-cannot-close",
+      "rejectedByGeneratedCompact": true
+    },
+    {
+      "check": "stale-enrollment-root",
+      "rejectedByGeneratedCompact": true
+    },
+    {
+      "check": "missing-agent-consent",
+      "rejectedByGeneratedCompact": true
+    },
+    {
+      "check": "agent-cannot-accept",
+      "rejectedByGeneratedCompact": true
+    },
+    {
+      "check": "changed-limit-consent",
+      "rejectedByGeneratedCompact": true
+    },
+    {
+      "check": "changed-predecessor-consent",
+      "rejectedByGeneratedCompact": true
+    },
+    {
+      "check": "enrollment-replay",
+      "rejectedByGeneratedCompact": true
+    },
+    {
+      "check": "consumed-predecessor-cannot-reopen",
+      "rejectedByGeneratedCompact": true
+    },
+    {
+      "check": "premature-expiry",
+      "rejectedByGeneratedCompact": true
+    },
+    {
+      "check": "allocation-owner-or-issuer-only",
+      "rejectedByGeneratedCompact": true
+    },
+    {
+      "check": "zero-obligation-ack-issuer-only",
+      "rejectedByGeneratedCompact": true
+    },
+    {
+      "check": "no-obligation-positive-report",
+      "rejectedByGeneratedCompact": true
+    },
+    {
+      "check": "zero-obligation-ack-replay",
+      "rejectedByGeneratedCompact": true
+    },
+    {
+      "check": "cash-obligation-zero-report",
+      "rejectedByGeneratedCompact": true
+    },
+    {
+      "check": "cash-obligation-wrong-amount",
+      "rejectedByGeneratedCompact": true
+    },
+    {
+      "check": "refund-issuer-only",
+      "rejectedByGeneratedCompact": true
+    },
+    {
+      "check": "compensation-replay",
+      "rejectedByGeneratedCompact": true
+    },
+    {
+      "check": "merchant-cannot-disable-registry",
+      "rejectedByGeneratedCompact": true
+    },
+    {
+      "check": "disabled-merchant-new-offer",
+      "rejectedByGeneratedCompact": true
+    },
+    {
+      "check": "claim-backing-withdrawal",
+      "rejectedByGeneratedCompact": true
+    },
+    {
+      "check": "identity-announcement",
+      "rejectedByGeneratedCompact": true
+    },
+    {
+      "check": "small-subgroup-announcement",
+      "rejectedByGeneratedCompact": true
+    },
+    {
+      "check": "off-curve-announcement",
+      "rejectedByGeneratedCompact": true
+    },
+    {
+      "check": "response-at-order",
+      "rejectedByGeneratedCompact": true
+    },
+    {
+      "check": "challenge-remainder-at-order",
+      "rejectedByGeneratedCompact": true
+    },
+    {
+      "check": "wrong-quotient",
+      "rejectedByGeneratedCompact": true
+    },
+    {
+      "check": "wrong-carry",
+      "rejectedByGeneratedCompact": true
+    },
+    {
+      "check": "noncanonical-field-lift",
+      "rejectedByGeneratedCompact": true
+    }
+  ],
+  "signatureChecks": [
+    {
+      "check": "identity-announcement",
+      "rejected": true
+    },
+    {
+      "check": "small-subgroup-announcement",
+      "rejected": true
+    },
+    {
+      "check": "off-curve-announcement",
+      "rejected": true
+    },
+    {
+      "check": "response-at-order",
+      "rejected": true
+    },
+    {
+      "check": "challenge-remainder-at-order",
+      "rejected": true
+    },
+    {
+      "check": "wrong-quotient",
+      "rejected": true
+    },
+    {
+      "check": "wrong-carry",
+      "rejected": true
+    },
+    {
+      "check": "noncanonical-field-lift",
+      "rejected": true
+    }
+  ],
+  "disclosureChecks": [
+    {
+      "circuit": "draw",
+      "selectedIdentityOrInputBookOrSaltRedisclosed": false,
+      "separateFacilityExpiryQuery": false,
+      "publicPrincipalField": false,
+      "publicReserveTotals": false,
+      "completePrivacyCertified": false
+    },
+    {
+      "circuit": "draw",
+      "selectedIdentityOrInputBookOrSaltRedisclosed": false,
+      "separateFacilityExpiryQuery": false,
+      "publicPrincipalField": false,
+      "publicReserveTotals": false,
+      "completePrivacyCertified": false
+    },
+    {
+      "circuit": "draw",
+      "selectedIdentityOrInputBookOrSaltRedisclosed": false,
+      "separateFacilityExpiryQuery": false,
+      "publicPrincipalField": false,
+      "publicReserveTotals": false,
+      "completePrivacyCertified": false
+    },
+    {
+      "circuit": "draw",
+      "selectedIdentityOrInputBookOrSaltRedisclosed": false,
+      "separateFacilityExpiryQuery": false,
+      "publicPrincipalField": false,
+      "publicReserveTotals": false,
+      "completePrivacyCertified": false
+    },
+    {
+      "circuit": "draw",
+      "selectedIdentityOrInputBookOrSaltRedisclosed": false,
+      "separateFacilityExpiryQuery": false,
+      "publicPrincipalField": false,
+      "publicReserveTotals": false,
+      "completePrivacyCertified": false
+    }
+  ],
+  "syntheticFinalAccounting": {
+    "T": "198979",
+    "R": "947",
+    "X": "198"
+  },
+  "gitNormalizedScriptFingerprints": {
+    "scripts/private-offer-spike.mjs": "24b63ec196052b7895b885b84ed2efc3da82e9103ab8dd88806052353aa4cf06",
+    "scripts/private-offer-signers.mjs": "80695e03759e98c7bda37ea909430e1b94c9ccabf9f2ef4c6defa3a1a5e2660e",
+    "scripts/private-offer-encoding.mjs": "e78ffe273c86f72f58733574287b3099530be96efbed37a6fe3d8c16a36a7f22",
+    "scripts/signed-pool-signers.mjs": "df077892d65f2736322be3e627e6ec9f1bcfa422f9369dcb2016d203ca5831a3",
+    "scripts/private-pool-spike.mjs": "be5b8a3e2f85a3bb3e45fabfaafe55b45f414f6999b3931a6fb4c33f01a04397",
+    "src/lib/line/encoding.ts": "8fe151cc8eb4f50727c6658beb42e7892028fccfff34f2c1a8045bf61602d0c5",
+    "src/lib/security/vault-codec.ts": "0abc995f6f042c9b142833d43cb97fd43f3eb934fdcfee0d043368db1d757062"
+  },
+  "fingerprintScope": "Actual execution bytes are separate from LF Git-storage bytes; existing Windows encoding.ts remains CRLF."
+}

@@ -1,0 +1,164 @@
+{
+  "schema": "line-private-offer-public-corpus/v1",
+  "sourceSha256": "ae970672c048c48692ab690554c77285fec19d1943dc3b4574080970b7fa657d",
+  "originalNativeReportSha256": "f39aa16c8a19f8fd2a3ff37a8e208118e77f3eac684b7709164748f572ff49ba",
+  "publicNativeReport": "docs/private-signed-2026-10-11-evidence/offer-native-proof.json",
+  "publicNativeReportSha256": "73253fc123286434df581ff8621254cc486b10ee8c52876e64f1bb9ae595727f",
+  "entries": [
+    {
+      "index": 3,
+      "circuit": "openLine",
+      "file": "3-openLine.proven-public-tx.bin",
+      "transactionSha256": "cc1509e8e60fb878ae88da90f9b76413f1a3a051148d056daa0f7cdf6b2f1077",
+      "bytes": 6128
+    },
+    {
+      "index": 8,
+      "circuit": "openLine",
+      "file": "8-openLine.proven-public-tx.bin",
+      "transactionSha256": "11b7769d36dc5ef5fb65be96012d83fab12cab235179347590c7ff762f206643",
+      "bytes": 6127
+    },
+    {
+      "index": 4,
+      "circuit": "openLine",
+      "file": "4-openLine.proven-public-tx.bin",
+      "transactionSha256": "1a86ef8aa8d7c4b660a2a233cdb48a460af0f1b99b08db016c97f36eecab2dc5",
+      "bytes": 6579
+    },
+    {
+      "index": 9,
+      "circuit": "openLine",
+      "file": "9-openLine.proven-public-tx.bin",
+      "transactionSha256": "a72a52727e93b7bf02bc7710f06b62c108080f2c441286f9dd0a6d209f768ccf",
+      "bytes": 6579
+    },
+    {
+      "index": 5,
+      "circuit": "postQuote",
+      "file": "5-postQuote.proven-public-tx.bin",
+      "transactionSha256": "95bf69f1896303acfa152050ad0249c746d3f84f39223d5716b146ae26640aef",
+      "bytes": 5939
+    },
+    {
+      "index": 10,
+      "circuit": "postQuote",
+      "file": "10-postQuote.proven-public-tx.bin",
+      "transactionSha256": "126dd5612380334948db929e2671255f3b5623f9b60068d05d3da431d20bda01",
+      "bytes": 5939
+    },
+    {
+      "index": 6,
+      "circuit": "draw",
+      "file": "6-draw.proven-public-tx.bin",
+      "transactionSha256": "498527ec160d25ebcba00633acdd5b6fcfca73de7bd5238ef8fd945cdc54430c",
+      "bytes": 6975
+    },
+    {
+      "index": 11,
+      "circuit": "draw",
+      "file": "11-draw.proven-public-tx.bin",
+      "transactionSha256": "339b7ede94f5485a03cce88afa178289135384ad58ad57f76a4888864565e2cf",
+      "bytes": 6975
+    },
+    {
+      "index": 7,
+      "circuit": "redeemDraw",
+      "file": "7-redeemDraw.proven-public-tx.bin",
+      "transactionSha256": "b802ff93ed73801908c4910079c378c9531fc6920ad264563a62ae7389dd9260",
+      "bytes": 6276
+    },
+    {
+      "index": 12,
+      "circuit": "redeemDraw",
+      "file": "12-redeemDraw.proven-public-tx.bin",
+      "transactionSha256": "49fec12fd9158edc6bd160e34dd973ce2f455397e94d6d71bea81aa6b61dd082",
+      "bytes": 6278
+    },
+    {
+      "index": 36,
+      "circuit": "openLine",
+      "file": "36-openLine.proven-public-tx.bin",
+      "transactionSha256": "f03b843060ecee6ad52d714d2298900ac6a0c0ad72a6bbd3e5a5a325a9d7fd5f",
+      "bytes": 6162
+    },
+    {
+      "index": 37,
+      "circuit": "openLine",
+      "file": "37-openLine.proven-public-tx.bin",
+      "transactionSha256": "7e493fbd0c76a63c3818b1b72333d37bb8ec609fdebb69d8c7363df0be52758e",
+      "bytes": 6162
+    },
+    {
+      "index": 38,
+      "circuit": "openLine",
+      "file": "38-openLine.proven-public-tx.bin",
+      "transactionSha256": "35c5256c11fbe818ee82781fad0c173142968f7489fa892f7b5b015ecf547f45",
+      "bytes": 6610
+    },
+    {
+      "index": 39,
+      "circuit": "openLine",
+      "file": "39-openLine.proven-public-tx.bin",
+      "transactionSha256": "bcde78e1777273e11f87fedbfdd90d8b1e42b62a6ef16b88ba00a205aa45c36e",
+      "bytes": 6611
+    },
+    {
+      "index": 48,
+      "circuit": "acknowledgeRepayment",
+      "file": "48-acknowledgeRepayment.proven-public-tx.bin",
+      "transactionSha256": "bd0310315c5304aafc4de21b39b2ff8553ca4198701f725bfd2964d203f915bc",
+      "bytes": 6432
+    },
+    {
+      "index": 52,
+      "circuit": "acknowledgeRepayment",
+      "file": "52-acknowledgeRepayment.proven-public-tx.bin",
+      "transactionSha256": "4ab3f301b709c807bd85103de69065dcf926f96897b4a1f2a71883edc47e3247",
+      "bytes": 6433
+    },
+    {
+      "index": 49,
+      "circuit": "cancelOrExpireNote",
+      "file": "49-cancelOrExpireNote.proven-public-tx.bin",
+      "transactionSha256": "9c04e701263c852b7db63e3b537167d830e2d6f56c476a7157028f2d256580db",
+      "bytes": 6256
+    },
+    {
+      "index": 53,
+      "circuit": "cancelOrExpireNote",
+      "file": "53-cancelOrExpireNote.proven-public-tx.bin",
+      "transactionSha256": "ec83bb8a8399c341645abf0e203c2e206fe8db8a6bca607491ddf2f4aa0fa74f",
+      "bytes": 6256
+    },
+    {
+      "index": 50,
+      "circuit": "cancelOrExpireNote",
+      "file": "50-cancelOrExpireNote.proven-public-tx.bin",
+      "transactionSha256": "1676442365431835f594e33bfc01354c78437470c9d26fa3efe0365f2181db09",
+      "bytes": 6724
+    },
+    {
+      "index": 54,
+      "circuit": "cancelOrExpireNote",
+      "file": "54-cancelOrExpireNote.proven-public-tx.bin",
+      "transactionSha256": "35cb24d84318ab558c0d8641e5c5bd1f60a637cf1675c6a0c46cfa5d3adf05fd",
+      "bytes": 6724
+    },
+    {
+      "index": 51,
+      "circuit": "cancelOrExpireNote",
+      "file": "51-cancelOrExpireNote.proven-public-tx.bin",
+      "transactionSha256": "a9197ec13b344365500ef924d899b270b4e988313ff7ba712771ac638103a75e",
+      "bytes": 6468
+    },
+    {
+      "index": 55,
+      "circuit": "cancelOrExpireNote",
+      "file": "55-cancelOrExpireNote.proven-public-tx.bin",
+      "transactionSha256": "a063b408d6cd22b67290bb759ae95b704a2de75daeedab16b1f16457f52e763a",
+      "bytes": 6467
+    }
+  ],
+  "scope": "Twenty-two already-public synthetic proven transactions from eleven pairs in the completed 65-call native run. No private preimages, journals, role/TLS keys or newly generated proofs."
+}

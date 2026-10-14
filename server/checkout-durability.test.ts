@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { spawn } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -11,6 +11,37 @@ import { checkoutMiddleware } from "./checkout-http.ts";
 import { EncryptedCheckoutStore, type CheckoutCheckpointStore } from "./checkout-storage.ts";
 
 const PASSWORD = "test-only-checkpoint-passphrase";
+test("Windows checkpoint ACL validation works with an unavailable module search path", { skip: process.platform !== "win32" }, async () => {
+  const root = await mkdtemp(join(tmpdir(), "line-checkout-module-path-"));
+  try {
+    const directory = join(root, "private");
+    await mkdir(directory);
+    // Hosted runners can create temp directories with unrelated explicit ACLs.
+    // Establish a genuinely private fixture before testing module discovery.
+    const escaped = directory.replaceAll("'", "''");
+    execFileSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", `$ErrorActionPreference='Stop'; $user=[System.Security.Principal.WindowsIdentity]::GetCurrent().User; $system=[System.Security.Principal.SecurityIdentifier]::new('S-1-5-18'); $acl=[System.Security.AccessControl.DirectorySecurity]::new(); $acl.SetOwner($user); $acl.SetAccessRuleProtection($true,$false); foreach($principal in @($user,$system)){ $acl.AddAccessRule([System.Security.AccessControl.FileSystemAccessRule]::new($principal,'FullControl','ContainerInherit, ObjectInherit','None','Allow')) }; [System.IO.Directory]::SetAccessControl('${escaped}',$acl)`], { windowsHide: true, stdio: "pipe" });
+    const code = `try { const {EncryptedCheckoutStore}=await import('./server/checkout-storage.ts'); const store=await EncryptedCheckoutStore.open(process.env.TEST_CHECKOUT_DIR,process.env.TEST_CHECKOUT_PASSWORD); await store.close(); } catch(e) { console.error(e.message.includes('unrelated explicit access')?'ACL_POLICY_REJECTION':e.message.includes('powershell.exe')?'ACL_COMMAND_FAILURE':e.message.includes('lease')?'LEASE_FAILURE':'CHECKPOINT_OTHER_FAILURE'); process.exitCode=1; }`;
+    await new Promise<void>((yes, no) => {
+      const child = spawn(process.execPath, ["--experimental-strip-types", "--input-type=module", "-e", code], {
+        cwd: resolve("."), env: { ...process.env, PSModulePath: join(root, "missing-modules"), TEST_CHECKOUT_DIR: directory, TEST_CHECKOUT_PASSWORD: PASSWORD },
+        windowsHide: true, stdio: ["ignore", "ignore", "pipe"],
+      });
+      let category = "CHECKPOINT_OTHER_FAILURE";
+      child.stderr.on("data", bytes => { const match = bytes.toString().match(/\b(ACL_POLICY_REJECTION|ACL_COMMAND_FAILURE|LEASE_FAILURE|CHECKPOINT_OTHER_FAILURE)\b/); if (match) category = match[1]; });
+      child.on("error", no); child.on("close", code => code === 0 ? yes() : no(new Error(`Private checkpoint ACL inspection failed without module discovery: ${category}.`)));
+    });
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test("Windows checkpoint ACL inspection still rejects an explicit unrelated reader", { skip: process.platform !== "win32" }, async () => {
+  const root = await mkdtemp(join(tmpdir(), "line-checkout-acl-reader-")), directory = join(root, "private");
+  try {
+    await mkdir(directory);
+    execFileSync("icacls.exe", [directory, "/grant", "*S-1-1-0:(OI)(CI)R"], { windowsHide: true, stdio: "ignore" });
+    await assert.rejects(EncryptedCheckoutStore.open(directory, PASSWORD), /unrelated explicit access/);
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
 test("checkpoint recovery rejects the pre-domain-commitment snapshot version", async () => {
   const f = await fixture();
   try {

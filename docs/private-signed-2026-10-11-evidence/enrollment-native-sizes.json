@@ -1,0 +1,91 @@
+{
+  "schema": "line-private-enrollment-native-size-review/v1",
+  "sourceSha256": "27759dbf6fd283f210c0832117139c81d6e6ec4a408386081987a1a2322fdd8f",
+  "proofReport": "enrollment-native-proof.json",
+  "pairs": [
+    {
+      "case": "enrollment-consent",
+      "circuit": "openLine",
+      "left": {
+        "transactionSha256": "cb52a7e5dffa8a84c329e75bdb2d5e1dd142a8124b5fd986df1517ddf7c45cf1",
+        "bytes": 6162
+      },
+      "right": {
+        "transactionSha256": "5ef2c34b7e5f28ae3e5b2d08b9c1338fb5b4b8a12c82a00a5655de3792b749ae",
+        "bytes": 6161
+      },
+      "transactionSizesEqual": false
+    },
+    {
+      "case": "enrollment-acceptance",
+      "circuit": "openLine",
+      "left": {
+        "transactionSha256": "fdb95a218181ec0ca132b4836becea4fe064cbb0b0afb7dc796325f5004f8de4",
+        "bytes": 6612
+      },
+      "right": {
+        "transactionSha256": "712044ae475615886f3fb754efac9c7958c730d1e735c8b3b86eb1f38345f2a0",
+        "bytes": 6612
+      },
+      "transactionSizesEqual": true
+    },
+    {
+      "case": "refund-repayment",
+      "circuit": "acknowledgeRepayment",
+      "left": {
+        "transactionSha256": "9cf00bbfc7c2dbd9892171ccabe5151f5acfe5509dce29cc35777a38000b5e0d",
+        "bytes": 6432
+      },
+      "right": {
+        "transactionSha256": "79a6bcaa0b4155f47de38a76e225f8e789add8910c52589986d69b22265b93cb",
+        "bytes": 6433
+      },
+      "transactionSizesEqual": false
+    },
+    {
+      "case": "refund-expiry",
+      "circuit": "cancelOrExpireNote",
+      "left": {
+        "transactionSha256": "9222ee5cfabfadd5aed933ff3bc0f2e5f8704eaaebde3ff9088fab005cf781ae",
+        "bytes": 6256
+      },
+      "right": {
+        "transactionSha256": "9036ad64379e6457996af196a60a00b36288a6126b6287403cf2f631719b9593",
+        "bytes": 6256
+      },
+      "transactionSizesEqual": true
+    },
+    {
+      "case": "refund-allocation",
+      "circuit": "cancelOrExpireNote",
+      "left": {
+        "transactionSha256": "b46502ef84a71790a19f5d71c392c75f45557ac333fa8ce59a9244a9f2381313",
+        "bytes": 6724
+      },
+      "right": {
+        "transactionSha256": "4e79f1af45b31872a73308cca53bd253aa4314182539b293fab5aac821401266",
+        "bytes": 6723
+      },
+      "transactionSizesEqual": false
+    },
+    {
+      "case": "refund-acknowledgment",
+      "circuit": "cancelOrExpireNote",
+      "left": {
+        "transactionSha256": "c6db9716182a48e4f611bd5a9ced2b682138db383c21b5fc62a392a5a443e3eb",
+        "bytes": 6468
+      },
+      "right": {
+        "transactionSha256": "7dfb7d8afaffd10acbfa698d4e56071d021820f4f72a11c130870963909fdfe1",
+        "bytes": 6468
+      },
+      "transactionSizesEqual": true
+    }
+  ],
+  "nativeProofsVerified": true,
+  "syntheticLedger": true,
+  "feeBalancingEnabled": false,
+  "networkExecuted": false,
+  "fullHistoryPrivacyPassed": false,
+  "evidenceScope": "Finite native counterfactual sizes only; differing lengths are retained and unexplained. No distributional, metadata or asset-rail privacy certification."
+}

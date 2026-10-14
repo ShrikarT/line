@@ -1,6 +1,30 @@
 # Line Wave 2 demonstration
 
-Updated: 9 October 2026. This guide separates the executable local checkout from contract/reference-model tests and the required production acceptance. It does not certify a live deployment or token payout. Product requirements remain in [PRODUCT_DIRECTION.md](PRODUCT_DIRECTION.md).
+Current verified scope, 13 October: the [corrected integrated native lifecycle](COORDINATOR_NATIVE_TIME_2026-10-13.md) completes **30 calls across all twelve circuits, 100 deliberate exits, 82 controls and four proof corruption/interruption checks**, through four owners and two suppliers. The generated lane completes 30 calls/92 exits/82 controls. This closes the local integrated lifecycle gap; it does not establish fee-funded network finality, authentic asset settlement, independent administration, full-history privacy or fleet operation. The [deck](../artifacts/wave2/line-wave2.html) is rendered and the approved [narrated review](../artifacts/wave2/line-review-video/README.md) is rendered and verified locally at 204.7 seconds, 1080p/30 fps with narration. It explains evidence; no live application recording, published video or submitted entry is claimed.
+
+Earlier experiment/checkpoint descriptions below retain their historical source/helper scopes.
+
+Latest evidence: [enrollment](PRIVATE_ENROLLMENT_2026-10-11.md) verifies 52 local contract calls across all twelve names; [durable agent integration](DURABLE_ACTOR_2026-10-11.md) verifies six calls through two process restarts. These distinct synthetic runs are not the deployed canonical contract, independent institutional custody, complete financial recovery, full-history privacy or asset settlement.
+
+Updated: 11 October 2026. This guide separates the executable local checkout, reported canonical Preprod deployment, source-bound proof experiments and required production acceptance. Product requirements remain in [PRODUCT_DIRECTION.md](PRODUCT_DIRECTION.md).
+
+## Current evidence to show accurately
+
+| Evidence path | Verified or reported result | Boundary |
+|---|---|---|
+| Local `/checkout` | Generated Compact execution and deterministic services; tested role capabilities, retry and recovery | This browser path does not submit proofs or transfer assets |
+| Canonical Preprod contract | Deployment evidence records twelve registered verifier keys and eight executed calls at `b2254962147c9cc2e5b9fbcf39f8a4e0d1f149b7801a651df2e41dda1e4410d9` | [Independent receipt reconciliation](NETWORK_RECEIPT_AUDIT_2026-10-11.md) awaits authenticated access; registrations are not twelve executions or payouts |
+| Canonical local proofs | Nineteen native-verified calls across all twelve names, with corrupted-proof controls | [Synthetic ledger with fee balancing disabled](LOCAL_PROOF_VERIFICATION_2026-10-11.md); separate from the checkout and network |
+| Private-finance source `a8d14adf` | Thirty-eight native-verified calls across all twelve names; five corrupted draws rejected | [Separate experimental ABI](SIGNED_PRIVATE_FINANCE_2026-10-11.md); no deployment, full-history privacy or institutional custody claim |
+| Merchant source `afb75b1` | Thirty-nine lifecycle plus seven isolated native-verified calls across all twelve names; six corrupted draws rejected; 55 generated rejection controls | [Merchant membership/privacy prototype](PRIVATE_MERCHANT_2026-10-11.md); separate experimental ABI, synthetic ledger, no deployment or full-history privacy claim |
+
+The older merchant refund histories retain a one-byte acknowledgment difference (6468 versus 6467), at their original source/helper scope. The later private-offer corpus has its own eleven-pair [wire decomposition](PUBLIC_ENCODING_REVIEW_2026-10-12.md), explaining its recorded differences through public encodings without proving full-value distributions or historical privacy. Do not transfer those measurements between sources. The [durable software signer](DURABLE_APPROVAL_SIGNER_2026-10-11.md) has separate persistence/crash controls and is not the signer used by the older merchant native run.
+
+For current submission evidence use the [full audit](AUDIT_REPORT_2026-10-13.md), [private-offer 65-call scope](PRIVATE_OFFER_2026-10-11.md), [fresh bindings](PER_OFFER_BINDINGS_2026-10-12.md), [older claims](CLAIM_ARCHIVE_2026-10-13.md), [repayment/reopening](COORDINATOR_REPAYMENT_REOPENING_2026-10-13.md) and [all-twelve compensation/recovery](COORDINATOR_COMPENSATION_2026-10-13.md). Current generated lifecycle covers twelve names and three modes with 30 calls/92 exits/82 controls. Receipts/time remain synthetic; historical native archive covers six names. Native/network proof of the newest path, real payouts and full observer privacy remain open. Keep browser, generated, locally proved, reported network and genuinely paid lanes distinct.
+
+Show the exact source/commit and matching receipt for each path. A deployment screenshot must not be presented as evidence that the privacy candidate or browser checkout executes on chain. Funding/redemption/refund counters do not establish asset transfers.
+
+Public event requirements and rubric are now retrieved, but the deadlines conflict: live AKINDO Wave 2 metadata gives **19 October 2026, 15:00:34 UTC / 20:30:34 IST**, the Midnight overview gives **17 October**, and the linked official rules PDF gives **3 October**. The PDF and live event agree on 40/15/15/15/10/5 judging weights; the linked judging document uses a different allocation. See [current requirements, sources and unresolved authority](WAVE2_REQUIREMENTS_2026-10-11.md). Do not treat any one cutoff as confirmed for this entrant. The entrant must obtain organizer clarification and submit personally; prepare the required repository, deck and video now.
 
 ## Start the executable procurement evaluation
 

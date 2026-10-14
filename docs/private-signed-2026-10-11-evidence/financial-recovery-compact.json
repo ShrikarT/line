@@ -1,0 +1,139 @@
+{
+  "schema": "line-recoverable-offer-compact/v1",
+  "createdAt": "2026-10-12T07:38:43.687Z",
+  "sourceSha256": "ae970672c048c48692ab690554c77285fec19d1943dc3b4574080970b7fa657d",
+  "scriptFingerprints": {
+    "scripts/recoverable-offer-compact.mjs": "1de3a4cadbca2ad8a5225db91a38c0d59bbbacc9749ebd3e1ef209ffb402cc2b",
+    "scripts/durable-approval-actor.mjs": "3ac1a52c31c5bc8136f162772254f25539c0488de939deb659a1454f3b451504",
+    "scripts/durable-approval-signer.mjs": "2c3b6e3350a64b49255058f08588f08692d952660e05b5c92e51d1885ce3c1fd",
+    "scripts/private-finance-child.mjs": "c2ae3d79eee6148e6db2753550707331ae3bd39db47b44b4cc793ab2912a8159",
+    "scripts/private-finance-journal.mjs": "c819ccad6f161703f49fc6d013121610425a651d06854607a29b3200128c1393",
+    "server/checkout-storage.ts": "343083864e5ad9bb6c6f53e68dc1e070dc97e5360b00c38e6bd4a9cc2cc3860b",
+    "scripts/private-offer-encoding.mjs": "e78ffe273c86f72f58733574287b3099530be96efbed37a6fe3d8c16a36a7f22",
+    "scripts/private-offer-signers.mjs": "80695e03759e98c7bda37ea909430e1b94c9ccabf9f2ef4c6defa3a1a5e2660e",
+    "scripts/signed-pool-signers.mjs": "df077892d65f2736322be3e627e6ec9f1bcfa422f9369dcb2016d203ca5831a3",
+    "scripts/private-pool-spike.mjs": "be5b8a3e2f85a3bb3e45fabfaafe55b45f414f6999b3931a6fb4c33f01a04397",
+    "src/lib/line/encoding.ts": "fb2af647156d2a744c6fb031fe084aee25708a379a7db6412782ca9c2e232b5b",
+    "src/lib/security/vault-codec.ts": "7df485e705a4d64b2fb6ea262ca96dd5c11c509c32991b03e2dea94d09fb55f9"
+  },
+  "artifactFingerprints": {
+    "contract/index.js": "23e5c49249dd0af5aef7e25625db197dd4d6d7244d324bbe6a876d49a1624683",
+    "compiler/contract-info.json": "10a94c9d83abde894552fb57960188ae6b15e29be4b424a59fc0ee0320cbcfc5"
+  },
+  "freshCompilation": true,
+  "sourceBindingVerifiedByThisRun": true,
+  "cachedGeneratedBindings": false,
+  "compiler": "0.31.1",
+  "runtime": "0.16.0",
+  "exportedCircuits": [
+    "registerMerchant",
+    "disableMerchant",
+    "fundReserve",
+    "withdrawUnencumberedReserve",
+    "withdrawFees",
+    "openLine",
+    "postQuote",
+    "draw",
+    "redeemDraw",
+    "cancelOrExpireNote",
+    "acknowledgeRepayment",
+    "setStatus"
+  ],
+  "traces": [
+    {
+      "actor": "issuer",
+      "circuit": "fundReserve",
+      "durableAgent": false,
+      "signingScalarWitnesses": 0
+    },
+    {
+      "actor": "agent",
+      "circuit": "openLine",
+      "durableAgent": true,
+      "signingScalarWitnesses": 0
+    },
+    {
+      "actor": "issuer",
+      "circuit": "openLine",
+      "durableAgent": false,
+      "signingScalarWitnesses": 0
+    },
+    {
+      "actor": "merchant",
+      "circuit": "postQuote",
+      "durableAgent": false,
+      "signingScalarWitnesses": 0
+    },
+    {
+      "actor": "agent",
+      "circuit": "draw",
+      "durableAgent": true,
+      "signingScalarWitnesses": 0
+    },
+    {
+      "actor": "merchant",
+      "circuit": "redeemDraw",
+      "durableAgent": false,
+      "signingScalarWitnesses": 0
+    }
+  ],
+  "policyChecks": [
+    {
+      "rejectedByActorPolicy": true,
+      "reachedCompact": false
+    },
+    {
+      "rejectedByActorPolicy": true,
+      "reachedCompact": false
+    },
+    {
+      "rejectedByActorPolicy": true,
+      "reachedCompact": false
+    },
+    {
+      "rejectedByActorPolicy": true,
+      "reachedCompact": false
+    }
+  ],
+  "compactChecks": [
+    {
+      "check": "recovered-approval-cannot-debit-twice",
+      "rejectedByGeneratedCompact": true
+    }
+  ],
+  "realAgentProcessRestarts": 2,
+  "unchangedAgentIdentity": true,
+  "recoveredConsentAndDrawApprovals": true,
+  "signingScalarWitnesses": 0,
+  "testOwnerKeySuppliedByLauncher": true,
+  "sameHost": true,
+  "independentAdministrativeCustody": false,
+  "financialCheckpointDurable": true,
+  "preparedCandidatePersistedBeforeProof": true,
+  "coordinatorMemoryClearedAndReloaded": true,
+  "storageSubprocessInvocations": 20,
+  "completeCoordinatorRestart": false,
+  "cryptographicProofsGenerated": false,
+  "networkSubmitted": false,
+  "authenticAssetSettlement": false,
+  "fullHistoryPrivacyPassed": false,
+  "debtInferableIfObserverKnowsAllFees": true,
+  "supplierRequestsContainFinancialBook": false,
+  "approvalABI": "line-private-offer/v1",
+  "evidenceScope": "Generated-Compact recovery of source-bound encrypted financial checkpoints and prepared witnesses, with twenty separate storage subprocess invocations, cleared/reloaded coordinator financial memory and two agent restarts. Whole-coordinator crash, operator key recovery and network reconciliation remain unverified. Not a native proof, independent operator or full-history privacy pass.",
+  "gitNormalizedScriptFingerprints": {
+    "scripts/recoverable-offer-compact.mjs": "1de3a4cadbca2ad8a5225db91a38c0d59bbbacc9749ebd3e1ef209ffb402cc2b",
+    "scripts/durable-approval-actor.mjs": "3ac1a52c31c5bc8136f162772254f25539c0488de939deb659a1454f3b451504",
+    "scripts/durable-approval-signer.mjs": "2c3b6e3350a64b49255058f08588f08692d952660e05b5c92e51d1885ce3c1fd",
+    "scripts/private-finance-child.mjs": "c2ae3d79eee6148e6db2753550707331ae3bd39db47b44b4cc793ab2912a8159",
+    "scripts/private-finance-journal.mjs": "c819ccad6f161703f49fc6d013121610425a651d06854607a29b3200128c1393",
+    "server/checkout-storage.ts": "062dc031363ee0fa3117cadd6029edb9375ac5f038430c236dbd71d3402ad339",
+    "scripts/private-offer-encoding.mjs": "e78ffe273c86f72f58733574287b3099530be96efbed37a6fe3d8c16a36a7f22",
+    "scripts/private-offer-signers.mjs": "80695e03759e98c7bda37ea909430e1b94c9ccabf9f2ef4c6defa3a1a5e2660e",
+    "scripts/signed-pool-signers.mjs": "df077892d65f2736322be3e627e6ec9f1bcfa422f9369dcb2016d203ca5831a3",
+    "scripts/private-pool-spike.mjs": "be5b8a3e2f85a3bb3e45fabfaafe55b45f414f6999b3931a6fb4c33f01a04397",
+    "src/lib/line/encoding.ts": "8fe151cc8eb4f50727c6658beb42e7892028fccfff34f2c1a8045bf61602d0c5",
+    "src/lib/security/vault-codec.ts": "0abc995f6f042c9b142833d43cb97fd43f3eb934fdcfee0d043368db1d757062"
+  },
+  "fingerprintScope": "Runtime hashes identify exact local files used; secondary LF-normalized hashes correlate Git source and do not establish another execution."
+}
