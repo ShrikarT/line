@@ -1,6 +1,15 @@
 # Engineering status and acceptance evidence
 
-## Preprod priority — 14 October 2026
+## Actual live checkout - 14 October 2026
+
+The highest-priority Preprod product work now runs at **http://127.0.0.1:5174/preprod** from the audit worktree. Fresh canonical instance `8990864c6f80c517c7458fa9b2526d3500f3a9814399fc836097ee409da9bed0` has **22 independently verified finalized transactions** and all **12 exact canonical verifier keys**: deployment plus 11 keys, three setup calls, six two-merchant purchase calls, and one repayment acknowledgement. The test book is now 0 outstanding / 60 available. Actual browser reload and full backend restart preserve the book and receipts without another charge; mobile has no overflow. The original line expired and its deployment did not retain its private opening, making the authorized redeployment necessary.
+
+Focused review fixes cover concurrent streamed-body admission, pending-book reconciliation before witness calculation, orphan/prepared journal recovery, custom-document reload, and a reachable serialized reconciliation action. Final core verification: **560 tests, 559 passing, zero failures, one intentional skip**, with concurrency limited to four after an unrestricted resource-contention run timed out in WSL/OpenSSL/compiler fixtures. Separate receipt tests: **38 passing**. Build/typecheck and key/secret-pattern scans pass; Compact bindings have zero drift. All 24 browser cases pass across the full run and a targeted rerun of one cold-load navigation timeout; exact scope is recorded in the live report. Configured credentials and the native signer are absent from the browser bundle.
+
+Role keys are logically distinct but held by one local operator. Test accounting does not provide merchant token payouts or verify cash repayment. Public amounts/history still limit privacy. Website deployment is deferred. [Current run instructions and complete evidence](LIVE_PREPROD_CHECKOUT_2026-10-14.md).
+
+
+## Earlier read-only checkpoint — 14 October 2026
 
 The owner deferred website deployment and prioritized actual Midnight Preprod execution, authorizing redeployment if required. The polished checkout now has the original matching canonical full release: all 36 HTTP proving assets pass hash/size checks, all 12 verifier keys match the local fixture, and proof-server 8.1.3 is healthy on localhost:6300. The reported address is configured locally. Network join now refreshes the consoles' ledger/runtime status; deployment, join and receipt CLI commands load ignored `.env.local` credentials. GitHub main `cc5cb71` includes the prior audit/polish PR.
 

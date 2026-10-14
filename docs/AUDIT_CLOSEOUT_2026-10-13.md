@@ -1,5 +1,7 @@
 # Audit closeout and owner decisions — 13 October 2026
 
+**14 October update:** the owner-supplied signer/token now establish an actual two-merchant Preprod checkout, repayment and backend restart on a fresh canonical instance: 22 independently verified finalized transactions. Prior credential/deployment blockers below are historical. [Current evidence, fixes, scope and remaining decisions](LIVE_PREPROD_CHECKOUT_2026-10-14.md). Website deployment and wider investigation remain deferred.
+
 The [consolidated report](AUDIT_REPORT_2026-10-13.md) covers product direction, customer/economics assumptions, Compact accounting, privacy, role custody, execution/recovery, deployment evidence, consoles and Wave 2 readiness. The audit and implemented fixes are ready for handoff. This does **not** certify operating private credit, full-history privacy or an absence of undiscovered bugs. The owner requested that blocked investigations be documented and that work stop after the report and authorized fixes are verified.
 
 ## Verified handoff

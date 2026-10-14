@@ -7,8 +7,16 @@ const DEFAULT_DOCUMENT = "Line lets an autonomous agent buy API services with is
 export function PreprodPage() {
   const [state, setState] = useState<PreprodSummary | null>(null), [document, setDocument] = useState(DEFAULT_DOCUMENT);
   const [error, setError] = useState(""), [submitting, setSubmitting] = useState(false);
+  const [planId, setPlanId] = useState<string | null>(() => sessionStorage.getItem("line.preprod.purchase"));
   const purchaseId = useRef<string | null>(null), repayId = useRef<string | null>(null);
   useEffect(() => { purchaseId.current = sessionStorage.getItem("line.preprod.purchase") ?? null; repayId.current = sessionStorage.getItem("line.preprod.repay") ?? null; }, []);
+  useEffect(() => {
+    const latest = state?.orders.at(-1)?.id.slice(0, 36), active = planId ?? latest;
+    if (!active) return;
+    if (!planId) { setPlanId(active); purchaseId.current = active; sessionStorage.setItem("line.preprod.purchase", active); }
+    const retained = state?.orders.find(order => order.id.startsWith(`${active}-`))?.document;
+    if (retained !== undefined) setDocument(retained);
+  }, [state?.orders, planId]);
   useEffect(() => {
     let stopped = false; const controller = new AbortController(); let timer: ReturnType<typeof setTimeout>;
     const poll = async () => {
@@ -21,10 +29,11 @@ export function PreprodPage() {
     };
     void poll(); return () => { stopped = true; controller.abort(); clearTimeout(timer); };
   }, []);
-  async function act(action: "purchase" | "acknowledge") {
+  async function act(action: "purchase" | "acknowledge" | "reconcile") {
     setSubmitting(true); setError("");
-    const ref = action === "purchase" ? purchaseId : repayId, key = action === "purchase" ? "line.preprod.purchase" : "line.preprod.repay";
-    ref.current ??= crypto.randomUUID(); sessionStorage.setItem(key, ref.current);
+    const ref = action === "purchase" ? purchaseId : action === "acknowledge" ? repayId : { current: crypto.randomUUID() }, key = action === "purchase" ? "line.preprod.purchase" : "line.preprod.repay";
+    ref.current ??= crypto.randomUUID(); if (action !== "reconcile") sessionStorage.setItem(key, ref.current);
+    if (action === "purchase") setPlanId(ref.current);
     try {
       const response = await fetch(`/api/preprod/${action}`, { method: "POST", headers: { "Content-Type": "application/json", "X-Line-Preprod": "operator" }, body: JSON.stringify({ requestId: ref.current, ...(action === "purchase" ? { document } : {}) }), signal: AbortSignal.timeout(30_000) });
       const result = await response.json(); if (!response.ok) throw new Error(result.error ?? "Preprod request failed.");
@@ -32,15 +41,24 @@ export function PreprodPage() {
     } catch (failure) { setError(failure instanceof Error ? failure.message : "Request failed. Retry uses the same request ID."); }
     finally { setSubmitting(false); }
   }
-  const busy = submitting || !!state?.busy, ready = state?.phase === "ready", delivered = state?.orders.filter(order => order.status === "delivered") ?? [];
+  const busy = submitting || !!state?.busy, ready = state?.phase === "ready";
+  const activeOrders = state?.orders.filter(order => order.id.startsWith(`${planId ?? state.orders.at(-1)?.id.slice(0, 36)}-`)) ?? [];
+  const delivered = activeOrders.filter(order => order.status === "delivered");
+  function nextPurchase() {
+    const id = crypto.randomUUID(); purchaseId.current = id; repayId.current = null;
+    sessionStorage.setItem("line.preprod.purchase", id); sessionStorage.removeItem("line.preprod.repay");
+    setPlanId(id); setDocument(DEFAULT_DOCUMENT); setError("");
+  }
   return <Shell evaluation evaluationMode="preprod"><div className="mx-auto max-w-6xl space-y-6">
     <div className="space-y-3"><p className="text-xs font-semibold uppercase tracking-widest text-muted">Live on Midnight Preprod</p><h1 className="font-display text-3xl font-semibold tracking-tight sm:text-4xl">One agent. Two merchants. Real proofs.</h1><p className="max-w-2xl text-sm text-muted">The agent proves its purchases against an issuer-approved credit line. Each merchant redeems a separate claim before its service runs.</p></div>
     {error && <div role="alert" className="rounded-lg border border-red/30 bg-red/10 p-4 text-sm">{error}</div>}
     <div role="status" aria-live="polite" className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-elevated p-4 text-sm"><span>{busy ? state?.progress ?? "Connecting to Preprod..." : ready ? "Connected to Midnight Preprod" : "Loading the deployed facility..."}</span><span className="font-mono text-xs">{state?.receipts.length ?? 0} confirmed transactions</span></div>
+    {!!state?.pending && <div className="space-y-3 rounded-lg border border-border p-4"><p className="text-sm">A saved transaction needs confirmation. Check its receipt before continuing.</p><Button variant="ghost" disabled={busy} onClick={() => void act("reconcile")}>Reconcile saved transaction</Button></div>}
     <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]"><Panel kicker="Agent checkout" title="Buy the two API services">
-      <label className="block space-y-2 text-sm"><span>Document to analyze</span><textarea className="min-h-36 w-full rounded-md border border-border bg-bg p-3" value={document} onChange={event => setDocument(event.target.value)} maxLength={5000} disabled={busy || delivered.length > 0} /></label>
+      <label className="block space-y-2 text-sm"><span>Document to analyze</span><textarea className="min-h-36 w-full rounded-md border border-border bg-bg p-3" value={document} onChange={event => setDocument(event.target.value)} maxLength={5000} disabled={busy || activeOrders.length > 0} /></label>
       <div className="grid gap-3 sm:grid-cols-2"><div className="rounded-md border border-border p-4"><p className="text-xs text-muted">Merchant A</p><p className="mt-1 font-semibold">Text analysis</p><p className="mt-2 font-mono">25 units</p></div><div className="rounded-md border border-border p-4"><p className="text-xs text-muted">Merchant B</p><p className="mt-1 font-semibold">Cost report</p><p className="mt-2 font-mono">20 units</p></div></div>
       <Button disabled={!ready || busy || !!state?.pending || delivered.length >= 2} onClick={() => void act("purchase")}>{busy ? "Confirming on Preprod..." : delivered.length >= 2 ? "Both services delivered" : purchaseId.current ? "Run or resume purchases" : "Run agent purchase"}</Button>
+      {delivered.length >= 2 && state?.privateBook.outstanding === 0 && <Button variant="ghost" disabled={busy || !!state.pending} onClick={nextPurchase}>Start another purchase</Button>}
       <p className="text-xs text-muted">Each quote, draw and redemption is a network transaction. Confirmations can take a few minutes; you can reload and resume with the same request ID.</p>
       {delivered.map(order => <article key={order.id} className="rounded-md border border-ok/30 bg-ok/5 p-4"><p className="font-semibold">{order.service === "text-analysis" ? "Merchant A delivered" : "Merchant B delivered"}</p><pre className="mt-3 whitespace-pre-wrap break-words text-xs">{JSON.stringify(order.result, null, 2)}</pre></article>)}
     </Panel><div className="space-y-6"><Panel kicker="Issuer’s private view" title="Credit book">

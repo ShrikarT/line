@@ -6,6 +6,7 @@ import { VaultBar } from "./vault-bar";
 
 const NAV = [
   { to: "/", label: "Overview" },
+  { to: "/preprod", label: "Live Preprod" },
   { to: "/checkout", label: "API checkout" },
   { to: "/issuer", label: "Issuer" },
   { to: "/merchant", label: "Merchant" },

@@ -1,5 +1,7 @@
 # Line — current project and Wave 2 audit
 
+**14 October update:** the owner-supplied signer/token now establish an actual two-merchant Preprod checkout, repayment and backend restart on a fresh canonical instance: 22 independently verified finalized transactions. Prior credential/deployment blockers below are historical. [Current evidence, fixes, scope and remaining decisions](LIVE_PREPROD_CHECKOUT_2026-10-14.md). Website deployment and wider investigation remain deferred.
+
 Snapshot: **13 October 2026, IST**. Repository: [ShrikarT/line](https://github.com/ShrikarT/line). Latest freshly fetched main: `a0e51ee`, including deployment work `babc507`. Audit/fix branch: `fix/audit-integration`, [draft PR #10](https://github.com/ShrikarT/line/pull/10). The auditor has not changed the original checkout; its new uncommitted Motion/activity-card work is recorded in the closeout. This report consolidates the current result; the [detailed audit history](FULL_AUDIT_2026-10-11.md) preserves earlier reproductions and failures.
 
 ## Verdict
