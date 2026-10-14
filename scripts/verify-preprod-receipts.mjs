@@ -46,7 +46,7 @@ async function main(){
     ['registerMerchant',...evidence.keyInsertions.slice(0,evidence.keyInsertions.findIndex(item=>item.txHash===row.txHash)+1).map(item=>item.circuit)]:Object.keys(fixture.keys);
    assert.deepEqual(keys.sort(),expected.sort());
    for(const name of keys)need(Buffer.from(state.operation(name).verifierKey).equals(Buffer.from(fixture.keys[name],'base64')),'NETWORK_VERIFIER_KEY_MISMATCH');
-   const v=ledger(state.data);
+   const v=ledger(observed.compactState.data);
    report.checks.push({kind:row.kind,name:row.name??row.circuit??'deploy',txHash:row.txHash,blockHeight:row.blockHeight,
     rpcBlockHash:canonicalHash,finalizedHead:observed.finalizedHead,transactionStatus:tx.transactionResult.status,entryPoint:action.entryPoint??null,
     rawTransactionSha256:sha(raw.serialize()),stateSha256:sha(state.serialize()),registeredCircuitCount:keys.length,

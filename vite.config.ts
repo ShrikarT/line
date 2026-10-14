@@ -1,4 +1,4 @@
-import { defineConfig, type Plugin, type PreviewServer, type ViteDevServer } from "vite";
+import { defineConfig, loadEnv, type Plugin, type PreviewServer, type ViteDevServer } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import wasm from "vite-plugin-wasm";
@@ -10,6 +10,7 @@ const checkoutClosers = new Set<() => Promise<void>>();
 async function installCheckout(server: ViteDevServer | PreviewServer) {
   const { checkoutMiddleware } = await import(pathToFileURL(`${process.cwd()}/server/checkout-http.ts`).href);
   const { zkAssetMiddleware } = await import(pathToFileURL(`${process.cwd()}/server/zk-assets.ts`).href);
+  const { networkSessionMiddleware } = await import(pathToFileURL(`${process.cwd()}/server/network-session.ts`).href);
   const checkout = checkoutMiddleware();
   let closing: Promise<void> | undefined;
   const close = () => closing ??= checkout.close().finally(() => checkoutClosers.delete(close));
@@ -22,6 +23,8 @@ async function installCheckout(server: ViteDevServer | PreviewServer) {
       void close().catch(() => server.config.logger.error("Checkout storage cleanup failed. Inspect its directory lease before restarting."));
     });
     server.middlewares.use(assets);
+    const networkEnv = loadEnv(server.config.mode, server.config.envDir, "MIDNIGHT_");
+    server.middlewares.use(networkSessionMiddleware(process.env.MIDNIGHT_BLOCKFROST_PROJECT_ID ?? networkEnv.MIDNIGHT_BLOCKFROST_PROJECT_ID));
     server.middlewares.use(checkout);
   } catch (error) { await close().catch(() => {}); throw error; }
 }

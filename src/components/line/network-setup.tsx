@@ -21,7 +21,19 @@ export function NetworkSetupScreen({ onConnected, onSwitchToLocal }: NetworkSetu
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const busy = connecting || joiningContract;
-  useEffect(() => { setWallets(getAvailableWallets()); }, []);
+  useEffect(() => {
+    setWallets(getAvailableWallets());
+    const controller = new AbortController();
+    void fetch("/api/line/network-session", { method: "POST", headers: { "X-Line-Session": "network-setup" }, signal: controller.signal })
+      .then(async response => {
+        if (!response.ok) return;
+        const config = await response.json();
+        if (config.networkId === "preprod" && typeof config.blockfrostProjectId === "string") {
+          setProjectToken(current => current || config.blockfrostProjectId);
+        }
+      }).catch(() => { /* Manual token input remains available outside local setup. */ });
+    return () => controller.abort();
+  }, []);
 
   const handleConnectWallet = async () => {
     setConnecting(true); setErrorMsg(null); setSuccessMsg(null); setConnectedWalletName(null);

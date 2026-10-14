@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import * as L from '@midnight-ntwrk/ledger-v8';
+import {StateValue,ChargedState} from '@midnight-ntwrk/compact-runtime';
 import {createFinalizedReceiptReader,validateReceiptMetadata} from '../scripts/finalized-contract-receipt.mjs';
 import {resolveMidnightEndpoints} from '../src/lib/runtime/endpoints.ts';
 
@@ -29,6 +30,8 @@ function fixture({mutate=()=>{},transport}={}){
 test('reader fetches finality and canonical block, then binds metadata to actual public call bytes',async()=>{
  const f=fixture(),result=await f.reader.read(row,address);
  assert.equal(result.raw.transactionHash(),txHash);assert.equal(result.networkFinalityVerified,true);
+ assert(result.compactState.data instanceof StateValue||result.compactState.data instanceof ChargedState,'Generated bindings require Compact runtime state, not ledger-v8 state.');
+ assert.deepEqual(result.compactState.serialize(),state);
  assert.deepEqual(result.finalizedHead,{hash:headHash,height:125});assert.deepEqual(result.state.serialize(),state);
  assert.deepEqual(f.requests.filter(x=>!x.request.query).map(x=>x.request.method),['chain_getFinalizedHead','chain_getHeader','chain_getBlockHash']);
  for(const {options}of f.requests){assert.equal(options.method,'POST');assert.equal(options.redirect,'error');assert(options.signal instanceof AbortSignal);}
@@ -37,6 +40,12 @@ test('reader fetches finality and canonical block, then binds metadata to actual
 test('reader does not accept indexer metadata naming another circuit in the same raw transaction',async()=>{
  const f=fixture({mutate:tx=>{tx.contractActions[0].entryPoint='draw';}});
  await assert.rejects(f.reader.read({...row,name:'draw'},address),/RAW_CIRCUIT_ENTRY_POINT_MISMATCH/);
+});
+test('reader validates raw bytes and finality when entire-success segment outcomes are null',async()=>{
+ const f=fixture({mutate:tx=>{tx.transactionResult.segments=null;}});
+ const result=await f.reader.read(row,address);
+ assert.equal(result.networkFinalityVerified,true);
+ assert.deepEqual(result.state.serialize(),state);
 });
 test('reader rejects a fabricated contract address even with matching indexer metadata',async()=>{
  const other='ab'.repeat(32),f=fixture({mutate:tx=>{tx.contractActions[0].address=other;}});

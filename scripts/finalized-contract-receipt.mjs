@@ -2,6 +2,7 @@
  * TLS indexer/RPC responses are the authority; this is not a light-client proof.
  */
 import * as L from '@midnight-ntwrk/ledger-v8';
+import {ContractState as CompactContractState} from '@midnight-ntwrk/compact-runtime';
 import {assertEndpointCredentials} from '../src/lib/runtime/endpoints.ts';
 
 export class ReceiptError extends Error {constructor(code){super(code);this.code=code;}}
@@ -27,7 +28,11 @@ export function validateReceiptMetadata(row,tx,address,finalizedHeight,canonical
  need(height(row.blockHeight)&&height(finalizedHeight),'RECEIPT_HEIGHT_INVALID');
  need(hash(tx.hash)===hash(row.txHash)&&tx.block?.height===row.blockHeight,'RECEIPT_HASH_HEIGHT_MISMATCH');
  need(tx.transactionResult?.status==='SUCCESS','TRANSACTION_NOT_ENTIRELY_SUCCESSFUL');
- need(Array.isArray(tx.transactionResult.segments)&&tx.transactionResult.segments.every(s=>s&&s.success===true),'FAILED_TRANSACTION_SEGMENT');
+ // Indexer v4 omits per-segment outcomes for entire success/failure; the
+ // official Midnight.js provider uses them only for PARTIAL_SUCCESS. Keep
+ // requiring explicit aggregate SUCCESS, and reject contradictory outcomes.
+ const segments=tx.transactionResult.segments;
+ need(segments===null||(Array.isArray(segments)&&segments.every(s=>s&&s.success===true)),'FAILED_TRANSACTION_SEGMENT');
  need(row.blockHeight<=finalizedHeight,'BLOCK_NOT_FINALIZED');
  need(hash(canonicalHash)===hash(tx.block.hash),'INDEXER_RPC_BLOCK_MISMATCH');
  need(Array.isArray(tx.contractActions),'CONTRACT_ACTIONS_INVALID');
@@ -94,8 +99,8 @@ export function createFinalizedReceiptReader({endpoints,fetchImpl=globalThis.fet
   need(height(expected.blockHeight),'RECEIPT_HEIGHT_INVALID');need(expected.blockHeight<=finalizedHeight,'BLOCK_NOT_FINALIZED');
   const canonicalHash=hash(await rpc('chain_getBlockHash',[expected.blockHeight]));
   const action=validateReceiptMetadata(expected,tx,address,finalizedHeight,canonicalHash);
-  let raw,state;const encodedTx=bytes(tx.raw),encodedState=bytes(action.state);
-  try{raw=L.Transaction.deserialize('signature','proof','binding',encodedTx);state=L.ContractState.deserialize(encodedState);}
+  let raw,state,compactState;const encodedTx=bytes(tx.raw),encodedState=bytes(action.state);
+  try{raw=L.Transaction.deserialize('signature','proof','binding',encodedTx);state=L.ContractState.deserialize(encodedState);compactState=CompactContractState.deserialize(encodedState);}
   catch{throw new ReceiptError('NETWORK_BYTES_DECODE_FAILED');}
   need(Buffer.from(raw.serialize()).equals(Buffer.from(encodedTx))&&Buffer.from(state.serialize()).equals(Buffer.from(encodedState)),'NETWORK_BYTES_NOT_CANONICAL');
   need(hash(raw.transactionHash())===hash(expected.txHash),'RAW_TRANSACTION_HASH_MISMATCH');
@@ -107,7 +112,7 @@ export function createFinalizedReceiptReader({endpoints,fetchImpl=globalThis.fet
   need(actions.length===1,'RAW_CONTRACT_ACTION_NOT_UNIQUE');const rawAction=actions[0];
   need(row.kind==='call'?rawAction instanceof L.ContractCall:row.kind==='deploy'?rawAction instanceof L.ContractDeploy:rawAction instanceof L.MaintenanceUpdate,'RAW_CONTRACT_ACTION_KIND_MISMATCH');
   if(row.kind==='call')need((typeof rawAction.entryPoint==='string'?rawAction.entryPoint:Buffer.from(rawAction.entryPoint).toString('utf8'))===row.name,'RAW_CIRCUIT_ENTRY_POINT_MISMATCH');
-  return {transaction:tx,action,raw,state,canonicalHash,finalizedHead:{hash:finalizedHash,height:finalizedHeight},networkFinalityVerified:true,
+  return {transaction:tx,action,raw,state,compactState,canonicalHash,finalizedHead:{hash:finalizedHash,height:finalizedHeight},networkFinalityVerified:true,
    trust:'Configured TLS indexer and RPC; not independent full-node or local proof verification.'};
  }};
 }

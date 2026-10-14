@@ -9,6 +9,12 @@ const receipt=()=>({hash,block:{height:120,hash:blockHash},transactionResult:{st
 test('receipt validation requires exact successful finalized action metadata',()=>{
  const tx=receipt();assert.equal(validateReceiptMetadata(row,tx,address,125,blockHash),tx.contractActions[0]);
 });
+test('indexer entire success accepts explicit null segment outcomes',()=>{
+ const tx=receipt();tx.transactionResult.segments=null;
+ assert.equal(validateReceiptMetadata(row,tx,address,125,blockHash),tx.contractActions[0]);
+ tx.transactionResult.status='PARTIAL_SUCCESS';
+ assert.throws(()=>validateReceiptMetadata(row,tx,address,125,blockHash),/TRANSACTION_NOT_ENTIRELY_SUCCESSFUL/);
+});
 for(const [label,mutate,expected]of [
  ['different transaction hash',tx=>{tx.hash='00'.repeat(32);},'RECEIPT_HASH_HEIGHT_MISMATCH'],
  ['different reported block',tx=>{tx.block.height=119;},'RECEIPT_HASH_HEIGHT_MISMATCH'],

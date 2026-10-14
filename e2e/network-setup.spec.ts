@@ -1,6 +1,7 @@
 import { test, expect } from "@playwright/test";
 
 test("wallet connection keeps contract setup open and rejects invalid addresses", async ({ page }) => {
+  await page.route("**/api/line/network-session", route => route.fulfill({ status: 404, body: "{}" }));
   await page.addInitScript(() => {
     (window as unknown as { midnight: object }).midnight = {
       "io.line.test": {
@@ -29,4 +30,14 @@ test("wallet connection keeps contract setup open and rejects invalid addresses"
   await expect(page.getByRole("button", { name: "Join Contract", exact: true })).toBeDisabled();
   await page.getByRole("button", { name: "Connect Midnight Wallet" }).click();
   await expect(page.getByText("Enter a Blockfrost Midnight Preprod project token.")).toBeVisible();
+});
+
+test("local Preprod configuration fills the session token without browser storage", async ({ page }) => {
+  await page.route("**/api/line/network-session", route => route.fulfill({ contentType: "application/json",
+    body: JSON.stringify({ networkId: "preprod", blockfrostProjectId: "local-session-fixture" }) }));
+  await page.goto("/");
+  await page.getByRole("button", { name: "Local Simulator" }).click();
+  await expect(page.getByLabel("Blockfrost Midnight Preprod project token")).toHaveValue("local-session-fixture");
+  const stored = await page.evaluate(() => JSON.stringify({ local: { ...localStorage }, session: { ...sessionStorage } }));
+  expect(stored).not.toContain("local-session-fixture");
 });
