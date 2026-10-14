@@ -1,5 +1,13 @@
 # Engineering status and acceptance evidence
 
+## Preprod priority — 14 October 2026
+
+The owner deferred website deployment and prioritized actual Midnight Preprod execution, authorizing redeployment if required. The polished checkout now has the original matching canonical full release: all 36 HTTP proving assets pass hash/size checks, all 12 verifier keys match the local fixture, and proof-server 8.1.3 is healthy on localhost:6300. The reported address is configured locally. Network join now refreshes the consoles' ledger/runtime status; deployment, join and receipt CLI commands load ignored `.env.local` credentials. GitHub main `cc5cb71` includes the prior audit/polish PR.
+
+The Blockfrost token is still absent. Recorded network receipts and deployed key compatibility cannot yet be freshly verified; no new network action or redeployment has been performed. Existing role secrets/private book openings are also needed to operate the old deployment. [Connection steps and remaining inputs](PREPROD_READY.md). The `/checkout` server flow remains a local demo.
+
+Build/typecheck, all five relevant navigation/network browser tests, and all 40 focused store/SDK/wallet tests pass. The required full `npm test` run also completes: **548 tests, 547 passing, zero failures, one intentional compiled-owner skip, 60 suites**. Canonical managed bindings remain unchanged. These checks do not establish network execution.
+
 ## Product demo priority — 14 October 2026
 
 The owner requested only the highest-priority work to get a running, polished product; extended audit/native work is deferred. The local app runs at `http://127.0.0.1:5174/`. The homepage now leads into a real two-service purchasing flow rather than unrelated zero-state counters and engineering dashboards. Default credit is 60 units, so both 25/20-unit purchases deliver; an explicit 40-unit scenario retains decline, issuer acknowledgement and exact retry. The UI has actual progress, empty states, keyboard focus, responsive layouts and a bundled licensed Manrope font, eliminating external font requests. No contract, accounting or settlement behavior changes.
