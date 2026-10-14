@@ -11,6 +11,7 @@ async function installCheckout(server: ViteDevServer | PreviewServer) {
   const { checkoutMiddleware } = await import(pathToFileURL(`${process.cwd()}/server/checkout-http.ts`).href);
   const { zkAssetMiddleware } = await import(pathToFileURL(`${process.cwd()}/server/zk-assets.ts`).href);
   const { networkSessionMiddleware } = await import(pathToFileURL(`${process.cwd()}/server/network-session.ts`).href);
+  const { preprodMiddleware } = await import(pathToFileURL(`${process.cwd()}/server/preprod-http.ts`).href);
   const checkout = checkoutMiddleware();
   let closing: Promise<void> | undefined;
   const close = () => closing ??= checkout.close().finally(() => checkoutClosers.delete(close));
@@ -25,6 +26,10 @@ async function installCheckout(server: ViteDevServer | PreviewServer) {
     server.middlewares.use(assets);
     const networkEnv = loadEnv(server.config.mode, server.config.envDir, "MIDNIGHT_");
     server.middlewares.use(networkSessionMiddleware(process.env.MIDNIGHT_BLOCKFROST_PROJECT_ID ?? networkEnv.MIDNIGHT_BLOCKFROST_PROJECT_ID));
+    const live = preprodMiddleware({ env: { ...networkEnv, LINE_LIVE_PREPROD: process.env.LINE_LIVE_PREPROD ?? loadEnv(server.config.mode, server.config.envDir, "LINE_").LINE_LIVE_PREPROD } });
+    server.middlewares.use((req, res, next) => { void live.middleware(req, res, next); });
+    checkoutClosers.add(live.close);
+    server.httpServer?.once("close", () => { void live.close().finally(() => checkoutClosers.delete(live.close)); });
     server.middlewares.use(checkout);
   } catch (error) { await close().catch(() => {}); throw error; }
 }
@@ -53,6 +58,7 @@ export default defineConfig({
   server: {
     host: "0.0.0.0",
     port: 5173,
+    watch: { ignored: ["**/.midnight-cache/**", "**/.compact-keys/**", "**/.line-checkout-private/**"] },
   },
   preview: {
     host: "0.0.0.0",
