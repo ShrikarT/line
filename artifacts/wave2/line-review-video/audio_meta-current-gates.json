@@ -1,0 +1,23 @@
+{
+  "tts_provider": "kokoro",
+  "voice_id": "am_michael",
+  "bgm": null,
+  "bgm_pending": false,
+  "bgm_provider": null,
+  "bgm_pid": null,
+  "bgm_log": null,
+  "bgm_mode": null,
+  "bgm_target_duration_s": null,
+  "bgm_seed_duration_s": null,
+  "bgm_loop_count": null,
+  "voices": [
+    {
+      "id": "scene-7-current",
+      "path": "assets/voice/scene-7-current.wav",
+      "duration_s": 23.339,
+      "words": []
+    }
+  ],
+  "sfx": [],
+  "total_duration_s": 23.339
+}

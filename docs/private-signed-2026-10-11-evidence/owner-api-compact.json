@@ -1,0 +1,152 @@
+{
+  "schema": "line-owner-approval-service-compact/v1",
+  "createdAt": "2026-10-12T09:10:50.369Z",
+  "sourceSha256": "ae970672c048c48692ab690554c77285fec19d1943dc3b4574080970b7fa657d",
+  "scriptFingerprints": {
+    "scripts/approval-service-compact.mjs": "a5369737c5b529266ab52b53651fd4b67aea2329ccdb1dfe4f70de4dc0a2dc0f",
+    "scripts/approval-owner-service.mjs": "8513fa94cd4644b86da339bc5ebf042814b53b2e250f2b50eabb2a13dd3589b4",
+    "scripts/approval-service-frame.mjs": "550a409609088ca19eef9c56614b5c36a60b0957165a589e46b8938e3035deb8",
+    "scripts/approval-owner-example-policy.mjs": "0f54f84ca2a313c519c3a89d5bf849ff2fa120c8f857118c0687a1e6ccc80b30",
+    "scripts/durable-approval-signer.mjs": "66086d2593a03cc3bbec100e115b8f97877ba0bbb2982cc6094bfce84989efd9",
+    "scripts/durable-approval-actor.mjs": "3ac1a52c31c5bc8136f162772254f25539c0488de939deb659a1454f3b451504",
+    "scripts/signed-pool-signers.mjs": "df077892d65f2736322be3e627e6ec9f1bcfa422f9369dcb2016d203ca5831a3",
+    "scripts/private-offer-signers.mjs": "80695e03759e98c7bda37ea909430e1b94c9ccabf9f2ef4c6defa3a1a5e2660e",
+    "scripts/private-offer-encoding.mjs": "e78ffe273c86f72f58733574287b3099530be96efbed37a6fe3d8c16a36a7f22",
+    "scripts/private-pool-spike.mjs": "be5b8a3e2f85a3bb3e45fabfaafe55b45f414f6999b3931a6fb4c33f01a04397",
+    "src/lib/line/encoding.ts": "fb2af647156d2a744c6fb031fe084aee25708a379a7db6412782ca9c2e232b5b",
+    "src/lib/security/vault-codec.ts": "7df485e705a4d64b2fb6ea262ca96dd5c11c509c32991b03e2dea94d09fb55f9",
+    "scripts/compile-compact.mjs": "e97c91eb1846e087684f64d2a7b3b2dbc4a4e8896db5c2846bd9b563be93bda6",
+    "tests/fixtures/approval-service-tls.mjs": "0231722840e48af75958ea0e9a9ad39b1794e4b20a9164cc774f77770f54d1e5"
+  },
+  "artifacts": {
+    "contract/index.js": "23e5c49249dd0af5aef7e25625db197dd4d6d7244d324bbe6a876d49a1624683",
+    "compiler/contract-info.json": "10a94c9d83abde894552fb57960188ae6b15e29be4b424a59fc0ee0320cbcfc5"
+  },
+  "freshCompilation": true,
+  "cachedGeneratedBindings": false,
+  "traces": [
+    {
+      "actor": "issuer",
+      "circuit": "registerMerchant",
+      "approvalOverMutualTls": true,
+      "signingScalarWitnesses": 0
+    },
+    {
+      "actor": "issuer",
+      "circuit": "fundReserve",
+      "approvalOverMutualTls": true,
+      "signingScalarWitnesses": 0
+    },
+    {
+      "actor": "agent",
+      "circuit": "openLine",
+      "approvalOverMutualTls": true,
+      "signingScalarWitnesses": 0
+    },
+    {
+      "actor": "issuer",
+      "circuit": "openLine",
+      "approvalOverMutualTls": true,
+      "signingScalarWitnesses": 0
+    },
+    {
+      "actor": "merchantA",
+      "circuit": "postQuote",
+      "approvalOverMutualTls": true,
+      "signingScalarWitnesses": 0
+    },
+    {
+      "actor": "agent",
+      "circuit": "draw",
+      "approvalOverMutualTls": true,
+      "signingScalarWitnesses": 0
+    },
+    {
+      "actor": "merchantA",
+      "circuit": "redeemDraw",
+      "approvalOverMutualTls": true,
+      "signingScalarWitnesses": 0
+    },
+    {
+      "actor": "merchantB",
+      "circuit": "postQuote",
+      "approvalOverMutualTls": true,
+      "signingScalarWitnesses": 0
+    },
+    {
+      "actor": "agent",
+      "circuit": "draw",
+      "approvalOverMutualTls": true,
+      "signingScalarWitnesses": 0
+    },
+    {
+      "actor": "merchantB",
+      "circuit": "redeemDraw",
+      "approvalOverMutualTls": true,
+      "signingScalarWitnesses": 0
+    }
+  ],
+  "controls": [
+    {
+      "check": "foreign-merchant-claim",
+      "rejectedByGeneratedCompact": true
+    },
+    {
+      "check": "exact-approval-replay",
+      "rejectedByGeneratedCompact": true
+    },
+    {
+      "check": "foreign-merchant-claim",
+      "rejectedByGeneratedCompact": true
+    },
+    {
+      "check": "exact-approval-replay",
+      "rejectedByGeneratedCompact": true
+    }
+  ],
+  "owners": 4,
+  "merchants": 2,
+  "serviceRestarts": 4,
+  "requestApplicationBytes": 131072,
+  "responseApplicationBytes": 8192,
+  "signingScalarWitnesses": 0,
+  "compiler": "0.31.1",
+  "runtime": "0.16.0",
+  "exportedCircuits": [
+    "registerMerchant",
+    "disableMerchant",
+    "fundReserve",
+    "withdrawUnencumberedReserve",
+    "withdrawFees",
+    "openLine",
+    "postQuote",
+    "draw",
+    "redeemDraw",
+    "cancelOrExpireNote",
+    "acknowledgeRepayment",
+    "setStatus"
+  ],
+  "cryptographicProofsGenerated": false,
+  "networkSubmitted": false,
+  "authenticAssetSettlement": false,
+  "independentAdministrativeCustody": false,
+  "fullHistoryPrivacyPassed": false,
+  "evidenceScope": "Fresh generated Compact through four mTLS owner services and two suppliers. Same-host synthetic owner harness knows encryption keys; financial state is volatile. No native proofs, separate operators, assets or complete privacy certification.",
+  "gitNormalizedScriptFingerprints": {
+    "scripts/approval-service-compact.mjs": "a5369737c5b529266ab52b53651fd4b67aea2329ccdb1dfe4f70de4dc0a2dc0f",
+    "scripts/approval-owner-service.mjs": "8513fa94cd4644b86da339bc5ebf042814b53b2e250f2b50eabb2a13dd3589b4",
+    "scripts/approval-service-frame.mjs": "550a409609088ca19eef9c56614b5c36a60b0957165a589e46b8938e3035deb8",
+    "scripts/approval-owner-example-policy.mjs": "0f54f84ca2a313c519c3a89d5bf849ff2fa120c8f857118c0687a1e6ccc80b30",
+    "scripts/durable-approval-signer.mjs": "66086d2593a03cc3bbec100e115b8f97877ba0bbb2982cc6094bfce84989efd9",
+    "scripts/durable-approval-actor.mjs": "3ac1a52c31c5bc8136f162772254f25539c0488de939deb659a1454f3b451504",
+    "scripts/signed-pool-signers.mjs": "df077892d65f2736322be3e627e6ec9f1bcfa422f9369dcb2016d203ca5831a3",
+    "scripts/private-offer-signers.mjs": "80695e03759e98c7bda37ea909430e1b94c9ccabf9f2ef4c6defa3a1a5e2660e",
+    "scripts/private-offer-encoding.mjs": "e78ffe273c86f72f58733574287b3099530be96efbed37a6fe3d8c16a36a7f22",
+    "scripts/private-pool-spike.mjs": "be5b8a3e2f85a3bb3e45fabfaafe55b45f414f6999b3931a6fb4c33f01a04397",
+    "src/lib/line/encoding.ts": "8fe151cc8eb4f50727c6658beb42e7892028fccfff34f2c1a8045bf61602d0c5",
+    "src/lib/security/vault-codec.ts": "0abc995f6f042c9b142833d43cb97fd43f3eb934fdcfee0d043368db1d757062",
+    "scripts/compile-compact.mjs": "e97c91eb1846e087684f64d2a7b3b2dbc4a4e8896db5c2846bd9b563be93bda6",
+    "tests/fixtures/approval-service-tls.mjs": "0231722840e48af75958ea0e9a9ad39b1794e4b20a9164cc774f77770f54d1e5"
+  },
+  "fingerprintScope": "Runtime hashes identify exact files executed. LF-normalized hashes correlate Git source and do not establish another run."
+}

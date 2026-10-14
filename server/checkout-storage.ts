@@ -42,6 +42,15 @@ export class EncryptedCheckoutStore implements CheckoutCheckpointStore {
   private constructor(directory: string, password: string, binding: string) { this.directory = directory; this.password = password; this.binding = binding; }
 
   static async open(directory: string, password: string): Promise<EncryptedCheckoutStore> {
+    return this.openBound(directory, password, await checkoutBinding());
+  }
+
+  /** Explicit owner-selected provenance for other local checkpoint protocols.
+   * Callers must derive this digest from their protocol/source/instance scope.
+   * The default checkout entry point retains its authoritative binding above.
+   */
+  static async openBound(directory: string, password: string, binding: string): Promise<EncryptedCheckoutStore> {
+    if (!/^[0-9a-f]{64}$/.test(binding)) throw new CheckoutPersistenceError("Checkpoint binding must be a provenance digest.");
     if (password.length < 16) throw new CheckoutPersistenceError("Checkout storage password must contain at least 16 characters.");
     const target = resolve(directory);
     try { await mkdir(target, { mode: 0o700 }); }
@@ -61,12 +70,14 @@ export class EncryptedCheckoutStore implements CheckoutCheckpointStore {
       execFileSync("icacls.exe", [target, "/inheritance:r", "/grant:r", `*${sid}:(OI)(CI)F`, "*S-1-5-18:(OI)(CI)F"], { windowsHide: true, stdio: "pipe" });
       // An existing directory may contain unrelated explicit ACL entries: reject them.
       const escaped = target.replaceAll("'", "''");
-      const acl = execFileSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", `(Get-Acl -LiteralPath '${escaped}').Access | ForEach-Object { $_.IdentityReference.Translate([System.Security.Principal.SecurityIdentifier]).Value }`], { encoding: "utf8", windowsHide: true });
+      // Read the .NET ACL directly: inherited PowerShell 7 module paths can
+      // make Windows PowerShell's Get-Acl autoload fail with duplicate types.
+      const acl = execFileSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", `$ErrorActionPreference = 'Stop'; [System.IO.Directory]::GetAccessControl('${escaped}').GetAccessRules($true, $true, [System.Security.Principal.SecurityIdentifier]) | ForEach-Object { $_.IdentityReference.Value }`], { encoding: "utf8", windowsHide: true });
       if (acl.trim().split(/\r?\n/).some(entry => entry !== sid && entry !== "S-1-5-18")) throw new CheckoutPersistenceError("Checkout directory has unrelated explicit access. Use a new private directory.");
     } else if ((stat.mode & 0o077) !== 0 || stat.uid !== process.getuid?.()) {
       throw new CheckoutPersistenceError("Checkout directory must be owned by this user with mode 0700.");
     }
-    const store = new EncryptedCheckoutStore(target, password, await checkoutBinding());
+    const store = new EncryptedCheckoutStore(target, password, binding);
     const leasePath = join(target, ".lease");
     await store.acquire(leasePath);
     return store;

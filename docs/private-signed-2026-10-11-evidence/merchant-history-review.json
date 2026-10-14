@@ -1,0 +1,466 @@
+{
+  "schema": "line-private-merchant-history-review/v1",
+  "createdAt": "2026-10-11T11:23:47.220Z",
+  "sourceSha256": "afb75b1bf6156500e63e75fb2d7a69bc002bf84daf15736c4aa2fbd99cb9a4b7",
+  "scriptFingerprints": {
+    "scripts/private-merchant-history-review.mjs": "eec4daf23024bbb276b5353024673afc3181ea0a26fdd0ed7fd938a10e715807",
+    "scripts/private-merchant-spike.mjs": "8a4b63f0586e49118c399d2baf15fd8c58b24d64e530479b14df44dcebbc9df4",
+    "scripts/signed-pool-signers.mjs": "df077892d65f2736322be3e627e6ec9f1bcfa422f9369dcb2016d203ca5831a3",
+    "scripts/private-pool-spike.mjs": "be5b8a3e2f85a3bb3e45fabfaafe55b45f414f6999b3931a6fb4c33f01a04397",
+    "src/lib/line/encoding.ts": "fb2af647156d2a744c6fb031fe084aee25708a379a7db6412782ca9c2e232b5b",
+    "src/lib/security/vault-codec.ts": "7df485e705a4d64b2fb6ea262ca96dd5c11c509c32991b03e2dea94d09fb55f9"
+  },
+  "freshCompilation": true,
+  "artifactFingerprints": {
+    "contract/index.js": "db00d5035da207badfe34662d8662797c8a15edf51539e60d072d54a23bfd570",
+    "compiler/contract-info.json": "7a374b77b08691daa30251ee7486b60fe726811f6853204fb7b25995277559c2"
+  },
+  "generatedOnly": true,
+  "nativeProofsVerifiedByThisRun": false,
+  "networkExecuted": false,
+  "fullHistoryPrivacyPassed": false,
+  "commonReachableStart": true,
+  "continuousCounterfactualHistories": true,
+  "actionSequence": [
+    "acknowledgeRepayment",
+    "cancelOrExpireNote",
+    "cancelOrExpireNote",
+    "cancelOrExpireNote"
+  ],
+  "pairs": [
+    {
+      "circuit": "acknowledgeRepayment",
+      "publicInputsEqual": true,
+      "publicOutputsEqual": true,
+      "syntheticTimeEqual": true,
+      "transcriptEntries": {
+        "alternate": 97,
+        "normal": 97
+      },
+      "differingLeaves": [
+        {
+          "path": "/transcript/34/push/value/content/value/0",
+          "left": {
+            "type": "string",
+            "characters": 64,
+            "hexEncoded": true
+          },
+          "right": {
+            "type": "string",
+            "characters": 64,
+            "hexEncoded": true
+          }
+        },
+        {
+          "path": "/transcript/38/push/value/content/value/0",
+          "left": {
+            "type": "string",
+            "characters": 64,
+            "hexEncoded": true
+          },
+          "right": {
+            "type": "string",
+            "characters": 64,
+            "hexEncoded": true
+          }
+        },
+        {
+          "path": "/transcript/50/push/value/content/value/0",
+          "left": {
+            "type": "string",
+            "characters": 64,
+            "hexEncoded": true
+          },
+          "right": {
+            "type": "string",
+            "characters": 64,
+            "hexEncoded": true
+          }
+        },
+        {
+          "path": "/transcript/58/push/value/content/value/0",
+          "left": {
+            "type": "string",
+            "characters": 64,
+            "hexEncoded": true
+          },
+          "right": {
+            "type": "string",
+            "characters": 64,
+            "hexEncoded": true
+          }
+        },
+        {
+          "path": "/transcript/62/push/value/content/value/0",
+          "left": {
+            "type": "string",
+            "characters": 64,
+            "hexEncoded": true
+          },
+          "right": {
+            "type": "string",
+            "characters": 64,
+            "hexEncoded": true
+          }
+        },
+        {
+          "path": "/transcript/67/push/value/content/value/0",
+          "left": {
+            "type": "string",
+            "characters": 64,
+            "hexEncoded": true
+          },
+          "right": {
+            "type": "string",
+            "characters": 64,
+            "hexEncoded": true
+          }
+        },
+        {
+          "path": "/transcript/88/push/value/content/value/0",
+          "left": {
+            "type": "string",
+            "characters": 64,
+            "hexEncoded": true
+          },
+          "right": {
+            "type": "string",
+            "characters": 64,
+            "hexEncoded": true
+          }
+        }
+      ],
+      "otherDifferingLeafKinds": 0,
+      "classification": "Observed differences require semantic and cryptographic analysis; hex encoding alone does not imply hiding."
+    },
+    {
+      "circuit": "cancelOrExpireNote",
+      "publicInputsEqual": true,
+      "publicOutputsEqual": true,
+      "syntheticTimeEqual": true,
+      "transcriptEntries": {
+        "alternate": 76,
+        "normal": 76
+      },
+      "differingLeaves": [
+        {
+          "path": "/transcript/47/push/value/content/value/0",
+          "left": {
+            "type": "string",
+            "characters": 64,
+            "hexEncoded": true
+          },
+          "right": {
+            "type": "string",
+            "characters": 64,
+            "hexEncoded": true
+          }
+        },
+        {
+          "path": "/transcript/51/push/value/content/value/0",
+          "left": {
+            "type": "string",
+            "characters": 64,
+            "hexEncoded": true
+          },
+          "right": {
+            "type": "string",
+            "characters": 64,
+            "hexEncoded": true
+          }
+        },
+        {
+          "path": "/transcript/62/push/value/content/value/0",
+          "left": {
+            "type": "string",
+            "characters": 64,
+            "hexEncoded": true
+          },
+          "right": {
+            "type": "string",
+            "characters": 64,
+            "hexEncoded": true
+          }
+        },
+        {
+          "path": "/transcript/70/push/value/content/value/0",
+          "left": {
+            "type": "string",
+            "characters": 64,
+            "hexEncoded": true
+          },
+          "right": {
+            "type": "string",
+            "characters": 64,
+            "hexEncoded": true
+          }
+        }
+      ],
+      "otherDifferingLeafKinds": 0,
+      "classification": "Observed differences require semantic and cryptographic analysis; hex encoding alone does not imply hiding."
+    },
+    {
+      "circuit": "cancelOrExpireNote",
+      "publicInputsEqual": true,
+      "publicOutputsEqual": true,
+      "syntheticTimeEqual": true,
+      "transcriptEntries": {
+        "alternate": 109,
+        "normal": 109
+      },
+      "differingLeaves": [
+        {
+          "path": "/transcript/11/popeq/result/value/0",
+          "left": {
+            "type": "string",
+            "characters": 64,
+            "hexEncoded": true
+          },
+          "right": {
+            "type": "string",
+            "characters": 64,
+            "hexEncoded": true
+          }
+        },
+        {
+          "path": "/transcript/17/popeq/result/value/0",
+          "left": {
+            "type": "string",
+            "characters": 64,
+            "hexEncoded": true
+          },
+          "right": {
+            "type": "string",
+            "characters": 64,
+            "hexEncoded": true
+          }
+        },
+        {
+          "path": "/transcript/47/push/value/content/value/0",
+          "left": {
+            "type": "string",
+            "characters": 64,
+            "hexEncoded": true
+          },
+          "right": {
+            "type": "string",
+            "characters": 64,
+            "hexEncoded": true
+          }
+        },
+        {
+          "path": "/transcript/51/push/value/content/value/0",
+          "left": {
+            "type": "string",
+            "characters": 64,
+            "hexEncoded": true
+          },
+          "right": {
+            "type": "string",
+            "characters": 64,
+            "hexEncoded": true
+          }
+        },
+        {
+          "path": "/transcript/70/push/value/content/value/0",
+          "left": {
+            "type": "string",
+            "characters": 64,
+            "hexEncoded": true
+          },
+          "right": {
+            "type": "string",
+            "characters": 64,
+            "hexEncoded": true
+          }
+        },
+        {
+          "path": "/transcript/75/push/value/content/value/0",
+          "left": {
+            "type": "string",
+            "characters": 64,
+            "hexEncoded": true
+          },
+          "right": {
+            "type": "string",
+            "characters": 64,
+            "hexEncoded": true
+          }
+        },
+        {
+          "path": "/transcript/79/push/value/content/value/0",
+          "left": {
+            "type": "string",
+            "characters": 64,
+            "hexEncoded": true
+          },
+          "right": {
+            "type": "string",
+            "characters": 64,
+            "hexEncoded": true
+          }
+        },
+        {
+          "path": "/transcript/87/push/value/content/value/0",
+          "left": {
+            "type": "string",
+            "characters": 64,
+            "hexEncoded": true
+          },
+          "right": {
+            "type": "string",
+            "characters": 64,
+            "hexEncoded": true
+          }
+        },
+        {
+          "path": "/transcript/95/push/value/content/value/0",
+          "left": {
+            "type": "string",
+            "characters": 64,
+            "hexEncoded": true
+          },
+          "right": {
+            "type": "string",
+            "characters": 64,
+            "hexEncoded": true
+          }
+        },
+        {
+          "path": "/transcript/103/push/value/content/value/0",
+          "left": {
+            "type": "string",
+            "characters": 64,
+            "hexEncoded": true
+          },
+          "right": {
+            "type": "string",
+            "characters": 64,
+            "hexEncoded": true
+          }
+        }
+      ],
+      "otherDifferingLeafKinds": 0,
+      "classification": "Observed differences require semantic and cryptographic analysis; hex encoding alone does not imply hiding."
+    },
+    {
+      "circuit": "cancelOrExpireNote",
+      "publicInputsEqual": true,
+      "publicOutputsEqual": true,
+      "syntheticTimeEqual": true,
+      "transcriptEntries": {
+        "alternate": 89,
+        "normal": 89
+      },
+      "differingLeaves": [
+        {
+          "path": "/transcript/11/popeq/result/value/0",
+          "left": {
+            "type": "string",
+            "characters": 64,
+            "hexEncoded": true
+          },
+          "right": {
+            "type": "string",
+            "characters": 64,
+            "hexEncoded": true
+          }
+        },
+        {
+          "path": "/transcript/17/popeq/result/value/0",
+          "left": {
+            "type": "string",
+            "characters": 64,
+            "hexEncoded": true
+          },
+          "right": {
+            "type": "string",
+            "characters": 64,
+            "hexEncoded": true
+          }
+        },
+        {
+          "path": "/transcript/47/push/value/content/value/0",
+          "left": {
+            "type": "string",
+            "characters": 64,
+            "hexEncoded": true
+          },
+          "right": {
+            "type": "string",
+            "characters": 64,
+            "hexEncoded": true
+          }
+        },
+        {
+          "path": "/transcript/51/push/value/content/value/0",
+          "left": {
+            "type": "string",
+            "characters": 64,
+            "hexEncoded": true
+          },
+          "right": {
+            "type": "string",
+            "characters": 64,
+            "hexEncoded": true
+          }
+        },
+        {
+          "path": "/transcript/65/push/value/content/value/0",
+          "left": {
+            "type": "string",
+            "characters": 64,
+            "hexEncoded": true
+          },
+          "right": {
+            "type": "string",
+            "characters": 64,
+            "hexEncoded": true
+          }
+        },
+        {
+          "path": "/transcript/69/push/value/content/value/0",
+          "left": {
+            "type": "string",
+            "characters": 64,
+            "hexEncoded": true
+          },
+          "right": {
+            "type": "string",
+            "characters": 64,
+            "hexEncoded": true
+          }
+        },
+        {
+          "path": "/transcript/75/push/value/content/value/0",
+          "left": {
+            "type": "string",
+            "characters": 64,
+            "hexEncoded": true
+          },
+          "right": {
+            "type": "string",
+            "characters": 64,
+            "hexEncoded": true
+          }
+        },
+        {
+          "path": "/transcript/83/push/value/content/value/0",
+          "left": {
+            "type": "string",
+            "characters": 64,
+            "hexEncoded": true
+          },
+          "right": {
+            "type": "string",
+            "characters": 64,
+            "hexEncoded": true
+          }
+        }
+      ],
+      "otherDifferingLeafKinds": 0,
+      "classification": "Observed differences require semantic and cryptographic analysis; hex encoding alone does not imply hiding."
+    }
+  ],
+  "evidenceScope": "Finite generated query comparison only. Values are not equated or treated as private merely because they differ. Sender, fees, proofs, network timing, asset events and institutional custody are outside this run."
+}

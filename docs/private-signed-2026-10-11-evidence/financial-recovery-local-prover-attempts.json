@@ -1,0 +1,118 @@
+{
+  "schema": "line-financial-recovery-local-prover-attempts/v1",
+  "attempts": [
+    {
+      "createdAt": "2026-10-12T07:04:47.521Z",
+      "complete": false,
+      "sourceSha256": "ae970672c048c48692ab690554c77285fec19d1943dc3b4574080970b7fa657d",
+      "scriptFingerprints": {
+        "scripts/recoverable-offer-proof.mjs": "35667a4c4a5be8e10c82e061f1ed07982841dcbaef06b622a5c14bf4c6b6cfcf",
+        "scripts/private-pool-provers.mjs": "9ca9fbddb3a18b82c14fca9f92ff1abf412813423d581c653b33b6b94ab3e5a4",
+        "scripts/recoverable-offer-compact.mjs": "1de3a4cadbca2ad8a5225db91a38c0d59bbbacc9749ebd3e1ef209ffb402cc2b",
+        "scripts/durable-approval-actor.mjs": "3ac1a52c31c5bc8136f162772254f25539c0488de939deb659a1454f3b451504",
+        "scripts/durable-approval-signer.mjs": "2c3b6e3350a64b49255058f08588f08692d952660e05b5c92e51d1885ce3c1fd",
+        "scripts/private-finance-child.mjs": "c2ae3d79eee6148e6db2753550707331ae3bd39db47b44b4cc793ab2912a8159",
+        "scripts/private-finance-journal.mjs": "c819ccad6f161703f49fc6d013121610425a651d06854607a29b3200128c1393",
+        "server/checkout-storage.ts": "f29c13ae64ae3a0e45442995dddbcc04d8d243b7955d346f841607e60ed0ea92",
+        "scripts/private-offer-encoding.mjs": "e78ffe273c86f72f58733574287b3099530be96efbed37a6fe3d8c16a36a7f22",
+        "scripts/private-offer-signers.mjs": "80695e03759e98c7bda37ea909430e1b94c9ccabf9f2ef4c6defa3a1a5e2660e",
+        "src/lib/security/vault-codec.ts": "7df485e705a4d64b2fb6ea262ca96dd5c11c509c32991b03e2dea94d09fb55f9",
+        "scripts/signed-pool-signers.mjs": "df077892d65f2736322be3e627e6ec9f1bcfa422f9369dcb2016d203ca5831a3",
+        "scripts/private-pool-spike.mjs": "be5b8a3e2f85a3bb3e45fabfaafe55b45f414f6999b3931a6fb4c33f01a04397",
+        "src/lib/line/encoding.ts": "fb2af647156d2a744c6fb031fe084aee25708a379a7db6412782ca9c2e232b5b",
+        "scripts/native-local-proving-provider.mjs": "283e209cd6c45413af5a47ba09cfc685976c82445cf67f2719f1c44252ba6d67",
+        "scripts/native-preimage-checker/src/main.rs": "d6c792b64f09b2b36772d2db5410174c6be228209ae0295dc9c0efd7b329b4b1",
+        "scripts/native-preimage-checker/src/bin/line-native-local-prover.rs": "bd6a0915cae6075f38ef42650ba0bc9de7f834785a7b5497954226785f93f669",
+        "scripts/native-preimage-checker/Cargo.toml": "6a24180c8e1382e9fa56d441cd9764d24ff9055b60914fc96e910d9d76bc82f5",
+        "scripts/native-preimage-checker/Cargo.lock": "fac9015cf5af129d4a53753b86949081148c560551ac3334e81c621b263c3101"
+      },
+      "nativeProverSha256": "a5748c0f42767e7050e58da5d5eac5b529b7783002d0af32efa9ecd5726269e4",
+      "nativeCheckerSha256": "441e12062c2b168a301be55f5ada64ad198f829a6561060cb093a9b40f3786c8",
+      "nativeVerifierSha256": "a1906a9cec364a736c4b76ee0e46b1fd06160a7cbda8b59d9f2c80277fb4380c",
+      "backend": "pinned-native-rust",
+      "acceptedContractCalls": 0,
+      "failedStage": "fundReserve:prove",
+      "diagnostics": [],
+      "networkSubmitted": false
+    },
+    {
+      "createdAt": "2026-10-12T07:06:47.010Z",
+      "complete": false,
+      "sourceSha256": "ae970672c048c48692ab690554c77285fec19d1943dc3b4574080970b7fa657d",
+      "scriptFingerprints": {
+        "scripts/recoverable-offer-proof.mjs": "35667a4c4a5be8e10c82e061f1ed07982841dcbaef06b622a5c14bf4c6b6cfcf",
+        "scripts/private-pool-provers.mjs": "9ca9fbddb3a18b82c14fca9f92ff1abf412813423d581c653b33b6b94ab3e5a4",
+        "scripts/recoverable-offer-compact.mjs": "1de3a4cadbca2ad8a5225db91a38c0d59bbbacc9749ebd3e1ef209ffb402cc2b",
+        "scripts/durable-approval-actor.mjs": "3ac1a52c31c5bc8136f162772254f25539c0488de939deb659a1454f3b451504",
+        "scripts/durable-approval-signer.mjs": "2c3b6e3350a64b49255058f08588f08692d952660e05b5c92e51d1885ce3c1fd",
+        "scripts/private-finance-child.mjs": "c2ae3d79eee6148e6db2753550707331ae3bd39db47b44b4cc793ab2912a8159",
+        "scripts/private-finance-journal.mjs": "c819ccad6f161703f49fc6d013121610425a651d06854607a29b3200128c1393",
+        "server/checkout-storage.ts": "f29c13ae64ae3a0e45442995dddbcc04d8d243b7955d346f841607e60ed0ea92",
+        "scripts/private-offer-encoding.mjs": "e78ffe273c86f72f58733574287b3099530be96efbed37a6fe3d8c16a36a7f22",
+        "scripts/private-offer-signers.mjs": "80695e03759e98c7bda37ea909430e1b94c9ccabf9f2ef4c6defa3a1a5e2660e",
+        "src/lib/security/vault-codec.ts": "7df485e705a4d64b2fb6ea262ca96dd5c11c509c32991b03e2dea94d09fb55f9",
+        "scripts/signed-pool-signers.mjs": "df077892d65f2736322be3e627e6ec9f1bcfa422f9369dcb2016d203ca5831a3",
+        "scripts/private-pool-spike.mjs": "be5b8a3e2f85a3bb3e45fabfaafe55b45f414f6999b3931a6fb4c33f01a04397",
+        "src/lib/line/encoding.ts": "fb2af647156d2a744c6fb031fe084aee25708a379a7db6412782ca9c2e232b5b",
+        "scripts/native-local-proving-provider.mjs": "54c276018339eeb05b32dd62f0332ef2317579ca4574d4463f114aa7b3a304e5",
+        "scripts/native-preimage-checker/src/main.rs": "d6c792b64f09b2b36772d2db5410174c6be228209ae0295dc9c0efd7b329b4b1",
+        "scripts/native-preimage-checker/src/bin/line-native-local-prover.rs": "bd6a0915cae6075f38ef42650ba0bc9de7f834785a7b5497954226785f93f669",
+        "scripts/native-preimage-checker/Cargo.toml": "6a24180c8e1382e9fa56d441cd9764d24ff9055b60914fc96e910d9d76bc82f5",
+        "scripts/native-preimage-checker/Cargo.lock": "fac9015cf5af129d4a53753b86949081148c560551ac3334e81c621b263c3101"
+      },
+      "nativeProverSha256": "a5748c0f42767e7050e58da5d5eac5b529b7783002d0af32efa9ecd5726269e4",
+      "nativeCheckerSha256": "441e12062c2b168a301be55f5ada64ad198f829a6561060cb093a9b40f3786c8",
+      "nativeVerifierSha256": "a1906a9cec364a736c4b76ee0e46b1fd06160a7cbda8b59d9f2c80277fb4380c",
+      "backend": "pinned-native-rust",
+      "acceptedContractCalls": 0,
+      "failedStage": "fundReserve:prove",
+      "diagnostics": [],
+      "networkSubmitted": false
+    },
+    {
+      "createdAt": "2026-10-12T07:09:12.511Z",
+      "complete": false,
+      "sourceSha256": "ae970672c048c48692ab690554c77285fec19d1943dc3b4574080970b7fa657d",
+      "scriptFingerprints": {
+        "scripts/recoverable-offer-proof.mjs": "3457ff8677d7cee35d93bb62dceae711e54d2813534027f67486db43edcc79be",
+        "scripts/private-pool-provers.mjs": "9ca9fbddb3a18b82c14fca9f92ff1abf412813423d581c653b33b6b94ab3e5a4",
+        "scripts/recoverable-offer-compact.mjs": "1de3a4cadbca2ad8a5225db91a38c0d59bbbacc9749ebd3e1ef209ffb402cc2b",
+        "scripts/durable-approval-actor.mjs": "3ac1a52c31c5bc8136f162772254f25539c0488de939deb659a1454f3b451504",
+        "scripts/durable-approval-signer.mjs": "2c3b6e3350a64b49255058f08588f08692d952660e05b5c92e51d1885ce3c1fd",
+        "scripts/private-finance-child.mjs": "c2ae3d79eee6148e6db2753550707331ae3bd39db47b44b4cc793ab2912a8159",
+        "scripts/private-finance-journal.mjs": "c819ccad6f161703f49fc6d013121610425a651d06854607a29b3200128c1393",
+        "server/checkout-storage.ts": "f29c13ae64ae3a0e45442995dddbcc04d8d243b7955d346f841607e60ed0ea92",
+        "scripts/private-offer-encoding.mjs": "e78ffe273c86f72f58733574287b3099530be96efbed37a6fe3d8c16a36a7f22",
+        "scripts/private-offer-signers.mjs": "80695e03759e98c7bda37ea909430e1b94c9ccabf9f2ef4c6defa3a1a5e2660e",
+        "src/lib/security/vault-codec.ts": "7df485e705a4d64b2fb6ea262ca96dd5c11c509c32991b03e2dea94d09fb55f9",
+        "scripts/signed-pool-signers.mjs": "df077892d65f2736322be3e627e6ec9f1bcfa422f9369dcb2016d203ca5831a3",
+        "scripts/private-pool-spike.mjs": "be5b8a3e2f85a3bb3e45fabfaafe55b45f414f6999b3931a6fb4c33f01a04397",
+        "src/lib/line/encoding.ts": "fb2af647156d2a744c6fb031fe084aee25708a379a7db6412782ca9c2e232b5b",
+        "scripts/native-local-proving-provider.mjs": "12a44a9d40ca78abfa9939782aa8feb2659fd9248e54aa04db8a6b73fc84e00b",
+        "scripts/native-preimage-checker/src/main.rs": "d6c792b64f09b2b36772d2db5410174c6be228209ae0295dc9c0efd7b329b4b1",
+        "scripts/native-preimage-checker/src/bin/line-native-local-prover.rs": "6f45f0e42b07326b78c42264525782e7823493f6f904bda4d74a1ea8f31955ab",
+        "scripts/native-preimage-checker/Cargo.toml": "6a24180c8e1382e9fa56d441cd9764d24ff9055b60914fc96e910d9d76bc82f5",
+        "scripts/native-preimage-checker/Cargo.lock": "fac9015cf5af129d4a53753b86949081148c560551ac3334e81c621b263c3101"
+      },
+      "nativeProverSha256": "6ea0db6746112813fc363fbdee893f1234dc8915d39bd6666c154d1b86b3810f",
+      "nativeCheckerSha256": "441e12062c2b168a301be55f5ada64ad198f829a6561060cb093a9b40f3786c8",
+      "nativeVerifierSha256": "a1906a9cec364a736c4b76ee0e46b1fd06160a7cbda8b59d9f2c80277fb4380c",
+      "backend": "pinned-native-rust",
+      "acceptedContractCalls": 0,
+      "failedStage": "fundReserve:prove",
+      "diagnostics": [
+        {
+          "stage": "fundReserve:prove",
+          "nativeProcessFailure": {
+            "category": "process_failure",
+            "exitCode": 3221225725,
+            "signal": null,
+            "lastStage": "key_material_loaded"
+          }
+        }
+      ],
+      "networkSubmitted": false
+    }
+  ],
+  "evidenceScope": "Historical attempts. The bounded diagnostic records Windows STATUS_STACK_OVERFLOW after key material load. No contract call accepted; synthetic deployment has no contract proof. These are not the earlier Docker HTTP 400 attempt."
+}

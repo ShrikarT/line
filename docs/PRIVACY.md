@@ -1,5 +1,9 @@
 # Privacy Architecture & Ledger Inventory
 
+## Owner-authorized next-version change — 11 October 2026
+
+The owner authorized redesign of public note amounts and reserve deltas. This document inventories the **unchanged canonical baseline**. Its public-disclosure facts do not constrain the next version. See [the redesign and verification/migration gates](PRIVACY_REDESIGN_2026-10-11.md) and [the compiled pool counterexamples](PRIVATE_POOL_2026-10-11.md). No full-history privacy pass or canonical migration is claimed.
+
 ## Executive Summary
 
 Line is a protocol prototype exploring agent purchasing; private credit and checkout are its unproven destination.
