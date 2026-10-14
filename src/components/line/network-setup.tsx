@@ -3,6 +3,7 @@ import { Panel, Button, FlashBar } from "./ui";
 import { getAvailableWallets, type WalletInfo } from "@/lib/runtime/wallet";
 import { getRuntime, setRuntime, MidnightNetworkRuntime, LocalDevelopmentRuntime } from "@/lib/runtime";
 import { sanitizeServiceError } from "@/lib/runtime/endpoints";
+import { useAppStore } from "@/app/store";
 
 interface NetworkSetupProps { onConnected?: () => void; onSwitchToLocal?: () => void }
 
@@ -41,7 +42,8 @@ export function NetworkSetupScreen({ onConnected, onSwitchToLocal }: NetworkSetu
       const runtime = getRuntime();
       if (!(runtime instanceof MidnightNetworkRuntime) || !runtime.isWalletConnected()) throw new Error("Connect a wallet for this network first.");
       const status = await runtime.joinContract(contractAddressInput.trim());
-      setSuccessMsg(`Line contract state loaded: ${status.contractDomain.slice(0, 12)}?`);
+      await useAppStore.getState().refreshStatus();
+      setSuccessMsg(`Line contract state loaded: ${status.contractDomain.slice(0, 12)}...`);
       onConnected?.();
     } catch (err) { setErrorMsg(sanitizeServiceError(err instanceof Error ? err.message : String(err))); }
     finally { setJoiningContract(false); }
