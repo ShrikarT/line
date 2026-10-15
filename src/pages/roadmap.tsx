@@ -1,5 +1,7 @@
 import { Shell } from "@/components/line/shell";
-import { Panel } from "@/components/line/ui";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Badge } from "@/components/ui/badge";
+import { ArrowRight } from "@phosphor-icons/react";
 
 const gates = [
   {
@@ -66,29 +68,24 @@ const gates = [
   },
 ];
 
+const evidence = [
+  { status: "Verified demo", detail: "Two merchants delivered through finalized Preprod claims. External suppliers remain a future integration." },
+  { status: "Partially verified", detail: "Encrypted recovery is implemented. Independent organizations do not yet hold the demo role keys." },
+  { status: "Under development", detail: "Private ledger fields are hidden. Complete historical confidentiality is not established." },
+  { status: "Not connected", detail: "Accounting and claims are implemented. Payment assets, custody and merchant payouts are not connected." },
+  { status: "Verified demo", detail: "22 finalized transactions demonstrate the deployed purchase and repayment journey; broader network acceptance remains separate." },
+  { status: "Needs validation", detail: "Enterprise API and compute purchasing is a customer hypothesis. No customer or supplier adoption is claimed." },
+];
+
 export function RoadmapPage() {
-  return (
-    <Shell>
-      <div className="max-w-4xl space-y-6 pb-12">
-        <div className="max-w-[680px] space-y-3">
-          <p className="font-mono text-xs uppercase tracking-wide text-accent">Product readiness</p>
-          <h1 className="text-balance font-display text-3xl font-semibold">From private credit authorization to dependable agent commerce</h1>
-          <p className="text-pretty text-base text-muted">Line's full direction is confidential purchasing authority, funded merchant settlement and useful service delivery for autonomous agents. Enterprise API and compute procurement is the initial customer path. These gates define the complete outcome, without reducing the ambition to a demo or a submission date.</p>
-        </div>
-        <Panel kicker="Current mechanism" title="Twelve Compact circuits for authorization and accounting">
-          <p className="text-pretty text-sm text-muted">The repository includes issuer controls, merchant quotes, private witness authorization, merchant bound notes, reserve accounting and redemption nullifiers. Local execution demonstrates contract transitions. Current public amounts and transaction history limit confidentiality; accounting counters do not establish funded assets or token payout.</p>
-          <p className="text-pretty text-sm text-muted">Each gate below is a requirement with its own verification criteria. Listing it does not assert that it has been completed. Read the engineering status and transaction evidence before treating a capability as operational.</p>
-        </Panel>
-        {gates.map((gate) => (
-          <Panel key={gate.kicker} kicker={gate.kicker} title={gate.title}>
-            <ul className="list-disc space-y-3 pl-4 text-sm text-muted">
-              {gate.items.map((item) => <li key={item} className="text-pretty">{item}</li>)}
-            </ul>
-          </Panel>
-        ))}
-        <p className="text-sm text-muted">Protocol changes preserve Compact as the source of truth and the twelve circuit boundary. Changes that require a different protocol shape need an explicit versioned design and compatibility review.</p>
-        <a href="/checkout" className="inline-flex rounded-md bg-accent px-3 py-2 text-base font-semibold text-accent-fg transition duration-700 ease-[cubic-bezier(0.32,0.72,0,1)] hover:opacity-90 active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent">Try API checkout</a>
-      </div>
-    </Shell>
-  );
+  return <Shell hideVault><div className="flex flex-col gap-8">
+    <div className="line-page-intro"><div><p className="line-eyebrow">Product readiness / Roadmap</p><h1>Built in public.<br />Measured in evidence.</h1></div><p>From private credit authorization to dependable agent commerce. Six gates define the complete product beyond this demo.</p></div>
+    <div className="roadmap-overview"><div><span className="line-eyebrow">Working today</span><h2>Two merchants.<br />One verified journey.</h2><p>Actual Compact proofs, finalized Preprod transactions and a private book that survives restart.</p><a className="line-button line-button-primary" href="/preprod">Open live checkout <ArrowRight aria-hidden="true" /></a></div><div><span className="line-eyebrow">The next product gates</span><p>Independent custody. Full-history privacy. Real settlement. Validated demand.</p><span className="text-sm text-muted">A working demo is evidence of execution. Each production requirement below needs its own acceptance evidence.</span></div></div>
+    <Accordion type="multiple" defaultValue={[gates[0].kicker]} className="roadmap-list">{gates.map((gate, index) => <AccordionItem key={gate.kicker} value={gate.kicker}>
+      <AccordionTrigger><div className="roadmap-heading"><span className="roadmap-number">{String(index + 1).padStart(2, "0")}</span><div><span className="line-eyebrow">{gate.kicker}</span><h2>{gate.title}</h2><Badge variant={evidence[index].status === "Verified demo" ? "secondary" : "outline"}>{evidence[index].status}</Badge></div></div></AccordionTrigger>
+      <AccordionContent><div className="roadmap-content"><p className="roadmap-evidence">{evidence[index].detail}</p><h3>Acceptance requirements</h3><ul>{gate.items.map(item => <li key={item}>{item}</li>)}</ul></div></AccordionContent>
+    </AccordionItem>)}</Accordion>
+    <div className="scope-callout"><div><h2>Keep the protocol honest.</h2><p>Compact remains the source of truth. The canonical protocol has twelve circuits. Planned capabilities are not presented as operational or as customer evidence.</p></div></div>
+    <a href="/checkout" className="line-text-link">Try API checkout <ArrowRight aria-hidden="true" /></a>
+  </div></Shell>;
 }

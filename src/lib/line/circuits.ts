@@ -23,7 +23,7 @@ export const CIRCUITS = [
   {
     name: "withdrawUnencumberedReserve",
     caller: "Issuer",
-    proves: "Authorized issuer, amount <= totalReserve - (encumberedReserve + redeemedReserve + feeReserve). Releases unencumbered capacity.",
+    proves: "Authorized issuer, amount <= totalReserve - (encumberedReserve + redeemedReserve + feeReserve + pendingFeeReserve + refundReserve + reportedRefundReserve). Releases unencumbered capacity.",
     discloses: "Released capacity amount, updated totalReserve",
     hides: "Issuer secret",
   },
@@ -51,7 +51,7 @@ export const CIRCUITS = [
   {
     name: "draw",
     caller: "Agent",
-    proves: "Owns I, opens current C, reconstructs Q, B+A ≤ L, reserve solvency (withdrawable >= A), N unused. Issues private note D.",
+    proves: "Owns I, opens current C, reconstructs Q, B + A + fee <= L, exact issuer fee policy, reserve solvency for principal and fee, N unused. Issues private note D.",
     discloses: "C', N, Q used, note commitment D, NoteMeta.amount, encumbered reserve delta",
     hides: "B, L, remaining capacity, merchantPk inside note D",
   },
@@ -65,14 +65,14 @@ export const CIRCUITS = [
   {
     name: "cancelOrExpireNote",
     caller: "Issuer / Anyone",
-    proves: "Action clock > note expiry (or issuer cancelled). Releases encumbered reserve back to unencumbered.",
-    discloses: "Cancelled note D, encumberedReserve decrease",
+    proves: "Ledger-time expiry holds for permissionless expiration. Authenticated compensation allocates debt relief and privately commits any cash remainder; issuer refund reporting retains the original backing.",
+    discloses: "Note status, reserve bucket changes and refund-report nullifiers",
     hides: "Private note preimages",
   },
   {
     name: "acknowledgeRepayment",
     caller: "Issuer",
-    proves: "Issuer receipt bound to current C, 0 < R ≤ B, N_repay unused. Only way B decreases.",
+    proves: "Issuer receipt bound to current C, 0 < R ≤ B, N_repay unused. Exact payment reference cannot be replayed. Compensation can separately reduce debt.",
     discloses: "C', repay nullifier",
     hides: "R, B, payment reference",
   },

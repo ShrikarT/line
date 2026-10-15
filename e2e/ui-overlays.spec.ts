@@ -1,0 +1,36 @@
+import { test, expect } from "@playwright/test";
+import { mkdir } from "node:fs/promises";
+import path from "node:path";
+
+test("network setup, vault manager and import controls fit the mobile workspace", async ({ page }) => {
+  test.setTimeout(60_000);
+  const output = path.resolve("artifacts/ui-redesign");
+  await mkdir(output, { recursive: true });
+  await page.route("**/api/line/network-session", route => route.fulfill({ status: 404, body: "{}" }));
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/");
+  await page.getByRole("button", { name: "Local Simulator", exact: true }).click();
+  const setup = page.getByRole("region", { name: "Network setup", exact: true });
+  await expect(setup.getByLabel("Network", { exact: true })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+  await setup.screenshot({ path: path.join(output, "network-setup-390.png") });
+  await page.getByRole("button", { name: "Switch to Local Development Simulator", exact: true }).click();
+  await page.goto("/issuer");
+  await page.getByLabel("Vault passphrase", { exact: true }).fill("VisualOverlayVault123!");
+  await page.getByRole("button", { name: "Unlock Vault", exact: true }).click();
+  await page.getByRole("button", { name: "Manage Vault Keys", exact: true }).click();
+  await expect(page.getByLabel("Identity role to import")).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+  await page.locator(".line-vault-wrap").screenshot({ path: path.join(output, "vault-manager-390.png") });
+  await page.goto("/agent");
+  await page.getByRole("button", { name: "+ Import Quote Package", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Import Quote", exact: true })).toBeDisabled();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+  await page.locator(".role-columns > .line-panel").first().screenshot({ path: path.join(output, "quote-import-390.png") });
+  await page.goto("/merchant");
+  await page.getByRole("button", { name: "+ Import Draw Note Package", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Import Draw Note", exact: true })).toBeDisabled();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+  await page.locator(".role-columns > .line-panel").first().screenshot({ path: path.join(output, "note-import-390.png") });
+});

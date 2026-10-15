@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { Shell } from "@/components/line/shell";
 import { Button, Panel } from "@/components/line/ui";
+import { ArrowUpRight, CheckCircle, CircleNotch, Lightning } from "@phosphor-icons/react";
+import { Badge } from "@/components/ui/badge";
+import { CreditBook, PurchaseSteps, ServiceCards, ServiceResult } from "@/components/line/purchase";
 import type { PreprodSummary } from "@/lib/preprod";
 
 const DEFAULT_DOCUMENT = "Line lets an autonomous agent buy API services with issuer-approved credit. Midnight proves clearance, each merchant redeems its own claim, and the credit book stays out of plaintext ledger fields.";
@@ -49,26 +52,31 @@ export function PreprodPage() {
     sessionStorage.setItem("line.preprod.purchase", id); sessionStorage.removeItem("line.preprod.repay");
     setPlanId(id); setDocument(DEFAULT_DOCUMENT); setError("");
   }
-  return <Shell evaluation evaluationMode="preprod"><div className="mx-auto max-w-6xl space-y-6">
-    <div className="space-y-3"><p className="text-xs font-semibold uppercase tracking-widest text-muted">Live on Midnight Preprod</p><h1 className="font-display text-3xl font-semibold tracking-tight sm:text-4xl">One agent. Two merchants. Real proofs.</h1><p className="max-w-2xl text-sm text-muted">The agent proves its purchases against an issuer-approved credit line. Each merchant redeems a separate claim before its service runs.</p></div>
-    {error && <div role="alert" className="rounded-lg border border-red/30 bg-red/10 p-4 text-sm">{error}</div>}
-    <div role="status" aria-live="polite" className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-elevated p-4 text-sm"><span>{busy ? state?.progress ?? "Connecting to Preprod..." : ready ? "Connected to Midnight Preprod" : "Loading the deployed facility..."}</span><span className="font-mono text-xs">{state?.receipts.length ?? 0} confirmed transactions</span></div>
-    {!!state?.pending && <div className="space-y-3 rounded-lg border border-border p-4"><p className="text-sm">A saved transaction needs confirmation. Check its receipt before continuing.</p><Button variant="ghost" disabled={busy} onClick={() => void act("reconcile")}>Reconcile saved transaction</Button></div>}
-    <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]"><Panel kicker="Agent checkout" title="Buy the two API services">
-      <label className="block space-y-2 text-sm"><span>Document to analyze</span><textarea className="min-h-36 w-full rounded-md border border-border bg-bg p-3" value={document} onChange={event => setDocument(event.target.value)} maxLength={5000} disabled={busy || activeOrders.length > 0} /></label>
-      <div className="grid gap-3 sm:grid-cols-2"><div className="rounded-md border border-border p-4"><p className="text-xs text-muted">Merchant A</p><p className="mt-1 font-semibold">Text analysis</p><p className="mt-2 font-mono">25 units</p></div><div className="rounded-md border border-border p-4"><p className="text-xs text-muted">Merchant B</p><p className="mt-1 font-semibold">Cost report</p><p className="mt-2 font-mono">20 units</p></div></div>
+  return <Shell evaluation evaluationMode="preprod"><div className="checkout-workspace">
+    <div className="line-page-intro checkout-intro"><div><p className="line-eyebrow">Live on Midnight Preprod</p><h1>One agent. Two merchants.<br />Real proofs.</h1></div><p>The agent proves each purchase against your approved line. Each merchant redeems its own claim before its service runs.</p></div>
+    {error && <div role="alert" className="scope-callout is-error"><div><h2>We couldn't complete that request.</h2><p>{error}</p></div></div>}
+    <div role="status" aria-live="polite" className="network-status"><div>{busy ? <CircleNotch className="animate-spin" aria-hidden="true" /> : <Lightning weight="duotone" aria-hidden="true" />}<span>{busy ? state?.progress ?? "Connecting to Preprod..." : ready ? "Connected to Midnight Preprod" : "Loading the deployed facility..."}</span></div><Badge variant="outline">{state?.receipts.length ?? 0} confirmed transactions</Badge></div>
+    {!!state?.pending && <div className="scope-callout"><div><h2>Confirm the saved transaction.</h2><p>Check its receipt before continuing so the same purchase is not submitted twice.</p><Button variant="ghost" disabled={busy} onClick={() => void act("reconcile")}>Reconcile saved transaction</Button></div></div>}
+    <PurchaseSteps steps={[{ label: "Facility connected", complete: !!ready }, { label: "Agent purchases", complete: activeOrders.length > 0 }, { label: "Merchants deliver", complete: delivered.length >= 2 }]} />
+    <div className="checkout-columns"><Panel kicker="01 / Agent checkout" title="Give the agent a task">
+      <label className="document-field"><span>Document to analyze</span><textarea value={document} onChange={event => setDocument(event.target.value)} maxLength={5000} disabled={busy || activeOrders.length > 0} /><small>{document.length.toLocaleString()} / 5,000 characters</small></label>
+      <ServiceCards />
       <Button disabled={!ready || busy || !!state?.pending || delivered.length >= 2} onClick={() => void act("purchase")}>{busy ? "Confirming on Preprod..." : delivered.length >= 2 ? "Both services delivered" : purchaseId.current ? "Run or resume purchases" : "Run agent purchase"}</Button>
       {delivered.length >= 2 && state?.privateBook.outstanding === 0 && <Button variant="ghost" disabled={busy || !!state.pending} onClick={nextPurchase}>Start another purchase</Button>}
-      <p className="text-xs text-muted">Each quote, draw and redemption is a network transaction. Confirmations can take a few minutes; you can reload and resume with the same request ID.</p>
-      {delivered.map(order => <article key={order.id} className="rounded-md border border-ok/30 bg-ok/5 p-4"><p className="font-semibold">{order.service === "text-analysis" ? "Merchant A delivered" : "Merchant B delivered"}</p><pre className="mt-3 whitespace-pre-wrap break-words text-xs">{JSON.stringify(order.result, null, 2)}</pre></article>)}
-    </Panel><div className="space-y-6"><Panel kicker="Issuer’s private view" title="Credit book">
-      <div className="grid grid-cols-3 gap-3">{[["Limit", state?.privateBook.limit], ["Outstanding", state?.privateBook.outstanding], ["Remaining", state?.privateBook.remaining]].map(([label, value]) => <div key={label}><p className="text-xs text-muted">{label}</p><p className="mt-2 font-mono text-2xl">{value ?? "—"}</p></div>)}</div>
+      <p className="text-xs text-muted">Each quote, draw and redemption is a network transaction. Confirmations can take a few minutes. Reloading retains the same request ID.</p>
+    </Panel><div className="flex flex-col gap-6"><Panel kicker="02 / Issuer's private view" title="Credit book">
+      <CreditBook book={state?.privateBook} />
       <Button variant="ghost" disabled={!ready || busy || !!state?.pending || !state?.privateBook.outstanding} onClick={() => void act("acknowledge")}>Acknowledge reported test repayment</Button><p className="text-xs text-muted">This proves an issuer acknowledgement. It does not verify a cash repayment or transfer tokens.</p>
-    </Panel><Panel kicker="Network evidence" title="Confirmed contract calls">
-      <p className="break-all font-mono text-xs">{state?.contractAddress ?? "Loading contract address..."}</p>
-      <ol className="max-h-80 space-y-3 overflow-y-auto">{state?.receipts.filter(receipt => receipt.kind === "call").slice().reverse().map(receipt => <li key={receipt.id} className="rounded-md border border-border p-3"><div className="flex justify-between gap-3 text-xs"><strong>{receipt.name}</strong><span>Block {receipt.blockHeight}</span></div><p className="mt-2 break-all font-mono text-[11px] text-muted">{receipt.txHash}</p></li>)}</ol>
-    </Panel></div></div>
-    <details className="rounded-lg border border-border bg-elevated p-4 text-sm"><summary className="cursor-pointer font-semibold">What this live demo establishes</summary><p className="mt-3 text-muted">Actual Compact proofs, DUST fees, finalized Preprod transactions and durable private openings. The local operator controls the role keys. The services are deterministic; reserve and redemption units are accounting, with no merchant token payout. Public amounts and reserve history can reveal debt; complete historical privacy is still under development.</p></details>
-    <a className="text-sm text-navy underline" href="/checkout">Open the quick local checkout demo</a>
+    </Panel><div className="checkout-explainer"><span className="line-eyebrow">What happens next</span><h2>Quote. Prove. Deliver.</h2><p>The merchant signs the terms. The agent proves clearance. A confirmed redemption unlocks the service result.</p><a href="/circuits" className="line-text-link">Explore the twelve circuits <ArrowUpRight aria-hidden="true" /></a></div></div></div>
+    <section aria-label="Service delivery" className="flex flex-col gap-5"><div className="section-label-row"><h2>Service results</h2><span>{delivered.length} of 2 delivered</span></div>
+      {delivered.length === 0 ? <div className="line-empty-state"><CheckCircle weight="duotone" aria-hidden="true" /><h3>Your results arrive after confirmation.</h3><p>Run the agent's task to follow both merchant claims through to delivery.</p></div> : <div className="service-grid">{delivered.map(order => <Panel key={order.id} kicker={order.service === "text-analysis" ? "Merchant A / Text analysis" : "Merchant B / Cost report"} title={order.service === "text-analysis" ? "Merchant A delivered" : "Merchant B delivered"}><ServiceResult result={order.result ?? {}} merchant={order.service === "text-analysis" ? "Merchant A" : "Merchant B"} /></Panel>)}</div>}
+    </section>
+    <Panel kicker="03 / Network evidence" title="Confirmed contract calls">
+      <div className="contract-address"><span>Contract address</span><code>{state?.contractAddress ?? "Loading contract address..."}</code></div>
+      <ol className="receipt-list">{state?.receipts.filter(receipt => receipt.kind === "call").slice().reverse().map(receipt => <li key={receipt.id}><CheckCircle weight="fill" aria-hidden="true" /><div><div className="receipt-heading"><strong>{receipt.name}</strong><span>Block {receipt.blockHeight.toLocaleString()}</span></div><code>{receipt.txHash}</code></div><Badge variant="secondary">Confirmed</Badge></li>)}</ol>
+      {state && state.receipts.filter(receipt => receipt.kind === "call").length === 0 && <p className="text-sm text-muted">Confirmed circuit calls will appear here with their block and transaction hash.</p>}
+    </Panel>
+    <details className="scope-details"><summary>What this live demo establishes</summary><p>Actual Compact proofs, DUST fees, finalized Preprod transactions and durable private openings. The local operator controls the role keys. The services are deterministic; reserve and redemption units are accounting, with no merchant token payout. Public amounts and reserve history can reveal debt; complete historical privacy is still under development.</p><a href="/privacy" className="line-text-link">Privacy & demo scope <ArrowUpRight aria-hidden="true" /></a></details>
+    <a className="line-text-link" href="/checkout">Open the quick local checkout demo <ArrowUpRight aria-hidden="true" /></a>
   </div></Shell>;
 }

@@ -11,14 +11,14 @@ export function ExplorerPage() {
   const nullifiers = (ledger as any).nullifiers ?? [];
 
   return (
-    <Shell>
-      <div className="space-y-6">
+    <Shell hideVault>
+      <div className="explorer-overview space-y-6">
         <ExplorerPanel />
         <div className="grid gap-6 md:grid-cols-2">
           <Panel kicker="Public" title="Quote commitments">
             <ul className="space-y-2">
               {quotes.length === 0 ? (
-                <li className="text-sm text-subtle">None</li>
+                <li className="console-inbox-empty">No entries yet. Confirmed activity in this runtime will appear here.</li>
               ) : (
                 quotes.map((q: any) => (
                   <li key={q.commitment} className="text-sm">
@@ -32,7 +32,7 @@ export function ExplorerPage() {
           <Panel kicker="Public" title="Nullifiers">
             <ul className="space-y-2">
               {nullifiers.length === 0 ? (
-                <li className="text-sm text-subtle">None</li>
+                <li className="console-inbox-empty">No entries yet. Confirmed activity in this runtime will appear here.</li>
               ) : (
                 nullifiers.map((n: any) => (
                   <li key={n}>

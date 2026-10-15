@@ -30,7 +30,7 @@ export function IssuerPage() {
 
   return (
     <Shell>
-      <div className="grid gap-6 lg:grid-cols-[1fr_1fr]">
+      <div className="role-columns">
         <Panel kicker="Issuer desk" title="Underwrite, Reserve & Acknowledge">
           <p className="text-sm text-muted">
             Only this desk can record settlement reserve capacity, withdraw unencumbered capacity, register
@@ -48,7 +48,7 @@ export function IssuerPage() {
             <Stat label="Fee rate (bps)" value={ledger.feeBps ?? "Unavailable"} />
           </div>
 
-          <div className="border-t border-border pt-3 space-y-2">
+          <div className="console-section">
             <p className="text-xs font-semibold uppercase tracking-wider text-muted">Settlement Reserve Capacity</p>
             <div className="flex flex-wrap gap-2">
               <Button onClick={() => doFundReserve(500)} disabled={isBusy}>
@@ -62,12 +62,12 @@ export function IssuerPage() {
                 Withdraw Unencumbered ({withdrawable})
               </Button>
               <Button variant="ghost" onClick={() => doRegisterMerchant()} disabled={isBusy}>
-                Register Merchant B
+                Register vault merchant
               </Button>
             </div>
           </div>
 
-          <div className="border-t border-border pt-3 space-y-2">
+          <div className="console-section">
             <p className="text-xs font-semibold uppercase tracking-wider text-muted">Credit Line Lifecycle</p>
             <div className="grid grid-cols-2 gap-3">
               <label className="text-xs text-muted">Flat fee (units)

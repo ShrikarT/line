@@ -9,6 +9,7 @@ import { CircuitsPage } from "@/pages/circuits.tsx";
 import { RoadmapPage } from "@/pages/roadmap.tsx";
 import { CheckoutPage } from "@/pages/checkout.tsx";
 import { PreprodPage } from "@/pages/preprod.tsx";
+import { PrivacyPage, NotFoundPage } from "@/pages/privacy.tsx";
 
 const PAGES: Record<string, ComponentType> = {
   "/": Home,
@@ -21,6 +22,7 @@ const PAGES: Record<string, ComponentType> = {
   "/roadmap": RoadmapPage,
   "/checkout": CheckoutPage,
   "/preprod": PreprodPage,
+  "/privacy": PrivacyPage,
 };
 
 export function App() {
@@ -49,6 +51,11 @@ export function App() {
     };
   }, []);
 
-  const Page = PAGES[path] ?? Home;
+  useEffect(() => {
+    const title = path === "/" ? "Credit for agents. Control for you." : path === "/preprod" ? "Live Midnight Preprod" : path.slice(1).replaceAll("-", " ") || "Workspace";
+    document.title = `${title.charAt(0).toUpperCase() + title.slice(1)} · Line`;
+  }, [path]);
+
+  const Page = PAGES[path] ?? NotFoundPage;
   return <Page />;
 }
