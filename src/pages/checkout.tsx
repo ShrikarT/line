@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Shell } from "@/components/line/shell";
+import { CreditBook, PurchaseSteps, ServiceCards, ServiceResult } from "@/components/line/purchase";
 import { Button, Panel } from "@/components/line/ui";
 
 type Durability = "encrypted-disk" | "volatile";
@@ -125,7 +126,8 @@ export function CheckoutPage() {
   const durability = view?.durability ?? session?.durability ?? serverDurability;
   return (
     <Shell evaluation>
-      <div className="mb-8 grid gap-6 lg:grid-cols-[1fr_auto] lg:items-end">
+      <div className="local-checkout">
+      <div className="line-page-intro checkout-intro">
         <div className="max-w-2xl flex flex-col gap-3">
           <p className="text-xs font-semibold uppercase tracking-widest text-navy">Interactive purchasing demo</p>
           <h1 className="font-display text-4xl font-semibold tracking-tight md:text-5xl">One task. Two merchants.<br />Your rules.</h1>
@@ -137,13 +139,11 @@ export function CheckoutPage() {
           <p className="mt-2 font-semibold">{busy ? "Working on your request…" : !issued ? "1. Authorize the credit line" : receipts.length === 0 ? "2. Run the agent’s task" : receipts.every(r => r.outcome === "delivered") ? "3. Both merchants delivered" : "3. Review clearance and recovery"}</p>
         </div>
       </div>
-      <ol className="mb-6 grid gap-3 sm:grid-cols-3" aria-label="Purchase workflow">
-        {[{label:"Issuer authorizes",complete:issued},{label:"Agent purchases",complete:receipts.length > 0},{label:"Merchants deliver",complete:receipts.length === 2 && receipts.every(r => r.outcome === "delivered")}].map((step,index) => <li key={step.label} className="flex items-center gap-3 rounded-lg border border-border bg-elevated p-4"><span className={step.complete ? "flex size-8 items-center justify-center rounded-full bg-navy text-cream" : "flex size-8 items-center justify-center rounded-full bg-subtle-fill text-muted"}>{step.complete ? "✓" : index + 1}</span><span className="text-sm font-medium">{step.label}</span></li>)}
-      </ol>
-      {!issued && <fieldset className="mb-6 flex flex-wrap gap-3 rounded-xl border border-border bg-elevated p-4" disabled={busy}>
+      <PurchaseSteps steps={[{ label: "Issuer authorizes", complete: issued }, { label: "Agent purchases", complete: receipts.length > 0 }, { label: "Merchants deliver", complete: receipts.length === 2 && receipts.every(r => r.outcome === "delivered") }]} />
+      {!issued && <fieldset className="scenario-picker" disabled={busy}>
         <legend className="px-2 text-sm font-semibold">Choose your demo</legend>
-        <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-border px-4 py-3 text-sm"><input type="radio" name="scenario" checked={limit === "60"} onChange={() => setLimit("60")} />Complete both purchases<span className="text-xs text-muted">60 unit line</span></label>
-        <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-border px-4 py-3 text-sm"><input type="radio" name="scenario" checked={limit === "40"} onChange={() => setLimit("40")} />Decline and recovery<span className="text-xs text-muted">40 unit line</span></label>
+        <label className="scenario-option"><input type="radio" name="scenario" checked={limit === "60"} onChange={() => setLimit("60")} />Complete both purchases<span className="text-xs text-muted">60 unit line</span></label>
+        <label className="scenario-option"><input type="radio" name="scenario" checked={limit === "40"} onChange={() => setLimit("40")} />Decline and recovery<span className="text-xs text-muted">40 unit line</span></label>
       </fieldset>}
       {error && <p role="alert" className="mb-4 rounded-md border border-danger/40 p-3 text-sm text-danger">{error}{attempt && " Retry the same plan to retain its request IDs."}</p>}
       {notice && <p role="status" className="mb-4 rounded-md border border-border p-3 text-sm">{notice}</p>}
@@ -155,11 +155,7 @@ export function CheckoutPage() {
             <label className="space-y-2 text-sm">Accounting reserve<input aria-label="Accounting reserve" type="number" min="1" max="1000000" value={reserve} disabled={busy || issued} onChange={e => setReserve(e.target.value)} className={field} /></label>
           </div>
           {!issued && <Button disabled={busy} onClick={open}>{busy ? "Opening…" : "Open evaluation line"}</Button>}
-          {view?.privateBooks && <dl className="grid grid-cols-3 gap-2 border-t border-border pt-3 text-sm" aria-label="Issuer private credit book">
-            <div><dt className="text-subtle">Private limit</dt><dd>{view.privateBooks.limit}</dd></div>
-            <div><dt className="text-subtle">Private debt</dt><dd>{view.privateBooks.outstanding}</dd></div>
-            <div><dt className="text-subtle">Private capacity</dt><dd>{view.privateBooks.remaining}</dd></div>
-          </dl>}
+          {view?.privateBooks && <CreditBook book={view.privateBooks} />}
           {issued && <div className="space-y-3 border-t border-border pt-3">
             <label className="block space-y-2 text-sm">Evaluation repayment<input type="number" aria-label="Evaluation repayment" value={repayment} min="1" max="1000000" disabled={busy || Boolean(ackId)} onChange={e => setRepayment(e.target.value)} className={field} /></label>
             <Button variant="ghost" disabled={busy} onClick={acknowledge}>Issuer: acknowledge evaluation repayment</Button>
@@ -175,17 +171,17 @@ export function CheckoutPage() {
         </Panel>
         <Panel kicker="02 / Agent" title="Give the agent a task">
           <label className="block space-y-2 text-sm">Document<textarea aria-label="Document" rows={6} maxLength={8000} value={document} disabled={busy || Boolean(attempt)} onChange={e => setDocument(e.target.value)} className={field} /></label>
-          <div className="grid gap-2 sm:grid-cols-2"><div className="rounded-lg border border-border bg-bg p-3 text-sm"><p className="font-medium">Merchant A</p><p className="text-muted">Document analysis · 25 units</p></div><div className="rounded-lg border border-border bg-bg p-3 text-sm"><p className="font-medium">Merchant B</p><p className="text-muted">Processing estimate · 20 units</p></div></div>
+          <ServiceCards />
           <Button disabled={busy || !issued || !document.trim()} onClick={run}>{busy ? "Executing…" : attempt ? "Retry the same purchase plan" : lastPlan?.document === document && receipts.some(receipt => receipt.outcome === "declined") ? "Retry declined purchase" : "Run agent purchase plan"}</Button>
           <p className="text-xs text-subtle">The agent endpoint can buy catalog services. Its token cannot fund the reserve, change its limit or acknowledge repayments.</p>
         </Panel>
       </div>
-      {receipts.length === 0 && <div className="mt-6 rounded-xl border border-dashed border-border p-6 text-center"><p className="font-medium">Your service results will appear here</p><p className="mt-2 text-sm text-muted">{issued ? "Run the purchase plan to see both merchants respond." : "Open a credit line above, then run the agent’s task."}</p></div>}
+      {receipts.length === 0 && <div className="line-empty-state mt-6"><p className="font-medium">Your service results will appear here</p><p className="mt-2 text-sm text-muted">{issued ? "Run the purchase plan to see both merchants respond." : "Open a credit line above, then run the agent’s task."}</p></div>}
       {receipts.length > 0 && <div className="mt-6 grid gap-6 lg:grid-cols-2" aria-label="Purchase results">
         {receipts.map(receipt => <Panel key={receipt.orderId} kicker={`${receipt.merchant} · ${receipt.amount} evaluation units`} title={receipt.outcome === "delivered" ? "Service delivered" : receipt.outcome === "compensated" ? "Expired claim compensated" : receipt.outcome === "expired" ? "Quote expired" : receipt.outcome === "pending" ? "Purchase pending" : "Purchase declined"}>
           {receipt.message && <p className="text-danger">{receipt.message}</p>}
           <ol className="space-y-1 text-sm text-muted">{receipt.stages.map(stage => <li key={stage}>{stage.replaceAll("-", " ")}</li>)}</ol>
-          {receipt.output && <pre className="overflow-auto rounded-md bg-bg p-3 text-xs" aria-label={`${receipt.merchant} service result`}>{JSON.stringify(receipt.output, null, 2)}</pre>}
+          {receipt.output && <ServiceResult result={receipt.output} merchant={receipt.merchant} />}
           <details className="text-xs text-subtle"><summary className="cursor-pointer">Quote and claim references</summary><p className="mt-2 break-all">Quote: {receipt.quote}</p><p className="mt-2 break-all">Note: {receipt.note ?? "No note issued"}</p></details>
           <p className="text-xs text-subtle">Payout: not connected. Claim redemption is an accounting transition.</p>
         </Panel>)}
@@ -200,6 +196,7 @@ export function CheckoutPage() {
         <details className="text-xs text-subtle"><summary className="cursor-pointer">Contract references</summary><p className="mt-2 break-all">Domain: {view.domain}</p><p className="mt-2 break-all">Current commitment: {view.lineCommit}</p></details>
       </Panel></div>}
       {session && <div className="mt-6"><Button variant="ghost" disabled={busy} onClick={() => { setSession(null); setView(null); setReceipts([]); setAttempt(null); setLastPlan(null); setAckId(null); setRefundRefs({}); setError(""); setNotice("Evaluation cleared in this browser. Server records with debt or pending obligations remain available using the original capabilities."); }}>Start a new evaluation</Button></div>}
+      </div>
     </Shell>
   );
 }

@@ -22,9 +22,9 @@ export function LabPage() {
   const seedRedeemedNote = useSimulator((s) => s.seedRedeemedNote);
 
   return (
-    <Shell>
+    <Shell hideVault>
       <div className="ink-panel space-y-6 rounded-2xl p-4 md:p-8">
-        <div className="flex items-center gap-2 font-mono text-xs text-pink">
+        <div className="flex flex-wrap items-center gap-2 font-mono text-xs text-pink">
           <span className="size-2 bg-accent" />
           <span className="font-semibold uppercase tracking-wider text-cream">Protocol Verification Lab</span>
           <span className="text-muted">· Isolated Local Simulator Environment (Not Live Network State)</span>
@@ -32,8 +32,7 @@ export function LabPage() {
 
         <Panel kicker="QA & Security" title="Attack Vector Execution & Invariant Verification" className="border-white/10 bg-charcoal">
           <p className="text-sm text-muted">
-            Each button is an adversarial attack vector that must fail. A green flash confirms the protocol invariant
-            held and the attack was successfully blocked in-circuit or by the Compact execution engine.
+            Each attack should reject without changing the simulated ledger. Results here exercise the local protocol model; they do not establish a cryptographic proof or live network result.
           </p>
           <FlashBar flash={flash} />
 
@@ -47,7 +46,7 @@ export function LabPage() {
             </div>
           </div>
 
-          <div className="space-y-2 border-t border-white/10 pt-4">
+          <div className="console-section">
             <p className="text-xs font-semibold uppercase tracking-wider text-muted">Credit Authorization & Invariant Attacks</p>
             <div className="flex flex-wrap gap-2">
               <Button onClick={attackReplay}>Replay draw</Button>
@@ -58,7 +57,7 @@ export function LabPage() {
             </div>
           </div>
 
-          <div className="space-y-2 border-t border-white/10 pt-4">
+          <div className="console-section">
             <p className="text-xs font-semibold uppercase tracking-wider text-muted">Settlement Claim & Reserve Solvency Attacks</p>
             <div className="flex flex-wrap gap-2">
               <Button onClick={attackWrongMerchantRedeem}>

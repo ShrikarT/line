@@ -1,3 +1,4 @@
+import { getRuntime } from "@/lib/runtime";
 import { useAppStore } from "@/app/store.ts";
 import { Mono, Panel, Stat } from "./ui";
 
@@ -25,18 +26,18 @@ export function ExplorerPanel() {
         and linked history can reveal debt or constrain it. This view shows reserve accounting,
         commitments and the instance domain; it does not establish cash custody or merchant payout.
       </p>
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-6">
+      <div className="public-stats">
         <Stat label="Status" value={ledger.status} />
         <Stat label="Action Clock" value={ledger.actionClock} />
         <Stat label="Generation" value={ledger.lineGeneration} />
-        <Stat label="Runtime" value={ledger.runtime ?? "network"} />
+        <Stat label="Runtime" value={getRuntime().mode === "local" ? "simulator" : getRuntime().mode} />
         <Stat label="Quotes" value={quotesCount} />
         <Stat label="Nullifiers" value={nullifiersCount} />
       </div>
 
-      <div className="rounded border border-border bg-subtle-fill p-3 space-y-2">
+      <div className="reserve-accounting">
         <p className="text-xs font-semibold uppercase tracking-wider text-muted">Contract Reserve Accounting</p>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+        <div className="reserve-metrics">
           <Stat label="Total Reserve" value={total} />
           <Stat label="Encumbered" value={encumbered} />
           <Stat label="Redeemed" value={redeemed} />
@@ -49,7 +50,7 @@ export function ExplorerPanel() {
         <p className="text-xs text-muted">Refund budgets retain each original claim's full cost. They do not disclose the private cash remainder or verify a payout.</p>
       </div>
 
-      <div className="space-y-2">
+      <div className="commitment-list">
         <Stat label="Identity commitment" value={<Mono value={ledger.identityCommitment} />} />
         <Stat label="Line commitment C" value={<Mono value={ledger.lineCommitment} />} />
         <Stat label="Contract Domain" value={<Mono value={ledger.contractDomain} />} />

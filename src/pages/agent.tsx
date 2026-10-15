@@ -30,7 +30,7 @@ export function AgentPage() {
 
   return (
     <Shell>
-      <div className="grid gap-6 lg:grid-cols-[1fr_1fr]">
+      <div className="role-columns">
         <Panel kicker="Agent console" title="Private books & Draw Notes">
           <p className="text-sm text-muted">
             Credit openings are encrypted in your private vault. Draws issue merchant-bound notes
@@ -52,14 +52,14 @@ export function AgentPage() {
             </p>
           )}
 
-          <div className="border-t border-border pt-4 space-y-3">
+          <div className="console-section">
             <div className="flex items-center justify-between">
               <p className="text-xs font-semibold uppercase tracking-wider text-muted">
                 Pending Invoices ({invoices.filter((i) => !i.used).length})
               </p>
               <button
                 onClick={() => setShowImportQuote(!showImportQuote)}
-                className="text-xs text-accent underline"
+                className="text-xs text-navy underline"
               >
                 {showImportQuote ? "Cancel" : "+ Import Quote Package"}
               </button>
@@ -96,7 +96,7 @@ export function AgentPage() {
             )}
 
             {invoices.filter((i) => !i.used).length === 0 ? (
-              <p className="text-sm text-subtle">No open quotes from merchants.</p>
+              <div className="console-inbox-empty">No open quotes from merchants. <a className="underline" href="/merchant">Create a merchant quote</a> or import a quote package to begin.</div>
             ) : (
               <ul className="space-y-2">
                 {invoices.filter((i) => !i.used).map((inv) => (
@@ -118,12 +118,12 @@ export function AgentPage() {
             )}
           </div>
 
-          <div className="border-t border-border pt-4 space-y-3">
+          <div className="console-section">
             <p className="text-xs font-semibold uppercase tracking-wider text-muted">
               Authorized Draw Notes ({notes.length})
             </p>
             {notes.length === 0 ? (
-              <p className="text-sm text-subtle">No notes issued yet.</p>
+              <div className="console-inbox-empty">No notes issued yet. An approved draw creates a claim addressed to its merchant.</div>
             ) : (
               <ul className="space-y-2">
                 {notes.map((n) => (

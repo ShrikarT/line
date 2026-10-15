@@ -83,16 +83,16 @@ export function VaultBar() {
 
   if (!isVaultUnlocked) {
     return (
-      <div className="border-b border-border bg-subtle-fill/80 px-4 py-2 text-xs">
+      <div className="vault-surface">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2 text-muted">
-            <span className="inline-block h-2 w-2 rounded-full bg-amber-400" />
+            <span className="inline-block h-2 w-2 rounded-full bg-accent" />
             <span>
               <strong>Private Vault Locked:</strong> AES-GCM encrypted state in IndexedDB.
             </span>
           </div>
 
-          <form onSubmit={handleUnlock} className="flex items-center gap-2">
+          <form onSubmit={handleUnlock} className="flex flex-wrap items-center gap-2">
             <input
               type="password"
               aria-label="Vault passphrase"
@@ -115,20 +115,20 @@ export function VaultBar() {
   const agentImportProtected = importRole === "agent" && hasIssuedAgentLine;
 
   return (
-    <div className="border-b border-border bg-subtle-fill/80 px-4 py-2 text-xs">
+    <div className="vault-surface">
       <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <span className="inline-block h-2 w-2 rounded-full bg-ok" />
           <span className="text-ok font-medium">Vault Unlocked</span>
           <span className="text-subtle">· Ephemeral session active (AES-GCM WebCrypto)</span>
           {!hasAllKeys && (
-            <span className="rounded bg-amber-500/20 px-1.5 py-0.5 text-[10px] text-amber-300">
+            <span className="rounded bg-amber-500/20 px-1.5 py-0.5 text-[10px] text-navy">
               Setup credentials needed
             </span>
           )}
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {!hasAllKeys && (
             <button
               onClick={handleGenerateAll}
@@ -155,7 +155,7 @@ export function VaultBar() {
       </div>
 
       {recoveryRequired && (
-        <div role="status" className="mx-auto flex max-w-6xl flex-wrap items-center gap-3 pt-2 text-amber-300">
+        <div role="status" className="mx-auto flex max-w-6xl flex-wrap items-center gap-3 pt-2 text-navy">
           <span>A previous operation needs reconciliation. New submissions are blocked until its outcome is established.</span>
           <Button variant="ghost" disabled={isBusy || operationBusy} onClick={() => runAction(async () => {
             if (!(await recoverOperations())) throw new Error(useAppStore.getState().flash?.text ?? "Recovery unavailable.");

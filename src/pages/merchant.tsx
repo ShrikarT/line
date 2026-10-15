@@ -29,7 +29,7 @@ export function MerchantPage() {
 
   return (
     <Shell>
-      <div className="grid gap-6 lg:grid-cols-[1fr_1fr]">
+      <div className="role-columns">
         <Panel kicker="Merchant desk" title="Post quotes & Redeem Settlement Notes">
           <p className="text-sm text-muted">
             You know the invoice terms and hold the merchant private key. Line settlements issue private,
@@ -38,7 +38,7 @@ export function MerchantPage() {
           </p>
           <FlashBar flash={flash} />
 
-          <div className="flex items-center gap-2 border-b border-border pb-3">
+          <div className="merchant-switch">
             <span className="text-xs font-semibold uppercase text-muted">Active Merchant:</span>
             <Button
               variant={activeMerchant === "A" ? "primary" : "ghost"}
@@ -63,14 +63,14 @@ export function MerchantPage() {
             </Button>
           </div>
 
-          <div className="border-t border-border pt-4 space-y-3">
+          <div className="console-section">
             <div className="flex items-center justify-between">
               <p className="text-xs font-semibold uppercase tracking-wider text-muted">
                 Settlement Notes Inbox ({notes.length})
               </p>
               <button
                 onClick={() => setShowImportNote(!showImportNote)}
-                className="text-xs text-accent underline"
+                className="text-xs text-navy underline"
               >
                 {showImportNote ? "Cancel" : "+ Import Draw Note Package"}
               </button>
@@ -107,7 +107,7 @@ export function MerchantPage() {
             )}
 
             {notes.length === 0 ? (
-              <p className="text-sm text-subtle">No notes received yet. Agent draws create notes.</p>
+              <div className="console-inbox-empty">No notes received yet. Agent draws create notes addressed to a merchant. Import a note package to redeem its claim.</div>
             ) : (
               <ul className="space-y-2">
                 {notes.map((n) => (
@@ -136,13 +136,13 @@ export function MerchantPage() {
             )}
           </div>
 
-          <div className="border-t border-border pt-4 space-y-3">
+          <div className="console-section">
             <p className="text-xs font-semibold uppercase tracking-wider text-muted">
               Issued Quotes ({invoices.length})
             </p>
             <ul className="space-y-2">
               {invoices.length === 0 ? (
-                <li className="text-sm text-subtle">No invoices in the private merchant store.</li>
+                <li className="console-inbox-empty">No invoices in the private merchant store. Publish your first quote above.</li>
               ) : (
                 invoices.map((inv) => (
                   <li key={inv.Q} className="flex flex-col gap-1 text-sm border-b border-border/40 pb-2">
@@ -176,10 +176,7 @@ export function MerchantPage() {
             </ul>
           </div>
 
-          <Stat
-            label="Privacy disclosure"
-            value="The agent's credit limit, outstanding debt and remaining capacity remain private. Settlement amount and merchant pseudonym are public in this protocol version."
-          />
+          <div className="console-section"><p className="line-panel-kicker">Privacy disclosure</p><p className="text-sm text-muted">Credit openings are not plaintext ledger fields. Public amounts, merchant keys and transaction history can still reveal debt. <a className="underline" href="/privacy">Understand the boundary.</a></p></div>
         </Panel>
         <ExplorerPanel />
       </div>

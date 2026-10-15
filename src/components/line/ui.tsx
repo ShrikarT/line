@@ -39,20 +39,15 @@ export function Panel({
   return (
     <section
       className={cn(
-        "rounded-xl border border-border bg-elevated p-5 md:p-6",
+        "line-panel",
         className,
       )}
     >
-      {kicker ? (
-        <p className="mb-2 text-xs font-medium uppercase tracking-wide text-subtle">
-          {kicker}
-        </p>
-      ) : null}
-      <div className="flex items-center gap-3">
+      <div className="line-panel-header">
+        <div>{kicker ? <p className="line-panel-kicker">{kicker}</p> : null}<h2 className="line-panel-title">{title}</h2></div>
         <PixelMark />
-        <h2 className="font-display text-lg font-semibold tracking-tight text-navy">{title}</h2>
       </div>
-      <div className="mt-4 space-y-4">{children}</div>
+      <div className="line-panel-content">{children}</div>
     </section>
   );
 }
@@ -76,10 +71,10 @@ export function Button({
       disabled={disabled}
       onClick={onClick}
       className={cn(
-        "inline-flex min-h-11 items-center justify-center rounded-md px-4 text-sm font-medium transition-transform duration-[var(--motion-quick)] enabled:active:scale-[0.98] disabled:opacity-40",
-        variant === "primary" && "bg-accent text-accent-fg hover:opacity-90",
-        variant === "ghost" && "border border-navy bg-elevated text-navy hover:bg-subtle-fill",
-        variant === "danger" && "border border-danger/40 bg-elevated text-danger hover:bg-danger/10",
+        "line-button",
+        variant === "primary" && "line-button-primary",
+        variant === "ghost" && "line-button-ghost",
+        variant === "danger" && "line-button-danger",
       )}
     >
       {children}
@@ -98,12 +93,12 @@ export function Mono({ value }: { value: string | null | undefined }) {
 
 export function Stat({ label, value, privateHint }: { label: string; value: React.ReactNode; privateHint?: boolean }) {
   return (
-    <div>
-      <p className="text-xs uppercase tracking-wide text-subtle">
+    <div className="line-stat">
+      <p className="line-stat-label">
         {label}
         {privateHint ? " · private" : ""}
       </p>
-      <div className="mt-1 font-mono text-sm tabular-nums">{value}</div>
+      <div className="line-stat-value">{value}</div>
     </div>
   );
 }
