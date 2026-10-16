@@ -1,5 +1,7 @@
 # Line UI redesign — 14 October 2026
 
+The owner's subsequent visual feedback is addressed in the [product interface revision](UI_REVISION_2026-10-15.md), finalized on 16 October. This document records the earlier design and verification snapshot.
+
 ## Scope and design
 
 The full web interface is updated in `feat/line-ui-redesign`, based on `6c8fc67`, in the isolated `line-audit-review` checkout. Final review continued on 15 October 2026. The original checkout's pending UI work is preserved. Website deployment is not part of this change.

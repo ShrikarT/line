@@ -1,5 +1,11 @@
 # Engineering status and acceptance evidence
 
+## Product interface revision - 16 October 2026
+
+The second visual revision addresses the owner's feedback on the initial redesign. It replaces the homepage with a layered credit-card/receipt hero, an animated three-role purchase preview and product-specific policy/proof/claim illustrations. The original logo and cream/navy/coral/blush identity remain. Shared workspaces receive refined navy navigation, a shadcn Command search dialog, clearer headings, aligned service cards and improved vault/lab surfaces. Anime.js transitions respect reduced motion. All twelve routes and setup/import/populated states are covered by 40 desktop/phone captures. [Design decisions, completion matrix and verification details](UI_REVISION_2026-10-15.md).
+
+Fresh verification: **560 core tests, 559 passed, zero failures, one intentional skip**; build/typecheck, key and secret scanners, patch formatting and **16-file zero-drift Compact check** pass. All **32 unique browser cases** have passing evidence across the full and focused runs; these are not one clean combined run. One obsolete text selector was corrected; a subsequent Chromium navigation resource error passed its isolated rerun. Full-speed replay exposed premature animation completion; the timeline now starts after assembly, and both preview/search cases pass, including reduced and normal motion. Existing SDK/bundle warnings remain documented. Read-only Preprod status is ready with 22 receipts and no pending operation/error. Original brand, canonical contract, managed output, backend and script files are unchanged. Public deployment remains deferred.
+
 ## Full interface redesign — 15 October 2026
 
 The isolated `feat/line-ui-redesign` worktree now contains the complete visual update: editorial homepage with original textured landscape artwork; aligned desktop/mobile navigation; redesigned live and local checkout, all role consoles, explorer, circuit search/reference, lab and roadmap; working privacy and not-found pages. The original Line logo, cream/navy/coral/blush identity and bundled font are retained. Shared service cards, credit meters, readable results, accessible tabs/accordions and reduced-motion-aware reveals carry the design through the product. Canonical Compact, managed output, signing/backend logic and original brand assets are unchanged.
