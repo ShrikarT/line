@@ -31,7 +31,7 @@ test.describe("Line — Autonomous Agent Credit Platform", () => {
 
     // 4. Public Explorer
     await page.goto("/explorer");
-    await expect(page.locator("text=Public ledger")).toBeVisible();
+    await expect(page.getByText("Public ledger", { exact: true })).toBeVisible();
     await expect(page.locator("text=Total Reserve")).toBeVisible();
     await expect(page.locator("text=Encumbered")).toBeVisible();
 
