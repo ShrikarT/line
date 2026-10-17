@@ -3,6 +3,16 @@ import { bech32m } from "@scure/base";
 import { decodeWalletPublicKey, getConnectedWallet, getWalletConfiguration } from "../runtime/wallet.ts";
 import { encodeVaultJson, encryptSecret, getVaultSessionPassphrase, getVaultSessionRevision, isVaultSessionUnlocked, loadEncryptedJson, lockVaultSession, saveEncryptedJson, unlockVaultSession } from "../security/vault.ts";
 import { hexToBytes, randomBytes32, toHex } from "../line/encoding.ts";
+import { decodeOrganizationBackup, isOrganizationEmpty } from "./backup.ts";
+import { withinDeadline } from "./finality.ts";
+
+/** Read-only connector probes can be abandoned without approving a late action. */
+export async function readOrganizationWallet(wallet: ConnectedAPI, timeoutMs = 25_000) {
+  const [configuration, shielded, receiving] = await withinDeadline(Promise.all([
+    getWalletConfiguration(wallet, "preprod"), wallet.getShieldedAddresses(), wallet.getUnshieldedAddress(),
+  ]), timeoutMs, "The wallet is not responding. Reopen Lace and try again; no transaction was submitted by this wallet check.");
+  return { configuration, shielded, receiving };
+}
 
 export type OrganizationReceipt = { kind: "deploy" | "key" | "call"; circuit: string; contractAddress: string; txId: string; txHash: string; blockHeight: number; recordedAt: string };
 export type MerchantBinding = { publicKey: string; address: string; name: string; disabled?: boolean };
@@ -13,7 +23,7 @@ export type OrganizationFacility = {
 };
 export type OrganizationQuote = { contractAddress: string; domain: string; merchantPk: string; invoiceId: string; quoteNonce: string; amount: bigint; expiry: bigint; generation: bigint; feeFlat: bigint; feeBps: bigint; quoteCommitment: string };
 export type OrganizationNote = { contractAddress: string; domain: string; identity: string; merchantPk: string; quoteCommitment: string; amount: bigint; fee: bigint; expiry: bigint; generation: bigint; noteNonce: string; noteSalt: string; noteCommitment: string; redeemed: boolean; refund?: { salt: string; amount: bigint; paid: boolean } };
-export type OrganizationServiceOrder = { id: string; facilityId: string; service: string; document: string; price: string; assetColor: string; merchantPk: string; merchantAddress: string; noteCommitment?: string; result?: Record<string, unknown>; delivered: boolean };
+export type OrganizationServiceOrder = { id: string; facilityId: string; service: string; document: string; price: string; assetColor: string; merchantPk: string; merchantAddress: string; noteCommitment?: string; result?: Record<string, unknown>; delivered: boolean; cancelled?: boolean; requestId?: string; quoteCommitment?: string; quoteExpiry?: bigint; history?: { requestId: string; quoteCommitment?: string; noteCommitment?: string; retiredAt: string }[] };
 export type OrganizationSnapshot = { schema: "line:organization-account/v1"; networkId: "preprod"; accountId: string; issuerSecret: string; merchantSecret: string; facilities: OrganizationFacility[]; quotes: OrganizationQuote[]; notes: OrganizationNote[]; receipts: OrganizationReceipt[]; serviceOrders?: OrganizationServiceOrder[]; failures?: OrganizationReceipt[] };
 export type OrganizationPending = { id: string; kind: OrganizationReceipt["kind"]; circuit: string; facilityId: string | null; contractAddress: string | null; sourceFingerprint: string; after: OrganizationSnapshot; txId: string | null; transaction: string | null };
 export type OrganizationRecord = { snapshot: OrganizationSnapshot; pending: OrganizationPending | null };
@@ -53,8 +63,7 @@ export class OrganizationAccount {
   static async unlock(wallet: ConnectedAPI, passphrase: string): Promise<OrganizationAccount> {
     if (wallet !== getConnectedWallet()) throw new Error("Connect your wallet before opening an organization.");
     if (passphrase.length < 8) throw new Error("Use at least eight characters for the organization vault password.");
-    await getWalletConfiguration(wallet, "preprod");
-    const [shielded, unshielded] = await Promise.all([wallet.getShieldedAddresses(), wallet.getUnshieldedAddress()]);
+    const { shielded, receiving: unshielded } = await readOrganizationWallet(wallet);
     const accountId = decodeWalletPublicKey(shielded.shieldedCoinPublicKey, "shield-cpk", "preprod");
     receivingAddressBytes(unshielded.unshieldedAddress);
     // Authenticate existing ciphertext before replacing any open vault session.
@@ -78,12 +87,9 @@ export class OrganizationAccount {
   };
   async assertWallet() {
     this.assertSession();
-    const shielded = await this.wallet.getShieldedAddresses();
+    const { shielded, receiving } = await readOrganizationWallet(this.wallet);
     this.assertSession();
     if (decodeWalletPublicKey(shielded.shieldedCoinPublicKey, "shield-cpk", "preprod") !== this.accountId) { this.close(); throw new Error("Wallet account changed. Unlock the selected account’s own vault."); }
-    const config = await this.wallet.getConfiguration();
-    if (config.networkId !== "preprod") { this.close(); throw new Error("Switch your wallet back to Midnight Preprod."); }
-    const receiving = await this.wallet.getUnshieldedAddress();
     if (receiving.unshieldedAddress !== this.receivingAddress) { this.close(); throw new Error("Wallet receiving account changed. Reopen its organization vault."); }
     this.assertSession();
   }
@@ -158,6 +164,20 @@ export class OrganizationAccount {
     return this.exclusive(async () => {
       this.assertSession();
       return encryptSecret(this.key(), encodeVaultJson(this.record), getVaultSessionPassphrase()!);
+    });
+  }
+  async restoreBackup(file: string, backupPassword: string, verify: (record: OrganizationRecord) => Promise<void>) {
+    // Authenticate before taking the write lock. Decryption never changes the
+    // active vault password; a restored record is encrypted with this session.
+    const restored = await decodeOrganizationBackup(file, backupPassword, this.key(), this.accountId);
+    return this.exclusive(async () => {
+      if (!isOrganizationEmpty(this.record)) throw new Error("Restore into a fresh organization workspace. Existing facilities, claims and pending transactions cannot be overwritten by a backup.");
+      for (const facility of restored.snapshot.facilities) {
+        if (facility.issuerRecipient !== this.receivingAddress) throw new Error("The restored facility belongs to another receiving wallet.");
+      }
+      await verify(copyAccount(restored));
+      await this.assertWallet();
+      await this.commit(restored);
     });
   }
   async edit(action: (snapshot: OrganizationSnapshot) => void) {

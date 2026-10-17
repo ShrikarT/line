@@ -6,7 +6,7 @@ import { CompiledContract } from '@midnight-ntwrk/midnight-js-protocol/compact-j
 import { NodeZkConfigProvider } from '@midnight-ntwrk/midnight-js-node-zk-config-provider';
 import { httpClientProofProvider } from '@midnight-ntwrk/midnight-js-http-client-proof-provider';
 import { levelPrivateStateProvider } from '@midnight-ntwrk/midnight-js-level-private-state-provider';
-import { findDeployedContract } from '@midnight-ntwrk/midnight-js-contracts';
+import { OrganizationTransactions } from '../src/lib/organization/transactions.ts';
 import { ORGANIZATION_SERVICES, fulfillOrganizationService } from './organization-services.mjs';
 import { PreprodLive } from './preprod-live.mjs';
 // Keep this new product profile independent of the legacy operator module cache.
@@ -39,7 +39,9 @@ export class OrganizationMerchants extends PreprodLive {
   }]));
   service.compiled=CompiledContract.make('line-organization',generated.Contract).pipe(CompiledContract.withWitnesses(witnesses),CompiledContract.withCompiledFileAssets(service.release.artifactDir));
   service.zk=new NodeZkConfigProvider(service.release.artifactDir);
-  service.providers={...parent.providers,privateStateProvider:service.privateProvider,zkConfigProvider:service.zk,proofProvider:httpClientProofProvider(service.endpoints.proofServerUri,service.zk),midnightProvider:{submitTx:tx=>service.journalAndSubmit(tx)}};
+  service.providers={...parent.providers,privateStateProvider:service.privateProvider,zkConfigProvider:service.zk,proofProvider:httpClientProofProvider(service.endpoints.proofServerUri,service.zk),
+   midnightProvider:{submitTx:tx=>service.journalAndSubmit(tx)}};
+  service.transactions=new OrganizationTransactions(service.providers,()=>service.compiled);
   return service;
  }
  catalog(){return {network:'preprod',assetColor:ASSET,decimals:6,sourceFingerprint:this.release.inputs.source.sha256,services:ORGANIZATION_SERVICES.map(service=>({...service,profile:{name:`Line / ${service.name}`,publicKey:toHex(merchantPublicKey(this.merchantKeys[service.merchant])),address:this.recipients[service.merchant].address}}))};}
@@ -55,10 +57,12 @@ export class OrganizationMerchants extends PreprodLive {
   return book;
  }
  async bindOrganization(address){
-  this.privateProvider.setContractAddress(address);const id=`organization-merchant:${address}`;
-  if(await this.privateProvider.get(id)==null)await this.privateProvider.set(id,{});
-  return findDeployedContract(this.providers,{compiledContract:this.compiled,contractAddress:address,privateStateId:id});
+  return {callTx:{
+   postQuote:expiry=>this.transactions.call(address,'postQuote',[expiry]).then(receipt=>({public:receipt})),
+   redeemDraw:(commitment,expiry)=>this.transactions.call(address,'redeemDraw',[commitment,expiry]).then(receipt=>({public:receipt})),
+  }};
  }
+ async reconcile(){const receipt=await super.reconcile();if(receipt?.txId)this.transactions.finality.forget(receipt.txId);return receipt;}
  order(id){
   const order=this.state.orders.find(order=>order.id===id);if(!order)return null;
   return {id:order.id,contractAddress:order.address,service:order.service,status:order.status,quotePackage:order.status==='created'?null:encodeQuote(order.quote),result:order.status==='delivered'?order.result:null,receipts:this.state.receipts.filter(receipt=>receipt.id===`quote-${id}`||receipt.id===`redeem-${id}`).map(({name,contractAddress,txHash,blockHeight})=>({circuit:name,contractAddress,txHash,blockHeight})),pending:this.state.pending?.id===`quote-${id}`||this.state.pending?.id===`redeem-${id}`};

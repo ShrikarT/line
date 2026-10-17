@@ -25,4 +25,14 @@ The existing operator facilities are retained as historical network evidence. Th
 
 The organization owns and controls its delegated agent. This profile does not establish the separate-issuer/borrower custody goal of the broader external-credit architecture. The selected transparent asset reveals deposit, payout and refund amounts and recipients; commitments alone do not establish full-history privacy. No deployment or actual user deposit is claimed until its network receipt is confirmed.
 
-Nine generated-Compact checks currently pass: selected-asset deposit with no mint; both merchant payouts; authorization/replay/recipient replacement; asset shortage/locked withdrawals; earned-fee payout; real-deposit replenishment and reference replay; and actual excess-refund conservation. These are execution/effect tests with synthetic ledger balances, not funded network evidence. The browser account, actual SDK deployment preparation and merchant service integration are implemented. Metadata-only connector tests establish wallet-scoped encrypted isolation and rejection before submission; the owner confirms actual Lace connection and vault opening. A funded organization deployment and end-to-end purchase still require network acceptance. See [the current readiness audit](ORGANIZATION_READINESS_2026-10-18.md) for limits and next steps.
+Ten generated-Compact checks currently pass, including stale prior-generation refund-opening rejection: selected-asset deposit with no mint; both merchant payouts; authorization/replay/recipient replacement; asset shortage/locked withdrawals; earned-fee payout; real-deposit replenishment and reference replay; and actual excess-refund conservation. These are execution/effect tests with synthetic ledger balances, not funded network evidence. The browser account, actual SDK deployment preparation and merchant service integration are implemented. Metadata-only connector tests establish wallet-scoped encrypted isolation and rejection before submission; the owner confirms actual Lace connection and vault opening. A funded organization deployment and end-to-end purchase still require network acceptance. See [the current readiness audit](ORGANIZATION_READINESS_2026-10-18.md) for limits and next steps.
+
+## Recovery follow-up
+
+Encrypted export can be imported into a fresh workspace for the same wallet.
+The import authenticates the original envelope, validates records and checks
+actual facility books and note/refund commitments before the atomic write. An
+exact pending candidate and its signed bytes remain pending until reconciliation.
+An uncharged request can be cancelled or re-quoted; unresolved charged claims
+block replacement. Wallet, submission and finality waits return within explicit
+bounds without authorizing a late replacement. See the [remaining-work ledger](REMAINING_WORK_2026-10-18.md).

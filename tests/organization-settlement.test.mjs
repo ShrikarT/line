@@ -7,6 +7,7 @@ import { Contract, ledger } from '../contracts/managed/organization/contract/ind
 import { blankPrivate, WITNESSES } from '../src/lib/line/compact-harness.ts';
 import { issuerPublicKey, merchantPublicKey, agentId, quoteCommit, pad32, toHex } from '../src/lib/line/encoding.ts';
 import { validateContractArtifacts } from '../scripts/contract-artifacts.mjs';
+import { matchesRestoredNotes } from '../src/lib/organization/recovery.ts';
 
 const issuer = pad32('settlement-test-issuer');
 const agent = pad32('settlement-test-agent');
@@ -179,4 +180,26 @@ test('expired partially replenished claims pay the actual excess back once', () 
   assert.equal(f.read().refundReserve, 0n);
   assert.equal(f.read().reportedRefundReserve, 0n);
   assert.throws(() => f.execute('cancelOrExpireNote', [a.args[0], 2n, 20000n], refundPs), /already acknowledged/);
+});
+
+test('restore rejects missing or wrong refund openings even when a prior-generation allocation leaves the current book unchanged', () => {
+  const f = fixture(), claim = f.draw(merchantA, 25n);
+  const note = { contractAddress: address, domain: toHex(f.read().contractDomain), identity: toHex(agentId(agent)), merchantPk: toHex(merchantPublicKey(merchantA)), quoteCommitment: toHex(claim.ps.noteQuoteCommit), amount: 25n, fee: 0n, expiry, generation: 1n, noteNonce: toHex(claim.ps.noteNonce), noteSalt: toHex(claim.ps.noteSalt), noteCommitment: toHex(claim.args[0]), redeemed: false };
+  f.replenish(25n, 'restore-replenishment');
+  f.call('setStatus', [3]);
+  f.call('openLine', [20000n, 0n, 0n], { salt: pad32('replacement-book') });
+  const committedBook = toHex(f.read().lineCommit);
+  assert(matchesRestoredNotes(f.read(), [note]));
+  f.time(10001);
+  const refundSalt = pad32('prior-generation-refund');
+  f.call('cancelOrExpireNote', [claim.args[0], 1n, 20000n], { ...claim.ps, callerSecret: issuer, quoteMerchantPk: merchantPublicKey(merchantA), newSalt: refundSalt });
+  assert.equal(toHex(f.read().lineCommit), committedBook);
+  assert.equal(matchesRestoredNotes(f.read(), [note]), false);
+  const allocated = { ...note, refund: { salt: toHex(refundSalt), amount: 25n, paid: false } };
+  assert(matchesRestoredNotes(f.read(), [allocated]));
+  for (const refund of [{ ...allocated.refund, salt: toHex(pad32('wrong-opening')) }, { ...allocated.refund, amount: 24n }, { ...allocated.refund, paid: true }]) assert.equal(matchesRestoredNotes(f.read(), [{ ...note, refund }]), false);
+  assert.equal(matchesRestoredNotes(f.read(), [{ ...allocated, noteSalt: toHex(pad32('wrong-note-opening')) }]), false);
+  f.call('cancelOrExpireNote', [claim.args[0], 2n, 20000n], { callerSecret: issuer, noteIdentity: agentId(agent), repayAmount: 25n, salt: refundSalt, paymentRef: pad32('restore-refund-payment') });
+  assert.equal(matchesRestoredNotes(f.read(), [allocated]), false);
+  assert(matchesRestoredNotes(f.read(), [{ ...allocated, refund: { ...allocated.refund, paid: true } }]));
 });

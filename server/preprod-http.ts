@@ -24,7 +24,7 @@ export function preprodMiddleware({ env, create, createSettlement, createMerchan
     if (createMerchants) return createMerchants(parent, child);
     if (!child.recipients?.A || !child.recipients.B) throw Error("The supplier receiving wallets are not configured.");
     const moduleUrl = pathToFileURL(`${process.cwd()}/server/organization-merchants.mjs`);
-    moduleUrl.searchParams.set("organization", "v1");
+    moduleUrl.searchParams.set("organization", "v2");
     const module = await import(moduleUrl.href);
     return module.OrganizationMerchants.create(parent, child.recipients) as Promise<NativeMerchants>;
   }).catch(failure => { merchants = undefined; throw failure; });

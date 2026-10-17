@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { useOrganization } from "./organization-session";
 import { OrganizationField as Field, organizationField as field } from "./organization-ui";
 import type { OrganizationCatalog } from "@/lib/organization/network";
+import { serviceOrderNote } from "@/lib/organization/orders";
 
 export function OrganizationCheckout({ facilityId }: { facilityId: string }) {
   const { network, snapshot, busy, pending, run } = useOrganization();
@@ -31,10 +32,21 @@ export function OrganizationCheckout({ facilityId }: { facilityId: string }) {
       </article>;
     })}</div> : !error && <p role="status" className="mt-4 flex items-center gap-2 text-sm text-muted"><CircleNotch className="animate-spin" aria-hidden="true" />Loading the supplier catalog…</p>}
     {error && <p role="alert" className="wallet-error mt-4">{error}</p>}
-    {!!orders.length && <div className="organization-claims mt-8">{orders.slice().reverse().map(order => <article className="organization-claim" key={order.id}>
+    {!!orders.length && <div className="organization-claims mt-8">{orders.slice().reverse().map(order => {
+      const note = snapshot ? serviceOrderNote(snapshot, order) : undefined;
+      const actionable = !busy && !pending && !!network;
+      const replaceable = !note || !!note.refund?.paid;
+      return <article className="organization-claim" key={order.id}>
       <div className="flex items-center gap-2"><CheckCircle aria-hidden="true" className={order.delivered ? "text-ok" : "text-muted"} /><strong>{catalog?.services.find(service => service.id === order.service)?.name ?? order.service}</strong></div>
-      <p className="text-sm text-muted">{order.delivered ? "Delivered after the merchant’s on-chain asset payout." : "Saved purchase. Its original request and claim will be reused."}</p><code>{order.id}</code>
-      {order.delivered ? <pre className="organization-service-result">{JSON.stringify(order.result, null, 2)}</pre> : <Button variant="outline" disabled={disabled} onClick={() => void run(client => client.continueService(order.id))}>Resume this purchase</Button>}
-    </article>)}</div>}
+      <p className="text-sm text-muted">{order.delivered ? "Delivered after the merchant’s on-chain asset payout." : order.cancelled ? "Request cancelled. Its history is retained and no replacement payment was created." : "Saved purchase. Its original request and claim will be reused."}</p><code>{order.id}</code>
+      {order.quoteExpiry && <p className="text-xs text-muted">Quote deadline: {new Date(Number(order.quoteExpiry) * 1000).toLocaleString()}</p>}
+      {order.delivered ? <pre className="organization-service-result">{JSON.stringify(order.result, null, 2)}</pre> : !order.cancelled && <div className="flex flex-wrap gap-2">
+        <Button variant="outline" disabled={!actionable || !!note?.refund} onClick={() => void run(client => client.continueService(order.id))}>Resume this purchase</Button>
+        {replaceable && <><Button variant="outline" disabled={!actionable} onClick={() => void run(client => client.requoteService(order.id))}>Get a fresh quote</Button><Button variant="ghost" disabled={!actionable} onClick={() => void run(client => client.cancelService(order.id))}>Cancel saved request</Button></>}
+        {note && !note.redeemed && !note.refund && note.expiry <= BigInt(Math.floor(Date.now() / 1000)) && <Button variant="outline" disabled={!actionable} onClick={() => void run(client => client.cancelExpired(facilityId, note.noteCommitment))}>Recover expired purchase</Button>}
+        {note?.refund && !note.refund.paid && <Button variant="outline" disabled={!actionable} onClick={() => void run(client => client.refund(facilityId, note.noteCommitment))}>Receive remaining refund</Button>}
+      </div>}
+      {!!order.history?.length && <p className="text-xs text-muted">{order.history.length} retired request(s) retained for recovery.</p>}
+    </article>; })}</div>}
   </section>;
 }
