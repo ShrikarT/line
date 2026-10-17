@@ -15,6 +15,7 @@ export const POINTER_FILENAME = ".compact-keys/current-release.json";
 const PROFILES = {
   canonical: { source: "contracts/line.compact", pointer: POINTER_FILENAME },
   "test-settlement": { source: "contracts/experimental/line-test-settlement.compact", pointer: ".compact-keys/test-settlement-release.json" },
+  organization: { source: "contracts/organization/line.compact", pointer: ".compact-keys/organization-release.json" },
 };
 function selectedProfile(profile) {
   check(Object.hasOwn(PROFILES, profile), "Unknown contract release profile.");
@@ -97,7 +98,7 @@ function metadata(info, profile = "canonical") {
   exactNames(info.circuits, NAMES, "twelve circuits");
   for (const circuit of info.circuits) {
     check(circuit.pure === false && circuit.proof === true, `Circuit ${circuit.name} must be impure and provable.`);
-    const expected = profile === "test-settlement" && circuit.name === "registerMerchant"
+    const expected = ["test-settlement", "organization"].includes(profile) && circuit.name === "registerMerchant"
       ? [...CIRCUITS.registerMerchant, arg("recipient", { "type-name": "Struct", name: "UserAddress", elements: [arg("bytes", BYTES32)] })]
       : CIRCUITS[circuit.name];
     check(isDeepStrictEqual(circuit.arguments, expected) && isDeepStrictEqual(circuit["result-type"], EMPTY), `Wrong public signature for ${circuit.name}.`);

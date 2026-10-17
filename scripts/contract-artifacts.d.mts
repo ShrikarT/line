@@ -12,5 +12,6 @@ export type ValidatedRelease = {
   inputs: ReleaseInputs;
   files: Record<string, ArtifactFingerprint>;
 };
-export function resolveContractRelease(options?: { projectRoot?: string }): string;
-export function validateContractArtifacts(options: { artifactDir: string; projectRoot?: string; requireKeys?: boolean; requireRelease?: boolean }): ValidatedRelease;
+export type ContractProfile = "canonical" | "test-settlement" | "organization";
+export function resolveContractRelease(options?: { projectRoot?: string; profile?: ContractProfile }): string;
+export function validateContractArtifacts(options: { artifactDir: string; projectRoot?: string; requireKeys?: boolean; requireRelease?: boolean; profile?: ContractProfile }): ValidatedRelease;

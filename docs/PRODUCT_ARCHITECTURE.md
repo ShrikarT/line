@@ -1,5 +1,9 @@
 # Product Architecture & Technical Specification
 
+## Active organization product: 18 October 2026
+
+The owner selected organization-funded agent spending. The new asset-backed profile, browser account custody and real supplier flow are described in [ORGANIZATION_PRODUCT.md](ORGANIZATION_PRODUCT.md); current acceptance and limitations are in [the readiness audit](ORGANIZATION_READINESS_2026-10-18.md). The original external-credit architecture and canonical accounting profile below remain separate. An organization's own deposit is not third-party credit, and historical operator receipts do not certify a new user facility.
+
 ## Line: Protocol prototype for agent purchasing; private credit is the unproven destination
 
 ### Overview

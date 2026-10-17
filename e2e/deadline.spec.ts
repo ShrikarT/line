@@ -5,8 +5,9 @@ test("role consoles display the agreed UTC deadline and confirmed redeemed statu
   page.on("pageerror", error => errors.push(error.message));
   await page.goto("/merchant");
   const expiry = await page.evaluate(async () => {
-    const { useAppStore } = await import("/src/app/store.ts" as any);
-    const { setRuntime, InMemoryTestRuntime } = await import("/src/lib/runtime/index.ts" as any);
+    const { browserModuleUrl } = await import("/e2e/browser-module.ts" as any);
+    const { useAppStore } = await import(browserModuleUrl("/src/app/store.ts"));
+    const { setRuntime, InMemoryTestRuntime } = await import(browserModuleUrl("/src/lib/runtime/index.ts"));
     setRuntime(new InMemoryTestRuntime());
     const store = useAppStore.getState();
     if (!await store.unlockVault("BrowserDeadlinePassword123!")) throw new Error("Vault setup failed");
@@ -41,8 +42,9 @@ test("issuer sets fixed fee terms and both buyer and merchant see the complete p
   page.on("pageerror", error => errors.push(error.message));
   await page.goto("/issuer");
   await page.evaluate(async () => {
-    const { useAppStore } = await import("/src/app/store.ts" as any);
-    const { setRuntime, InMemoryTestRuntime } = await import("/src/lib/runtime/index.ts" as any);
+    const { browserModuleUrl } = await import("/e2e/browser-module.ts" as any);
+    const { useAppStore } = await import(browserModuleUrl("/src/app/store.ts"));
+    const { setRuntime, InMemoryTestRuntime } = await import(browserModuleUrl("/src/lib/runtime/index.ts"));
     setRuntime(new InMemoryTestRuntime());
     const store = useAppStore.getState();
     if (!await store.unlockVault("BrowserPricingPassword123!")) throw new Error("Vault setup failed");
@@ -62,7 +64,8 @@ test("issuer sets fixed fee terms and both buyer and merchant see the complete p
   await page.getByRole("button", { name: "Draw & Issue Note", exact: true }).click();
   await expect(page.getByText("Note 40 units", { exact: true })).toBeVisible();
   const accounting = await page.evaluate(async () => {
-    const { useAppStore } = await import("/src/app/store.ts" as any);
+    const { browserModuleUrl } = await import("/e2e/browser-module.ts" as any);
+    const { useAppStore } = await import(browserModuleUrl("/src/app/store.ts"));
     const { ledger, agentLineRecord } = useAppStore.getState();
     return { feeFlat: ledger.feeFlat, feeBps: ledger.feeBps, debt: agentLineRecord?.outstanding,
       encumbered: ledger.encumberedReserve, fees: ledger.feeReserve, pendingFees: ledger.pendingFeeReserve };

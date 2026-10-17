@@ -1,12 +1,15 @@
 import { test, expect } from "@playwright/test";
 
 test("expired purchase credits debt, reports the private cash remainder and retains backing", async ({ page }) => {
+  test.setTimeout(60_000);
+  await page.emulateMedia({ reducedMotion: "reduce" });
   const errors: string[] = [];
   page.on("pageerror", error => errors.push(error.message));
   await page.goto("/agent");
   const noteCommit = await page.evaluate(async () => {
-    const { useAppStore } = await import("/src/app/store.ts" as any);
-    const { setRuntime, InMemoryTestRuntime } = await import("/src/lib/runtime/index.ts" as any);
+    const { browserModuleUrl } = await import("/e2e/browser-module.ts" as any);
+    const { useAppStore } = await import(browserModuleUrl("/src/app/store.ts"));
+    const { setRuntime, InMemoryTestRuntime } = await import(browserModuleUrl("/src/lib/runtime/index.ts"));
     let now = Math.floor(Date.now() / 1000);
     setRuntime(new InMemoryTestRuntime(undefined, { clock: () => now }));
     const store = useAppStore.getState();
@@ -30,7 +33,8 @@ test("expired purchase credits debt, reports the private cash remainder and reta
   await page.getByRole("button", { name: "Record issuer refund report", exact: true }).click();
   await expect(page.getByText("Issuer reported the refund; cash transfer remains unverified and full backing stays locked.", { exact: true })).toBeVisible();
   const state = await page.evaluate(async () => {
-    const { useAppStore } = await import("/src/app/store.ts" as any);
+    const { browserModuleUrl } = await import("/e2e/browser-module.ts" as any);
+    const { useAppStore } = await import(browserModuleUrl("/src/app/store.ts"));
     const { ledger, agentLineRecord, refunds } = useAppStore.getState();
     return { debt: agentLineRecord?.outstanding, pending: ledger.pendingFeeReserve, earned: ledger.feeReserve,
       held: ledger.refundReserve, reported: ledger.reportedRefundReserve, available: ledger.withdrawableReserve,

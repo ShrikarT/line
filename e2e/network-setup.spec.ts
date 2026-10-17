@@ -16,7 +16,7 @@ test("wallet connection keeps contract setup open and rejects invalid addresses"
       },
     };
   });
-  await page.goto("/");
+  await page.goto("/issuer");
   await page.getByRole("button", { name: "Local Simulator" }).click();
   await page.getByLabel("Network", { exact: true }).selectOption("preview");
   await page.getByRole("button", { name: "Connect Midnight Wallet" }).click();
@@ -35,7 +35,7 @@ test("wallet connection keeps contract setup open and rejects invalid addresses"
 test("local Preprod configuration fills the session token without browser storage", async ({ page }) => {
   await page.route("**/api/line/network-session", route => route.fulfill({ contentType: "application/json",
     body: JSON.stringify({ networkId: "preprod", blockfrostProjectId: "local-session-fixture" }) }));
-  await page.goto("/");
+  await page.goto("/issuer");
   await page.getByRole("button", { name: "Local Simulator" }).click();
   await expect(page.getByLabel("Blockfrost Midnight Preprod project token")).toHaveValue("local-session-fixture");
   const stored = await page.evaluate(() => JSON.stringify({ local: { ...localStorage }, session: { ...sessionStorage } }));

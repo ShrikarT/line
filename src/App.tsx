@@ -10,12 +10,15 @@ import { RoadmapPage } from "@/pages/roadmap.tsx";
 import { CheckoutPage } from "@/pages/checkout.tsx";
 import { PreprodPage, TestSettlementPage } from "@/pages/preprod.tsx";
 import { PrivacyPage, NotFoundPage } from "@/pages/privacy.tsx";
-import { WorkspacePage } from "@/pages/workspace";
+import { OrganizationWorkspacePage, OrganizationPage, AgentWorkspacePage, SupplierWorkspacePage } from "@/pages/organization-workspace";
 import { ConnectPage } from "@/pages/connect";
 
 const PAGES: Record<string, ComponentType> = {
   "/": Home,
-  "/app": WorkspacePage,
+  "/app": OrganizationWorkspacePage,
+  "/organization": OrganizationPage,
+  "/agents": AgentWorkspacePage,
+  "/suppliers": SupplierWorkspacePage,
   "/connect": ConnectPage,
   "/issuer": IssuerPage,
   "/merchant": MerchantPage,

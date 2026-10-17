@@ -1,10 +1,11 @@
 import { test, expect } from "@playwright/test";
 
 test.describe("Line — Autonomous Agent Credit Platform", () => {
-  test("homepage loads with core architecture and runtime badge", async ({ page }) => {
+  test("homepage opens the real organization product on Preprod", async ({ page }) => {
     await page.goto("/");
     await expect(page.locator("header a[href='/']").first()).toBeVisible();
-    await expect(page.locator("text=Local Simulator")).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1 })).toContainText("Spending for agents.");
+    await expect(page.getByRole("button", { name: "Local Simulator", exact: true })).toHaveCount(0);
   });
 
   test("navigates across all role consoles without browser runtime errors", async ({ page }) => {
@@ -26,7 +27,7 @@ test.describe("Line — Autonomous Agent Credit Platform", () => {
 
     // 3. Agent Console
     await page.goto("/agent");
-    await expect(page.locator("text=Agent console")).toBeVisible();
+    await expect(page.locator("main").getByText("Agent console", { exact: true })).toBeVisible();
     await expect(page.locator("text=Private books & Draw Notes")).toBeVisible();
 
     // 4. Public Explorer
@@ -48,7 +49,7 @@ test.describe("Line — Autonomous Agent Credit Platform", () => {
   });
 
   test("runtime switcher opens network setup screen and enforces wallet boundaries", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/issuer");
     const badge = page.locator("button:has-text('Local Simulator')");
     await expect(badge).toBeVisible();
     await badge.click();

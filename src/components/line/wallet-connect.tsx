@@ -88,9 +88,9 @@ export function WalletSessionProvider({ children }: { children: ReactNode }) {
           {wallets.length ? wallets.map(wallet => <Button key={wallet.rdns} variant="outline" className="wallet-option" disabled={connecting} onClick={() => void connect(wallet)}><Wallet aria-hidden="true" /><span>{wallet.name}</span>{connecting ? <CircleNotch className="animate-spin" aria-hidden="true" /> : <ArrowRight aria-hidden="true" />}</Button>) : <div className="wallet-empty"><strong>No Midnight wallet detected yet.</strong><p>Install a Midnight-compatible browser wallet, enable it for this site, then refresh this page. On mobile, open Line in a browser that supports your wallet extension.</p><Button variant="outline" asChild><a href="https://docs.midnight.network/getting-started/installation" target="_blank" rel="noreferrer">Wallet setup guide <ArrowSquareOut aria-hidden="true" /></a></Button></div>}
           {connecting && <p role="status" className="text-sm text-muted">Approve the connection in your wallet extension…</p>}
         </div>}
-        <div className="wallet-scope"><CheckCircle aria-hidden="true" /><p>Connecting shares your wallet address. It does not send a transaction. The funded demo uses the local operator’s existing facility and merchant wallets; your wallet is not its signer.</p></div>
+        <div className="wallet-scope"><CheckCircle aria-hidden="true" /><p>Connecting shares your wallet address and sends no transaction. Your organization’s records stay encrypted in its wallet-scoped vault. Deposits and purchases require separate wallet approvals.</p></div>
         <Button variant="secondary" asChild><a href="/app" onClick={() => setOpen(false)}>Continue to workspace <ArrowRight aria-hidden="true" /></a></Button>
-        <a className="text-center text-xs text-muted underline underline-offset-4" href="/connect" onClick={() => setOpen(false)}>Advanced: connect your own deployed facility</a>
+        {!["/", "/app", "/organization", "/agents", "/suppliers"].includes(window.location.pathname) && <a className="text-center text-xs text-muted underline underline-offset-4" href="/connect" onClick={() => setOpen(false)}>Advanced: connect an existing canonical contract</a>}
       </DialogContent>
     </Dialog>
   </WalletContext.Provider>;

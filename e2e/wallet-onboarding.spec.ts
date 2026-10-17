@@ -40,8 +40,9 @@ for (const width of [1440, 390]) {
     await expect(page.getByRole("link", { name: "Wallet setup guide" })).toHaveAttribute("href", "https://docs.midnight.network/getting-started/installation");
     await page.getByRole("link", { name: "Continue to workspace" }).click();
     await expect(page).toHaveURL(/\/app$/);
-    await expect(page.getByRole("heading", { level: 1 })).toContainText("Put your agent");
-    await expect(page.getByRole("link", { name: "Open test-token checkout" })).toHaveAttribute("href", "/test-payout");
+    await expect(page.getByRole("heading", { level: 1 })).toContainText("Your treasury");
+    await expect(page.getByRole("heading", { name: "Start with your wallet." })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Open test-token checkout" })).toHaveCount(0);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
     await mkdir("artifacts/wallet-onboarding", { recursive: true });
     await page.screenshot({ path: `artifacts/wallet-onboarding/workspace-${width}.png`, fullPage: true });
@@ -65,8 +66,9 @@ test("selected wallet connects, survives navigation, copies and disconnects with
   await page.setViewportSize({ width: 390, height: 844 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
   await page.screenshot({ path: "artifacts/wallet-onboarding/connected-mobile.png" });
+  await page.setViewportSize({ width: 1440, height: 900 });
   await page.getByRole("link", { name: "Continue to workspace" }).click();
-  await page.locator('.workspace-role[href="/agent"]').click();
+  await page.getByRole("link", { name: "Agent purchases", exact: true }).click();
   await expect(page.locator("header").getByRole("button", { name: "Manage connected wallet" })).toBeVisible();
   await page.locator("header").getByRole("button", { name: "Manage connected wallet" }).click();
   await page.getByRole("button", { name: "Disconnect from Line" }).click();
@@ -102,9 +104,9 @@ test("wrong network never displays a connected account", async ({ page }) => {
 
 test("mobile wallet dialog exposes advanced facility setup", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("/app");
+  await page.goto("/issuer");
   await page.locator("header").getByRole("button", { name: "Connect wallet", exact: true }).click();
-  await page.getByRole("link", { name: "Advanced: connect your own deployed facility" }).click();
+  await page.getByRole("link", { name: "Advanced: connect an existing canonical contract" }).click();
   await expect(page).toHaveURL(/\/connect$/);
   await expect(page.getByRole("heading", { name: "Connect a facility." })).toBeVisible();
   await expect(page.getByRole("button", { name: "Connect Midnight Wallet", exact: true })).toBeVisible();

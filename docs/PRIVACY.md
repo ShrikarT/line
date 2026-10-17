@@ -1,5 +1,9 @@
 # Privacy Architecture & Ledger Inventory
 
+## Organization-funded profile: 18 October 2026
+
+The new organization asset profile retains the baseline public note amounts, merchant keys and reserve deltas. Its transparent deposits, refunds and payouts also reveal asset amounts and receiving addresses. The organization owns its delegated agent; independent outside issuer/borrower custody is not claimed. Full-history balance inference remains open. [Current product and acceptance](ORGANIZATION_READINESS_2026-10-18.md).
+
 ## Owner-authorized next-version change — 11 October 2026
 
 The owner authorized redesign of public note amounts and reserve deltas. This document inventories the **unchanged canonical baseline**. Its public-disclosure facts do not constrain the next version. See [the redesign and verification/migration gates](PRIVACY_REDESIGN_2026-10-11.md) and [the compiled pool counterexamples](PRIVATE_POOL_2026-10-11.md). No full-history privacy pass or canonical migration is claimed.

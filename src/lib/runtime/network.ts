@@ -285,7 +285,7 @@ export class MidnightNetworkRuntime implements LineRuntime {
   private async createZkConfigProvider(): Promise<ZKConfigProvider<LineCircuitId>> {
     if (typeof window !== "undefined") {
       const { FetchZkConfigProvider } = await import("@midnight-ntwrk/midnight-js-fetch-zk-config-provider");
-      return new FetchZkConfigProvider<LineCircuitId>(new URL(this.zkConfigBaseUrl, window.location.origin).href);
+      return new FetchZkConfigProvider<LineCircuitId>(new URL(this.zkConfigBaseUrl, window.location.origin).href, globalThis.fetch.bind(globalThis));
     }
     const nodeModule = "./network-node.ts";
     const { createNodeZkProvider } = await import(/* @vite-ignore */ nodeModule) as typeof import("./network-node.ts");
