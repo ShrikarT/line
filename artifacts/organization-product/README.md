@@ -1,5 +1,12 @@
 # Organization product verification
 
+The latest creation-feedback and hosting-preparation increment is recorded in
+[hosting-preparation-verification.json](hosting-preparation-verification.json):
+598 core passes plus one intentional skip, 36 focused organization passes and
+eight organization browser passes. The deploy build exports the actual public
+proving release, and its SDK static-transport checks pass. No new customer
+deployment, funded payout or public hosting is claimed.
+
 The current recovery increment is recorded in [recovery-verification.json](recovery-verification.json): 594 core passes, one intentional skip, 32 focused organization passes and seven organization browser passes; build, release/drift checks and scans pass. The evidence below describes the earlier checkpoint.
 
 See [the readiness report](../../docs/ORGANIZATION_READINESS_2026-10-18.md) and [machine-readable scope](verification.json).

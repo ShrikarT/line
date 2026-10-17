@@ -11,6 +11,8 @@ Each organization funds and controls its own agents' spending. Open `/app` in th
 
 Actual Lace connection and vault opening are owner-confirmed. A new organization facility's funded end-to-end lifecycle still needs its own finalized receipts; historical operator receipts do not certify it. The first-party merchant backend/proof server must be running and configured. Authenticated encrypted backup restore and expired-request recovery are implemented. Public hosting is authorized after verification; the user reports facility creation failing without a visible error, so funded acceptance and full-history privacy remain open. See the [remaining-work ledger](docs/REMAINING_WORK_2026-10-18.md).
 
+`npm run build:deploy` includes the validated organization proving assets in the frontend build. It requires a full `organization:release` first. The durable supplier backend still needs its own production runtime; [hosting preparation](docs/HOSTING_PREPARATION_2026-10-18.md) documents the remaining deployment requirements.
+
 ## Historical protocol and external-credit research
 
 The sections below retain the earlier prototype/research context and its original evidence scopes. They do not describe an outside credit provider for the organization-funded product above.

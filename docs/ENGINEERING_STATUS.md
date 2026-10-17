@@ -1,5 +1,11 @@
 # Engineering status and acceptance evidence
 
+## Creation feedback and public-asset preparation: 18 October 2026
+
+A new browser regression reproduces a pre-submission silent rejection: native required-field validation prevents submission without an application alert. The form now displays and focuses actionable feedback, with zero signatures. This is a verified UX defect, not a confirmed diagnosis of the owner's exact Lace failure. Actual SDK maintenance construction/signing and proof conversion also reach a deliberately rejecting wallet without submission.
+
+The static build exporter prepares only the 37 public organization proving assets from the validated source-bound release. It rejects changed source/material and pre-existing output, checks copied hashes and atomically publishes the directory. The actual local release exports successfully; three synthetic integrity controls pass. Fresh verification: **599 core tests, 598 passed, zero failures/cancellations, one intentional skip**; **eight organization browser cases pass**. The deploy build, TypeScript, zero managed drift and credential scans pass (85 production modules). A temporary loopback static server verifies all 36 actual proving-file hashes, twelve SDK verifier fetches and the draw prover/binary-ZKIR fetches. No wallet transaction was approved or submitted by these checks. [Hosting preparation and remaining backend requirements](HOSTING_PREPARATION_2026-10-18.md).
+
 ## Organization recovery follow-up: 18 October 2026
 
 The current increment adds authenticated encrypted backup import into a fresh wallet-scoped workspace, chain checks of private books and note/refund openings, expired request cancellation and re-quoting, and bounded wallet identity/approval, submission and finality waits. Signed uncertainty retains the exact original transaction. Both browser and native supplier paths use asynchronous SDK submission with application-owned finality; a late SDK watcher cannot promote private books after the application timed out. Cancellation or a new quote is blocked while a charged claim is unresolved.

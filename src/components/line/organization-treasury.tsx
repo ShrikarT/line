@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useOrganization } from "./organization-session";
 import { OrganizationField as Field, organizationField as field } from "./organization-ui";
@@ -14,6 +14,9 @@ export function OrganizationTreasury({ facilityId, onSelect }: { facilityId: str
   const [amount, setAmount] = useState(""), [limit, setLimit] = useState(""), [days, setDays] = useState("7");
   const [status, setStatus] = useState<Awaited<ReturnType<OrganizationNetwork["facilitySummary"]>> | null>(null), [error, setError] = useState("");
   const [catalog, setCatalog] = useState<OrganizationCatalog | null>(null);
+  const [formError, setFormError] = useState("");
+  const formErrorRef = useRef<HTMLParagraphElement>(null);
+  useEffect(() => { if (formError) formErrorRef.current?.focus(); }, [formError]);
   const [catalogError, setCatalogError] = useState(""), [refresh, setRefresh] = useState(0), [walletUnits, setWalletUnits] = useState<string | null>(null);
   useEffect(() => {
     let cancelled = false;
@@ -38,11 +41,12 @@ export function OrganizationTreasury({ facilityId, onSelect }: { facilityId: str
     {catalogError && <p role="alert" className="wallet-error">{catalogError}</p>}
     <details className="organization-create" open={!snapshot?.facilities.length}><summary>Create an agent facility</summary><p>Deploy your own contract and delegated agent. Deployment and verifier setup require twelve wallet-approved transactions. Save an encrypted backup before depositing.</p>
       {catalog && <div className="mt-4"><Field label="Initial API supplier"><select className={field} disabled={disabled} onChange={event => { const service = catalog.services.find(service => service.id === event.target.value); if (service) setProfile(encodeMerchant(service.profile)); }}><option value="">Choose a supplier or paste your own profile</option>{catalog.services.map(service => <option key={service.id} value={service.id}>{service.name}</option>)}</select></Field></div>}
-      <form className="organization-form-grid" onSubmit={event => { event.preventDefault(); act(async (client, account) => { await client.createFacility(name, asset, decodeMerchant(profile)); onSelect(account.snapshot().facilities.at(-1)?.id ?? ""); }); }}>
+      <form className="organization-form-grid" onInvalidCapture={() => { setFormError("Complete the required name, asset and supplier profile before creating your facility."); formErrorRef.current?.focus(); }} onInputCapture={() => setFormError("")} onSubmit={event => { event.preventDefault(); setFormError(""); act(async (client, account) => { await client.createFacility(name, asset, decodeMerchant(profile)); onSelect(account.snapshot().facilities.at(-1)?.id ?? ""); }); }}>
         <Field label="Organization / agent name"><input className={field} value={name} onChange={event => setName(event.target.value)} maxLength={80} disabled={disabled} required /></Field>
         <Field label="Settlement asset color" hint="64 hex characters. All zeroes selects native tNIGHT on Preprod."><input className={`${field} font-mono`} value={asset} onChange={event => setAsset(event.target.value)} pattern="[0-9a-f]{64}" disabled={disabled} required /></Field>
         <div className="col-span-full"><Field label="Initial merchant profile" hint="Ask the supplier to share their profile from their own Merchant workspace. Only their public key and receiving address are included."><textarea className={field} value={profile} onChange={event => setProfile(event.target.value)} maxLength={16384} rows={4} disabled={disabled} required /></Field></div>
         <Button type="submit" disabled={disabled}>Create facility</Button>
+        {formError && <p ref={formErrorRef} tabIndex={-1} role="alert" className="wallet-error col-span-full">{formError}</p>}
       </form>
     </details>
     {facility && <>
