@@ -54,6 +54,7 @@ const NAV = [
     items: [
       { to: "/", label: "Overview", icon: House },
       { to: "/preprod", label: "Live Preprod", icon: Lightning },
+      { to: "/test-payout", label: "Test-token payout", icon: Lightning },
       { to: "/checkout", label: "API checkout", icon: ArrowRight },
     ],
   },

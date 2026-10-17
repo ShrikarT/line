@@ -1,0 +1,21 @@
+{
+  "checkedAt": "2026-10-16T14:03:46.793Z",
+  "pendingPoolMatch": false,
+  "pendingPoolSize": 0,
+  "dryRun": {
+    "jsonrpc": "2.0",
+    "id": 3,
+    "error": {
+      "code": -32601,
+      "message": "RPC call is unsafe to be called externally"
+    }
+  },
+  "exactRetry": {
+    "jsonrpc": "2.0",
+    "id": 4,
+    "error": {
+      "code": 1012,
+      "message": "Transaction is temporarily banned"
+    }
+  }
+}

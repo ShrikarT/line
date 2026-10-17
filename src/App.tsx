@@ -8,7 +8,7 @@ import { LabPage } from "@/pages/lab.tsx";
 import { CircuitsPage } from "@/pages/circuits.tsx";
 import { RoadmapPage } from "@/pages/roadmap.tsx";
 import { CheckoutPage } from "@/pages/checkout.tsx";
-import { PreprodPage } from "@/pages/preprod.tsx";
+import { PreprodPage, TestSettlementPage } from "@/pages/preprod.tsx";
 import { PrivacyPage, NotFoundPage } from "@/pages/privacy.tsx";
 
 const PAGES: Record<string, ComponentType> = {
@@ -22,6 +22,7 @@ const PAGES: Record<string, ComponentType> = {
   "/roadmap": RoadmapPage,
   "/checkout": CheckoutPage,
   "/preprod": PreprodPage,
+  "/test-payout": TestSettlementPage,
   "/privacy": PrivacyPage,
 };
 

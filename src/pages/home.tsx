@@ -110,7 +110,7 @@ export function Home() {
             <span>Private witnesses. Verifiable rules.</span>
             <a href="#proof">
               <span className="live-dot" />
-              22 confirmed transactions <ArrowUpRight />
+              28 confirmed transactions <ArrowUpRight />
             </a>
           </div>
         </section>
@@ -296,14 +296,14 @@ export function Home() {
             <div className="network-evidence">
               <div className="network-counter">
                 <strong>
-                  22<span>tx</span>
+                  28<span>tx</span>
                 </strong>
                 <div>
                   <span className="live-dot" />
                   <span>
                     Confirmed on Preprod
                     <br />
-                    <small>Verified 14 October 2026</small>
+                    <small>Verified 16 October 2026</small>
                   </span>
                 </div>
               </div>

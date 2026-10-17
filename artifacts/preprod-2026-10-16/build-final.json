@@ -1,0 +1,13 @@
+{
+  "checkedAt": "2026-10-17T09:43:56.901Z",
+  "checks": [
+    {
+      "name": "typecheck",
+      "exitCode": 0
+    },
+    {
+      "name": "bundle",
+      "exitCode": 0
+    }
+  ]
+}

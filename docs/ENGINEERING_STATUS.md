@@ -1,5 +1,15 @@
 # Engineering status and acceptance evidence
 
+## Actual Midnight test-token payout - 17 October 2026
+
+The polished `/test-payout` page now completes an actual two-merchant purchase on a separate twelve-circuit Preprod contract: **21 finalized transactions**, **25 test units received by A**, **20 by B**, and **155 remaining in contract custody** from the 200-unit mint. A separate read-only verifier matches all receipts, all twelve release keys, exact raw payouts, registered recipients and asset balances. Browser reload retains delivery and receipts without another POST. Desktop/phone captures were inspected with no runtime error or overflow. The test asset is transparent and valueless; cash repayment, production capital, independent custody and full-history privacy remain unestablished. [Evidence, source/recovery details, precise test scope and restart limitation](TEST_TOKEN_PAYOUT_2026-10-16.md).
+
+The empty DUST fee section that caused RPC 117 is reproduced with actual rejected bytes and prevented before submission; a positive fee overhead is now confirmed through the successful live calls. Core inventory is 563: 561 passed in the full run, one compiler/owner fixture timed out and passed its isolated rerun, one intentional skip. All 562 runnable cases have passing evidence across those runs. Fourteen focused backend and six generated settlement checks pass. Ten browser cases pass together, with two preview/search cases passing again after a tab-mount animation fix. Build/typecheck, both credential checks and the 16-file canonical Compact drift check pass. A full backend restart of the new facility remains unverified because automatic approval review blocked stopping the local server. Public deployment remains deferred.
+
+## Fresh funded purchase - 16 October 2026
+
+Actual browser purchasing on the canonical Preprod instance added **six funded, finalized calls** across both merchants, for **28 confirmed receipts**. Both services delivered; reload retained the results without another charge. A separate read-only check verified all 28 receipts and all twelve exact canonical verifier keys. The stopped local proof server was restored, and a read-only readiness command now checks it explicitly. That accounting facility remains separate from the test-token payout version described above. [Fresh transaction evidence and boundaries](FRESH_PREPROD_2026-10-16.md).
+
 ## Product interface revision - 16 October 2026
 
 The second visual revision addresses the owner's feedback on the initial redesign. It replaces the homepage with a layered credit-card/receipt hero, an animated three-role purchase preview and product-specific policy/proof/claim illustrations. The original logo and cream/navy/coral/blush identity remain. Shared workspaces receive refined navy navigation, a shadcn Command search dialog, clearer headings, aligned service cards and improved vault/lab surfaces. Anime.js transitions respect reduced motion. All twelve routes and setup/import/populated states are covered by 40 desktop/phone captures. [Design decisions, completion matrix and verification details](UI_REVISION_2026-10-15.md).

@@ -12,6 +12,14 @@ import { spawn } from "node:child_process";
 
 export const RELEASE_FILENAME = "line-release.json";
 export const POINTER_FILENAME = ".compact-keys/current-release.json";
+const PROFILES = {
+  canonical: { source: "contracts/line.compact", pointer: POINTER_FILENAME },
+  "test-settlement": { source: "contracts/experimental/line-test-settlement.compact", pointer: ".compact-keys/test-settlement-release.json" },
+};
+function selectedProfile(profile) {
+  check(Object.hasOwn(PROFILES, profile), "Unknown contract release profile.");
+  return PROFILES[profile];
+}
 export const SUPPORTED_COMPACT = Object.freeze({ compiler: "0.31.1", language: "0.23.0", runtime: "0.16.0", ledger: "8.0.2" });
 const BYTES32 = { "type-name": "Bytes", length: 32 };
 const UINT64 = { "type-name": "Uint", maxval: "18446744073709551615" };
@@ -64,15 +72,16 @@ function physicalContained(root, path) {
   while (!existsSync(ancestor) && dirname(ancestor) !== ancestor) ancestor = dirname(ancestor);
   return contained(realpathSync(root), realpathSync(ancestor));
 }
-function inputs(projectRoot) {
+function inputs(projectRoot, profile = "canonical") {
   const packagePath = join(projectRoot, "package.json");
   const pkg = json(packagePath);
   check(isDeepStrictEqual(pkg.compact, SUPPORTED_COMPACT), "package.json compact pins must be compiler 0.31.1 / language 0.23.0 / runtime 0.16.0 / ledger 8.0.2.");
   check(pkg.dependencies?.["@midnight-ntwrk/compact-runtime"] === "0.16.0", "Direct Compact runtime dependency must be exactly 0.16.0.");
-  const source = join(projectRoot, "contracts/line.compact");
+  const sourcePath = selectedProfile(profile).source;
+  const source = join(projectRoot, sourcePath);
   check(/pragma\s+language_version\s+0\.23\s*;/.test(readFileSync(source, "utf8")), "Canonical source pragma must be language 0.23.");
   return {
-    source: { path: "contracts/line.compact", ...regularFile(source) },
+    source: { path: sourcePath, ...regularFile(source) },
     compilerWrapper: { path: "scripts/compile-compact.mjs", ...regularFile(join(projectRoot, "scripts/compile-compact.mjs")) },
     compact: { ...pkg.compact }, runtimeDependency: "0.16.0",
   };
@@ -81,14 +90,17 @@ function exactNames(entries, names, label) {
   check(Array.isArray(entries), `Missing ${label} metadata.`);
   check(isDeepStrictEqual(entries.map(entry => entry.name).sort(), [...names].sort()), `Expected exactly the canonical ${label}; duplicates and additional names are rejected.`);
 }
-function metadata(info) {
+function metadata(info, profile = "canonical") {
   for (const [key, expected] of [["compiler-version", "0.31.1"], ["language-version", "0.23.0"], ["runtime-version", "0.16.0"]]) {
     check(info[key] === expected, `Unsupported ${key}: expected ${expected}.`);
   }
   exactNames(info.circuits, NAMES, "twelve circuits");
   for (const circuit of info.circuits) {
     check(circuit.pure === false && circuit.proof === true, `Circuit ${circuit.name} must be impure and provable.`);
-    check(isDeepStrictEqual(circuit.arguments, CIRCUITS[circuit.name]) && isDeepStrictEqual(circuit["result-type"], EMPTY), `Wrong public signature for ${circuit.name}.`);
+    const expected = profile === "test-settlement" && circuit.name === "registerMerchant"
+      ? [...CIRCUITS.registerMerchant, arg("recipient", { "type-name": "Struct", name: "UserAddress", elements: [arg("bytes", BYTES32)] })]
+      : CIRCUITS[circuit.name];
+    check(isDeepStrictEqual(circuit.arguments, expected) && isDeepStrictEqual(circuit["result-type"], EMPTY), `Wrong public signature for ${circuit.name}.`);
   }
   exactNames(info.witnesses, [...BYTE_WITNESSES, ...UINT_WITNESSES], "twenty witnesses");
   for (const witness of info.witnesses) {
@@ -98,14 +110,14 @@ function metadata(info) {
 }
 
 /** Metadata-only checks can be used after --skip-zk, but deployment defaults require a full release. */
-export function validateContractArtifacts({ artifactDir, projectRoot = process.cwd(), requireKeys = true, requireRelease = true } = {}) {
+export function validateContractArtifacts({ artifactDir, projectRoot = process.cwd(), requireKeys = true, requireRelease = true, profile = "canonical" } = {}) {
   check(typeof artifactDir === "string" && artifactDir.length > 0, "An artifact directory is required.");
   projectRoot = resolve(projectRoot);
   artifactDir = resolve(projectRoot, artifactDir);
-  const currentInputs = inputs(projectRoot);
+  const currentInputs = inputs(projectRoot, profile);
   check(!existsSync(join(artifactDir, "compiler/contract-manifest.json")), "Obsolete compiler/contract-manifest.json detected. Build a fresh ledger 8 release; do not reuse ledger 9 metadata.");
   const compilerInfo = json(join(artifactDir, "compiler/contract-info.json"), true);
-  metadata(compilerInfo);
+  metadata(compilerInfo, profile);
   const javascript = readFileSync(join(artifactDir, "contract/index.js"), "utf8");
   check(/checkRuntimeVersion\(\s*['"]0\.16\.0['"]\s*\)/.test(javascript), "Generated JS must expect Compact runtime 0.16.0.");
   for (const name of NAMES) {
@@ -119,6 +131,7 @@ export function validateContractArtifacts({ artifactDir, projectRoot = process.c
     artifactFile(artifactDir, RELEASE_FILENAME);
     release = json(join(artifactDir, RELEASE_FILENAME));
     check(release.schema === "line-contract-release/v1", "Missing or unsupported Line release schema.");
+    check((release.profile ?? "canonical") === profile, "Release profile mismatch.");
     check(release.generation?.kind === "fresh-full-compact-compile", "Release must originate from a fresh full compiler run.");
     check(isDeepStrictEqual(release.inputs, currentInputs), "Release source/configuration differs from current canonical inputs.");
     check(isDeepStrictEqual(release.files, files), "Release artifact hashes/sizes differ: keys, bindings or ZKIR are missing, modified or stale.");
@@ -127,9 +140,10 @@ export function validateContractArtifacts({ artifactDir, projectRoot = process.c
 }
 
 /** Resolve a previously validated pointer. Validation of the selected release remains mandatory. */
-export function resolveContractRelease({ projectRoot = process.cwd() } = {}) {
+export function resolveContractRelease({ projectRoot = process.cwd(), profile = "canonical" } = {}) {
   projectRoot = resolve(projectRoot);
-  const pointer = json(join(projectRoot, POINTER_FILENAME));
+  const pointer = json(join(projectRoot, selectedProfile(profile).pointer));
+  check((pointer.profile ?? "canonical") === profile, "Release pointer profile mismatch.");
   check(pointer.schema === "line-contract-release-pointer/v1" && typeof pointer.artifactDir === "string" && !isAbsolute(pointer.artifactDir), "Invalid current-release pointer.");
   const artifactDir = resolve(projectRoot, pointer.artifactDir);
   check(contained(projectRoot, artifactDir) && physicalContained(projectRoot, artifactDir), "Current-release pointer escapes the project.");
@@ -149,29 +163,29 @@ async function compileProject({ projectRoot, source, artifactDir }) {
 }
 
 /** Never seals existing keys. The compiler callback is a test seam/trusted tool, not untrusted input. */
-export async function buildContractRelease({ projectRoot = process.cwd(), output, compile = compileProject, publishPointer = true } = {}) {
+export async function buildContractRelease({ projectRoot = process.cwd(), output, compile = compileProject, publishPointer = true, profile = "canonical" } = {}) {
   projectRoot = resolve(projectRoot);
-  const before = inputs(projectRoot);
+  const before = inputs(projectRoot, profile);
   const artifactDir = output ? resolve(projectRoot, output) : join(projectRoot, ".compact-keys", "releases", `${SUPPORTED_COMPACT.compiler}-${before.source.sha256.slice(0, 12)}-${randomUUID()}`);
   check(contained(projectRoot, artifactDir) && artifactDir !== projectRoot && physicalContained(projectRoot, artifactDir), "Release output must be a new directory inside the project.");
   check(!existsSync(artifactDir), "Release output already exists; refusing to seal old or stale artifacts.");
   mkdirSync(artifactDir, { recursive: true });
   await compile({ projectRoot, source: join(projectRoot, before.source.path), artifactDir });
-  check(isDeepStrictEqual(inputs(projectRoot), before), "Canonical source/configuration changed during key generation; release not published.");
-  const checked = validateContractArtifacts({ artifactDir, projectRoot, requireKeys: true, requireRelease: false });
+  check(isDeepStrictEqual(inputs(projectRoot, profile), before), "Canonical source/configuration changed during key generation; release not published.");
+  const checked = validateContractArtifacts({ artifactDir, projectRoot, requireKeys: true, requireRelease: false, profile });
   const release = {
-    schema: "line-contract-release/v1", createdAt: new Date().toISOString(),
+    schema: "line-contract-release/v1", profile, createdAt: new Date().toISOString(),
     generation: { kind: "fresh-full-compact-compile", zkirVersion: { major: 2, minor: 0 } },
     inputs: checked.inputs, files: checked.files,
   };
   writeFileSync(join(artifactDir, RELEASE_FILENAME), `${JSON.stringify(release, null, 2)}\n`, { flag: "wx" });
-  const verified = validateContractArtifacts({ artifactDir, projectRoot });
+  const verified = validateContractArtifacts({ artifactDir, projectRoot, profile });
   if (publishPointer) {
-    const pointerPath = join(projectRoot, POINTER_FILENAME);
+    const pointerPath = join(projectRoot, selectedProfile(profile).pointer);
     check(physicalContained(projectRoot, pointerPath), "Current-release pointer directory escapes the project.");
     mkdirSync(dirname(pointerPath), { recursive: true });
     const temporaryPath = `${pointerPath}.${randomUUID()}.tmp`;
-    writeFileSync(temporaryPath, `${JSON.stringify({ schema: "line-contract-release-pointer/v1", artifactDir: relative(projectRoot, artifactDir).split(sep).join("/"), releaseSha256: regularFile(join(artifactDir, RELEASE_FILENAME)).sha256 }, null, 2)}\n`, { flag: "wx" });
+    writeFileSync(temporaryPath, `${JSON.stringify({ schema: "line-contract-release-pointer/v1", profile, artifactDir: relative(projectRoot, artifactDir).split(sep).join("/"), releaseSha256: regularFile(join(artifactDir, RELEASE_FILENAME)).sha256 }, null, 2)}\n`, { flag: "wx" });
     renameSync(temporaryPath, pointerPath);
   }
   return verified;

@@ -115,20 +115,23 @@ export function PurchasePlayground() {
   useEffect(() => {
     if (!root.current || matchMedia("(prefers-reduced-motion: reduce)").matches)
       return;
-    const animation = animate(
-      root.current.querySelectorAll(
+    let animation: ReturnType<typeof animate> | undefined;
+    const frame = requestAnimationFrame(() => {
+      const targets = root.current?.querySelectorAll(
         ".playground-panel[data-state='active'] .demo-animate",
-      ),
-      {
+      );
+      if (!targets?.length) return;
+      animation = animate(targets, {
         opacity: [0, 1],
         y: [12, 0],
         duration: 600,
         delay: stagger(70),
         ease: "outCubic",
-      },
-    );
+      });
+    });
     return () => {
-      animation.revert();
+      cancelAnimationFrame(frame);
+      animation?.revert();
     };
   }, [role]);
   return (

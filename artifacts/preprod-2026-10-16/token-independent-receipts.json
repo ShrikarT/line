@@ -1,0 +1,200 @@
+{
+  "checkedAt": "2026-10-17T09:54:23.710Z",
+  "network": "preprod",
+  "contractAddress": "a159597495b52ea7a703a29562b17fcb042bf7eaa984ec1e05e7e8935208304b",
+  "sourceSha256": "c60602098003d0e1d489222266582a4a003f28ce6c7bcf762d7500c256a652d6",
+  "confirmedTransactions": 21,
+  "verifierKeysMatched": [
+    "acknowledgeRepayment",
+    "cancelOrExpireNote",
+    "disableMerchant",
+    "draw",
+    "fundReserve",
+    "openLine",
+    "postQuote",
+    "redeemDraw",
+    "registerMerchant",
+    "setStatus",
+    "withdrawFees",
+    "withdrawUnencumberedReserve"
+  ],
+  "fundedTestUnits": "200",
+  "paidTestUnits": "45",
+  "remainingContractTestUnits": "155",
+  "payouts": [
+    {
+      "id": "597fa77a-36b2-4962-ac26-8012a66bb46b-0-redeem",
+      "txHash": "b02e0c3777a67bd4c0a9cdbc7fe77097f1fa7bd26e32f4bbecc4c24484367da6",
+      "blockHeight": 3018769,
+      "recipient": "627fd5e8b794a9356ce95a5ce8042a64209f62d2e914a06027097e6cb595ba25",
+      "units": "25",
+      "tokenColor": "0d6953d8b70bb5b9980771ae8dfc489d8b2ca05d2fa10093f25d6053b8d664cd",
+      "contractBalanceAfter": "175"
+    },
+    {
+      "id": "597fa77a-36b2-4962-ac26-8012a66bb46b-1-redeem",
+      "txHash": "291762e37b41552b4ed05809b7cb5f9b3c838d5b1b8cf160ef03e9babaa50dba",
+      "blockHeight": 3018803,
+      "recipient": "c012167b24820bfdc17b4468b54ea4918ac5d2d5334c218c50e844c8386f0685",
+      "units": "20",
+      "tokenColor": "0d6953d8b70bb5b9980771ae8dfc489d8b2ca05d2fa10093f25d6053b8d664cd",
+      "contractBalanceAfter": "155"
+    }
+  ],
+  "receipts": [
+    {
+      "id": "deploy",
+      "name": "deploy",
+      "txHash": "cb8b73c64a9ade7adce2a650ebdb295b4d353a1deceb1a5fdd484b65f833f53c",
+      "blockHeight": 3006826,
+      "verified": true
+    },
+    {
+      "id": "key-disablemerchant",
+      "name": "disableMerchant",
+      "txHash": "cdb3c7cc0e77af6299dbd9bbb5f35c722427cdf84317c5b4b81a8d8e4aa0f946",
+      "blockHeight": 3006834,
+      "verified": true
+    },
+    {
+      "id": "key-fundreserve",
+      "name": "fundReserve",
+      "txHash": "cf049beeb84e4470df93b1e88b072c03ce25048eddef78de9dd219c98d471e58",
+      "blockHeight": 3006840,
+      "verified": true
+    },
+    {
+      "id": "key-withdrawunencumberedreserve",
+      "name": "withdrawUnencumberedReserve",
+      "txHash": "c74f72cf5daf0a3a661e13175bd121f097be83653be03c9995dc799634ad4543",
+      "blockHeight": 3006845,
+      "verified": true
+    },
+    {
+      "id": "key-withdrawfees",
+      "name": "withdrawFees",
+      "txHash": "2d90ca6e01cbe526c46004cc856a0b0e61930c3e10a14bfa3904f6b471c6832b",
+      "blockHeight": 3006850,
+      "verified": true
+    },
+    {
+      "id": "key-openline",
+      "name": "openLine",
+      "txHash": "769cdb102220e54771833e7c698449818526d82c0d78572499bd8d33c83cfdbb",
+      "blockHeight": 3006856,
+      "verified": true
+    },
+    {
+      "id": "key-postquote",
+      "name": "postQuote",
+      "txHash": "c7fbeb0d2adf98e432325345b30e317ebe54cb9ee3de963ba4ebe27f5b873365",
+      "blockHeight": 3006860,
+      "verified": true
+    },
+    {
+      "id": "key-draw",
+      "name": "draw",
+      "txHash": "810f0b4aef72644d330b56e0032a01c4becf90e74c90dfea84c0889849652333",
+      "blockHeight": 3006864,
+      "verified": true
+    },
+    {
+      "id": "key-redeemdraw",
+      "name": "redeemDraw",
+      "txHash": "f85e82a62dbb56367dbdc34cceec865a8f901190cac937eba9c4d67c9f1db1b0",
+      "blockHeight": 3006868,
+      "verified": true
+    },
+    {
+      "id": "key-cancelorexpirenote",
+      "name": "cancelOrExpireNote",
+      "txHash": "850296b4f313ea393895fe7b8fb00214f49f9f20626ac5b3d62678036043ef42",
+      "blockHeight": 3006872,
+      "verified": true
+    },
+    {
+      "id": "key-acknowledgerepayment",
+      "name": "acknowledgeRepayment",
+      "txHash": "d1e1b1eb238ff9c6f73e1fceca8aa6347d763b37b6d4005631c6d1ce20e37a75",
+      "blockHeight": 3006876,
+      "verified": true
+    },
+    {
+      "id": "key-setstatus",
+      "name": "setStatus",
+      "txHash": "dc72d25ff6175cf9d3cf0b17e5875f131572bc8ac30769ae406765a7a8a73614",
+      "blockHeight": 3006880,
+      "verified": true
+    },
+    {
+      "id": "setup-fund",
+      "name": "fundReserve",
+      "txHash": "634a128b6275c58c817b25e5be4d6cdeaee2ed710763984200f685b9089c765a",
+      "blockHeight": 3006890,
+      "verified": true
+    },
+    {
+      "id": "setup-merchant-b",
+      "name": "registerMerchant",
+      "txHash": "a72986b9dd68125bcb1ff95f2916aacc0ca8cf86b033ccf6bbcb5884b9bff848",
+      "blockHeight": 3018714,
+      "verified": true
+    },
+    {
+      "id": "setup-open",
+      "name": "openLine",
+      "txHash": "2a1e0cc1b1434fa12b67a59c02b345e99ad9776bc1195b5132ada2a7a76cd025",
+      "blockHeight": 3018725,
+      "verified": true
+    },
+    {
+      "id": "597fa77a-36b2-4962-ac26-8012a66bb46b-0-quote",
+      "name": "postQuote",
+      "txHash": "cfd3c8c2114e62ed6512f467c3186fe9f68e350dbb1179450d0ee111053adffe",
+      "blockHeight": 3018741,
+      "verified": true
+    },
+    {
+      "id": "597fa77a-36b2-4962-ac26-8012a66bb46b-0-draw",
+      "name": "draw",
+      "txHash": "f1d00ae4ed763b7dc496a46d5602252e1e4a35e92243f0f684bc0248b96ce65e",
+      "blockHeight": 3018757,
+      "verified": true
+    },
+    {
+      "id": "597fa77a-36b2-4962-ac26-8012a66bb46b-0-redeem",
+      "name": "redeemDraw",
+      "txHash": "b02e0c3777a67bd4c0a9cdbc7fe77097f1fa7bd26e32f4bbecc4c24484367da6",
+      "blockHeight": 3018769,
+      "verified": true
+    },
+    {
+      "id": "597fa77a-36b2-4962-ac26-8012a66bb46b-1-quote",
+      "name": "postQuote",
+      "txHash": "2d4993e1287d7a430ba2b2af2c83ed559755918c14e4e507cfdb778f0ed4b6b3",
+      "blockHeight": 3018779,
+      "verified": true
+    },
+    {
+      "id": "597fa77a-36b2-4962-ac26-8012a66bb46b-1-draw",
+      "name": "draw",
+      "txHash": "fb069e3509703a1738a2bf40d1fad4afeed66b2fe75e0587c5b75f6715086ce2",
+      "blockHeight": 3018792,
+      "verified": true
+    },
+    {
+      "id": "597fa77a-36b2-4962-ac26-8012a66bb46b-1-redeem",
+      "name": "redeemDraw",
+      "txHash": "291762e37b41552b4ed05809b7cb5f9b3c838d5b1b8cf160ef03e9babaa50dba",
+      "blockHeight": 3018803,
+      "verified": true
+    }
+  ],
+  "finalizedHead": {
+    "hash": "50e3968c818e519e58be38974036765c786a9bed6d66ba9f3d399a999939eb71",
+    "height": 3018835
+  },
+  "tokenPayoutEstablished": true,
+  "cashRepaymentVerified": false,
+  "trust": "Configured TLS indexer and RPC; finalized block, raw transaction, registered recipient and asset-balance checks. Not a light-client proof."
+}
