@@ -1,6 +1,14 @@
 # Engineering status and acceptance evidence
 
-## Organization-owned user product: 18 October 2026
+## Organization recovery follow-up: 18 October 2026
+
+The current increment adds authenticated encrypted backup import into a fresh wallet-scoped workspace, chain checks of private books and note/refund openings, expired request cancellation and re-quoting, and bounded wallet identity/approval, submission and finality waits. Signed uncertainty retains the exact original transaction. Both browser and native supplier paths use asynchronous SDK submission with application-owned finality; a late SDK watcher cannot promote private books after the application timed out. Cancellation or a new quote is blocked while a charged claim is unresolved.
+
+Review found and fixed two defects: wallet identity reads could keep the account lock indefinitely, and an older backup could omit a prior-generation compensation salt even though the current line commitment still matched. The generated Compact regression now verifies that unchanged-current-book case and rejects missing/wrong refund openings. The full core run discovers 595 tests: 594 pass, no failures or cancellations, one intentional skip. All 32 focused organization checks and seven organization browser cases pass. Production build/typecheck, both Compact regenerations with zero drift, organization release validation and credential scans pass (85 production modules). The actual SDK rejection path has visible error feedback at desktop and phone widths. [Current recovery evidence scope](../artifacts/organization-product/recovery-verification.json).
+
+**Still unconfirmed:** the new user facility's funded Preprod lifecycle and actual two-supplier payouts. Full-history privacy remains open. The owner authorized public hosting after verification, and reports facility creation failing without an error; the actual failing network stage is not yet reproduced. Explicit deployment stages and focused error feedback are added for the next attempt. No old operator or minted-test-token receipt is counted as new-user acceptance. [Complete remaining-work ledger](REMAINING_WORK_2026-10-18.md).
+
+## Prior organization-product checkpoint: 18 October 2026
 
 The owner selected organization-funded agent spending. The primary `/app`, `/organization`, `/agents` and `/suppliers` routes now use wallet-scoped encrypted accounts and a separate asset-backed twelve-circuit organization profile; they do not adopt the historical operator books. Actual Lace connection and vault opening are owner-confirmed. SDK deployment preparation reaches wallet approval and a rejecting connector leaves no confirmed facility. The browser verifier-fetch receiver bug, cross-tab order/note reuse, account-switch clearing and private-book publication before durable commit are fixed.
 

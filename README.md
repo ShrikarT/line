@@ -9,7 +9,7 @@ Each organization funds and controls its own agents' spending. Open `/app` in th
 - Organization source: `contracts/organization/line.compact`; managed bindings: `contracts/managed/organization/`.
 - `npm run organization:compile`, `npm run organization:release`, `npm run organization:validate`, `npm run test:organization`.
 
-Actual Lace connection and vault opening are owner-confirmed. A new organization facility's funded end-to-end lifecycle still needs its own finalized receipts; historical operator receipts do not certify it. The first-party merchant backend/proof server must be running and configured. Public hosting is deferred. Encrypted backup restore and full-history privacy remain open.
+Actual Lace connection and vault opening are owner-confirmed. A new organization facility's funded end-to-end lifecycle still needs its own finalized receipts; historical operator receipts do not certify it. The first-party merchant backend/proof server must be running and configured. Authenticated encrypted backup restore and expired-request recovery are implemented. Public hosting is authorized after verification; the user reports facility creation failing without a visible error, so funded acceptance and full-history privacy remain open. See the [remaining-work ledger](docs/REMAINING_WORK_2026-10-18.md).
 
 ## Historical protocol and external-credit research
 

@@ -1,0 +1,62 @@
+{
+  "schema": "line-organization-recovery-verification/v1",
+  "date": "2026-10-18",
+  "baselineCommit": "90592a4",
+  "profile": "organization",
+  "sourceFingerprint": "057aa57267c0b8afd537cfb8950946db99bda45954a259c521877bdbb23e5157",
+  "core": {
+    "discovered": 595,
+    "passed": 594,
+    "failed": 0,
+    "cancelled": 0,
+    "skipped": 1,
+    "log": "recovery-core-tests.log"
+  },
+  "organizationFocused": {
+    "passed": 32,
+    "failed": 0,
+    "log": "recovery-focused-tests.log"
+  },
+  "organizationBrowser": {
+    "passed": 7,
+    "failed": 0,
+    "log": "final-recovery-browser.log",
+    "connector": "metadata and deliberately rejecting test connector; no approved signatures or submissions"
+  },
+  "productionBuild": "passed",
+  "typecheck": "passed",
+  "canonicalManagedDrift": 0,
+  "organizationManagedDrift": 0,
+  "organizationReleaseValidation": "passed",
+  "fixtureKeyScan": {
+    "passed": true,
+    "productionModules": 85
+  },
+  "bannedCredentialScan": "passed",
+  "review": {
+    "spec": "two findings fixed and targeted re-review passed",
+    "standards": "bounded wallet reads fixed; engineering status updated",
+    "fixes": [
+      "stale prior-generation refund recovery material rejected",
+      "connector identity reads bounded without late continuation"
+    ]
+  },
+  "liveAcceptance": {
+    "ownerConfirmed": [
+      "Lace connection",
+      "organization vault unlock"
+    ],
+    "ownerReportedFailure": "facility creation fails without a visible error; exact cause not yet reproduced",
+    "newFundedOrganizationLifecycleConfirmed": false,
+    "newOrganizationPayoutsConfirmed": false,
+    "publicHostingDeployed": false,
+    "publicationAuthorizedAfterVerification": true,
+    "fullHistoryPrivacyEstablished": false
+  },
+  "limitations": [
+    "A rejecting connector test is not a funded Preprod transaction.",
+    "Current transparent amounts and reserve deltas do not meet full-history privacy.",
+    "The broader historical browser suite was not rerun in this increment.",
+    "Incomplete supplemental security investigation remains documented in the audit."
+  ]
+}

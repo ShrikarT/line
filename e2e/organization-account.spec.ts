@@ -87,14 +87,16 @@ test("two real account namespaces isolate encrypted identities and recover only 
   await page.screenshot({ path: "artifacts/organization-product/merchant-account-mobile.png", fullPage: true });
 });
 
-test("real facility preparation reaches wallet approval and a rejection creates no confirmed facility", async ({ page }) => {
+for (const width of [1440, 390]) test(`real facility preparation reaches wallet approval and a rejection creates no confirmed facility at ${width}px`, async ({ page }) => {
   test.setTimeout(180_000);
+  await page.setViewportSize({ width, height: 900 });
   await wallets(page); await page.goto("/app");
   await connect(page, "a"); await unlock(page);
   await page.getByLabel("Organization / agent name", { exact: true }).fill("Approval rejection control");
   await expect(page.getByLabel("Initial merchant profile", { exact: false })).not.toHaveValue("", { timeout: 30_000 });
   await page.getByRole("button", { name: "Create facility", exact: true }).click();
   await expect(page.getByRole("alert")).toContainText("No payment is authorized", { timeout: 150_000 });
+  await expect(page.getByRole("alert")).toBeInViewport();
   expect(await page.evaluate(() => (window as unknown as { organizationSignatures: number }).organizationSignatures)).toBe(1);
   await expect(page.getByRole("button", { name: "Create facility", exact: true })).toBeEnabled();
   await expect(page.getByText("Facility address", { exact: true })).toHaveCount(0);
@@ -128,4 +130,62 @@ test("an aborted organization receipt commit retains the exact pending candidate
     return { rejected, memoryUnchanged: account.snapshot().issuerSecret === before.issuerSecret, diskUnchanged: disk.snapshot.issuerSecret === before.issuerSecret, retainedCandidate: disk.pending.after.issuerSecret === candidate.issuerSecret, memoryTx: account.pending()?.txId, diskTx: disk.pending.txId, signatures: (window as unknown as { organizationSignatures: number }).organizationSignatures };
   });
   expect(result).toEqual({ rejected: true, memoryUnchanged: true, diskUnchanged: true, retainedCandidate: true, memoryTx: "cd".repeat(32), diskTx: "cd".repeat(32), signatures: 0 });
+});
+
+test("the downloaded encrypted backup restores the same organization in a fresh browser with a new vault password", async ({ page, browser }) => {
+  test.setTimeout(120_000);
+  await wallets(page); await page.goto("/app"); await connect(page, "a"); await unlock(page);
+  const originalProfile = await profile(page);
+  const downloadEvent = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Encrypted backup", exact: true }).click();
+  const stream = await (await downloadEvent).createReadStream(), chunks: Buffer[] = [];
+  if (!stream) throw new Error("The real encrypted download is missing.");
+  for await (const chunk of stream) chunks.push(Buffer.from(chunk));
+  const backup = Buffer.concat(chunks);
+  expect(JSON.parse(backup.toString()).version).toBe(2);
+  expect(backup.toString()).not.toContain("issuerSecret");
+  const recoveryContext = await browser.newContext();
+  try {
+    const recovered = await recoveryContext.newPage(); await wallets(recovered);
+    await recovered.goto(new URL("/app", page.url()).href); await connect(recovered, "a");
+    await unlock(recovered, "FreshBrowserVault123!");
+    await recovered.getByText("Restore an encrypted organization backup", { exact: true }).click();
+    await recovered.getByLabel("Encrypted backup file", { exact: true }).setInputFiles({ name: "organization.json", mimeType: "application/json", buffer: backup });
+    await recovered.getByLabel("Backup vault password", { exact: true }).fill("WrongBackupPassword123!");
+    await recovered.getByRole("button", { name: "Restore organization", exact: true }).click();
+    await expect(recovered.getByRole("alert")).toBeVisible();
+    await recovered.getByLabel("Backup vault password", { exact: true }).fill("Organization123!");
+    await recovered.getByRole("button", { name: "Restore organization", exact: true }).click();
+    await expect(recovered.getByRole("status")).toContainText("Organization restored", { timeout: 30_000 });
+    expect((await profile(recovered)).publicKey).toBe(originalProfile.publicKey);
+    await recovered.getByRole("button", { name: "Lock organization", exact: true }).click();
+    await unlock(recovered, "FreshBrowserVault123!");
+    expect((await profile(recovered)).publicKey).toBe(originalProfile.publicKey);
+    expect(await recovered.evaluate(() => (window as unknown as { organizationSignatures: number }).organizationSignatures)).toBe(0);
+  } finally { await recoveryContext.close(); }
+});
+
+test("organization restore refuses active-record overwrite before a network check and aborts failed persistence", async ({ page }) => {
+  await wallets(page); await page.goto("/app"); await connect(page, "a"); await unlock(page);
+  const result = await page.evaluate(async () => {
+    const { browserModuleUrl } = await import("/e2e/browser-module.ts" as any);
+    const { OrganizationAccount } = await import(browserModuleUrl("/src/lib/organization/account.ts"));
+    const { getConnectedWallet } = await import(browserModuleUrl("/src/lib/runtime/wallet.ts"));
+    const { encryptSecret, encodeVaultJson } = await import(browserModuleUrl("/src/lib/security/vault.ts"));
+    const account = await OrganizationAccount.unlock(getConnectedWallet()!, "Organization123!");
+    const originalSecret = account.snapshot().issuerSecret, replacement = account.snapshot(); replacement.issuerSecret = "22".repeat(32);
+    const envelope = await encryptSecret(`line:organization:preprod:${account.accountId}`, encodeVaultJson({ snapshot: replacement, pending: null }), "BackupControl123!");
+    const file = JSON.stringify(envelope), put = IDBObjectStore.prototype.put;
+    IDBObjectStore.prototype.put = function (...args: Parameters<typeof put>) { const request = put.apply(this, args); request.addEventListener("success", () => this.transaction.abort(), { once: true }); return request; };
+    let aborted = false;
+    try { await account.restoreBackup(file, "BackupControl123!", async () => {}); } catch { aborted = true; }
+    finally { IDBObjectStore.prototype.put = put; }
+    const unchanged = account.snapshot().issuerSecret === originalSecret;
+    // Synthetic history protects an already-used account. No chain receipt is claimed.
+    await account.edit(snapshot => snapshot.receipts.push({ kind: "call", circuit: "fundReserve", contractAddress: "ab".repeat(32), txId: "cd".repeat(32), txHash: "ef".repeat(32), blockHeight: 1, recordedAt: new Date().toISOString() }));
+    let rejected = false, networkChecks = 0;
+    try { await account.restoreBackup(file, "BackupControl123!", async () => { networkChecks++; }); } catch { rejected = true; }
+    return { aborted, unchanged, rejected, networkChecks, retainedReceipts: account.snapshot().receipts.length };
+  });
+  expect(result).toEqual({ aborted: true, unchanged: true, rejected: true, networkChecks: 0, retainedReceipts: 1 });
 });

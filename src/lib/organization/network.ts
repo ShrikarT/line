@@ -1,9 +1,8 @@
-import type { ConnectedAPI } from "@midnight-ntwrk/dapp-connector-api";
 import { CompiledContract } from "@midnight-ntwrk/midnight-js-protocol/compact-js";
 import { ContractCall, ContractDeploy, MaintenanceUpdate } from "@midnight-ntwrk/midnight-js-protocol/ledger";
 import { sampleSigningKey, ContractState } from "@midnight-ntwrk/compact-runtime";
-import { deployContract, findDeployedContract, submitInsertVerifierKeyTx, type ContractProviders } from "@midnight-ntwrk/midnight-js-contracts";
-import { createVerifierKey, FailEntirely, SucceedEntirely, type FinalizedTxData } from "@midnight-ntwrk/midnight-js-types";
+import type { ContractProviders } from "@midnight-ntwrk/midnight-js-contracts";
+import { FailEntirely, SucceedEntirely, type FinalizedTxData } from "@midnight-ntwrk/midnight-js-types";
 import { setNetworkId } from "@midnight-ntwrk/midnight-js-network-id";
 import { indexerPublicDataProvider } from "@midnight-ntwrk/midnight-js-indexer-public-data-provider";
 import { FetchZkConfigProvider } from "@midnight-ntwrk/midnight-js-fetch-zk-config-provider";
@@ -14,10 +13,13 @@ import { createWalletProviders, getWalletConfiguration } from "../runtime/wallet
 import { assertEndpointCredentials, resolveMidnightEndpoints } from "../runtime/endpoints";
 import { VaultPrivateStateProvider } from "../runtime/vault-provider";
 import type { LinePrivateWitnessContext } from "../runtime/network";
-import { getVaultSessionPassphrase } from "../security/vault";
 import { agentId, canonicalInvoiceIdBytes, drawNoteCommit, issuerPublicKey, merchantPublicKey, quoteCommit, randomBytes32, toHex } from "../line/encoding";
 import { decodeMerchant, decodeQuote, encodeNote } from "./transfers";
 import { OrganizationAccount, bytes32, copyAccount, receivingAddressBytes, type MerchantBinding, type OrganizationFacility, type OrganizationNote, type OrganizationQuote, type OrganizationReceipt, type OrganizationSnapshot } from "./account";
+import { OrganizationTransactions } from "./transactions";
+import { withinDeadline } from "./finality";
+import { activeServiceOrder, requireReplaceableOrder, retireServiceAttempt, serviceOrderNote, supplierRequestId } from "./orders";
+import { matchesRestoredFacility, matchesRestoredNotes } from "./recovery";
 
 type Circuit = keyof Contract<LinePrivateWitnessContext>["provableCircuits"];
 type Providers = ContractProviders<Contract<LinePrivateWitnessContext>>;
@@ -33,7 +35,8 @@ export class OrganizationNetwork {
   private constructor(readonly account: OrganizationAccount, private providers: Providers, private release: { sourceFingerprint: string; files: Record<string, { sha256: string }> }, private report: (message: string) => void) {}
   private input: LinePrivateWitnessContext | null = null;
   private verifierKeys = new Map<Circuit, Uint8Array>();
-  private observedTransactions = new Map<string, Promise<FinalizedTxData>>();
+  private transactions: OrganizationTransactions | null = null;
+  private tx() { if (!this.transactions) throw new Error("Organization network is not initialized."); return this.transactions; }
   private byteWitness(name: keyof LinePrivateWitnessContext): Witnesses<LinePrivateWitnessContext>["callerSecret"] {
     return context => { const value = this.input?.[name]; if (!(value instanceof Uint8Array) || value.length !== 32) throw new Error(`Missing private byte witness: ${name}.`); return [context.privateState, value]; };
   }
@@ -48,7 +51,7 @@ export class OrganizationNetwork {
 
   static async connect(account: OrganizationAccount, report: (message: string) => void = () => {}): Promise<OrganizationNetwork> {
     await account.assertWallet();
-    const configuration = await getWalletConfiguration(account.wallet, "preprod");
+    const configuration = await withinDeadline(getWalletConfiguration(account.wallet, "preprod"), 25_000, "The wallet configuration is unavailable. Reopen Lace and try again.");
     let token: string | undefined;
     const session = await fetch("/api/line/network-session", { method: "POST", headers: { "X-Line-Session": "network-setup" }, signal: AbortSignal.timeout(10_000) }).catch(() => null);
     if (session?.ok) { const config = await session.json(); if (config.networkId === "preprod" && typeof config.blockfrostProjectId === "string") token = config.blockfrostProjectId; }
@@ -58,17 +61,23 @@ export class OrganizationNetwork {
     if (!response.ok) throw new Error("The verified organization contract release is unavailable. Do not deposit into another contract version.");
     const release = await response.json();
     if (release.profile !== "organization" || !/^[0-9a-f]{64}$/.test(release.inputs?.source?.sha256 ?? "") || release.files?.["contract/index.js"]?.sha256 !== await fingerprint(new TextEncoder().encode(generatedJavascript))) throw new Error("Organization contract bindings do not match the published proving release.");
-    const zkConfigProvider = new FetchZkConfigProvider<Circuit>(new URL("/organization-zk", location.origin).href, globalThis.fetch.bind(globalThis));
+    const zkConfigProvider = new FetchZkConfigProvider<Circuit>(new URL("/organization-zk", location.origin).href, (url, init) => globalThis.fetch(url, { ...init, signal: init?.signal ? AbortSignal.any([init.signal, AbortSignal.timeout(60_000)]) : AbortSignal.timeout(60_000) }));
     const privateStateProvider = new VaultPrivateStateProvider<LinePrivateWitnessContext>({ networkId: "preprod", accountId: account.accountId });
-    const wallet = await createWalletProviders(account.wallet, "preprod");
+    const wallet = await withinDeadline(createWalletProviders(account.wallet, "preprod"), 25_000, "The wallet is not responding. Reopen Lace and try again.");
+    await account.assertWallet();
+    const publicData = indexerPublicDataProvider(endpoints.indexerUri, endpoints.indexerWsUri, globalThis.WebSocket);
     const client = new OrganizationNetwork(account, {
       ...wallet, zkConfigProvider, privateStateProvider,
-      publicDataProvider: indexerPublicDataProvider(endpoints.indexerUri, endpoints.indexerWsUri, globalThis.WebSocket),
+      publicDataProvider: { ...publicData,
+        queryContractState: (...args) => withinDeadline(publicData.queryContractState(...args), 25_000, "The contract state service is unavailable. No replacement payment was submitted."),
+        queryZSwapAndContractState: (...args) => withinDeadline(publicData.queryZSwapAndContractState(...args), 25_000, "The contract state service is unavailable. Try again after it recovers."),
+        queryUnshieldedBalances: (...args) => withinDeadline(publicData.queryUnshieldedBalances(...args), 25_000, "The asset balance service is unavailable."),
+      },
       proofProvider: httpClientProofProvider(endpoints.proofServerUri, zkConfigProvider),
     }, { sourceFingerprint: release.inputs.source.sha256, files: release.files }, report);
     const baseWallet = client.providers.walletProvider;
     client.providers = { ...client.providers,
-      walletProvider: { ...baseWallet, balanceTx: async (tx, ttl) => { await account.assertWallet(); report("Approve the transaction in your wallet"); const balanced = await baseWallet.balanceTx(tx, ttl); await account.assertWallet(); return balanced; } },
+      walletProvider: { ...baseWallet, balanceTx: async (tx, ttl) => { await account.assertWallet(); report("Approve the transaction in your wallet"); const balanced = await withinDeadline(baseWallet.balanceTx(tx, ttl), 180_000, "Wallet approval timed out. No transaction was submitted by Line. Close the old wallet prompt before trying again."); await account.assertWallet(); return balanced; } },
       midnightProvider: { submitTx: async tx => {
         await account.assertWallet();
         const pending = account.pending();
@@ -83,9 +92,10 @@ export class OrganizationNetwork {
         if (!id) throw new Error("Transaction has no identifier.");
         await account.submitted(id, toHex(tx.serialize()), action.address);
         report("Submitted to Midnight. Waiting for the finalized receipt");
-        return wallet.midnightProvider.submitTx(tx);
+        return withinDeadline(wallet.midnightProvider.submitTx(tx), 30_000, "The submission acknowledgement timed out. The original signed transaction is saved; check its status before doing anything else.");
       } },
     };
+    client.transactions = new OrganizationTransactions(client.providers, () => client.compiled());
     return client;
   }
   private facility(id: string): OrganizationFacility {
@@ -97,6 +107,7 @@ export class OrganizationNetwork {
     bytes32(address); await this.account.assertWallet();
     const state = await this.providers.publicDataProvider.queryContractState(address);
     if (!state) throw new Error("Organization facility was not found on Midnight Preprod.");
+    if (state.operations().some(name => !CIRCUITS.includes(name as Circuit))) throw new Error("Facility has operations outside the organization contract release.");
     for (const name of CIRCUITS) {
       const operation = state.operation(name);
       if (!operation) { if (requireAllKeys) throw new Error("Facility setup is incomplete. Resume registering its verifier keys."); else continue; }
@@ -107,6 +118,29 @@ export class OrganizationNetwork {
     const book = ledger(state.data);
     if (!same(book.issuer, issuerPublicKey(bytes32(this.account.snapshot().issuerSecret))) && this.account.snapshot().facilities.some(f => f.address === address)) throw new Error("This wallet does not own the selected organization facility.");
     return { state, book };
+  }
+  async restoreBackup(file: string, password: string) {
+    this.report("Authenticating the backup and checking its facilities on Midnight");
+    await this.account.restoreBackup(file, password, async record => {
+      if (record.pending && record.pending.sourceFingerprint !== this.release.sourceFingerprint) throw new Error("Restore the pending operation with its original contract release.");
+      const snapshots = [record.snapshot, ...(record.pending ? [record.pending.after] : [])];
+      const facilities = snapshots.flatMap(snapshot => snapshot.facilities);
+      const addresses = [...new Set([...facilities.flatMap(f => f.address ? [f.address] : []), ...snapshots.flatMap(snapshot => snapshot.notes.map(note => note.contractAddress))])];
+      for (const address of addresses) {
+        const state = await this.providers.publicDataProvider.queryContractState(address);
+        if (!state && record.pending?.kind === "deploy" && record.pending.contractAddress === address) continue;
+        const { book } = await this.inspect(address, false);
+        const expectedIssuer = issuerPublicKey(bytes32(record.snapshot.issuerSecret));
+        const owned = facilities.some(f => f.address === address);
+        if (owned && !same(book.issuer, expectedIssuer)) throw new Error("A restored facility has another issuer key.");
+        const matches = snapshots.some(snapshot => {
+          const facility = snapshot.facilities.find(f => f.address === address);
+          return (!owned || !!facility && matchesRestoredFacility(book, facility, snapshot.issuerSecret)) && matchesRestoredNotes(book, snapshot.notes.filter(note => note.contractAddress === address));
+        });
+        if (!matches) throw new Error("This backup's private book or refund openings are stale or belong to another facility. Recover a newer backup; no records were replaced.");
+      }
+    });
+    this.report("Organization restored. Any saved transaction must be reconciled before spending");
   }
   async facilitySummary(id: string) {
     const facility = this.facility(id), { state, book } = await this.inspect(facility.address!, false);
@@ -123,6 +157,7 @@ export class OrganizationNetwork {
     }
     if (receipt.status !== SucceedEntirely) throw new Error("The original transaction has a partial failure. Its saved operation is retained for investigation; no replacement payment will be made.");
     await this.account.complete(saved);
+    this.tx().finality.forget(pending.txId);
     this.report("Confirmed on Midnight Preprod");
   }
   private async operation(kind: OrganizationReceipt["kind"], circuit: string, facilityId: string | null, address: string | null, after: OrganizationSnapshot, action: () => Promise<FinalizedTxData>) {
@@ -130,13 +165,8 @@ export class OrganizationNetwork {
     try { await this.finish(await action()); }
     catch (failure) { if (!this.account.pending()?.txId) await this.account.discardUnsubmitted(); throw failure; }
   }
-  private async bound(address: string) {
-    this.providers.privateStateProvider.setContractAddress(address);
-    const id = `organization-state:${address}`;
-    if (await this.providers.privateStateProvider.get(id) == null) await this.providers.privateStateProvider.set(id, {});
-    return findDeployedContract(this.providers, { compiledContract: this.compiled(), contractAddress: address, privateStateId: id });
-  }
   async createFacility(name: string, assetColor: string, initialMerchant: MerchantBinding) {
+    this.report("Checking your connected wallet before facility deployment");
     return this.account.exclusive(async () => {
       if (!name.trim() || name.length > 80) throw new Error("Enter an organization or agent name of up to 80 characters.");
       bytes32(assetColor); bytes32(initialMerchant.publicKey); receivingAddressBytes(initialMerchant.address);
@@ -151,10 +181,8 @@ export class OrganizationNetwork {
       }
       const compiled = CompiledContract.make("line-organization", InitialContract).pipe(CompiledContract.withWitnesses(this.witnesses), CompiledContract.withCompiledFileAssets("/organization-zk"));
       this.providers.privateStateProvider.setContractAddress(`creating:${facility.id}`);
-      await this.operation("deploy", "deploy", facility.id, null, after, async () => {
-        const deployed = await deployContract(this.providers, { compiledContract: compiled, privateStateId: `organization-creation:${facility.id}`, initialPrivateState: {}, signingKey: facility.maintenanceKey, args: [issuerPublicKey(bytes32(after.issuerSecret)), bytes32(initialMerchant.publicKey), bytes32(facility.instanceNonce), asAddress(facility.issuerRecipient), asAddress(initialMerchant.address), bytes32(assetColor)] });
-        return deployed.deployTxData.public;
-      });
+      this.report("Preparing your facility deployment transaction");
+      await this.operation("deploy", "deploy", facility.id, null, after, () => this.tx().deploy(compiled, facility.maintenanceKey, [issuerPublicKey(bytes32(after.issuerSecret)), bytes32(initialMerchant.publicKey), bytes32(facility.instanceNonce), asAddress(facility.issuerRecipient), asAddress(initialMerchant.address), bytes32(assetColor)]));
     });
   }
   async registerVerifierKeys(id: string) {
@@ -167,7 +195,7 @@ export class OrganizationNetwork {
         const state = await this.providers.publicDataProvider.queryContractState(address);
         if (state?.operation(name)) continue;
         this.report(`Registering ${name}. Approve its network transaction`);
-        await this.operation("key", name, id, address, this.account.snapshot(), () => this.providers.zkConfigProvider.getVerifierKey(name).then(key => submitInsertVerifierKeyTx(this.providers, this.compiled(), address, name, createVerifierKey(key))));
+        await this.operation("key", name, id, address, this.account.snapshot(), () => this.tx().insert(address, name, facility.maintenanceKey));
       }
       await this.inspect(address);
     });
@@ -177,7 +205,7 @@ export class OrganizationNetwork {
       const facility = this.facility(id); await this.inspect(facility.address!);
       const snapshot = this.account.snapshot();
       this.input = { callerSecret: bytes32(snapshot.issuerSecret) };
-      try { await this.operation("call", action, id, facility.address, snapshot, async () => { const contract = await this.bound(facility.address!); const result = action === "withdrawFees" ? await contract.callTx.withdrawFees() : await contract.callTx[action](amount); return result.public; }); }
+      try { await this.operation("call", action, id, facility.address, snapshot, () => this.tx().call(facility.address!, action, action === "withdrawFees" ? [] : [amount])); }
       finally { this.input = null; }
     });
   }
@@ -188,7 +216,7 @@ export class OrganizationNetwork {
       const after = this.account.snapshot(), next = after.facilities.find(f => f.id === id)!;
       next.limit = limit; next.outstanding = 0n; next.epoch = 0n; next.generation = book.lineGeneration + 1n; next.salt = toHex(randomBytes32());
       this.input = { callerSecret: bytes32(after.issuerSecret), agentSecret: bytes32(next.agentSecret), salt: bytes32(next.salt), lineLimit: limit };
-      try { await this.operation("call", "openLine", id, facility.address, after, async () => (await (await this.bound(facility.address!)).callTx.openLine(expiry, 0n, 0n)).public); }
+      try { await this.operation("call", "openLine", id, facility.address, after, () => this.tx().call(facility.address!, "openLine", [expiry, 0n, 0n])); }
       finally { this.input = null; }
     });
   }
@@ -199,7 +227,7 @@ export class OrganizationNetwork {
       const after = this.account.snapshot(), next = after.facilities.find(f => f.id === id)!;
       next.outstanding -= amount; next.epoch++; next.salt = toHex(randomBytes32());
       this.input = { callerSecret: bytes32(after.issuerSecret), salt: bytes32(facility.salt), newSalt: bytes32(next.salt), lineLimit: facility.limit, lineOutstanding: facility.outstanding, lineEpoch: facility.epoch, repayAmount: amount, paymentRef: randomBytes32(), receiptNonce: randomBytes32() };
-      try { await this.operation("call", "acknowledgeRepayment", id, facility.address, after, async () => (await (await this.bound(facility.address!)).callTx.acknowledgeRepayment(BigInt(Math.floor(Date.now() / 1000) + 3600))).public); }
+      try { await this.operation("call", "acknowledgeRepayment", id, facility.address, after, () => this.tx().call(facility.address!, "acknowledgeRepayment", [BigInt(Math.floor(Date.now() / 1000) + 3600)])); }
       finally { this.input = null; }
     });
   }
@@ -212,7 +240,7 @@ export class OrganizationNetwork {
       bytes32(merchant.publicKey); receivingAddressBytes(merchant.address);
       const after = this.account.snapshot(); after.facilities.find(f => f.id === id)!.merchants.push(copyAccount(merchant));
       this.input = { callerSecret: bytes32(after.issuerSecret) };
-      try { await this.operation("call", "registerMerchant", id, facility.address, after, async () => (await (await this.bound(facility.address!)).callTx.registerMerchant(bytes32(merchant.publicKey), asAddress(merchant.address))).public); }
+      try { await this.operation("call", "registerMerchant", id, facility.address, after, () => this.tx().call(facility.address!, "registerMerchant", [bytes32(merchant.publicKey), asAddress(merchant.address)])); }
       finally { this.input = null; }
     });
   }
@@ -224,7 +252,7 @@ export class OrganizationNetwork {
       if (!merchant || merchant.disabled) throw new Error("Choose an active registered merchant.");
       merchant.disabled = true;
       this.input = { callerSecret: bytes32(after.issuerSecret) };
-      try { await this.operation("call", "disableMerchant", id, facility.address, after, async () => (await (await this.bound(facility.address!)).callTx.disableMerchant(bytes32(publicKey))).public); }
+      try { await this.operation("call", "disableMerchant", id, facility.address, after, () => this.tx().call(facility.address!, "disableMerchant", [bytes32(publicKey)])); }
       finally { this.input = null; }
     });
   }
@@ -238,11 +266,11 @@ export class OrganizationNetwork {
       const quote: OrganizationQuote = { contractAddress: address, domain: toHex(book.contractDomain), merchantPk: toHex(merchantPk), invoiceId: toHex(invoiceId), quoteNonce: toHex(nonce), amount, expiry, generation: book.lineGeneration, feeFlat: book.feeFlat, feeBps: book.feeBps, quoteCommitment: toHex(Q) };
       after.quotes.push(quote);
       this.input = { callerSecret: bytes32(after.merchantSecret), invoiceId, quoteNonce: nonce, quoteAmount: amount };
-      try { await this.operation("call", "postQuote", null, address, after, async () => (await (await this.bound(address)).callTx.postQuote(expiry)).public); return quote; }
+      try { await this.operation("call", "postQuote", null, address, after, () => this.tx().call(address, "postQuote", [expiry])); return quote; }
       finally { this.input = null; }
     });
   }
-  async purchase(id: string, quote: OrganizationQuote): Promise<OrganizationNote> {
+  async purchase(id: string, quote: OrganizationQuote, binding?: { orderId: string; requestId: string }): Promise<OrganizationNote> {
     return this.account.exclusive(async () => {
       try {
         const facility = this.facility(id), { book } = await this.inspect(facility.address!);
@@ -251,6 +279,8 @@ export class OrganizationNetwork {
         if (toHex(quoteBytes) !== quote.quoteCommitment) throw new Error("Quote opening differs.");
         const fee = quote.feeFlat + (quote.amount * quote.feeBps + 9999n) / 10000n;
         const after = this.account.snapshot(), next = after.facilities.find(f => f.id === id)!;
+        const service = binding ? activeServiceOrder(after, binding.orderId, binding.requestId) : null;
+        if (service && (service.facilityId !== id || service.quoteCommitment !== quote.quoteCommitment)) throw new Error("The saved API purchase changed.");
         const retained = after.notes.find(note => note.contractAddress === facility.address && note.quoteCommitment === quote.quoteCommitment);
         if (retained) return retained;
         next.outstanding += quote.amount + fee; next.epoch++; next.salt = toHex(randomBytes32());
@@ -258,8 +288,9 @@ export class OrganizationNetwork {
         const note: OrganizationNote = { contractAddress: facility.address!, domain: quote.domain, identity: toHex(agentId(bytes32(facility.agentSecret))), merchantPk: quote.merchantPk, quoteCommitment: quote.quoteCommitment, amount: quote.amount, fee, expiry: quote.expiry, generation: quote.generation, noteNonce: toHex(randomBytes32()), noteSalt: toHex(randomBytes32()), noteCommitment: "", redeemed: false };
         note.noteCommitment = toHex(drawNoteCommit({ domain: bytes32(note.domain), lineGeneration: note.generation, identity: bytes32(note.identity), quoteCommit: quoteBytes, merchantPk: bytes32(note.merchantPk), amount: note.amount, fee, noteNonce: bytes32(note.noteNonce), expiry: note.expiry }, bytes32(note.noteSalt)));
         after.notes.push(note);
+        if (service) service.noteCommitment = note.noteCommitment;
         this.input = { callerSecret: bytes32(facility.agentSecret), agentSecret: bytes32(facility.agentSecret), salt: bytes32(facility.salt), newSalt: bytes32(next.salt), lineLimit: facility.limit, lineOutstanding: facility.outstanding, lineEpoch: facility.epoch, quoteMerchantPk: bytes32(quote.merchantPk), invoiceId: bytes32(quote.invoiceId), quoteNonce: bytes32(quote.quoteNonce), quoteAmount: quote.amount, drawAmount: quote.amount, noteNonce: bytes32(note.noteNonce), noteSalt: bytes32(note.noteSalt) };
-        await this.operation("call", "draw", id, facility.address, after, async () => (await (await this.bound(facility.address!)).callTx.draw(quoteBytes, quote.expiry, fee)).public);
+        await this.operation("call", "draw", id, facility.address, after, () => this.tx().call(facility.address!, "draw", [quoteBytes, quote.expiry, fee]));
         return note;
       } catch { throw new Error("Clearance could not be proven."); }
       finally { this.input = null; }
@@ -275,7 +306,7 @@ export class OrganizationNetwork {
       const existing = after.notes.find(n => n.noteCommitment === note.noteCommitment);
       if (existing) existing.redeemed = true; else after.notes.push({ ...copyAccount(note), redeemed: true });
       this.input = { callerSecret: bytes32(after.merchantSecret), noteIdentity: bytes32(note.identity), noteQuoteCommit: bytes32(note.quoteCommitment), noteNonce: bytes32(note.noteNonce), noteSalt: bytes32(note.noteSalt), redeemAmount: note.amount };
-      try { await this.operation("call", "redeemDraw", null, note.contractAddress, after, async () => (await (await this.bound(note.contractAddress)).callTx.redeemDraw(commitment, note.expiry)).public); }
+      try { await this.operation("call", "redeemDraw", null, note.contractAddress, after, () => this.tx().call(note.contractAddress, "redeemDraw", [commitment, note.expiry])); }
       finally { this.input = null; }
     });
   }
@@ -283,9 +314,9 @@ export class OrganizationNetwork {
     return this.account.exclusive(async () => {
       const facility = this.facility(id); await this.inspect(facility.address!);
       const after = this.account.snapshot();
-      if (status === "close" && after.serviceOrders?.some(order => order.facilityId === id && !order.delivered)) throw new Error("Complete the saved API purchases before closing this allowance.");
+      if (status === "close" && after.serviceOrders?.some(order => order.facilityId === id && !order.delivered && !order.cancelled)) throw new Error("Complete or cancel the saved API purchases before closing this allowance.");
       this.input = { callerSecret: bytes32(after.issuerSecret), salt: bytes32(facility.salt), lineLimit: facility.limit, lineOutstanding: facility.outstanding, lineEpoch: facility.epoch };
-      try { await this.operation("call", "setStatus", id, facility.address, after, async () => (await (await this.bound(facility.address!)).callTx.setStatus(status === "pause" ? Status.DEFAULTED : status === "resume" ? Status.OPEN : Status.CLOSED)).public); }
+      try { await this.operation("call", "setStatus", id, facility.address, after, () => this.tx().call(facility.address!, "setStatus", [status === "pause" ? Status.DEFAULTED : status === "resume" ? Status.OPEN : Status.CLOSED])); }
       finally { this.input = null; }
     });
   }
@@ -299,7 +330,7 @@ export class OrganizationNetwork {
       note.refund = { salt, amount: cost - credit, paid: cost === credit };
       if (note.generation === book.lineGeneration) { next.outstanding -= credit; next.epoch++; next.salt = salt; }
       this.input = { callerSecret: bytes32(after.issuerSecret), noteIdentity: bytes32(note.identity), noteQuoteCommit: bytes32(note.quoteCommitment), quoteMerchantPk: bytes32(note.merchantPk), noteNonce: bytes32(note.noteNonce), noteSalt: bytes32(note.noteSalt), newSalt: bytes32(salt), salt: bytes32(facility.salt), lineLimit: facility.limit, lineOutstanding: facility.outstanding, lineEpoch: facility.epoch };
-      try { await this.operation("call", "cancelOrExpireNote", id, facility.address, after, async () => (await (await this.bound(facility.address!)).callTx.cancelOrExpireNote(bytes32(commitment), 1n, BigInt(Math.floor(Date.now() / 1000) + 3600))).public); }
+      try { await this.operation("call", "cancelOrExpireNote", id, facility.address, after, () => this.tx().call(facility.address!, "cancelOrExpireNote", [bytes32(commitment), 1n, BigInt(Math.floor(Date.now() / 1000) + 3600)])); }
       finally { this.input = null; }
     });
   }
@@ -310,7 +341,7 @@ export class OrganizationNetwork {
       if (!note?.refund || note.refund.paid || note.refund.amount <= 0n) throw new Error("This claim has no pending asset refund.");
       note.refund.paid = true;
       this.input = { callerSecret: bytes32(after.issuerSecret), noteIdentity: bytes32(note.identity), salt: bytes32(note.refund.salt), repayAmount: note.refund.amount, paymentRef: randomBytes32() };
-      try { await this.operation("call", "cancelOrExpireNote", id, facility.address, after, async () => (await (await this.bound(facility.address!)).callTx.cancelOrExpireNote(bytes32(commitment), 2n, BigInt(Math.floor(Date.now() / 1000) + 3600))).public); }
+      try { await this.operation("call", "cancelOrExpireNote", id, facility.address, after, () => this.tx().call(facility.address!, "cancelOrExpireNote", [bytes32(commitment), 2n, BigInt(Math.floor(Date.now() / 1000) + 3600)])); }
       finally { this.input = null; }
     });
   }
@@ -350,13 +381,13 @@ export class OrganizationNetwork {
     if (observed.book.status !== Status.OPEN || observed.book.lineGeneration !== facility.generation) throw new Error("Open this agent’s allowance before requesting a paid API quote.");
     if (!facility.merchants.some(merchant => merchant.publicKey === service.profile.publicKey && merchant.address === service.profile.address && !merchant.disabled)) throw new Error("Authorize this supplier before requesting a quote.");
     if (facility.outstanding + BigInt(service.price) > facility.limit) throw new Error("Clearance could not be proven.");
-    let order = this.account.snapshot().serviceOrders?.find(order => order.facilityId === id && order.service === serviceId && !order.delivered);
+    let order = this.account.snapshot().serviceOrders?.find(order => order.facilityId === id && order.service === serviceId && !order.delivered && !order.cancelled);
     if (order && order.document !== document) throw new Error("Resume the saved document purchase before starting a different task.");
     if (!order) {
       const proposed = { id: crypto.randomUUID(), facilityId: id, service: serviceId, document, price: service.price, assetColor: catalog.assetColor, merchantPk: service.profile.publicKey, merchantAddress: service.profile.address, delivered: false };
       await this.account.edit(snapshot => {
         snapshot.serviceOrders ??= [];
-        const existing = snapshot.serviceOrders.find(item => item.facilityId === id && item.service === serviceId && !item.delivered);
+        const existing = snapshot.serviceOrders.find(item => item.facilityId === id && item.service === serviceId && !item.delivered && !item.cancelled);
         if (existing && existing.document !== document) throw new Error("Resume the saved document purchase before starting a different task.");
         if (!existing) snapshot.serviceOrders.push(proposed);
         order = existing ?? proposed;
@@ -369,31 +400,79 @@ export class OrganizationNetwork {
     const order = this.account.snapshot().serviceOrders?.find(order => order.id === orderId);
     if (!order) throw new Error("This API purchase is not in the connected organization’s account.");
     if (order.delivered) return order.result;
+    if (order.cancelled) throw new Error("This saved request was cancelled. Start a new purchase for a new task.");
+    const requestId = supplierRequestId(order);
     const facility = this.facility(order.facilityId);
     this.report("The supplier is posting your exact service quote on Midnight");
-    await this.supplierRequest("orders", { id: order.id, contractAddress: facility.address, service: order.service, document: order.document });
-    const supplier = await this.waitForSupplier(order.id), quote = decodeQuote(supplier.quotePackage!);
+    await this.supplierRequest("orders", { id: requestId, contractAddress: facility.address, service: order.service, document: order.document });
+    const supplier = await this.waitForSupplier(requestId), quote = decodeQuote(supplier.quotePackage!);
     if (quote.contractAddress !== facility.address || quote.merchantPk !== order.merchantPk || quote.amount !== BigInt(order.price)) throw new Error("Supplier quote differs from the accepted purchase terms.");
     const { book } = await this.inspect(facility.address!);
     if (!same(book.merchantPayoutRecipients.lookup(bytes32(order.merchantPk)).bytes, receivingAddressBytes(order.merchantAddress))) throw new Error("The registered supplier recipient differs from the accepted purchase.");
+    await this.account.edit(snapshot => { const current = activeServiceOrder(snapshot, orderId, requestId); current.quoteCommitment = quote.quoteCommitment; current.quoteExpiry = quote.expiry; });
     let note = this.account.snapshot().notes.find(note => note.contractAddress === facility.address && note.quoteCommitment === quote.quoteCommitment);
-    if (!note) note = await this.purchase(order.facilityId, quote);
+    if (!note) {
+      if (quote.expiry <= BigInt(Math.floor(Date.now() / 1000)) || quote.generation !== book.lineGeneration) throw new Error("This uncharged quote expired or belongs to an earlier allowance. Request a fresh quote for the saved purchase.");
+      note = await this.purchase(order.facilityId, quote, { orderId, requestId });
+    }
     const claim = note;
-    await this.account.edit(snapshot => { snapshot.serviceOrders!.find(item => item.id === order.id)!.noteCommitment = claim.noteCommitment; });
+    await this.account.edit(snapshot => { activeServiceOrder(snapshot, orderId, requestId).noteCommitment = claim.noteCommitment; });
     this.report("The supplier is redeeming its claim and receiving the asset payout");
-    await this.supplierRequest(`orders/${order.id}/redeem`, { claim: encodeNote(claim) });
-    const delivered = await this.waitForSupplier(order.id, true);
+    await this.supplierRequest(`orders/${requestId}/redeem`, { claim: encodeNote(claim) });
+    const delivered = await this.waitForSupplier(requestId, true);
     if (delivered.contractAddress !== facility.address || delivered.service !== order.service || !delivered.result) throw new Error("Supplier response is for another purchase.");
     const observed = await this.inspect(facility.address!);
     const redeemed = observed.book.notes.lookup(bytes32(claim.noteCommitment));
     if (!redeemed.redeemed || redeemed.amount !== claim.amount || redeemed.fee !== claim.fee) throw new Error("The merchant payout has not been observed for this exact claim.");
     await this.account.edit(snapshot => {
-      const saved = snapshot.serviceOrders!.find(item => item.id === order.id)!;
+      const saved = activeServiceOrder(snapshot, orderId, requestId);
       saved.delivered = true; saved.result = delivered.result!;
       const retained = snapshot.notes.find(item => item.noteCommitment === claim.noteCommitment); if (retained) retained.redeemed = true;
     });
     this.report("Service delivered after the merchant’s on-chain payout");
     return delivered.result;
+  }
+  private async replacementEvidence(orderId: string) {
+    const snapshot = this.account.snapshot(), order = snapshot.serviceOrders?.find(item => item.id === orderId);
+    if (!order || order.delivered || order.cancelled) throw new Error("Choose an unfinished saved API purchase.");
+    const requestId = supplierRequestId(order), facility = this.facility(order.facilityId);
+    let quote = order.quoteCommitment;
+    if (!quote) {
+      const status = await this.supplierRequest(`orders/${requestId}`) as { order: SupplierOrder | null };
+      if (status.order?.quotePackage) {
+        const observed = decodeQuote(status.order.quotePackage);
+        if (observed.contractAddress !== facility.address || observed.merchantPk !== order.merchantPk || observed.amount !== BigInt(order.price)) throw new Error("The original supplier request differs from this saved purchase.");
+        quote = observed.quoteCommitment;
+      }
+    }
+    const settled = new Set<string>(), note = serviceOrderNote(snapshot, order, quote);
+    if (note) {
+      const { book } = await this.inspect(facility.address!);
+      const observed = book.notes.lookup(bytes32(note.noteCommitment));
+      if (note.refund?.paid && observed.compensationAllocated && (!observed.cashRefundOwed || observed.refundAcknowledged)) settled.add(note.noteCommitment);
+    }
+    return { order, requestId, quote, settled };
+  }
+  async cancelService(orderId: string) {
+    const evidence = await this.replacementEvidence(orderId);
+    await this.account.edit(snapshot => {
+      const order = activeServiceOrder(snapshot, orderId, evidence.requestId);
+      requireReplaceableOrder(snapshot, order, evidence.quote, evidence.settled);
+      retireServiceAttempt(order); order.cancelled = true;
+    });
+    this.report("Saved request cancelled. Its history is retained; no replacement payment was created");
+  }
+  async requoteService(orderId: string) {
+    const evidence = await this.replacementEvidence(orderId), catalog = await this.catalog();
+    const service = catalog.services.find(service => service.id === evidence.order.service);
+    if (!service || catalog.assetColor !== evidence.order.assetColor) throw new Error("This supplier no longer accepts the saved settlement asset.");
+    await this.account.edit(snapshot => {
+      const order = activeServiceOrder(snapshot, orderId, evidence.requestId);
+      requireReplaceableOrder(snapshot, order, evidence.quote, evidence.settled); retireServiceAttempt(order);
+      order.requestId = crypto.randomUUID(); order.price = service.price; order.merchantPk = service.profile.publicKey; order.merchantAddress = service.profile.address;
+      delete order.noteCommitment; delete order.quoteCommitment; delete order.quoteExpiry;
+    });
+    await this.continueService(orderId);
   }
   async reconcile() {
     return this.account.exclusive(async () => {
@@ -402,18 +481,7 @@ export class OrganizationNetwork {
       if (!pending.txId) { await this.account.discardUnsubmitted(); return; }
       if (pending.sourceFingerprint !== this.release.sourceFingerprint) throw new Error("Recover with the original organization contract release.");
       this.report("Checking the original signed transaction. No replacement will be created");
-      let observed = this.observedTransactions.get(pending.txId);
-      if (!observed) {
-        observed = this.providers.publicDataProvider.watchForTxData(pending.txId);
-        this.observedTransactions.set(pending.txId, observed);
-        void observed.catch(() => { this.observedTransactions.delete(pending.txId!); });
-      }
-      let timer: ReturnType<typeof setTimeout> | undefined;
-      try {
-        const receipt = await Promise.race([observed, new Promise<never>((_resolve, reject) => { timer = setTimeout(() => reject(new Error("Finality has not been observed yet. The original signed transaction is still saved. Check it again later; no new payment was submitted.")), 45_000); })]);
-        await this.finish(receipt);
-        this.observedTransactions.delete(pending.txId);
-      } finally { clearTimeout(timer); }
+      await this.finish(await this.tx().finality.wait(pending.txId));
     });
   }
 }
