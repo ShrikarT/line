@@ -14,8 +14,9 @@ test("console recovery button reconciles a lost local draw response without anot
   page.on("pageerror", error => pageErrors.push(error.message));
   await page.goto("/agent");
   const outcome = await page.evaluate(async () => {
-    const { useAppStore } = await import("/src/app/store.ts");
-    const { getRuntime } = await import("/src/lib/runtime/index.ts");
+    const { browserModuleUrl } = await import("/e2e/browser-module.ts" as any);
+    const { useAppStore } = await import(browserModuleUrl("/src/app/store.ts"));
+    const { getRuntime } = await import(browserModuleUrl("/src/lib/runtime/index.ts"));
     const store = useAppStore.getState();
     if (!(await store.unlockVault("console-recovery-browser-password"))) throw new Error("Unlock failed");
     for (const role of ["issuer", "merchant", "agent"] as const) await store.generateIdentity(role);
@@ -37,12 +38,14 @@ test("console recovery button reconciles a lost local draw response without anot
   // Replacing the vault session briefly clears decrypted UI state. Wait for
   // reconciliation itself, rather than treating that temporary hide as success.
   await expect.poll(() => page.evaluate(async () => {
-    const { useAppStore } = await import("/src/app/store.ts");
+    const { browserModuleUrl } = await import("/e2e/browser-module.ts" as any);
+    const { useAppStore } = await import(browserModuleUrl("/src/app/store.ts"));
     return useAppStore.getState().agentRecord?.B;
   })).toBe(40);
   await expect(recover).toBeHidden();
   const recovered = await page.evaluate(async () => {
-    const { useAppStore } = await import("/src/app/store.ts");
+    const { browserModuleUrl } = await import("/e2e/browser-module.ts" as any);
+    const { useAppStore } = await import(browserModuleUrl("/src/app/store.ts"));
     return { balance: useAppStore.getState().agentRecord?.B, notes: useAppStore.getState().drawNotes.length,
       blocked: useAppStore.getState().recoveryRequired, calls: (window as any).__recoveryCalls() };
   });

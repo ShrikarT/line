@@ -3,15 +3,15 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import wasm from "vite-plugin-wasm";
 import { pathToFileURL } from "node:url";
+import { zkAssetMiddleware } from "./server/zk-assets.ts";
+import { preprodMiddleware } from "./server/preprod-http.ts";
 
 // Native import keeps generated Compact/WASM execution in the server process.
 // It is excluded from the browser bundle and only provided in dev/preview.
 const checkoutClosers = new Set<() => Promise<void>>();
 async function installCheckout(server: ViteDevServer | PreviewServer) {
   const { checkoutMiddleware } = await import(pathToFileURL(`${process.cwd()}/server/checkout-http.ts`).href);
-  const { zkAssetMiddleware } = await import(pathToFileURL(`${process.cwd()}/server/zk-assets.ts`).href);
   const { networkSessionMiddleware } = await import(pathToFileURL(`${process.cwd()}/server/network-session.ts`).href);
-  const { preprodMiddleware } = await import(pathToFileURL(`${process.cwd()}/server/preprod-http.ts`).href);
   const checkout = checkoutMiddleware();
   let closing: Promise<void> | undefined;
   const close = () => closing ??= checkout.close().finally(() => checkoutClosers.delete(close));

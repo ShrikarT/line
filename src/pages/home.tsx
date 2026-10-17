@@ -19,17 +19,16 @@ import { useSectionReveal } from "@/components/line/motion";
 import {
   CreditSculpture,
   FeatureVisual,
-  PurchasePlayground,
 } from "@/components/line/credit-scene";
 
 const FAQ = [
   [
     "What does an agent actually buy?",
-    "The demo offers document analysis from Merchant A and a cost report from Merchant B. Each purchase has its own quote, credit authorization and merchant redemption. The services are deterministic local implementations.",
+    "The organization workspace offers document metrics and content integrity APIs. A supplier posts a quote, your wallet authorizes a claim, and the supplier delivers its computation after receiving the asset payout.",
   ],
   [
     "Is this running on Midnight?",
-    "Yes. The live Preprod checkout creates Compact proofs, pays network DUST fees and verifies finalized transactions. The quick demo runs generated Compact locally and needs no wallet.",
+    "Line uses Compact contracts and wallet approvals on Midnight Preprod. Connect your wallet, create your organization facility and complete its verifier setup. Your own finalized transactions appear in the workspace; historical protocol receipts are separate evidence.",
   ],
   [
     "What stays private?",
@@ -41,20 +40,20 @@ const FAQ = [
   ],
   [
     "Are real payments being made?",
-    "The test-token checkout transfers valueless test tokens to two merchant wallets on Midnight Preprod. The standard live checkout records credit and claims only. No real-money payment or independently verified repayment is connected.",
+    "The organization contract accepts existing assets and pays registered merchant wallets. Your organization supplies its own funds. Preprod tokens have no real-money value; the new organization lifecycle must be confirmed through its own network receipts.",
   ],
   [
     "What happens if the connection drops?",
-    "The live checkout retains the original request and private opening. Reload to resume, or reconcile the saved transaction before continuing. An uncertain submission is checked against its exact receipt rather than blindly repeated.",
+    "Your encrypted organization vault retains the original request and private opening. Reconnect the same wallet and unlock the vault to resume. An uncertain submission is checked against its exact receipt before another operation starts.",
   ],
 ];
 const features = [
   {
     kind: "policy" as const,
     number: "01",
-    role: "For the issuer",
+    role: "For the organization",
     title: "Set the spending rules.",
-    copy: "Choose the credit limit and reserve capacity. Your agent can use the allowance. Only you can change it.",
+    copy: "Deposit your existing assets and set an agent allowance. Your organization owns its facility and approves outgoing transactions.",
   },
   {
     kind: "proof" as const,
@@ -82,10 +81,10 @@ export function Home() {
             <span className="live-dot" />
             Built on Midnight
             <span className="overline-divider" />
-            Live on Preprod <ArrowUpRight />
+            Midnight Preprod <ArrowUpRight />
           </div>
           <h1 id="hero-heading">
-            Credit for agents.
+            Spending for agents.
             <br />
             <span>On your terms.</span>
           </h1>
@@ -129,12 +128,18 @@ export function Home() {
               </h2>
             </div>
             <p>
-              A credit line, an agent and two merchants.
+              Your treasury, your agent and your suppliers.
               <br />
-              Explore each role. Watch the rules become a purchase.
+              Connect your wallet. Fund a facility. Authorize a purchase.
             </p>
           </div>
-          <PurchasePlayground />
+          <div className="modern-feature-grid organization-home-flow">
+            {[
+              ["01", "Connect your wallet.", "Open the encrypted organization vault belonging to your Midnight Preprod account."],
+              ["02", "Fund your agent.", "Deposit existing assets into your own facility and set its private spending allowance."],
+              ["03", "Purchase a service.", "Approve the quoted purchase. The supplier redeems its claim before releasing the result."],
+            ].map(([step, title, copy]) => <article className="modern-feature" key={step}><div className="feature-copy"><span className="feature-role">{step}</span><h3>{title}</h3><p>{copy}</p></div></article>)}
+          </div>
         </section>
         <section className="modern-feature-section" data-reveal>
           <div className="line-container">
@@ -148,7 +153,7 @@ export function Home() {
                 </h2>
               </div>
               <p>
-                Authority stays with the issuer. The agent purchases. Each
+                Authority stays with your organization. The agent purchases. Each
                 merchant claims only what belongs to it.
               </p>
             </div>
@@ -177,8 +182,8 @@ export function Home() {
               <br />
               <span>Keep the spending in your hands.</span>
             </h2>
-            <a href="/checkout" className="line-button line-button-primary">
-              Try API checkout <ArrowUpRight />
+            <a href="/agents" className="line-button line-button-primary">
+              Open agent purchases <ArrowUpRight />
             </a>
             <div className="statement-line-art" aria-hidden="true">
               {Array.from({ length: 7 }, (_, i) => (
@@ -286,11 +291,10 @@ export function Home() {
                 <span>Recorded on chain.</span>
               </h2>
               <p>
-                Deployment, both merchant purchases and repayment. Each verified
-                result has a finalized transaction.
+                Historical protocol deployment, merchant purchases and issuer acknowledgements have finalized receipts. These records belong to the earlier operator facility.
               </p>
               <a href="/preprod" className="line-button line-button-primary">
-                Inspect live contract calls <ArrowUpRight />
+                Inspect historical protocol receipts <ArrowUpRight />
               </a>
             </div>
             <div className="network-evidence">
@@ -301,7 +305,7 @@ export function Home() {
                 <div>
                   <span className="live-dot" />
                   <span>
-                    Confirmed on Preprod
+                    Historical protocol facility
                     <br />
                     <small>Verified 16 October 2026</small>
                   </span>
@@ -377,13 +381,13 @@ export function Home() {
             </h2>
             <div className="hero-actions">
               <a
-                href="/preprod"
+                href="/app"
                 className="line-button line-button-primary line-button-large"
               >
-                Open live checkout <ArrowRight />
+                Open workspace <ArrowRight />
               </a>
-              <a href="/checkout" className="hero-secondary">
-                Try the quick local demo <ArrowUpRight />
+              <a href="/privacy" className="hero-secondary">
+                Read the privacy scope <ArrowUpRight />
               </a>
             </div>
           </div>
@@ -402,7 +406,7 @@ export function Home() {
               </p>
             </div>
             <nav aria-label="Footer" className="line-footer-links">
-              <a href="/preprod">Live checkout</a>
+              <a href="/app">Organization workspace</a>
               <a href="/circuits">The protocol</a>
               <a href="/roadmap">Roadmap</a>
               <a href="/privacy">Privacy & scope</a>

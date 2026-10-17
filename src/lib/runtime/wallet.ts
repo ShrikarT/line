@@ -10,6 +10,7 @@ import { Transaction } from "@midnight-ntwrk/midnight-js-protocol/ledger";
 import { bech32m } from "@scure/base";
 import { hexToBytes, toHex } from "../line/encoding.ts";
 import { WalletNotConnectedError, WalletApprovalRejectedError } from "./errors.ts";
+import { lockVaultSession } from "../security/vault.ts";
 
 export interface WalletInfo {
   rdns: string;
@@ -119,6 +120,7 @@ export function getActiveWalletInfo(): WalletInfo | null {
 }
 
 export async function disconnectWallet(): Promise<void> {
+  lockVaultSession();
   activeConnectedApi = null;
   activeWalletInfo = null;
   notifyWalletChanged();
@@ -158,6 +160,12 @@ export async function connectWallet(
   }
 
   try {
+    // Changing connections revokes decrypted organization and circuit records.
+    // An in-flight operation must reconcile under its original account.
+    lockVaultSession();
+    activeConnectedApi = null;
+    activeWalletInfo = null;
+    notifyWalletChanged();
     const connectedApi = await targetWallet.connect(networkId);
     if (!connectedApi) {
       throw new WalletNotConnectedError("Wallet connect resolved with empty API instance.");

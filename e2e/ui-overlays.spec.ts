@@ -9,9 +9,10 @@ test("network setup, vault manager and import controls fit the mobile workspace"
   await page.route("**/api/line/network-session", route => route.fulfill({ status: 404, body: "{}" }));
   await page.setViewportSize({ width: 390, height: 844 });
   await page.emulateMedia({ reducedMotion: "reduce" });
-  await page.goto("/");
-  await page.getByRole("button", { name: "Local Simulator", exact: true }).click();
-  const setup = page.getByRole("region", { name: "Network setup", exact: true });
+  // Mobile users enter advanced setup through its dedicated route; the header
+  // prioritizes the visible wallet control at this width.
+  await page.goto("/connect");
+  const setup = page.locator("main");
   await expect(setup.getByLabel("Network", { exact: true })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
   await setup.screenshot({ path: path.join(output, "network-setup-390.png") });

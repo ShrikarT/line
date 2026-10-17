@@ -1,5 +1,11 @@
 # Engineering status and acceptance evidence
 
+## Organization-owned user product: 18 October 2026
+
+The owner selected organization-funded agent spending. The primary `/app`, `/organization`, `/agents` and `/suppliers` routes now use wallet-scoped encrypted accounts and a separate asset-backed twelve-circuit organization profile; they do not adopt the historical operator books. Actual Lace connection and vault opening are owner-confirmed. SDK deployment preparation reaches wallet approval and a rejecting connector leaves no confirmed facility. The browser verifier-fetch receiver bug, cross-tab order/note reuse, account-switch clearing and private-book publication before durable commit are fixed.
+
+**A new organization-funded end-to-end Preprod lifecycle is not yet confirmed.** Its public address, wallet approvals, asset deposit and merchant payout receipts are still needed. Full release/build/typecheck and credential scans pass. The full core run is 582 discovered / 579 passed / one assertion failure / one cancelled / one intentional skip; affected cases pass separately, not as a green full rerun. [Current readiness audit, exact acceptance and unresolved items](ORGANIZATION_READINESS_2026-10-18.md). All nineteen focused organization checks and all four organization browser cases pass. The last full browser run passes 41/43; its two affected legacy UI cases pass on focused reruns. Both canonical and organization compilation checks show zero drift across sixteen files each. Production build/typecheck and scans pass. Evidence is preserved in [the verification scope](../artifacts/organization-product/verification.json).
+
 ## Visible wallet connection and product entry point — 17 October 2026
 
 The shared header exposes a real browser-wallet connection control on every route, including the operator-run Preprod pages, with a Preprod network check, extension discovery, rejection/retry, address copy and session disconnect. It reuses the pinned Connector v4 implementation; runtime wallet changes notify the same account UI. A new `/app` workspace introduces wallet setup, funded test-token checkout, a three-step testing guide and role-console links. `/connect` makes existing advanced contract configuration accessible on phones. Homepage entry actions lead to the workspace and payout copy distinguishes the two deployed facilities.

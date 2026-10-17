@@ -12,11 +12,10 @@ test("default demo delivers both merchants within the issuer's spending line", a
   await expect(page.getByText("3. Both merchants delivered", { exact: true })).toBeVisible();
 });
 
-test("homepage purchase flow delivers, declines generically, and revolves under issuer control", async ({ page }) => {
+test("historical local checkout delivers, declines generically, and revolves under issuer control", async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", error => errors.push(error.message));
-  await page.goto("/");
-  await page.getByRole("link", { name: "Try API checkout", exact: true }).first().click();
+  await page.goto("/checkout");
   await expect(page).toHaveURL(/\/checkout$/);
   await expect(page.getByText("Generated Compact · local evaluation", { exact: true })).toBeVisible();
   await page.getByRole("radio", { name: /Decline and recovery/ }).check();

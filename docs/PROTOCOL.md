@@ -2,6 +2,8 @@
 
 ## Overview
 
+This reference describes the canonical accounting profile. The separate organization-funded profile retains the twelve circuit names while requiring actual incoming assets for funding/replenishment and emitting asset payouts. See [its source/behavior summary](ORGANIZATION_PRODUCT.md) and [current acceptance](ORGANIZATION_READINESS_2026-10-18.md); it is not a migration of existing facilities.
+
 Line implements a confidential credit facility using Midnight Compact built-ins:
 - `persistentCommit<T>(value: T, salt: Bytes<32>): Bytes<32>`
 - `persistentHash<T>(value: T): Bytes<32>`

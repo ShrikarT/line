@@ -4,82 +4,26 @@ import path from "node:path";
 
 const output = path.resolve("artifacts/ui-revision/rendered");
 
-test("product preview explains a purchase and supports replay and each role", async ({
-  page,
-}) => {
+test("homepage explains real purchases and opens the wallet-owned workspace", async ({ page }) => {
   test.setTimeout(90_000);
   await mkdir(output, { recursive: true });
-  await page.setViewportSize({ width: 1440, height: 1000 });
   await page.emulateMedia({ reducedMotion: "reduce" });
-  const mutations: string[] = [];
-  const animationWarnings: string[] = [];
-  page.on("console", message => {
-    if (message.type() === "warning" && message.text().includes("No target found")) animationWarnings.push(message.text());
-  });
-  page.on("request", (request) => {
-    if (request.method() === "POST") mutations.push(request.url());
-  });
-  await page.goto("/");
-  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
-  await page.screenshot({ path: path.join(output, "home-hero-1440.png") });
-  await page
-    .getByRole("button", { name: "Preview a purchase", exact: true })
-    .click();
-  await expect(
-    page.getByText(
-      "Both illustrative claims redeemed. 45 units used, 15 remaining.",
-    ),
-  ).toBeVisible();
-  await expect(
-    page.locator('.demo-execution li[data-done="true"]'),
-  ).toHaveCount(3);
-  // Replay also exercises the full-duration timeline, not only reduced motion.
-  await page.emulateMedia({ reducedMotion: "no-preference" });
-  await page
-    .getByRole("button", { name: "Replay purchase", exact: true })
-    .click();
-  await expect(
-    page.getByRole("button", { name: "Replay purchase", exact: true }),
-  ).toBeEnabled();
-  await page
-    .locator(".purchase-playground")
-    .screenshot({ path: path.join(output, "purchase-playground-1440.png") });
-  await page.getByRole("tab", { name: "Issuer", exact: true }).click();
-  await expect(
-    page.getByRole("heading", { name: "You set the allowance.", exact: true }),
-  ).toBeVisible();
-  await page.getByRole("tab", { name: "Merchants", exact: true }).click();
-  await expect(
-    page.getByRole("heading", {
-      name: "Verify. Redeem. Deliver.",
-      exact: true,
-    }),
-  ).toBeVisible();
-  await page.getByRole("tab", { name: "Agent", exact: true }).click();
-  await expect(page.locator('.playground-panel[data-state="active"] .demo-animate').first()).toHaveCSS("opacity", "1");
-  await page.evaluate(() => window.scrollTo(0, 0));
-  await page.screenshot({
-    path: path.join(output, "home-complete-1440.png"),
-    fullPage: true,
-  });
-  await page.setViewportSize({ width: 390, height: 844 });
-  expect(
-    await page.evaluate(
-      () => document.documentElement.scrollWidth <= innerWidth + 1,
-    ),
-  ).toBe(true);
-  await page.screenshot({
-    path: path.join(output, "home-complete-390.png"),
-    fullPage: true,
-  });
-  await page.getByRole("tab", { name: "Merchants", exact: true }).click();
-  expect(
-    await page.evaluate(
-      () => document.documentElement.scrollWidth <= innerWidth + 1,
-    ),
-  ).toBe(true);
-  expect(mutations).toEqual([]);
-  expect(animationWarnings).toEqual([]);
+  const mutations: string[] = [], errors: string[] = [];
+  page.on("request", request => { if (request.method() === "POST") mutations.push(request.url()); });
+  page.on("pageerror", error => errors.push(error.message));
+  for (const width of [1440, 390]) {
+    await page.setViewportSize({ width, height: 900 }); await page.goto("/");
+    await expect(page.getByRole("heading", { level: 1 })).toContainText("Spending for agents.");
+    await expect(page.getByRole("heading", { name: "Fund your agent.", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Preview a purchase", exact: true })).toHaveCount(0);
+    await expect(page.locator('a[href="/checkout"]')).toHaveCount(0);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+    await page.screenshot({ path: path.join(output, `home-organization-${width}.png`), fullPage: true });
+  }
+  await page.getByRole("link", { name: "Open workspace", exact: true }).first().click();
+  await expect(page).toHaveURL(/\/app$/);
+  await expect(page.getByRole("heading", { name: "Start with your wallet." })).toBeVisible();
+  expect(mutations).toEqual([]); expect(errors).toEqual([]);
 });
 
 test("workspace command palette searches, handles empty results and preserves navigation", async ({
@@ -97,14 +41,14 @@ test("workspace command palette searches, handles empty results and preserves na
   await expect(
     page.getByText("No pages found. Try issuer, agent or checkout."),
   ).toBeVisible();
-  await search.fill("agent");
+  await search.fill("Agent console");
   await search.press("Enter");
   await expect(page).toHaveURL(/\/agent$/);
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await page.keyboard.press("Control+k");
   await expect(search).toBeVisible();
   await search.fill("merchant");
-  await page.getByRole("option", { name: /Merchant/ }).click();
+  await page.getByRole("option", { name: /Merchant console/ }).click();
   await expect(page).toHaveURL(/\/merchant$/);
   await page.keyboard.press("Control+k");
   await search.fill("issuer");

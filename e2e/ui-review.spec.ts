@@ -2,7 +2,7 @@ import { test, expect } from "@playwright/test";
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
 
-const routes = ["/", "/app", "/connect", "/preprod", "/test-payout", "/checkout", "/issuer", "/agent", "/merchant", "/explorer", "/circuits", "/lab", "/roadmap", "/privacy", "/missing-page"];
+const routes = ["/", "/app", "/organization", "/agents", "/suppliers", "/connect", "/preprod", "/test-payout", "/checkout", "/issuer", "/agent", "/merchant", "/explorer", "/circuits", "/lab", "/roadmap", "/privacy", "/missing-page"];
 const output = path.resolve(process.env.LINE_UI_ARTIFACT_DIR ?? "artifacts/ui-redesign");
 test.beforeEach(async ({ page }) => {
   // Visual review must never submit a funded transaction or access wallet material.
@@ -33,19 +33,15 @@ for (const width of [1440, 390]) {
   });
 }
 
-test("landing preview, FAQ and mobile navigation are keyboard accessible", async ({ page }) => {
+test("landing FAQ and real workspace navigation are keyboard accessible", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("tab", { name: "Issuer", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "You set the allowance." })).toBeVisible();
-  await page.getByRole("tab", { name: "Issuer", exact: true }).press("ArrowRight");
-  await expect(page.getByRole("tab", { name: "Agent", exact: true })).toBeFocused();
   await page.getByRole("button", { name: "What stays private?", exact: true }).click();
   await expect(page.getByText("The credit limit, debt and remaining capacity are private witnesses, not plaintext ledger fields.", { exact: false })).toBeVisible();
   await page.setViewportSize({ width: 390, height: 844 });
   await page.getByRole("button", { name: "Open navigation" }).click();
   await expect(page.getByRole("dialog")).toBeVisible();
-  await page.getByRole("dialog").getByRole("link", { name: "Circuits", exact: true }).click();
-  await expect(page).toHaveURL(/\/circuits$/);
+  await page.getByRole("dialog").getByRole("link", { name: "Agent purchases", exact: true }).click();
+  await expect(page).toHaveURL(/\/agents$/);
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
 });
@@ -105,10 +101,10 @@ test("expanded reference sections and delivered results remain usable on mobile"
   await expect(page.getByText(/Merchant registered in Compact registry/)).toBeVisible();
   await page.evaluate(() => window.scrollTo(0, 0));
   await page.screenshot({ path: path.join(output, "issuer-populated-1440.png"), fullPage: true });
-  await page.getByRole("link", { name: "Merchant", exact: true }).click();
+  await page.getByRole("link", { name: "Merchant console", exact: true }).click();
   await page.getByRole("button", { name: "Quote 40 (A)", exact: true }).click();
   await expect(page.getByText("Quote posted by Merchant A for 40 units.", { exact: true })).toBeVisible();
-  await page.getByRole("link", { name: "Agent", exact: true }).click();
+  await page.getByRole("link", { name: "Agent console", exact: true }).click();
   await page.getByRole("button", { name: "Draw & Issue Note", exact: true }).click();
   await expect(page.getByText("Note 40 units", { exact: true })).toBeVisible();
   await page.evaluate(() => window.scrollTo(0, 0));

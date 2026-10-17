@@ -1,5 +1,20 @@
 # Line
 
+## Organization workspace: current product path
+
+Each organization funds and controls its own agents' spending. Open `/app` in the local server, connect Midnight Lace on Preprod, and open the wallet-scoped encrypted organization vault. Create the organization's own facility, finish its circuit keys, deposit existing assets, set an allowance and purchase a supplier's authenticated quote. This path does not use the historical operator credit book or mint its reserve.
+
+- [Product model and contract behavior](docs/ORGANIZATION_PRODUCT.md)
+- [Current readiness audit, verification and unresolved items](docs/ORGANIZATION_READINESS_2026-10-18.md)
+- Organization source: `contracts/organization/line.compact`; managed bindings: `contracts/managed/organization/`.
+- `npm run organization:compile`, `npm run organization:release`, `npm run organization:validate`, `npm run test:organization`.
+
+Actual Lace connection and vault opening are owner-confirmed. A new organization facility's funded end-to-end lifecycle still needs its own finalized receipts; historical operator receipts do not certify it. The first-party merchant backend/proof server must be running and configured. Public hosting is deferred. Encrypted backup restore and full-history privacy remain open.
+
+## Historical protocol and external-credit research
+
+The sections below retain the earlier prototype/research context and its original evidence scopes. They do not describe an outside credit provider for the organization-funded product above.
+
 **A protocol prototype testing issuer-authorized agent purchasing. Private credit is the unproven destination.**
 
 Line's intended product lets organizations delegate revolving purchasing capacity to agents, lets merchants independently verify authorization and own single-use claims, and reconciles purchases with service delivery and actual payment. The first customer hypothesis is enterprise API/data/compute procurement. It is unvalidated: no customer interviews, pilots or revenue are established by this repository.

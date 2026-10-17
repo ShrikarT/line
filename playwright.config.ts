@@ -11,6 +11,8 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
   workers: 1,
   reporter: "list",
+  // The pinned SDK parses ledger WASM on a fresh document before rendering.
+  expect: { timeout: 20_000 },
   use: {
     baseURL: process.env.PLAYWRIGHT_BASE_URL || localUrl,
     trace: "on-first-retry",

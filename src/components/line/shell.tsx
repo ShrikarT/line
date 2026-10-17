@@ -55,17 +55,17 @@ const NAV = [
     items: [
       { to: "/", label: "Overview", icon: House },
       { to: "/app", label: "My workspace", icon: Robot },
-      { to: "/preprod", label: "Live Preprod", icon: Lightning },
-      { to: "/test-payout", label: "Test-token payout", icon: Lightning },
-      { to: "/checkout", label: "API checkout", icon: ArrowRight },
+      { to: "/organization", label: "Organization", icon: Bank },
+      { to: "/agents", label: "Agent purchases", icon: Robot },
+      { to: "/suppliers", label: "Merchant workspace", icon: Storefront },
     ],
   },
   {
-    label: "Participants",
+    label: "Protocol tools",
     items: [
-      { to: "/issuer", label: "Issuer", icon: Bank },
-      { to: "/agent", label: "Agent", icon: Robot },
-      { to: "/merchant", label: "Merchant", icon: Storefront },
+      { to: "/issuer", label: "Issuer console", icon: Bank },
+      { to: "/agent", label: "Agent console", icon: Robot },
+      { to: "/merchant", label: "Merchant console", icon: Storefront },
     ],
   },
   {
@@ -120,6 +120,9 @@ const INTRO: Record<
   },
 };
 
+const PRODUCT_PATHS = new Set(["/", "/app", "/organization", "/agents", "/suppliers"]);
+const navigationFor = (path: string) => PRODUCT_PATHS.has(path) ? NAV.filter(group => group.label === "Workspace") : NAV;
+
 function Navigation({
   path,
   onNavigate,
@@ -129,7 +132,7 @@ function Navigation({
 }) {
   return (
     <nav aria-label="Workspace navigation" className="flex flex-col gap-8">
-      {NAV.map((group) => (
+      {navigationFor(path).map((group) => (
         <div className="line-nav-group" key={group.label}>
           <p className="line-nav-caption">{group.label}</p>
           {group.items.map(({ to, label, icon: Icon }) => (
@@ -206,7 +209,7 @@ function WorkspaceSearch() {
           <CommandEmpty>
             No pages found. Try issuer, agent or checkout.
           </CommandEmpty>
-          {NAV.map((group) => (
+          {navigationFor(window.location.pathname).map((group) => (
             <CommandGroup key={group.label} heading={group.label}>
               {group.items.map(({ to, label, icon: Icon }) => (
                 <CommandItem
@@ -327,7 +330,7 @@ export function Shell({
           )}
           <div className="flex items-center gap-3">
             {!landing && <WorkspaceSearch />}
-            <div className="line-header-runtime">{runtimeControl}</div>
+            <div className="line-header-runtime">{PRODUCT_PATHS.has(pathname) ? <span className="line-runtime">Midnight Preprod</span> : runtimeControl}</div>
             <WalletButton />
             {landing && (
               <a
