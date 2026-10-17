@@ -4,6 +4,11 @@ import { createHash } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { resolveContractRelease, validateContractArtifacts } from "../scripts/contract-artifacts.mjs";
 
+/** The deployed static build and local server expose the same public manifest. */
+export function publicOrganizationManifest(release: ReturnType<typeof validateContractArtifacts>) {
+  return { profile: "organization", inputs: release.inputs, files: release.files };
+}
+
 /** Dev/preview only. Serve proving material, never private state or deployer credentials. */
 export function zkAssetMiddleware() {
   let release: ReturnType<typeof validateContractArtifacts> | null = null;
@@ -32,7 +37,7 @@ export function zkAssetMiddleware() {
       if (createHash("sha256").update(source).digest("hex") !== selected.inputs.source.sha256) return fail(503, "The source changed. Generate a fresh release and restart the server.");
       if (path === "release.json") {
         if (!organizationRequest) return fail(404, "Proving asset not found.");
-        const bytes = JSON.stringify({ profile: "organization", inputs: selected.inputs, files: selected.files });
+        const bytes = JSON.stringify(publicOrganizationManifest(selected));
         res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" });
         return res.end(req.method === "HEAD" ? undefined : bytes);
       }

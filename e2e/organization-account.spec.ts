@@ -87,6 +87,14 @@ test("two real account namespaces isolate encrypted identities and recover only 
   await page.screenshot({ path: "artifacts/organization-product/merchant-account-mobile.png", fullPage: true });
 });
 
+test("incomplete facility fields show actionable feedback without requesting a signature", async ({ page }) => {
+  await wallets(page); await page.goto("/app"); await connect(page, "a"); await unlock(page);
+  await page.getByRole("button", { name: "Create facility", exact: true }).click();
+  await expect(page.getByRole("alert")).toContainText("Complete the required name, asset and supplier profile");
+  await expect(page.getByRole("alert")).toBeInViewport();
+  expect(await page.evaluate(() => (window as unknown as { organizationSignatures: number }).organizationSignatures)).toBe(0);
+});
+
 for (const width of [1440, 390]) test(`real facility preparation reaches wallet approval and a rejection creates no confirmed facility at ${width}px`, async ({ page }) => {
   test.setTimeout(180_000);
   await page.setViewportSize({ width, height: 900 });

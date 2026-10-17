@@ -4,6 +4,18 @@
 
 The new organization asset profile retains the baseline public note amounts, merchant keys and reserve deltas. Its transparent deposits, refunds and payouts also reveal asset amounts and receiving addresses. The organization owns its delegated agent; independent outside issuer/borrower custody is not claimed. Full-history balance inference remains open. [Current product and acceptance](ORGANIZATION_READINESS_2026-10-18.md).
 
+## Settlement-rail constraint checked on 18 October 2026
+
+The [official token documentation](https://docs.midnight.network/tokens/overview)
+states that native NIGHT is unshielded and that shielded and unshielded assets are
+separate token types without a conversion mechanism. Holding NIGHT at another
+address does not conceal its transfers. Consequently, a different private
+settlement design is required; changing private witnesses alone cannot conceal
+the current native-asset payout amounts. This is an architectural inference from
+the asset model, not a completed alternative. A custom shielded token would also
+need genuine backing/redemption and full observer-model verification before it
+could replace organization funds. Neither is established by minting a test asset.
+
 ## Owner-authorized next-version change — 11 October 2026
 
 The owner authorized redesign of public note amounts and reserve deltas. This document inventories the **unchanged canonical baseline**. Its public-disclosure facts do not constrain the next version. See [the redesign and verification/migration gates](PRIVACY_REDESIGN_2026-10-11.md) and [the compiled pool counterexamples](PRIVATE_POOL_2026-10-11.md). No full-history privacy pass or canonical migration is claimed.
