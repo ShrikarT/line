@@ -5,3 +5,6 @@ contracts/managed/** text eol=lf
 scripts/compile-compact.mjs text eol=lf
 *.mjs text eol=lf
 src/lib/line/encoding.ts text eol=lf
+# The funded test profile pins the exact CRLF source bytes used for its keys.
+# Preserve them across checkouts; normalization requires a release migration.
+contracts/experimental/line-test-settlement.compact -text

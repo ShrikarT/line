@@ -2,6 +2,38 @@
 
 Current local app: **http://127.0.0.1:5174/**.
 
+## Live Midnight Preprod
+
+The homepage's **Open live checkout** action opens `/preprod`. It uses the existing funded test wallet and deployed canonical contract through the local operator backend.
+
+Before a live demonstration, start Docker Desktop and the existing proof server:
+
+```powershell
+docker start line-preprod-proof-8-1-3
+```
+
+After starting the app on port 5174, run:
+
+```powershell
+node scripts/check-preprod-readiness.mjs
+```
+
+This checks both the proof server and local operator API without submitting a transaction or displaying credentials. An existing contract can report phase `ready` even when Docker is stopped; check `proofServerReady` too. A busy or pending operation must finish or be reconciled before starting another purchase. Do not run a second signer CLI alongside the app.
+
+In `/preprod`, choose **Start another purchase** when available, edit the document and run the purchase. Two merchant services require six fee-funded calls. Keep the same request ID if interrupted. **Acknowledge reported test repayment** is explicitly a demo issuer report, not proof of a real payment. The existing contract records credit and claims; it does not pay merchant tokens.
+
+## Midnight test-token checkout
+
+Open **http://127.0.0.1:5174/test-payout** for the separate test-asset version. It uses the same local fee wallet and a separate contract, encrypted controller, merchant wallets and browser request IDs. Confirmed wallet balances and the test-token identity appear above checkout; the standard `/preprod` facility remains the accounting version. [Current network evidence and limits](TEST_TOKEN_PAYOUT_2026-10-16.md).
+
+Setup mints 200 valueless test units into contract custody. Each completed purchase pays 25 units to Merchant A and 20 to Merchant B, at their fixed registered addresses. These are transparent test tokens; their amounts and recipients are public. They have no monetary value or cash-redemption promise.
+
+Keep the same purchase ID after interruption. A pending transaction must be reconciled before another operation; reloading does not create a purchase. Once both services are delivered, the issuer can use the clearly labelled **Acknowledge reported test repayment** demonstration action before **Start another purchase** becomes available. That action proves an issuer report and does not establish a real incoming repayment. Further purchases remain bounded by the contract's actual remaining test assets.
+
+The local backend serializes both facilities through one fee-wallet job. It uses a positive DUST fee allowance and rejects empty fee sections before submission. Do not run a second signer process alongside the app.
+
+## Fast local evaluation
+
 From the audit checkout (`C:/Users/Shrikar/line-audit-review`), start it with:
 
 ```powershell

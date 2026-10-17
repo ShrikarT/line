@@ -1,0 +1,75 @@
+{
+  "canonical": {
+    "contractAddress": "8990864c6f80c517c7458fa9b2526d3500f3a9814399fc836097ee409da9bed0",
+    "receipts": 28,
+    "privateBook": {
+      "limit": 60,
+      "outstanding": 45,
+      "remaining": 15
+    },
+    "orders": [
+      {
+        "id": "f360bc0c-8b03-4355-8b3b-621c6787fbe5-0",
+        "service": "text-analysis",
+        "status": "delivered"
+      },
+      {
+        "id": "f360bc0c-8b03-4355-8b3b-621c6787fbe5-1",
+        "service": "cost-report",
+        "status": "delivered"
+      },
+      {
+        "id": "003f04c4-2205-4213-a496-9de3068491b9-0",
+        "service": "text-analysis",
+        "status": "delivered"
+      },
+      {
+        "id": "003f04c4-2205-4213-a496-9de3068491b9-1",
+        "service": "cost-report",
+        "status": "delivered"
+      }
+    ],
+    "tokenObservation": null
+  },
+  "settlement": {
+    "contractAddress": "a159597495b52ea7a703a29562b17fcb042bf7eaa984ec1e05e7e8935208304b",
+    "receipts": 21,
+    "privateBook": {
+      "limit": 60,
+      "outstanding": 45,
+      "remaining": 15
+    },
+    "orders": [
+      {
+        "id": "597fa77a-36b2-4962-ac26-8012a66bb46b-0",
+        "service": "text-analysis",
+        "status": "delivered"
+      },
+      {
+        "id": "597fa77a-36b2-4962-ac26-8012a66bb46b-1",
+        "service": "cost-report",
+        "status": "delivered"
+      }
+    ],
+    "tokenObservation": {
+      "color": "0d6953d8b70bb5b9980771ae8dfc489d8b2ca05d2fa10093f25d6053b8d664cd",
+      "balances": {
+        "A": {
+          "address": "mn_addr_preprod1vflat69hjj5n2m8ftfwwspp2vssf7ckjay22qcp8p9lxedv4hgjszhshk3",
+          "addressHex": "627fd5e8b794a9356ce95a5ce8042a64209f62d2e914a06027097e6cb595ba25",
+          "units": "25",
+          "expectedUnits": "25"
+        },
+        "B": {
+          "address": "mn_addr_preprod1cqfpv7eysg9lmstmg35t2n4yjx9vt5k4xdxzrrzsapzvswr0q6zs9v2yqe",
+          "addressHex": "c012167b24820bfdc17b4468b54ea4918ac5d2d5334c218c50e844c8386f0685",
+          "units": "20",
+          "expectedUnits": "20"
+        }
+      },
+      "verifiedAt": "2026-10-17T09:51:53.395Z",
+      "transparent": true,
+      "monetaryValue": false
+    }
+  }
+}

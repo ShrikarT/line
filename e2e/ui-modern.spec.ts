@@ -12,6 +12,10 @@ test("product preview explains a purchase and supports replay and each role", as
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.emulateMedia({ reducedMotion: "reduce" });
   const mutations: string[] = [];
+  const animationWarnings: string[] = [];
+  page.on("console", message => {
+    if (message.type() === "warning" && message.text().includes("No target found")) animationWarnings.push(message.text());
+  });
   page.on("request", (request) => {
     if (request.method() === "POST") mutations.push(request.url());
   });
@@ -52,6 +56,7 @@ test("product preview explains a purchase and supports replay and each role", as
     }),
   ).toBeVisible();
   await page.getByRole("tab", { name: "Agent", exact: true }).click();
+  await expect(page.locator('.playground-panel[data-state="active"] .demo-animate').first()).toHaveCSS("opacity", "1");
   await page.evaluate(() => window.scrollTo(0, 0));
   await page.screenshot({
     path: path.join(output, "home-complete-1440.png"),
@@ -74,6 +79,7 @@ test("product preview explains a purchase and supports replay and each role", as
     ),
   ).toBe(true);
   expect(mutations).toEqual([]);
+  expect(animationWarnings).toEqual([]);
 });
 
 test("workspace command palette searches, handles empty results and preserves navigation", async ({

@@ -5,6 +5,9 @@ import {resolveMidnightEndpoints,sanitizeServiceError} from '../src/lib/runtime/
 import {resolveContractRelease,validateContractArtifacts} from './contract-artifacts.mjs';
 
 try {
+ const args=process.argv.slice(2);
+ if(args.length!==0&&(args.length!==2||args[0]!=='--output'||!args[1]))throw Error('Usage: verify-live-preprod-checkout.mjs [--output report.json]');
+ const output=args[1]??'docs/preprod-2026-10-14-evidence/live-checkout-receipts.json';
  const directory='.midnight-cache/live-checkout',release=validateContractArtifacts({artifactDir:resolveContractRelease()});
  const reader=createFinalizedReceiptReader({endpoints:resolveMidnightEndpoints({networkId:'preprod',blockfrostProjectId:process.env.MIDNIGHT_BLOCKFROST_PROJECT_ID})});
  const records=readdirSync(directory).filter(name=>name.endsWith('.json')).map(name=>JSON.parse(readFileSync(`${directory}/${name}`,'utf8'))).filter(row=>row.schema==='line-live-checkout-operation/v1'&&row.disposition==='confirmed-success').sort((a,b)=>a.blockHeight-b.blockHeight);
@@ -19,6 +22,6 @@ try {
  if(names.length!==12)throw Error('Expected exactly twelve canonical verifier keys.');
  for(const name of names)if(!Buffer.from(latest.state.operation(name).verifierKey).equals(readFileSync(`${release.artifactDir}/keys/${name}.verifier`)))throw Error('Deployed verifier key mismatch.');
  const report={checkedAt:new Date().toISOString(),network:'preprod',contractAddress:records[0].contractAddress,sourceSha256:release.inputs.source.sha256,confirmedTransactions:receipts.length,canonicalVerifierKeysMatched:names,receipts,trust:'TLS indexer and RPC providers; canonical finalized-block and raw-transaction checks, not a light-client proof',tokenPayoutEstablished:false,cashRepaymentVerified:false};
- writeFileSync('docs/preprod-2026-10-14-evidence/live-checkout-receipts.json',JSON.stringify(report,null,2)+'\n');
+ writeFileSync(output,JSON.stringify(report,null,2)+'\n');
  console.log(JSON.stringify({verified:true,confirmedTransactions:receipts.length,canonicalVerifierKeysMatched:names.length}));
 }catch(error){console.error(sanitizeServiceError(error.message));process.exitCode=1;}

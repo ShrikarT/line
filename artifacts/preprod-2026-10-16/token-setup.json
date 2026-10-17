@@ -1,0 +1,325 @@
+{
+  "network": "preprod",
+  "contractAddress": "a159597495b52ea7a703a29562b17fcb042bf7eaa984ec1e05e7e8935208304b",
+  "phase": "ready",
+  "progress": "Test-token merchant balances verified",
+  "busy": false,
+  "pending": null,
+  "privateBook": {
+    "limit": 60,
+    "outstanding": 0,
+    "remaining": 60
+  },
+  "orders": [],
+  "receipts": [
+    {
+      "schema": "line-live-checkout-operation/v1",
+      "id": "deploy",
+      "kind": "deploy",
+      "name": "deploy",
+      "contractAddress": "a159597495b52ea7a703a29562b17fcb042bf7eaa984ec1e05e7e8935208304b",
+      "txId": "001017167f1cec98bc1144b678261a2a0dfb0a586f84ee0f47efd06d6c0c8d004b",
+      "txHash": "cb8b73c64a9ade7adce2a650ebdb295b4d353a1deceb1a5fdd484b65f833f53c",
+      "disposition": "confirmed-success",
+      "createdAt": "2026-10-16T13:53:07.050Z",
+      "extrinsicHash": "0xd7679b3acf90fd8ec1d462218aeddd91adde1f9c17b81728b96020b2fff12ca6",
+      "blockHeight": 3006826,
+      "finalizedHead": {
+        "hash": "bcbb17d9ac9fc346dd936a24fb6fe2b6a9fe732d5b40f64180686b352e0f8ff7",
+        "height": 3006827
+      },
+      "feePaid": "1",
+      "verifiedAt": "2026-10-16T13:53:40.339Z"
+    },
+    {
+      "schema": "line-live-checkout-operation/v1",
+      "id": "key-disablemerchant",
+      "kind": "key-registration",
+      "name": "disableMerchant",
+      "contractAddress": "a159597495b52ea7a703a29562b17fcb042bf7eaa984ec1e05e7e8935208304b",
+      "txId": "00b11434c2cad9d7782954b0af2c37cf4d90c646af9662664d3af63658841ed8b8",
+      "txHash": "cdb3c7cc0e77af6299dbd9bbb5f35c722427cdf84317c5b4b81a8d8e4aa0f946",
+      "disposition": "confirmed-success",
+      "createdAt": "2026-10-16T13:53:51.951Z",
+      "extrinsicHash": "0x3878fe4d679a55843d7300c2ce67668020a650ba45a9c743b13ffcfeb4cb9c55",
+      "blockHeight": 3006834,
+      "finalizedHead": {
+        "hash": "3be8010c45a8647f6800b11240303d8a86dfcc0e0e60e1d4023cae25905fb4c3",
+        "height": 3006834
+      },
+      "feePaid": "1",
+      "verifiedAt": "2026-10-16T13:54:19.062Z"
+    },
+    {
+      "schema": "line-live-checkout-operation/v1",
+      "id": "key-fundreserve",
+      "kind": "key-registration",
+      "name": "fundReserve",
+      "contractAddress": "a159597495b52ea7a703a29562b17fcb042bf7eaa984ec1e05e7e8935208304b",
+      "txId": "003594a685e6135b29aba8028ad517406b73ad2c8edece12f11324a9670f1ba2c3",
+      "txHash": "cf049beeb84e4470df93b1e88b072c03ce25048eddef78de9dd219c98d471e58",
+      "disposition": "confirmed-success",
+      "createdAt": "2026-10-16T13:54:28.727Z",
+      "extrinsicHash": "0xfb8923a084d69df0a5ab811506bf70d4d24ecd5d8ed803f239ba648fef91065c",
+      "blockHeight": 3006840,
+      "finalizedHead": {
+        "hash": "8467cdde4e9203ccad696fafcf243445050251ba13592685ec919b0d9bfcf486",
+        "height": 3006840
+      },
+      "feePaid": "1",
+      "verifiedAt": "2026-10-16T13:54:55.428Z"
+    },
+    {
+      "schema": "line-live-checkout-operation/v1",
+      "id": "key-withdrawunencumberedreserve",
+      "kind": "key-registration",
+      "name": "withdrawUnencumberedReserve",
+      "contractAddress": "a159597495b52ea7a703a29562b17fcb042bf7eaa984ec1e05e7e8935208304b",
+      "txId": "00deb10624ad84a05cb091d52dd326921caac3cdd98cf90af2fc3763ccc303504d",
+      "txHash": "c74f72cf5daf0a3a661e13175bd121f097be83653be03c9995dc799634ad4543",
+      "disposition": "confirmed-success",
+      "createdAt": "2026-10-16T13:55:02.727Z",
+      "extrinsicHash": "0x92987301a201ccc6de5495f7c7dabc7de212e7583d4fa9bf47fcbea09b39220d",
+      "blockHeight": 3006845,
+      "finalizedHead": {
+        "hash": "9f888c80e6490020e60b125f13a87fc996d813a1ca3130eb0d816c55e0824f5b",
+        "height": 3006845
+      },
+      "feePaid": "1",
+      "verifiedAt": "2026-10-16T13:55:23.678Z"
+    },
+    {
+      "schema": "line-live-checkout-operation/v1",
+      "id": "key-withdrawfees",
+      "kind": "key-registration",
+      "name": "withdrawFees",
+      "contractAddress": "a159597495b52ea7a703a29562b17fcb042bf7eaa984ec1e05e7e8935208304b",
+      "txId": "00ab11c7fd13566845b815e789e56c8066b13633e172adf97c7d3514907bf2ffa3",
+      "txHash": "2d90ca6e01cbe526c46004cc856a0b0e61930c3e10a14bfa3904f6b471c6832b",
+      "disposition": "confirmed-success",
+      "createdAt": "2026-10-16T13:55:31.634Z",
+      "extrinsicHash": "0x1c04c6afb40509cdbae8341c7cad6080badca0ecf870452c409de6a235652247",
+      "blockHeight": 3006850,
+      "finalizedHead": {
+        "hash": "9c54e3458d728d6e72d6d44587fe3be6f69a4dc38bff1632cdadac4c3ebdda2c",
+        "height": 3006851
+      },
+      "feePaid": "1",
+      "verifiedAt": "2026-10-16T13:56:01.628Z"
+    },
+    {
+      "schema": "line-live-checkout-operation/v1",
+      "id": "key-openline",
+      "kind": "key-registration",
+      "name": "openLine",
+      "contractAddress": "a159597495b52ea7a703a29562b17fcb042bf7eaa984ec1e05e7e8935208304b",
+      "txId": "0081425ed44c6e6bc048e12fa2c0a485f1698e7c330b1ab1caa33dd4ebfdf55322",
+      "txHash": "769cdb102220e54771833e7c698449818526d82c0d78572499bd8d33c83cfdbb",
+      "disposition": "confirmed-success",
+      "createdAt": "2026-10-16T13:56:07.570Z",
+      "extrinsicHash": "0x18b7a026453c867ecee99dcd39a05fb58bf5ad4d0359dffe4e931dbe84a7c72a",
+      "blockHeight": 3006856,
+      "finalizedHead": {
+        "hash": "61a712200deaa8138ef507d0fd135627c7909d60659a42b6effb0d76d81c6807",
+        "height": 3006856
+      },
+      "feePaid": "1",
+      "verifiedAt": "2026-10-16T13:56:27.367Z"
+    },
+    {
+      "schema": "line-live-checkout-operation/v1",
+      "id": "key-postquote",
+      "kind": "key-registration",
+      "name": "postQuote",
+      "contractAddress": "a159597495b52ea7a703a29562b17fcb042bf7eaa984ec1e05e7e8935208304b",
+      "txId": "00f0cd2aac5beaa24c979b6bb540f428c548075cba06695ddfef26420674b61839",
+      "txHash": "c7fbeb0d2adf98e432325345b30e317ebe54cb9ee3de963ba4ebe27f5b873365",
+      "disposition": "confirmed-success",
+      "createdAt": "2026-10-16T13:56:30.587Z",
+      "extrinsicHash": "0x947ef2200c0df771aca24e515257e744b63a51ae6aaf4ea7585890027e4c8db7",
+      "blockHeight": 3006860,
+      "finalizedHead": {
+        "hash": "b8656a2f45b5b06ce78d65269ddb291798029f277fa6f92559925f46fcefbf68",
+        "height": 3006860
+      },
+      "feePaid": "1",
+      "verifiedAt": "2026-10-16T13:56:53.825Z"
+    },
+    {
+      "schema": "line-live-checkout-operation/v1",
+      "id": "key-draw",
+      "kind": "key-registration",
+      "name": "draw",
+      "contractAddress": "a159597495b52ea7a703a29562b17fcb042bf7eaa984ec1e05e7e8935208304b",
+      "txId": "0027e1f8796da28752c6fdf04347b95d4ba517bbcdb8e9916dbb9c8bf4dd9038a8",
+      "txHash": "810f0b4aef72644d330b56e0032a01c4becf90e74c90dfea84c0889849652333",
+      "disposition": "confirmed-success",
+      "createdAt": "2026-10-16T13:56:57.382Z",
+      "extrinsicHash": "0x37ba16379f54384e717acb15707970c1aa9eba24c8a5b5683df7a3f534f85c0d",
+      "blockHeight": 3006864,
+      "finalizedHead": {
+        "hash": "b05b06acfd95bfcd86708e7fef05eec0598bad7298fa07a743275bb27f87957b",
+        "height": 3006864
+      },
+      "feePaid": "1",
+      "verifiedAt": "2026-10-16T13:57:18.567Z"
+    },
+    {
+      "schema": "line-live-checkout-operation/v1",
+      "id": "key-redeemdraw",
+      "kind": "key-registration",
+      "name": "redeemDraw",
+      "contractAddress": "a159597495b52ea7a703a29562b17fcb042bf7eaa984ec1e05e7e8935208304b",
+      "txId": "009ef78b3536e53aecb6dc9426f50459ae8b3ec1383edb0c028658e46b0b98d5ab",
+      "txHash": "f85e82a62dbb56367dbdc34cceec865a8f901190cac937eba9c4d67c9f1db1b0",
+      "disposition": "confirmed-success",
+      "createdAt": "2026-10-16T13:57:21.196Z",
+      "extrinsicHash": "0x3f3c432ee182b2edb41f9dd1389a48614ee3d7bf1f6db18aa032baec282a3809",
+      "blockHeight": 3006868,
+      "finalizedHead": {
+        "hash": "a0bebd4d31f910ba10d12329fef9266307e149901df4aef299e3b2a1318423c3",
+        "height": 3006868
+      },
+      "feePaid": "1",
+      "verifiedAt": "2026-10-16T13:57:42.187Z"
+    },
+    {
+      "schema": "line-live-checkout-operation/v1",
+      "id": "key-cancelorexpirenote",
+      "kind": "key-registration",
+      "name": "cancelOrExpireNote",
+      "contractAddress": "a159597495b52ea7a703a29562b17fcb042bf7eaa984ec1e05e7e8935208304b",
+      "txId": "005a506d970c613a439287cf2d30e6f042a17f2f44c5a5fe824dbf4a8f57ddf386",
+      "txHash": "850296b4f313ea393895fe7b8fb00214f49f9f20626ac5b3d62678036043ef42",
+      "disposition": "confirmed-success",
+      "createdAt": "2026-10-16T13:57:44.970Z",
+      "extrinsicHash": "0xaa56c89f4852699abbb6d2120511cb7636818463ee190224303bfa8edb9e0ad5",
+      "blockHeight": 3006872,
+      "finalizedHead": {
+        "hash": "2fc48cd2183677769b2fa4d3d0ddc483d74fc2cd204c0162b9911e644f1a5102",
+        "height": 3006872
+      },
+      "feePaid": "1",
+      "verifiedAt": "2026-10-16T13:58:06.894Z"
+    },
+    {
+      "schema": "line-live-checkout-operation/v1",
+      "id": "key-acknowledgerepayment",
+      "kind": "key-registration",
+      "name": "acknowledgeRepayment",
+      "contractAddress": "a159597495b52ea7a703a29562b17fcb042bf7eaa984ec1e05e7e8935208304b",
+      "txId": "0020318c3ee499d56ab0f9aebc6c1b93b23daf06aa5d5c26525c442d58882ca90b",
+      "txHash": "d1e1b1eb238ff9c6f73e1fceca8aa6347d763b37b6d4005631c6d1ce20e37a75",
+      "disposition": "confirmed-success",
+      "createdAt": "2026-10-16T13:58:09.586Z",
+      "extrinsicHash": "0x1f8e61529cc05549e3d01270b00d0b5b1b8785a818da47bf93cd51cb8bcf3d3c",
+      "blockHeight": 3006876,
+      "finalizedHead": {
+        "hash": "a95dd090a05263498417c21787beb180a14a1f01a9122548b3ea4ab1880563b8",
+        "height": 3006876
+      },
+      "feePaid": "1",
+      "verifiedAt": "2026-10-16T13:58:29.697Z"
+    },
+    {
+      "schema": "line-live-checkout-operation/v1",
+      "id": "key-setstatus",
+      "kind": "key-registration",
+      "name": "setStatus",
+      "contractAddress": "a159597495b52ea7a703a29562b17fcb042bf7eaa984ec1e05e7e8935208304b",
+      "txId": "0010eeab0115dbc4d98b21391982644752bb24b048a9fdf581c6f588833c609ea3",
+      "txHash": "dc72d25ff6175cf9d3cf0b17e5875f131572bc8ac30769ae406765a7a8a73614",
+      "disposition": "confirmed-success",
+      "createdAt": "2026-10-16T13:58:32.228Z",
+      "extrinsicHash": "0x4adb6d9c1aec31d9144590ecc7f28e722d7681814708e91be1050542ace99225",
+      "blockHeight": 3006880,
+      "finalizedHead": {
+        "hash": "804f0b9b1af190e350ef0d50b2cbc5e8293bd414fc8abd7a58f160abb492990c",
+        "height": 3006880
+      },
+      "feePaid": "1",
+      "verifiedAt": "2026-10-16T13:58:54.094Z"
+    },
+    {
+      "schema": "line-live-checkout-operation/v1",
+      "id": "setup-fund",
+      "kind": "call",
+      "name": "fundReserve",
+      "contractAddress": "a159597495b52ea7a703a29562b17fcb042bf7eaa984ec1e05e7e8935208304b",
+      "txId": "000b0b018a1bfab45016d92d8acf268a15edf008b1a70ba2c057fb1d510250c840",
+      "txHash": "634a128b6275c58c817b25e5be4d6cdeaee2ed710763984200f685b9089c765a",
+      "disposition": "confirmed-success",
+      "createdAt": "2026-10-16T13:59:28.736Z",
+      "extrinsicHash": "0x1d443e3765657fffb25c31db05a72afc18fbc67fe60371b337cbda8790b5e5ae",
+      "blockHeight": 3006890,
+      "finalizedHead": {
+        "hash": "40de289737225e74734933126ca2a2162731bc3d9d1d8b9bd2d47fa6f6c1b04b",
+        "height": 3006891
+      },
+      "feePaid": "1",
+      "verifiedAt": "2026-10-16T13:59:58.150Z"
+    },
+    {
+      "schema": "line-live-checkout-operation/v1",
+      "id": "setup-merchant-b",
+      "kind": "call",
+      "name": "registerMerchant",
+      "contractAddress": "a159597495b52ea7a703a29562b17fcb042bf7eaa984ec1e05e7e8935208304b",
+      "txId": "00784888f00e7e4f890c6f246d3e908a1e6990445238d6f96f865fcf8aaf20753c",
+      "txHash": "a72986b9dd68125bcb1ff95f2916aacc0ca8cf86b033ccf6bbcb5884b9bff848",
+      "disposition": "confirmed-success",
+      "createdAt": "2026-10-17T09:41:51.114Z",
+      "extrinsicHash": "0x124eafeec0bc1c081f88530fcdb28cd958fd310a71f2fd4b80f48632bc90cc60",
+      "blockHeight": 3018714,
+      "finalizedHead": {
+        "hash": "019452360ae77ee12adb96435ac0671ac4217ba84737511bc5dcb29669e4ac27",
+        "height": 3018717
+      },
+      "feePaid": "0",
+      "verifiedAt": "2026-10-17T09:42:45.415Z"
+    },
+    {
+      "schema": "line-live-checkout-operation/v1",
+      "id": "setup-open",
+      "kind": "call",
+      "name": "openLine",
+      "contractAddress": "a159597495b52ea7a703a29562b17fcb042bf7eaa984ec1e05e7e8935208304b",
+      "txId": "0088e214e2a6f1bd860591fb20d0486ce5f37c519d96f71d2abac847df472d9957",
+      "txHash": "2a1e0cc1b1434fa12b67a59c02b345e99ad9776bc1195b5132ada2a7a76cd025",
+      "disposition": "confirmed-success",
+      "createdAt": "2026-10-17T09:43:01.416Z",
+      "extrinsicHash": "0x7b9218de0dccee6b603b9f92004d34944a0296d23ab778b37d4b2d0eb52a482b",
+      "blockHeight": 3018725,
+      "finalizedHead": {
+        "hash": "af4d200a05f7648a8de2603dc25c8d0774296882b3594ce9fde315ab35067312",
+        "height": 3018729
+      },
+      "feePaid": "1",
+      "verifiedAt": "2026-10-17T09:43:55.774Z"
+    }
+  ],
+  "settlement": "Actual unshielded test-token payouts; no monetary value; repayment remains issuer-reported",
+  "custody": "One local operator controls issuer, agent and both merchant wallets",
+  "profile": "test-settlement",
+  "tokenObservation": {
+    "color": "0d6953d8b70bb5b9980771ae8dfc489d8b2ca05d2fa10093f25d6053b8d664cd",
+    "balances": {
+      "A": {
+        "address": "mn_addr_preprod1vflat69hjj5n2m8ftfwwspp2vssf7ckjay22qcp8p9lxedv4hgjszhshk3",
+        "addressHex": "627fd5e8b794a9356ce95a5ce8042a64209f62d2e914a06027097e6cb595ba25",
+        "units": "0",
+        "expectedUnits": "0"
+      },
+      "B": {
+        "address": "mn_addr_preprod1cqfpv7eysg9lmstmg35t2n4yjx9vt5k4xdxzrrzsapzvswr0q6zs9v2yqe",
+        "addressHex": "c012167b24820bfdc17b4468b54ea4918ac5d2d5334c218c50e844c8386f0685",
+        "units": "0",
+        "expectedUnits": "0"
+      }
+    },
+    "verifiedAt": "2026-10-17T09:43:59.793Z",
+    "transparent": true,
+    "monetaryValue": false
+  },
+  "error": null
+}

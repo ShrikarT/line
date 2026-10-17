@@ -1,0 +1,139 @@
+{
+  "checkedAt": "2026-10-16T05:54:33.272Z",
+  "network": "preprod",
+  "contractAddress": "8990864c6f80c517c7458fa9b2526d3500f3a9814399fc836097ee409da9bed0",
+  "requestId": "003f04c4-2205-4213-a496-9de3068491b9",
+  "beforeReceipts": 22,
+  "afterReceipts": 28,
+  "receipts": [
+    {
+      "schema": "line-live-checkout-operation/v1",
+      "id": "003f04c4-2205-4213-a496-9de3068491b9-0-quote",
+      "kind": "call",
+      "name": "postQuote",
+      "contractAddress": "8990864c6f80c517c7458fa9b2526d3500f3a9814399fc836097ee409da9bed0",
+      "txId": "00cad4e38f19c05cbec5485d84371eb821436fa878d591ccb7020089dd6324dbef",
+      "txHash": "43f460be51ccf4a4f201fe957ef7724dcea26aceab6be3cccde280598faad947",
+      "disposition": "confirmed-success",
+      "createdAt": "2026-10-16T05:50:34.966Z",
+      "extrinsicHash": "0x6b08715eef916dcabe47b3e5cebdaeadaf534ca92f35ef43ad1021fb23a70eb3",
+      "blockHeight": 3002001,
+      "finalizedHead": {
+        "hash": "3d9dfb88df827bb5800e5be772404bbc4e4b62f63663c8872a65c6bb11310c18",
+        "height": 3002001
+      },
+      "feePaid": "1",
+      "verifiedAt": "2026-10-16T05:51:03.803Z"
+    },
+    {
+      "schema": "line-live-checkout-operation/v1",
+      "id": "003f04c4-2205-4213-a496-9de3068491b9-0-draw",
+      "kind": "call",
+      "name": "draw",
+      "contractAddress": "8990864c6f80c517c7458fa9b2526d3500f3a9814399fc836097ee409da9bed0",
+      "txId": "009bf443c2ca09a01b7706873c2f794d845f305db1b5b792a039bd985118a5ffd8",
+      "txHash": "e0aa8ce47529e6beec0e388bb4ef603b9063a15c3c142653db9a4929957a4a47",
+      "disposition": "confirmed-success",
+      "createdAt": "2026-10-16T05:51:22.583Z",
+      "extrinsicHash": "0xf4eda0bcce132642748b205ee8bec1dcda9b33e89f2e7366b536a4327cb7357f",
+      "blockHeight": 3002009,
+      "finalizedHead": {
+        "hash": "ba1b8af449ae342c6c24c7664176d8d0e99cf41941ad9eebdc617094187c2c40",
+        "height": 3002010
+      },
+      "feePaid": "1",
+      "verifiedAt": "2026-10-16T05:51:53.849Z"
+    },
+    {
+      "schema": "line-live-checkout-operation/v1",
+      "id": "003f04c4-2205-4213-a496-9de3068491b9-0-redeem",
+      "kind": "call",
+      "name": "redeemDraw",
+      "contractAddress": "8990864c6f80c517c7458fa9b2526d3500f3a9814399fc836097ee409da9bed0",
+      "txId": "00aa5453164f2da024708bfa8c41b0c7f4f1b961c11ce89a8f49eb7014d9765608",
+      "txHash": "c8761468da3d7f246037f909b24d197191a3adc97f9992ef6cc5484a397a9a1a",
+      "disposition": "confirmed-success",
+      "createdAt": "2026-10-16T05:52:05.234Z",
+      "extrinsicHash": "0x1630eb7ad395f68ea48d541ab3aa6bf5348d4713df1eb8d46cef188897d66bdf",
+      "blockHeight": 3002016,
+      "finalizedHead": {
+        "hash": "a2921af5d7b6956f3ab63a21f5681189b65c67ed0dfcd0915a4d9999518dcacc",
+        "height": 3002017
+      },
+      "feePaid": "1",
+      "verifiedAt": "2026-10-16T05:52:34.610Z"
+    },
+    {
+      "schema": "line-live-checkout-operation/v1",
+      "id": "003f04c4-2205-4213-a496-9de3068491b9-1-quote",
+      "kind": "call",
+      "name": "postQuote",
+      "contractAddress": "8990864c6f80c517c7458fa9b2526d3500f3a9814399fc836097ee409da9bed0",
+      "txId": "000985b1dd25d77cd50a8544caf10cc4c862467e505f19072e7fe3a683bbc50f1d",
+      "txHash": "aaa94a09f589b6987d68883282223cca13736b49e5b556db16f22e021daddacd",
+      "disposition": "confirmed-success",
+      "createdAt": "2026-10-16T05:52:46.101Z",
+      "extrinsicHash": "0xf5bb589b9c6963ad30619c8f9244a1686f47f26df82c4ea3ad549a22f56b075c",
+      "blockHeight": 3002022,
+      "finalizedHead": {
+        "hash": "0e9b4894a373225f7f96842ba5b21fe1f287c4208540242d1f235f9a4ed2e57a",
+        "height": 3002023
+      },
+      "feePaid": "1",
+      "verifiedAt": "2026-10-16T05:53:09.991Z"
+    },
+    {
+      "schema": "line-live-checkout-operation/v1",
+      "id": "003f04c4-2205-4213-a496-9de3068491b9-1-draw",
+      "kind": "call",
+      "name": "draw",
+      "contractAddress": "8990864c6f80c517c7458fa9b2526d3500f3a9814399fc836097ee409da9bed0",
+      "txId": "005d1494836a60b068dd2f84c04c23a79e04092203a3034eb831c2d0305ffae102",
+      "txHash": "8cecb7b2040762ea037ada3eff97421601f1d2f4c6546034c207d11ae2673a95",
+      "disposition": "confirmed-success",
+      "createdAt": "2026-10-16T05:53:27.554Z",
+      "extrinsicHash": "0xd2dfef2b1f11c6aad37cc787c9d41fd6de61addb8c46168d8f8dc5a8eb93fe51",
+      "blockHeight": 3002029,
+      "finalizedHead": {
+        "hash": "dd4e4094ca8665307703c3b5ebbacf8e47e265ad985823e554b0d43bec901af9",
+        "height": 3002029
+      },
+      "feePaid": "1",
+      "verifiedAt": "2026-10-16T05:53:51.076Z"
+    },
+    {
+      "schema": "line-live-checkout-operation/v1",
+      "id": "003f04c4-2205-4213-a496-9de3068491b9-1-redeem",
+      "kind": "call",
+      "name": "redeemDraw",
+      "contractAddress": "8990864c6f80c517c7458fa9b2526d3500f3a9814399fc836097ee409da9bed0",
+      "txId": "005aebff1736a1b4ebcd26929c192ccd07b054bd738b491e0621f5639ac57f2fe8",
+      "txHash": "8fb7d9c1536e3ee28411931dd89b956407b9307ee1c32c49cb170c4f53694b8a",
+      "disposition": "confirmed-success",
+      "createdAt": "2026-10-16T05:54:01.993Z",
+      "extrinsicHash": "0xc3db50aaab35dc6dea61ce950954955b4b2b87bd143cd4de2fd76b4b659a4a7d",
+      "blockHeight": 3002035,
+      "finalizedHead": {
+        "hash": "812f627bf658ddbc4064cd93f82324f83b370baaf9402184a135d9c45124d9a2",
+        "height": 3002035
+      },
+      "feePaid": "1",
+      "verifiedAt": "2026-10-16T05:54:25.308Z"
+    }
+  ],
+  "deliveredServices": [
+    {
+      "service": "text-analysis",
+      "status": "delivered"
+    },
+    {
+      "service": "cost-report",
+      "status": "delivered"
+    }
+  ],
+  "browserErrors": [],
+  "mobileOverflow": false,
+  "reloadRetainedReceipts": true,
+  "tokenPayoutEstablished": false,
+  "cashRepaymentVerified": false
+}

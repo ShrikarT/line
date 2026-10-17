@@ -7,6 +7,17 @@ import {mkdtempSync,readFileSync,writeFileSync,rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import * as L from '@midnight-ntwrk/ledger-v8';
+import {assertFundedFeeTransaction} from './preprod-fees.mjs';
+
+test('actual rejected empty-fee bytes fail the guard; confirmed funded bytes pass',()=>{
+ const decode=name=>L.Transaction.deserialize('signature','proof','binding',readFileSync(`tests/fixtures/preprod-fees/${name}.bin`));
+ const rejected=decode('rejected-empty-fee'),confirmed=decode('confirmed-funded');
+ const strict=new L.WellFormedStrictness();
+ for(const key of ['enforceBalancing','verifyNativeProofs','verifyContractProofs','enforceLimits','verifySignatures'])strict[key]=false;
+ assert.throws(()=>rejected.wellFormed(L.LedgerState.blank('preprod'),strict,new Date('2026-10-17T03:33:00Z')),/transaction is not in normal form/);
+ assert.throws(()=>assertFundedFeeTransaction(rejected),/empty DUST intent/);
+ assert.equal(assertFundedFeeTransaction(confirmed),confirmed);
+});
 
 async function fixture(){
  const keys={issuer:new Uint8Array(32).fill(31),merchantA:new Uint8Array(32).fill(32),merchantB:new Uint8Array(32).fill(33),agent:new Uint8Array(32).fill(34)};
@@ -69,6 +80,22 @@ test('uncertain submission is only reconciled and never rebroadcast when receipt
  runtime.reader={read:async()=>{throw Error('Not indexed');}};runtime.fetchImpl=async()=>assert.fail('Must not rebroadcast');
  await assert.rejects(runtime.recoverPending(),/Not indexed/);assert.equal(runtime.state.pending.id,'uncertain');
  await assert.rejects(runtime.operation('another','call','postQuote',{}, {},async()=>assert.fail('Must not execute')),/Reconcile/);
+});
+
+test('RPC rejection preserves its code and message while keeping the transaction uncertain',async()=>{
+ const directory=mkdtempSync(join(tmpdir(),'line-rejection-')),runtime=Object.create(PreprodLive.prototype);
+ try{
+  const raw=readFileSync('tests/fixtures/private-offer-public-pairs/3-openLine.proven-public-tx.bin'),tx=L.Transaction.deserialize('signature','proof','binding',raw);
+  runtime.directory=directory;runtime.state={contractAddress:[...tx.intents.values()][0].actions[0].address,pending:{id:'rejected-open',kind:'call',name:'openLine'}};
+  runtime.state.pending.record=runtime.transactionRecord(runtime.state.pending,tx);
+  runtime.api={tx:{midnight:{sendMnTransaction:()=>({toHex:()=> 'same-extrinsic'})}}};runtime.endpoints={nodeUri:'https://example.invalid'};runtime.save=async()=>{};
+  let attempts=0;runtime.fetchImpl=async()=>{attempts++;return new Response(JSON.stringify({error:{code:1010,message:'Invalid Transaction: Custom error: 170'}}));};
+  await assert.rejects(runtime.submitPrepared(tx),/1010.*Custom error: 170/);
+  const retained=JSON.parse(readFileSync(join(directory,'rejected-open.json'),'utf8'));
+  assert.equal(retained.disposition,'submission-attempted');assert.equal(retained.submissionError.code,1010);assert.equal(retained.txHash,tx.transactionHash());
+  runtime.reader={read:async()=>{throw Error('Not indexed');}};
+  await assert.rejects(runtime.recoverPending(),/Not indexed/);assert.equal(attempts,1);
+ }finally{rmSync(directory,{recursive:true,force:true});}
 });
 test('actual Compact repayment restores the retained private book and repeated acknowledgement does not credit twice',async()=>{
  const f=await fixture();await f.runtime.purchase('12345678-1234-1234-1234-123456789abc','A document.');

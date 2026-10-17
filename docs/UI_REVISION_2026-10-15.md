@@ -2,6 +2,14 @@
 
 This revision follows the owner's feedback that the first redesign still felt basic. Its fixed baseline is `2317068` on `feat/line-ui-redesign`. The original Line logo and cream, navy, coral and blush colors remain authoritative.
 
+## Verified follow-up - 17 October 2026
+
+The final focused browser run passed **all ten cases in one run** (three minutes). It checks all twelve existing rendered routes at 1440px and 390px, mobile navigation and FAQ, circuit search/filter recovery, expanded reference sections, populated results, the animated purchase preview and replay, and keyboard workspace search. It also checks the new test-token page at both sizes, with isolated request IDs, setup/purchase endpoint selection and retained receipt rendering. Those token-page responses are explicitly mocked; the captures named `token-mocked-*` establish interface behavior, not a network payout.
+
+Both new receipt-page captures were visually inspected. The homepage evidence counter is now **28**, dated **16 October 2026**, matching the independently verified canonical receipt report. Canonical source/bindings and original brand files remain unchanged. Live token-settlement progress and its limits are tracked separately in [TEST_TOKEN_PAYOUT_2026-10-16.md](TEST_TOKEN_PAYOUT_2026-10-16.md).
+
+The final console review found a preview animation querying a tab before Radix had mounted its content. It now starts on the next animation frame, checks for actual targets and cancels on cleanup. Both preview/search cases pass again, including full-speed replay, role changes, completed opacity and an assertion that no `No target found` warning is emitted. The final build/typecheck passes after this fix.
+
 ## Reference and design decisions
 
 The live [Arkemis site](https://arkemis.space/) was rendered in Chromium and inspected at the hero, interactive product demo and feature sections. The useful details are its oversized type, distinct hero object, layered product surfaces, working demonstration and feature illustrations. Line translates these into a credit card and merchant receipt, a three-role purchase playground, and policy/proof/claim illustrations. No Arkemis code, brand graphics, copy or screenshots are shipped as Line product assets. The original Stock & Foil grid/alignment direction remains in the shared container and section columns.

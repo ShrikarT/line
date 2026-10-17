@@ -20,6 +20,7 @@ import {issuerPublicKey,merchantPublicKey,agentId,quoteCommit,drawNoteCommit,toH
 import {resolveMidnightEndpoints,sanitizeServiceError} from '../src/lib/runtime/endpoints.ts';
 import {resolveContractRelease,validateContractArtifacts} from '../scripts/contract-artifacts.mjs';
 import {createFinalizedReceiptReader} from '../scripts/finalized-contract-receipt.mjs';
+import {assertFundedFeeTransaction} from './preprod-fees.mjs';
 
 const BYTE_NAMES=['callerSecret','agentSecret','salt','newSalt','invoiceId','quoteNonce','receiptNonce','paymentRef','noteNonce','noteSalt','noteIdentity','noteQuoteCommit','quoteMerchantPk'];
 const UINT_NAMES=['lineLimit','lineOutstanding','lineEpoch','quoteAmount','drawAmount','redeemAmount','repayAmount'];
@@ -44,6 +45,7 @@ export class PreprodLive {
   this.keystore=createKeystore(account.selectRole(Roles.NightExternal).deriveKeyAt(0).key,'preprod');
   this.keys=Object.fromEntries(Object.entries({issuer:':line:issuer',merchantA:':line:initial_merchant',merchantB:':line:merchant_b',agent:':line:agent_1'}).map(([name,suffix])=>[name,new Uint8Array(createHash('sha256').update(mnemonic+suffix).digest())]));
   const privateOptions={midnightDbName:`${DIR}/private-db`,accountId:PublicKey.fromKeyStore(this.keystore).address,privateStoragePasswordProvider:()=>env.MIDNIGHT_STORAGE_PASSWORD};
+  this.privateStorageOptions=privateOptions;
   this.control=levelPrivateStateProvider({...privateOptions,privateStateStoreName:'controller',signingKeyStoreName:'controller-signing'});this.control.setContractAddress('00'.repeat(32));
   this.privateProvider=levelPrivateStateProvider({...privateOptions,privateStateStoreName:'sdk-states',signingKeyStoreName:'sdk-signing'});
   this.state=await this.control.get('application');
@@ -51,7 +53,8 @@ export class PreprodLive {
   if(this.state.sourceSha256!==this.release.inputs.source.sha256)throw Error('The retained private state belongs to another Compact source.');
   const dustSnapshot=readFileSync('.midnight-cache/dust-state.json','utf8'),dustCache=JSON.parse(dustSnapshot);
   if(dustCache.networkId!=='preprod'||BigInt(dustCache.publicKey.publicKey)!==this.dustKey.publicKey)throw Error('Wallet cache identity mismatch.');
-  const configuration={networkId:'preprod',txHistoryStorage:new InMemoryTransactionHistoryStorage(WalletEntrySchema),indexerClientConnection:{indexerHttpUrl:this.endpoints.indexerUri,indexerWsUrl:this.endpoints.indexerWsUri},relayURL:new URL(this.endpoints.nodeUri.replace(/^http/,'ws')),provingServerUrl:new URL(this.endpoints.proofServerUri),batchUpdates:{size:5000,timeout:50,spacing:0},costParameters:{feeBlocksMargin:5,additionalFeeOverhead:0n}};
+  const configuration={networkId:'preprod',txHistoryStorage:new InMemoryTransactionHistoryStorage(WalletEntrySchema),indexerClientConnection:{indexerHttpUrl:this.endpoints.indexerUri,indexerWsUrl:this.endpoints.indexerWsUri},relayURL:new URL(this.endpoints.nodeUri.replace(/^http/,'ws')),provingServerUrl:new URL(this.endpoints.proofServerUri),batchUpdates:{size:5000,timeout:50,spacing:0},costParameters:{feeBlocksMargin:5,additionalFeeOverhead:1n}};
+  this.walletConfiguration=configuration;
   this.facade=await WalletFacade.init({configuration,submissionService:()=>({submitTransaction:async()=>{throw Error('Use journaled submission.');},close:async()=>{}}),shielded:c=>ShieldedWallet(c).startWithSecretKeys(this.shieldedKeys),unshielded:c=>UnshieldedWallet(c).restore(readFileSync('.midnight-cache/unshielded-state.json','utf8')),dust:c=>DustWallet(c).restore(dustSnapshot)});
   await this.facade.start(this.shieldedKeys,this.dustKey);await this.facade.shielded.stop();await this.facade.dust.waitForSyncedState(5n);
   this.api=await ApiPromise.create({provider:new HttpProvider(this.endpoints.nodeUri),noInitWarn:true});
@@ -61,18 +64,20 @@ export class PreprodLive {
   const zkp=new NodeZkConfigProvider(this.release.artifactDir),proof=httpClientProofProvider(this.endpoints.proofServerUri,zkp);
   this.providers={publicDataProvider:this.publicProvider,privateStateProvider:this.privateProvider,zkConfigProvider:zkp,
    proofProvider:{proveTx:async tx=>{this.progress='Generating Compact proof';const result=await proof.proveTx(tx);this.progress='Proof generated';return result;}},
-   walletProvider:{getCoinPublicKey:()=>this.shieldedKeys.coinPublicKey,getEncryptionPublicKey:()=>this.shieldedKeys.encryptionPublicKey,balanceTx:async(tx,ttl)=>{this.progress='Balancing DUST transaction fees';const recipe=await this.facade.balanceUnboundTransaction(tx,{shieldedSecretKeys:this.shieldedKeys,dustSecretKey:this.dustKey},{ttl:ttl??new Date(Date.now()+30*60*1000),tokenKindsToBalance:['dust']});return this.facade.finalizeRecipe(recipe);}},
-   midnightProvider:{submitTx:async tx=>{
+   walletProvider:{getCoinPublicKey:()=>this.shieldedKeys.coinPublicKey,getEncryptionPublicKey:()=>this.shieldedKeys.encryptionPublicKey,balanceTx:async(tx,ttl)=>{this.progress='Synchronizing the fee wallet';await this.facade.dust.waitForSyncedState(0n);this.progress='Balancing DUST transaction fees';const recipe=await this.facade.balanceUnboundTransaction(tx,{shieldedSecretKeys:this.shieldedKeys,dustSecretKey:this.dustKey},{ttl:ttl??new Date(Date.now()+30*60*1000),tokenKindsToBalance:['dust']});return assertFundedFeeTransaction(await this.facade.finalizeRecipe(recipe));}},
+   midnightProvider:{submitTx:tx=>this.journalAndSubmit(tx)}};
+  await this.recoverPending();
+ }
+ async journalAndSubmit(tx){
     if(!this.state.pending)throw Error('Submission has no durable operation context.');
     const pending=this.state.pending,identifier=tx.identifiers().at(-1);if(!identifier)throw Error('Transaction has no identifier.');
     const actions=[...tx.intents.values()].flatMap(intent=>intent.actions);if(actions.length!==1)throw Error('Expected one contract action.');
     const address=actions[0].address;if(pending.kind==='deploy')pending.after.contractAddress=address;else if(address!==this.state.contractAddress)throw Error('Transaction targets another contract.');
     const record=this.transactionRecord(pending,tx);
-    writeFileSync(`${DIR}/${pending.id}.bin`,tx.serialize(),{flag:'wx'});writeFileSync(`${DIR}/${pending.id}.json`,JSON.stringify(record,null,2)+'\n',{flag:'wx'});
+    const directory=this.directory??DIR;
+    writeFileSync(`${directory}/${pending.id}.bin`,tx.serialize(),{flag:'wx'});writeFileSync(`${directory}/${pending.id}.json`,JSON.stringify(record,null,2)+'\n',{flag:'wx'});
     pending.record=record;await this.save();
     await this.submitPrepared(tx);return identifier;
-   }}};
-  await this.recoverPending();
  }
  transactionRecord(pending,tx){
   const actions=[...tx.intents.values()].flatMap(intent=>intent.actions),action=actions[0];
@@ -90,7 +95,11 @@ export class PreprodLive {
   row.disposition='submission-attempted';await this.save();writeFileSync(`${this.directory??DIR}/${pending.id}.json`,JSON.stringify(row,null,2)+'\n');
   this.progress='Waiting for Preprod confirmation';console.log(JSON.stringify({operation:pending.id,txHash:row.txHash}));
   const response=await (this.fetchImpl??fetch)(this.endpoints.nodeUri,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({jsonrpc:'2.0',id:1,method:'author_submitExtrinsic',params:[extHex]}),signal:AbortSignal.timeout(30000)});
-  if(!response.ok)throw Error('Submission result is uncertain. Reconcile the saved transaction.');const result=await response.json();if(result.error||typeof result.result!=='string')throw Error('RPC rejected the submission. Reconcile the saved transaction.');
+  if(!response.ok)throw Error('Submission result is uncertain. Reconcile the saved transaction.');const result=await response.json();if(result.error||typeof result.result!=='string'){
+   row.submissionError={code:Number.isInteger(result.error?.code)?result.error.code:null,message:sanitizeServiceError(String(result.error?.message??'Invalid RPC submission response').slice(0,512)),data:typeof result.error?.data==='string'?sanitizeServiceError(result.error.data.slice(0,512)):null};
+   await this.save();writeFileSync(`${this.directory??DIR}/${pending.id}.json`,JSON.stringify(row,null,2)+'\n');
+   throw Error(`RPC rejected the submission (${row.submissionError.code??'unknown'}): ${row.submissionError.message}. Reconcile the saved transaction.`);
+  }
   row.extrinsicHash=result.result;row.disposition='submitted';await this.save();writeFileSync(`${this.directory??DIR}/${pending.id}.json`,JSON.stringify(row,null,2)+'\n');
  }
  async recoverPending(){
@@ -132,14 +141,16 @@ export class PreprodLive {
  async setup(){
   await this.recoverPending();
   if(!this.state.contractAddress){
-   class ShellContract extends Contract{constructor(w){super(w);this.circuits={registerMerchant:this.circuits.registerMerchant};this.provableCircuits={registerMerchant:this.circuits.registerMerchant};}initialState(...args){const result=super.initialState(...args),shell=new C.ContractState();shell.data=result.currentContractState.data;shell.setOperation('registerMerchant',result.currentContractState.operation('registerMerchant'));return {...result,currentContractState:shell};}}
+   const ContractType=this.contractType??Contract;
+   class ShellContract extends ContractType{constructor(w){super(w);this.circuits={registerMerchant:this.circuits.registerMerchant};this.provableCircuits={registerMerchant:this.circuits.registerMerchant};}initialState(...args){const result=super.initialState(...args),shell=new C.ContractState();shell.data=result.currentContractState.data;shell.setOperation('registerMerchant',result.currentContractState.operation('registerMerchant'));return {...result,currentContractState:shell};}}
    const shell=CompiledContract.make('line',ShellContract).pipe(CompiledContract.withWitnesses(Object.fromEntries([...BYTE_NAMES.map(n=>[n,ctx=>[ctx.privateState,new Uint8Array(32)]]),...UINT_NAMES.map(n=>[n,ctx=>[ctx.privateState,0n]])])),CompiledContract.withCompiledFileAssets(this.release.artifactDir));
-   await this.operation('deploy','deploy','deploy',{}, {...this.state,phase:'registering'},()=>deployContract(this.providers,{compiledContract:shell,args:[issuerPublicKey(this.keys.issuer),merchantPublicKey(this.keys.merchantA),this.state.instanceNonce],signingKey:this.state.maintenanceKey}));
+   const constructorArgs=this.constructorArgs??[issuerPublicKey(this.keys.issuer),merchantPublicKey(this.keys.merchantA),this.state.instanceNonce];
+   await this.operation('deploy','deploy','deploy',{}, {...this.state,phase:'registering'},()=>deployContract(this.providers,{compiledContract:shell,args:constructorArgs,signingKey:this.state.maintenanceKey}));
   }
   this.privateProvider.setContractAddress(this.state.contractAddress);await this.privateProvider.setSigningKey(this.state.contractAddress,this.state.maintenanceKey);
   for(const name of CIRCUITS.filter(n=>n!=='registerMerchant'))await this.operation(`key-${name.toLowerCase()}`,'key-registration',name,{}, {...this.state},()=>submitInsertVerifierKeyTx(this.providers,this.compiled,this.state.contractAddress,name,new Uint8Array(readFileSync(`${this.release.artifactDir}/keys/${name}.verifier`))));
   await this.call('setup-fund','fundReserve',[200n],{callerSecret:this.keys.issuer},{...this.state});
-  await this.call('setup-merchant-b','registerMerchant',[merchantPublicKey(this.keys.merchantB)],{callerSecret:this.keys.issuer},{...this.state});
+  await this.call('setup-merchant-b','registerMerchant',this.merchantRegistrationArgs??[merchantPublicKey(this.keys.merchantB)],{callerSecret:this.keys.issuer},{...this.state});
   await this.call('setup-open','openLine',[BigInt(now()+7*86400),0n,0n],{callerSecret:this.keys.issuer,agentSecret:this.keys.agent,lineLimit:this.state.limit,salt:this.state.salt},{...this.state,phase:'ready',lineExpiry:now()+7*86400});
   return this.summary();
  }
@@ -148,7 +159,7 @@ export class PreprodLive {
   if(!/^[a-f0-9-]{36}$/.test(requestId))throw Error('A stable request ID is required.');
   if(this.state.phase!=='ready')throw Error('Finish Preprod setup first.');
   if(typeof document!=='string'||!document.trim()||document.length>5000)throw Error('Enter a document of up to 5000 characters.');
-  const contracts=await this.publicProvider.queryContractState(this.state.contractAddress),domain=ledger(contracts.data).contractDomain;
+  const contracts=await this.publicProvider.queryContractState(this.state.contractAddress),domain=(this.decodeLedger??ledger)(contracts.data).contractDomain;
   for(const [index,service,amount,key]of [[0,'text-analysis',25n,this.keys.merchantA],[1,'cost-report',20n,this.keys.merchantB]]){
    const orderId=`${requestId}-${index}`;let order=this.state.orders.find(o=>o.id===orderId);
    if(!order){const expiry=now()+86400;order={id:orderId,service,document,amount,invoiceId:canonicalInvoiceIdBytes(requestId.replaceAll('-','')),quoteNonce:bytes(),noteNonce:bytes(),noteSalt:bytes(),quoteExpiry:expiry,noteExpiry:expiry,status:'created'};this.state.orders.push(order);await this.save();}

@@ -70,3 +70,31 @@ test("reconciliation is admitted through the same job guard without creating a p
   stream.end(JSON.stringify({ requestId: "12345678-1234-1234-1234-123456789abc" }));
   await run; await live.close(); assert.deepEqual(statuses, [202]); assert.equal(recovered, 1);
 });
+
+test("test-token setup and canonical purchases share one fee-wallet job guard", async () => {
+  let setups = 0, purchases = 0, finish!: () => void;
+  const waiting = new Promise<void>(resolve => { finish = resolve; });
+  const parent = { summary: () => ({} as never), setup: async () => assert.fail("Canonical deployment is not exposed"), purchase: async () => { purchases++; return {} as never; }, acknowledge: async () => ({} as never), close: async () => {} };
+  const live = preprodMiddleware({ env: { LINE_LIVE_PREPROD: "1" }, create: async () => parent, createSettlement: async actual => {
+    assert.equal(actual, parent);
+    return { ...parent, setup: async () => { setups++; await waiting; return {} as never; } };
+  } });
+  const server = createServer((req, res) => { void live.middleware(req, res, () => { res.writeHead(404); res.end(); }); });
+  await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve));
+  const address = server.address(); assert(address && typeof address !== "string");
+  const origin = `http://127.0.0.1:${address.port}`;
+  const headers = { Origin: origin, "X-Line-Preprod": "operator", "Content-Type": "application/json" };
+  const body = JSON.stringify({ requestId: "12345678-1234-1234-1234-123456789abc", document: "Test-token purchase" });
+  try {
+    assert.equal((await fetch(`${origin}/api/preprod/setup`, { method: "POST", headers, body })).status, 404);
+    assert.equal((await fetch(`${origin}/api/preprod/settlement/status`, { headers })).status, 200);
+    assert.equal(setups, 0);
+    assert.equal((await fetch(`${origin}/api/preprod/settlement/setup`, { method: "POST", headers, body })).status, 202);
+    assert.equal((await fetch(`${origin}/api/preprod/purchase`, { method: "POST", headers, body })).status, 409);
+    assert.equal((await fetch(`${origin}/api/preprod/settlement/purchase`, { method: "POST", headers, body })).status, 409);
+    assert.equal(setups, 1); assert.equal(purchases, 0);
+    const status = await (await fetch(`${origin}/api/preprod/status`, { headers })).json();
+    assert.equal(status.busy, true);
+    assert.equal(status.progress, "Another Preprod contract operation is running");
+  } finally { finish(); await live.close(); await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve())); }
+});
