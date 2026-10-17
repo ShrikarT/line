@@ -30,6 +30,17 @@ export interface WalletState {
 
 let activeConnectedApi: ConnectedAPI | null = null;
 let activeWalletInfo: WalletInfo | null = null;
+const walletListeners = new Set<() => void>();
+
+/** Keep the shared account control in sync with advanced network setup. */
+export function subscribeWallet(listener: () => void): () => void {
+  walletListeners.add(listener);
+  return () => { walletListeners.delete(listener); };
+}
+
+function notifyWalletChanged(): void {
+  walletListeners.forEach(listener => listener());
+}
 
 /** Connector v4 public keys carry both a key type and network in Bech32m.
  * Uint8Array decoding avoids the address SDK's reliance on a global Buffer.
@@ -110,6 +121,7 @@ export function getActiveWalletInfo(): WalletInfo | null {
 export async function disconnectWallet(): Promise<void> {
   activeConnectedApi = null;
   activeWalletInfo = null;
+  notifyWalletChanged();
 }
 
 export async function connectWallet(
@@ -161,11 +173,13 @@ export async function connectWallet(
       apiVersion: targetWallet.apiVersion,
       isAvailable: true,
     };
+    notifyWalletChanged();
 
     return connectedApi;
   } catch (err) {
     activeConnectedApi = null;
     activeWalletInfo = null;
+    notifyWalletChanged();
 
     if (err instanceof Error) {
       const msg = err.message.toLowerCase();

@@ -2,9 +2,17 @@
 
 Current local app: **http://127.0.0.1:5174/**.
 
+## Start here: wallet and workspace
+
+Open **http://127.0.0.1:5174/app**. The header now exposes **Connect wallet** on desktop and mobile, including the live checkout pages. Choose a detected Midnight Connector v4 wallet, use Preprod, and approve the connection in the extension. Line displays the public receiving address and provides copy/disconnect controls. After a full reload, reconnect explicitly; wallet handles and addresses are not persisted by the new account UI. No mnemonic or wallet password is requested.
+
+The workspace links directly to `/test-payout`, describes the complete purchase test, and links to all three role consoles. Existing facility owners can open `/connect` for advanced service configuration and contract joining. The original runtime switch remains available on larger screens.
+
+**Connection is not facility ownership or authentication to the local operator.** The demo's issuer, agent, fee and merchant keys remain under the configured local operator. A connected browser wallet does not sign `/preprod` or `/test-payout` purchases, receive their merchant payouts, or automatically get a credit line. Independent borrower onboarding, role provisioning and a wallet-signed credit application are still outstanding product work. The role consoles use their configured simulator/network runtime and require matching private vault records for network operations.
+
 ## Live Midnight Preprod
 
-The homepage's **Open live checkout** action opens `/preprod`. It uses the existing funded test wallet and deployed canonical contract through the local operator backend.
+The homepage's **Open workspace** and header **Open app** actions open `/app`. Choose **Live Preprod** in the navigation for `/preprod`. It uses the existing funded test wallet and deployed canonical contract through the local operator backend.
 
 Before a live demonstration, start Docker Desktop and the existing proof server:
 

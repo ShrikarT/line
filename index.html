@@ -16,9 +16,15 @@
     <meta property="og:type" content="website" />
     <link rel="icon" type="image/png" href="/brand/app-icon.png" />
     <link rel="preload" href="/fonts/Manrope.ttf" as="font" type="font/ttf" crossorigin />
+    <style>
+      body { margin: 0; background: #faf2e7; }
+      .line-boot { min-height: 100dvh; display: grid; place-content: center; justify-items: center; gap: 16px; padding: 24px; box-sizing: border-box; color: #1e3a6e; font-family: Manrope, system-ui, sans-serif; text-align: center; }
+      .line-boot img { width: 48px; height: 48px; }
+      .line-boot p { margin: 0; font-size: 14px; color: #4a5b7c; }
+    </style>
   </head>
   <body class="bg-bg text-fg antialiased">
-    <div id="root"></div>
+    <div id="root"><div class="line-boot" role="status"><img src="/brand/logo-pixel.svg" alt="" /><strong>Opening your workspace…</strong><p>Preparing Line. Your wallet will connect only when you choose.</p><noscript>Enable JavaScript to use the Line workspace.</noscript></div></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
