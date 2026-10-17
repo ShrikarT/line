@@ -7,4 +7,4 @@ scripts/compile-compact.mjs text eol=lf
 src/lib/line/encoding.ts text eol=lf
 # The funded test profile pins the exact CRLF source bytes used for its keys.
 # Preserve them across checkouts; normalization requires a release migration.
-contracts/experimental/line-test-settlement.compact -text
+contracts/experimental/line-test-settlement.compact -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
