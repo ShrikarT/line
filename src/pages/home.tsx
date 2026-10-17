@@ -41,7 +41,7 @@ const FAQ = [
   ],
   [
     "Are real payments being made?",
-    "No merchant token payout is connected. Reserve and redemption units are test accounting. Repayment acknowledgement is an issuer assertion, not independent verification that cash arrived.",
+    "The test-token checkout transfers valueless test tokens to two merchant wallets on Midnight Preprod. The standard live checkout records credit and claims only. No real-money payment or independently verified repayment is connected.",
   ],
   [
     "What happens if the connection drops?",
@@ -96,10 +96,10 @@ export function Home() {
           </p>
           <div className="hero-actions">
             <a
-              href="/preprod"
+              href="/app"
               className="line-button line-button-primary line-button-large"
             >
-              Open live checkout <ArrowRight />
+              Open workspace <ArrowRight />
             </a>
             <a href="#how-it-works" className="hero-secondary">
               See how it works <ArrowDown />
@@ -323,8 +323,10 @@ export function Home() {
                 <CheckCircle weight="fill" />
               </div>
               <p>
-                Test accounting. No merchant token payout. Repayment is issuer
-                reported; one local operator holds the role keys.
+                This accounting facility records claims. The separate{" "}
+                <a href="/test-payout" className="underline underline-offset-4">test-token checkout</a>{" "}
+                pays valueless test assets. Repayment is issuer reported; one
+                local operator holds the role keys.
               </p>
             </div>
           </div>

@@ -24,6 +24,7 @@ import {
 } from "@/lib/runtime";
 import { NetworkSetupScreen } from "./network-setup";
 import { VaultBar } from "./vault-bar";
+import { WalletButton } from "./wallet-connect";
 import {
   Sheet,
   SheetContent,
@@ -53,6 +54,7 @@ const NAV = [
     label: "Workspace",
     items: [
       { to: "/", label: "Overview", icon: House },
+      { to: "/app", label: "My workspace", icon: Robot },
       { to: "/preprod", label: "Live Preprod", icon: Lightning },
       { to: "/test-payout", label: "Test-token payout", icon: Lightning },
       { to: "/checkout", label: "API checkout", icon: ArrowRight },
@@ -325,11 +327,12 @@ export function Shell({
           )}
           <div className="flex items-center gap-3">
             {!landing && <WorkspaceSearch />}
-            {runtimeControl}
+            <div className="line-header-runtime">{runtimeControl}</div>
+            <WalletButton />
             {landing && (
               <a
                 className="line-button line-button-primary line-desktop-cta"
-                href="/preprod"
+                href="/app"
               >
                 Open app <ArrowRight aria-hidden="true" />
               </a>

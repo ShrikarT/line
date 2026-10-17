@@ -2,7 +2,7 @@ import { test, expect } from "@playwright/test";
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
 
-const routes = ["/", "/preprod", "/checkout", "/issuer", "/agent", "/merchant", "/explorer", "/circuits", "/lab", "/roadmap", "/privacy", "/missing-page"];
+const routes = ["/", "/app", "/connect", "/preprod", "/test-payout", "/checkout", "/issuer", "/agent", "/merchant", "/explorer", "/circuits", "/lab", "/roadmap", "/privacy", "/missing-page"];
 const output = path.resolve(process.env.LINE_UI_ARTIFACT_DIR ?? "artifacts/ui-redesign");
 test.beforeEach(async ({ page }) => {
   // Visual review must never submit a funded transaction or access wallet material.
@@ -22,7 +22,9 @@ for (const width of [1440, 390]) {
     page.on("pageerror", error => errors.push(error.message));
     for (const route of routes) {
       await page.goto(route);
-      await expect(page.locator("main h1")).toBeVisible();
+      // The pinned SDK initializes WASM on a fresh document; allow cold startup
+      // while the full core suite or production bundler is using this machine.
+      await expect(page.locator("main h1"), `render ${route}`).toBeVisible({ timeout: 20_000 });
       await page.evaluate(() => document.fonts.ready);
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), `overflow on ${route}`).toBe(true);
       await page.screenshot({ path: path.join(output, `${route === "/" ? "home" : route.slice(1)}-${width}.png`), fullPage: true });

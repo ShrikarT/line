@@ -1,3 +1,65 @@
+/* Visible wallet access and the customer entry point use the original Line palette. */
+.line-wallet-button { border-radius: 999px; min-height: 40px; }
+.wallet-dialog { background: var(--color-cream); border-color: var(--color-border); gap: 24px; }
+.wallet-dialog [data-slot="dialog-title"] { font-size: 1.8rem; letter-spacing: -.05em; line-height: 1.15; color: var(--color-navy); }
+.wallet-dialog [data-slot="dialog-header"] { text-align: left; gap: 12px; }
+.wallet-emblem { display: grid; place-items: center; width: 56px; height: 56px; border-radius: 16px; background: var(--color-pink); color: var(--color-navy); margin-bottom: 8px; }
+.wallet-emblem svg { width: 28px; height: 28px; }
+.wallet-options, .wallet-account { display: flex; flex-direction: column; gap: 16px; }
+.wallet-option { min-height: 64px; justify-content: space-between; padding: 16px; background: var(--color-card); }
+.wallet-option span { flex: 1; text-align: left; }
+.wallet-empty { padding: 20px; background: var(--color-card); border: 1px solid var(--color-border); border-radius: 12px; }
+.wallet-empty p { margin: 8px 0 16px; color: var(--color-muted); font-size: .875rem; }
+.wallet-network { display: flex; align-items: center; gap: 8px; font-size: .75rem; color: var(--color-muted); }
+.wallet-address { overflow-wrap: anywhere; font-size: .75rem; padding: 16px; border: 1px solid var(--color-border); background: var(--color-card); border-radius: 8px; }
+.wallet-error { font-size: .875rem; color: var(--color-danger); background: var(--color-card); padding: 12px 16px; border-left: 3px solid var(--color-danger); }
+.wallet-scope { display: flex; gap: 12px; color: var(--color-muted); font-size: .75rem; border-top: 1px solid var(--color-border); padding-top: 20px; }
+.wallet-scope svg { flex: none; width: 18px; height: 18px; color: var(--color-ok); }
+.start-workspace { display: flex; flex-direction: column; gap: 40px; }
+.workspace-start-grid { display: grid; grid-template-columns: .85fr 1.15fr; gap: 24px; }
+.workspace-welcome, .workspace-launch { display: flex; flex-direction: column; align-items: flex-start; gap: 20px; border-radius: 16px; padding: 32px; }
+.workspace-welcome { background: var(--color-card); border: 1px solid var(--color-border); }
+.workspace-welcome > div:first-child { width: 100%; }
+.workspace-welcome > div:first-child > svg { color: var(--color-ok); width: 24px; height: 24px; }
+.workspace-welcome h2, .workspace-launch h2 { font-size: 2rem; letter-spacing: -.055em; line-height: 1.12; color: var(--color-navy); }
+.workspace-welcome p, .workspace-launch p { color: var(--color-muted); font-size: .9rem; max-width: 44ch; }
+.workspace-welcome small, .workspace-launch small { font-size: .75rem; color: var(--color-muted); line-height: 1.65; }
+.workspace-welcome .line-wallet-button { margin-top: auto; }
+.workspace-launch { background: var(--color-pink); }
+.workspace-launch h2 { font-size: 2.65rem; }
+.workspace-purchase-meta { display: flex; flex-wrap: wrap; gap: 16px; font-size: .75rem; color: var(--color-navy); }
+.workspace-purchase-meta span { display: inline-flex; gap: 6px; align-items: center; }
+.workspace-test-guide { padding: 28px 0; border-block: 1px solid var(--color-border); display: grid; grid-template-columns: 1fr 1.5fr; gap: 24px 40px; }
+.workspace-test-guide h2, .workspace-section-heading h2 { font-size: 1.55rem; letter-spacing: -.045em; color: var(--color-navy); line-height: 1.25; margin-top: 12px; }
+.workspace-test-guide ol { display: flex; flex-direction: column; gap: 20px; }
+.workspace-test-guide li { display: flex; gap: 12px; font-size: .875rem; color: var(--color-muted); }
+.workspace-test-guide li > span { display: grid; place-items: center; border: 1px solid var(--color-border); border-radius: 50%; width: 28px; height: 28px; flex: none; color: var(--color-navy); }
+.workspace-test-guide li strong { color: var(--color-navy); }
+.workspace-test-guide > p { grid-column: 1 / -1; }
+.workspace-section-heading { display: flex; align-items: end; justify-content: space-between; gap: 16px; margin-bottom: 24px; }
+.workspace-role-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.workspace-role { border: 1px solid var(--color-border); border-radius: 12px; padding: 24px; transition: background 150ms, border-color 150ms; }
+.workspace-role:hover { background: var(--color-card); border-color: var(--color-navy); }
+.workspace-role > svg { width: 28px; height: 28px; color: var(--color-navy); margin-bottom: 20px; }
+.workspace-role h3 { font-size: 1.1rem; color: var(--color-navy); font-weight: 600; }
+.workspace-role p { font-size: .8rem; color: var(--color-muted); margin: 8px 0 20px; }
+.workspace-role span { display: flex; gap: 8px; align-items: center; color: var(--color-navy); font-size: .75rem; }
+.operator-session-note { display: flex; align-items: center; gap: 16px; border: 1px solid var(--color-border); padding: 16px; border-radius: 10px; font-size: .75rem; color: var(--color-muted); }
+.operator-session-note > span { color: var(--color-navy); white-space: nowrap; font-weight: 600; }
+.operator-session-note > a { margin-left: auto; display: flex; align-items: center; gap: 4px; white-space: nowrap; color: var(--color-navy); }
+@media (max-width: 1199px) { .line-header-runtime { display: none; } }
+@media (max-width: 767px) {
+  .line-wallet-button { font-size: .75rem; padding-inline: 12px; max-width: 190px; }
+  .line-header-inner > div:last-child { gap: 8px; }
+  .workspace-start-grid, .workspace-test-guide { grid-template-columns: 1fr; }
+  .workspace-welcome, .workspace-launch { padding: 24px; }
+  .workspace-role-grid { grid-template-columns: 1fr; }
+  .workspace-section-heading { align-items: flex-start; flex-direction: column; }
+  .operator-session-note { flex-wrap: wrap; gap: 8px; }
+  .operator-session-note > a { margin-left: 0; }
+  .wallet-dialog { padding: 24px; }
+}
+
 /* Product-led revision: original Line colors, sculptural objects, quieter chrome. */
 .line-landing .line-header {
   background: #faf2e7e6;
