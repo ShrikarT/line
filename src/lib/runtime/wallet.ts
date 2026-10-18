@@ -21,6 +21,8 @@ export interface WalletInfo {
 }
 
 export type WalletConnectionStatus = "disconnected" | "connecting" | "connected" | "error";
+export type WalletConnectionPhase = "requesting-access" | "verifying-network" | "reading-address" | "checking-session";
+type WalletAccount = { address: string; network: string };
 
 export interface WalletState {
   status: WalletConnectionStatus;
@@ -31,7 +33,39 @@ export interface WalletState {
 
 let activeConnectedApi: ConnectedAPI | null = null;
 let activeWalletInfo: WalletInfo | null = null;
+let activeWalletAccount: WalletAccount | null = null;
+let pendingConnection: AbortController | null = null;
 const walletListeners = new Set<() => void>();
+
+/** A cancelled extension prompt may still answer later; it must never own a session. */
+function cancelledConnection(): WalletNotConnectedError {
+  return new WalletNotConnectedError("Wallet connection cancelled. Close any old connection prompt in Lace before trying again.");
+}
+
+function walletResponse<T>(request: () => Promise<T>, milliseconds: number, message: string, signal?: AbortSignal): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    if (signal?.aborted) { reject(cancelledConnection()); return; }
+    const timer = setTimeout(() => finish(new WalletNotConnectedError(message)), milliseconds);
+    const abort = () => finish(cancelledConnection());
+    let settled = false;
+    function finish(error?: unknown, value?: T) {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      signal?.removeEventListener("abort", abort);
+      if (error !== undefined) reject(error); else resolve(value as T);
+    }
+    signal?.addEventListener("abort", abort, { once: true });
+    try { Promise.resolve(request()).then(value => finish(undefined, value), error => finish(error)); }
+    catch (error) { finish(error); }
+  });
+}
+
+export function cancelWalletConnection(): void {
+  const pending = pendingConnection;
+  pendingConnection = null;
+  pending?.abort();
+}
 
 /** Keep the shared account control in sync with advanced network setup. */
 export function subscribeWallet(listener: () => void): () => void {
@@ -55,13 +89,33 @@ export function decodeWalletPublicKey(value: string, kind: "shield-cpk" | "shiel
   return toHex(decoded.bytes);
 }
 
-export async function getWalletConfiguration(api: ConnectedAPI, networkId: string): Promise<Configuration> {
+export async function getWalletConfiguration(api: ConnectedAPI, networkId: string, signal?: AbortSignal): Promise<Configuration> {
   for (const method of ["getConfiguration", "getShieldedAddresses", "balanceUnsealedTransaction", "submitTransaction"] as const) {
     if (typeof api[method] !== "function") throw new WalletNotConnectedError(`Wallet does not implement connector v4 capability: ${method}.`);
   }
-  const configuration = await api.getConfiguration();
+  const configuration = await walletResponse(() => api.getConfiguration(), 20_000,
+    "Wallet network verification timed out. Unlock Lace, select Preprod and reconnect.", signal);
   if (configuration.networkId !== networkId) throw new WalletNotConnectedError("Wallet network does not match the selected contract network.");
   return configuration;
+}
+
+async function readWalletAddress(api: ConnectedAPI, signal?: AbortSignal): Promise<string> {
+  if (typeof api.getUnshieldedAddress !== "function") throw new WalletNotConnectedError("Wallet does not implement connector v4 capability: getUnshieldedAddress.");
+  const account = await walletResponse(() => api.getUnshieldedAddress(), 20_000,
+    "Wallet address request timed out. Unlock Lace and reconnect.", signal);
+  if (typeof account?.unshieldedAddress !== "string" || !account.unshieldedAddress.trim()) {
+    throw new WalletNotConnectedError("Wallet did not return a receiving address. Open your Midnight Preprod account in Lace and reconnect.");
+  }
+  return account.unshieldedAddress;
+}
+
+export async function getWalletAccount(api: ConnectedAPI): Promise<WalletAccount> {
+  const config = await getWalletConfiguration(api, "preprod");
+  return { address: await readWalletAddress(api), network: config.networkId };
+}
+
+export function getConnectedWalletAccount(): WalletAccount | null {
+  return activeWalletAccount;
 }
 
 /** Adapts the standard connector to Midnight.js without obtaining secret keys. */
@@ -120,15 +174,18 @@ export function getActiveWalletInfo(): WalletInfo | null {
 }
 
 export async function disconnectWallet(): Promise<void> {
+  cancelWalletConnection();
   lockVaultSession();
   activeConnectedApi = null;
   activeWalletInfo = null;
+  activeWalletAccount = null;
   notifyWalletChanged();
 }
 
 export async function connectWallet(
   preferredRdns?: string,
-  networkId: string = "preprod"
+  networkId: string = "preprod",
+  report: (phase: WalletConnectionPhase) => void = () => {}
 ): Promise<ConnectedAPI> {
   if (typeof window === "undefined") {
     throw new WalletNotConnectedError("Browser window environment is required for wallet connection.");
@@ -159,21 +216,39 @@ export async function connectWallet(
     throw new WalletNotConnectedError("Wallet must implement Midnight DApp Connector API v4.");
   }
 
+  cancelWalletConnection();
+  const attempt = new AbortController();
+  pendingConnection = attempt;
   try {
     // Changing connections revokes decrypted organization and circuit records.
     // An in-flight operation must reconcile under its original account.
     lockVaultSession();
     activeConnectedApi = null;
     activeWalletInfo = null;
+    activeWalletAccount = null;
     notifyWalletChanged();
-    const connectedApi = await targetWallet.connect(networkId);
+    report("requesting-access");
+    const connectedApi = await walletResponse(() => targetWallet.connect(networkId), 90_000,
+      "Wallet connection timed out. Unlock Lace, select Preprod, close any old connection prompt and try again.", attempt.signal);
     if (!connectedApi) {
       throw new WalletNotConnectedError("Wallet connect resolved with empty API instance.");
     }
 
-    await getWalletConfiguration(connectedApi, networkId);
+    report("verifying-network");
+    await getWalletConfiguration(connectedApi, networkId, attempt.signal);
+    report("reading-address");
+    const address = await readWalletAddress(connectedApi, attempt.signal);
+    if (typeof connectedApi.getConnectionStatus !== "function") throw new WalletNotConnectedError("Wallet does not implement connector v4 capability: getConnectionStatus.");
+    report("checking-session");
+    const status = await walletResponse(() => connectedApi.getConnectionStatus(), 20_000,
+      "Wallet session check timed out. Unlock Lace and reconnect.", attempt.signal);
+    if (status?.status !== "connected" || status.networkId !== networkId) {
+      throw new WalletNotConnectedError(`Lace has not established a ${networkId} session. Open your Midnight account in Lace and reconnect.`);
+    }
+    if (attempt.signal.aborted || pendingConnection !== attempt) throw cancelledConnection();
 
     activeConnectedApi = connectedApi;
+    activeWalletAccount = { address, network: networkId };
     activeWalletInfo = {
       rdns: targetWallet.rdns ?? walletKey,
       name: targetWallet.name ?? walletKey,
@@ -181,16 +256,28 @@ export async function connectWallet(
       apiVersion: targetWallet.apiVersion,
       isAvailable: true,
     };
+    pendingConnection = null;
     notifyWalletChanged();
 
     return connectedApi;
   } catch (err) {
-    activeConnectedApi = null;
-    activeWalletInfo = null;
-    notifyWalletChanged();
+    if (pendingConnection === attempt) {
+      pendingConnection = null;
+      activeConnectedApi = null;
+      activeWalletInfo = null;
+      activeWalletAccount = null;
+      notifyWalletChanged();
+    }
 
-    if (err instanceof Error) {
-      const msg = err.message.toLowerCase();
+    // Connector errors can be plain structured objects rather than Error instances.
+    const message = err && typeof err === "object"
+      ? "message" in err ? String(err.message) : "reason" in err ? String(err.reason) : String(err)
+      : String(err);
+    {
+      const msg = message.toLowerCase();
+      if (msg.includes("locked")) {
+        throw new WalletNotConnectedError("Lace is locked. Unlock it in the extension, select Preprod, then try connecting again.");
+      }
       if (msg.includes("reject") || msg.includes("denied") || msg.includes("user declined")) {
         throw new WalletApprovalRejectedError();
       }
@@ -199,7 +286,7 @@ export async function connectWallet(
       throw err;
     }
     throw new WalletNotConnectedError(
-      `Failed to connect to ${targetWallet.name ?? walletKey}: ${err instanceof Error ? err.message : String(err)}`
+      `Failed to connect to ${targetWallet.name ?? walletKey}: ${message}`
     );
   }
 }

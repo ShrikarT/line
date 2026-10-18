@@ -7,6 +7,8 @@ test("wallet connection keeps contract setup open and rejects invalid addresses"
       "io.line.test": {
         name: "Connector test", rdns: "io.line.test", apiVersion: "4.0.1", icon: "",
         connect: async () => ({
+          getUnshieldedAddress: async () => ({ unshieldedAddress: "network-setup-test-address" }),
+          getConnectionStatus: async () => ({ status: "connected", networkId: "preview" }),
           getConfiguration: async () => ({ networkId: "preview", indexerUri: "https://indexer.preview.midnight.network/api/v4/graphql",
             indexerWsUri: "wss://indexer.preview.midnight.network/api/v4/graphql/ws", substrateNodeUri: "https://rpc.preview.midnight.network" }),
           getShieldedAddresses: async () => { throw new Error("No transaction requested by this test"); },

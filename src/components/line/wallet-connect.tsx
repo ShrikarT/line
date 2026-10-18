@@ -2,11 +2,17 @@ import { createContext, useContext, useEffect, useRef, useState, useSyncExternal
 import { ArrowRight, ArrowSquareOut, CheckCircle, CircleNotch, Copy, Plugs, Wallet } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { connectWallet, disconnectWallet, getActiveWalletInfo, getAvailableWallets, getConnectedWallet, subscribeWallet, type WalletInfo } from "@/lib/runtime/wallet";
+import { cancelWalletConnection, connectWallet, disconnectWallet, getActiveWalletInfo, getAvailableWallets, getConnectedWallet, getConnectedWalletAccount, subscribeWallet, type WalletConnectionPhase, type WalletInfo } from "@/lib/runtime/wallet";
 import { getRuntime, MidnightNetworkRuntime } from "@/lib/runtime";
 import { sanitizeServiceError } from "@/lib/runtime/endpoints";
 
 const WalletContext = createContext<{ connected: boolean; connecting: boolean; name: string; address: string; openWallet: () => void } | null>(null);
+const connectionMessages: Record<WalletConnectionPhase, string> = {
+  "requesting-access": "Waiting for Lace to open the connection request. Unlock the extension and select your Midnight Preprod account.",
+  "verifying-network": "Lace answered. Checking that your wallet is on Midnight Preprod…",
+  "reading-address": "Reading your receiving address from Lace. Approve address access if the extension asks.",
+  "checking-session": "Confirming your wallet session…",
+};
 
 export function useWalletSession() {
   const context = useContext(WalletContext);
@@ -27,8 +33,10 @@ export function WalletSessionProvider({ children }: { children: ReactNode }) {
   const api = useSyncExternalStore(subscribeWallet, getConnectedWallet, () => null);
   const [open, setOpen] = useState(false), [wallets, setWallets] = useState<WalletInfo[]>([]);
   const [connecting, setConnecting] = useState(false), [error, setError] = useState("");
+  const [connectionPhase, setConnectionPhase] = useState<WalletConnectionPhase>("requesting-access");
   const [account, setAccount] = useState({ address: "", network: "" }), [copied, setCopied] = useState(false);
   const busy = useRef(false);
+  const connectionAttempt = useRef(0);
   const info = getActiveWalletInfo();
   useEffect(() => {
     if (!open) return;
@@ -39,25 +47,33 @@ export function WalletSessionProvider({ children }: { children: ReactNode }) {
     return () => window.clearInterval(timer);
   }, [open]);
   useEffect(() => {
-    let cancelled = false;
-    setAccount({ address: "", network: "" }); setCopied(false);
-    if (api) void (async () => {
-      const config = await api.getConfiguration();
-      const address = typeof api.getUnshieldedAddress === "function" ? (await api.getUnshieldedAddress()).unshieldedAddress : "";
-      if (!cancelled) setAccount({ address, network: config.networkId });
-    })().catch(() => { if (!cancelled) setError("Wallet connected, but its address is unavailable. Unlock the wallet and reconnect to refresh it."); });
-    return () => { cancelled = true; };
+    setAccount(api ? getConnectedWalletAccount() ?? { address: "", network: "" } : { address: "", network: "" });
+    setCopied(false);
   }, [api]);
+  useEffect(() => () => { if (busy.current) { connectionAttempt.current++; cancelWalletConnection(); } }, []);
+  function cancelConnection() {
+    connectionAttempt.current++;
+    cancelWalletConnection();
+    busy.current = false; setConnecting(false);
+    setError("Connection cancelled. Unlock Lace, select Preprod and close any old connection prompt before trying again.");
+  }
+  function changeOpen(next: boolean) {
+    if (!next && busy.current) cancelConnection();
+    setOpen(next);
+  }
   async function connect(wallet: WalletInfo) {
     if (busy.current) return;
+    const attempt = ++connectionAttempt.current;
     busy.current = true; setConnecting(true); setError("");
-    try { await connectWallet(wallet.rdns, "preprod"); }
+    try { await connectWallet(wallet.rdns, "preprod", phase => { if (connectionAttempt.current === attempt) setConnectionPhase(phase); }); }
     catch (failure) {
+      if (connectionAttempt.current !== attempt) return;
       const code = failure instanceof Error && "code" in failure ? failure.code : "";
       setError(code === "WALLET_APPROVAL_REJECTED" ? "Connection declined. You can try again when you’re ready." : sanitizeServiceError(failure instanceof Error ? failure.message : "Could not connect. Unlock your wallet and select Preprod, then try again."));
-    } finally { busy.current = false; setConnecting(false); }
+    } finally { if (connectionAttempt.current === attempt) { busy.current = false; setConnecting(false); } }
   }
   async function disconnect() {
+    if (busy.current) cancelConnection();
     const runtime = getRuntime();
     if (runtime instanceof MidnightNetworkRuntime) await runtime.detachWallet();
     else await disconnectWallet();
@@ -69,7 +85,7 @@ export function WalletSessionProvider({ children }: { children: ReactNode }) {
   }
   return <WalletContext.Provider value={{ connected: !!api, connecting, name: info?.name ?? "Midnight wallet", address: account.address, openWallet: () => { setError(""); setOpen(true); } }}>
     {children}
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={changeOpen}>
       <DialogContent className="wallet-dialog max-h-[90dvh] overflow-y-auto">
         <DialogHeader>
           <div className="wallet-emblem"><Wallet weight="duotone" aria-hidden="true" /></div>
@@ -86,11 +102,11 @@ export function WalletSessionProvider({ children }: { children: ReactNode }) {
           <p className="text-xs text-muted">To revoke the site permission, remove Line from connected sites in your wallet. After refreshing the page, reconnect to approve a new session.</p>
         </div> : <div className="wallet-options" aria-busy={connecting}>
           {wallets.length ? wallets.map(wallet => <Button key={wallet.rdns} variant="outline" className="wallet-option" disabled={connecting} onClick={() => void connect(wallet)}><Wallet aria-hidden="true" /><span>{wallet.name}</span>{connecting ? <CircleNotch className="animate-spin" aria-hidden="true" /> : <ArrowRight aria-hidden="true" />}</Button>) : <div className="wallet-empty"><strong>No Midnight wallet detected yet.</strong><p>Install a Midnight-compatible browser wallet, enable it for this site, then refresh this page. On mobile, open Line in a browser that supports your wallet extension.</p><Button variant="outline" asChild><a href="https://docs.midnight.network/getting-started/installation" target="_blank" rel="noreferrer">Wallet setup guide <ArrowSquareOut aria-hidden="true" /></a></Button></div>}
-          {connecting && <p role="status" className="text-sm text-muted">Approve the connection in your wallet extension…</p>}
+          {connecting && <><p role="status" className="text-sm text-muted">{connectionMessages[connectionPhase]}</p><Button variant="ghost" onClick={cancelConnection}>Cancel connection</Button></>}
         </div>}
         <div className="wallet-scope"><CheckCircle aria-hidden="true" /><p>Connecting shares your wallet address and sends no transaction. Your organization’s records stay encrypted in its wallet-scoped vault. Deposits and purchases require separate wallet approvals.</p></div>
-        <Button variant="secondary" asChild><a href="/app" onClick={() => setOpen(false)}>Continue to workspace <ArrowRight aria-hidden="true" /></a></Button>
-        {!["/", "/app", "/organization", "/agents", "/suppliers"].includes(window.location.pathname) && <a className="text-center text-xs text-muted underline underline-offset-4" href="/connect" onClick={() => setOpen(false)}>Advanced: connect an existing canonical contract</a>}
+        <Button variant="secondary" asChild><a href="/app" onClick={() => changeOpen(false)}>Continue to workspace <ArrowRight aria-hidden="true" /></a></Button>
+        {!["/", "/app", "/organization", "/agents", "/suppliers"].includes(window.location.pathname) && <a className="text-center text-xs text-muted underline underline-offset-4" href="/connect" onClick={() => changeOpen(false)}>Advanced: connect an existing canonical contract</a>}
       </DialogContent>
     </Dialog>
   </WalletContext.Provider>;

@@ -32,7 +32,7 @@ followed by further privacy and custody work.
    linked machine-readable raw-output/receipt evidence.
 5. Reproduce with `npm ci`, `npm test`, `npm run typecheck`, and the pinned
    Compact toolchain described in the project configuration. The full suite
-   currently discovers 627 cases: 626 pass and one is intentionally skipped.
+   currently discovers 641 cases: 640 pass and one is intentionally skipped.
 
 The configured local app is `http://127.0.0.1:5174`. `/test-payout` is the actual
 test-token prototype; `/preprod` is the separate accounting profile. `/app` is the
