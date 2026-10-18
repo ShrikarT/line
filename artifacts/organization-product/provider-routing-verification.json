@@ -1,0 +1,17 @@
+{
+  "schema": "line-provider-routing-verification/v1",
+  "date": "2026-10-18",
+  "baselineCommit": "6d01550",
+  "core": { "command": "npm test", "discovered": 627, "passed": 626, "failed": 0, "cancelled": 0, "skipped": 1, "log": "provider-routing-final-core.log" },
+  "organizationBrowser": { "passed": 9, "failed": 0, "log": "provider-routing-browser-final.log", "actualLace": false, "submittedTransactions": 0 },
+  "actualBrowserSdkPreprodRead": "provider-routing-preprod-read.json",
+  "readerScope": "Actual HTTP state and historical WebSocket state through the standalone server, including same-reader reauthentication; isolated catalog, no native supplier wallet",
+  "review": { "standards": "No remaining actionable issue after renewal and idle-revocation fixes", "spec": "No remaining actionable issue after renewal and idle-revocation fixes" },
+  "compactSourceChanged": false,
+  "managedDrift": 0,
+  "buildDeploy": "passed",
+  "typecheck": "passed",
+  "newTransactions": 0,
+  "publicDeployment": false,
+  "scopeChange": "Owner prioritizes submission-ready prototype; production completeness deferred"
+}

@@ -9,7 +9,6 @@ import { FetchZkConfigProvider } from "@midnight-ntwrk/midnight-js-fetch-zk-conf
 import { Contract, Status, ledger, type Witnesses } from "../../../contracts/managed/organization/contract/index.js";
 import generatedJavascript from "../../../contracts/managed/organization/contract/index.js?raw";
 import { createWalletProviders, getWalletConfiguration } from "../runtime/wallet";
-import { assertEndpointCredentials, resolveMidnightEndpoints } from "../runtime/endpoints";
 import { VaultPrivateStateProvider } from "../runtime/vault-provider";
 import type { LinePrivateWitnessContext } from "../runtime/network";
 import { agentId, canonicalInvoiceIdBytes, drawNoteCommit, issuerPublicKey, merchantPublicKey, quoteCommit, randomBytes32, toHex } from "../line/encoding";
@@ -21,6 +20,8 @@ import { activeServiceOrder, requireReplaceableOrder, retireServiceAttempt, serv
 import { matchesRestoredFacility, matchesRestoredNotes } from "./recovery";
 import { organizationProofProvider } from "./proving";
 import { OrganizationSupplierClient } from "./supplier-client";
+import { organizationReadEndpoints } from "./read-endpoints";
+import { authenticatedOrganizationReads } from "./authenticated-reads";
 
 type Circuit = keyof Contract<LinePrivateWitnessContext>["provableCircuits"];
 type Providers = ContractProviders<Contract<LinePrivateWitnessContext>>;
@@ -33,8 +34,7 @@ const asAddress = (value: string) => ({ bytes: receivingAddressBytes(value) });
 
 /** Actual wallet -> Compact -> proof -> wallet signature -> finalized receipt. */
 export class OrganizationNetwork {
-  private constructor(readonly account: OrganizationAccount, private providers: Providers, private release: { sourceFingerprint: string; files: Record<string, { sha256: string }> }, private report: (message: string) => void) { this.supplier = new OrganizationSupplierClient(account, location.origin, report); }
-  private supplier: OrganizationSupplierClient;
+  private constructor(readonly account: OrganizationAccount, private providers: Providers, private release: { sourceFingerprint: string; files: Record<string, { sha256: string }> }, private report: (message: string) => void, private supplier: OrganizationSupplierClient) {}
   private input: LinePrivateWitnessContext | null = null;
   private verifierKeys = new Map<Circuit, Uint8Array>();
   private transactions: OrganizationTransactions | null = null;
@@ -54,11 +54,9 @@ export class OrganizationNetwork {
   static async connect(account: OrganizationAccount, report: (message: string) => void = () => {}): Promise<OrganizationNetwork> {
     await account.assertWallet();
     const configuration = await withinDeadline(getWalletConfiguration(account.wallet, "preprod"), 25_000, "The wallet configuration is unavailable. Reopen Lace and try again.");
-    let token: string | undefined;
-    const session = await fetch("/api/line/network-session", { method: "POST", headers: { "X-Line-Session": "network-setup" }, signal: AbortSignal.timeout(10_000) }).catch(() => null);
-    if (session?.ok) { const config = await session.json(); if (config.networkId === "preprod" && typeof config.blockfrostProjectId === "string") token = config.blockfrostProjectId; }
-    const endpoints = resolveMidnightEndpoints({ networkId: "preprod", blockfrostProjectId: token, indexerUri: configuration.indexerUri, indexerWsUri: configuration.indexerWsUri, nodeUri: configuration.substrateNodeUri, proofServerUri: configuration.proverServerUri || "http://127.0.0.1:6300" });
-    assertEndpointCredentials(endpoints); setNetworkId("preprod");
+    const supplier = new OrganizationSupplierClient(account, location.origin, report);
+    const endpoints = await organizationReadEndpoints(configuration, supplier, location.origin);
+    await account.assertWallet(); setNetworkId("preprod");
     const response = await fetch("/organization-zk/release.json", { cache: "no-store", signal: AbortSignal.timeout(15_000) });
     if (!response.ok) throw new Error("The verified organization contract release is unavailable. Do not deposit into another contract version.");
     const release = await response.json();
@@ -67,7 +65,7 @@ export class OrganizationNetwork {
     const privateStateProvider = new VaultPrivateStateProvider<LinePrivateWitnessContext>({ networkId: "preprod", accountId: account.accountId });
     const wallet = await withinDeadline(createWalletProviders(account.wallet, "preprod"), 25_000, "The wallet is not responding. Reopen Lace and try again.");
     await account.assertWallet();
-    const publicData = indexerPublicDataProvider(endpoints.indexerUri, endpoints.indexerWsUri, globalThis.WebSocket);
+    const publicData = authenticatedOrganizationReads(indexerPublicDataProvider(endpoints.indexerUri, endpoints.indexerWsUri, globalThis.WebSocket), endpoints.authorize);
     const client = new OrganizationNetwork(account, {
       ...wallet, zkConfigProvider, privateStateProvider,
       publicDataProvider: { ...publicData,
@@ -76,7 +74,7 @@ export class OrganizationNetwork {
         queryUnshieldedBalances: (...args) => withinDeadline(publicData.queryUnshieldedBalances(...args), 25_000, "The asset balance service is unavailable."),
       },
       proofProvider: organizationProofProvider(account.wallet, zkConfigProvider.asKeyMaterialProvider(), () => account.assertSession(), report),
-    }, { sourceFingerprint: release.inputs.source.sha256, files: release.files }, report);
+    }, { sourceFingerprint: release.inputs.source.sha256, files: release.files }, report, supplier);
     const baseWallet = client.providers.walletProvider;
     client.providers = { ...client.providers,
       walletProvider: { ...baseWallet, balanceTx: async (tx, ttl) => { await account.assertWallet(); report("Approve the transaction in your wallet"); const balanced = await withinDeadline(baseWallet.balanceTx(tx, ttl), 180_000, "Wallet approval timed out. No transaction was submitted by Line. Close the old wallet prompt before trying again."); await account.assertWallet(); return balanced; } },

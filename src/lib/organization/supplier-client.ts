@@ -11,6 +11,7 @@ export class OrganizationSupplierClient {
   private catalogChecked = false;
   private requiresAuthentication = false;
   private authenticated = false;
+  private authenticatedUntil = 0;
   private authentication: Promise<void> | null = null;
   private account: Account;
   private origin: string;
@@ -38,14 +39,16 @@ export class OrganizationSupplierClient {
       const proof = await withinDeadline(this.account.wallet.signData(message, { encoding: "text", keyType: "unshielded" }), 180_000, "Wallet sign-in timed out. Close the old wallet prompt before retrying.");
       await this.account.assertWallet();
       const verified = await this.fetch("auth/verify", { nonce, proof });
-      if (!verified.response.ok || verified.value.authenticated !== true) throw new Error(verified.value.error ?? "Wallet sign-in failed.");
+      if (!verified.response.ok || verified.value.authenticated !== true || !Number.isSafeInteger(verified.value.expiresAt) || verified.value.expiresAt <= Date.now()) throw new Error(verified.value.error ?? "Wallet sign-in failed.");
       this.authenticated = true;
+      this.authenticatedUntil = verified.value.expiresAt;
     })().finally(() => { this.authentication = null; });
     return this.authentication;
   }
   async request(path: string, body?: object): Promise<unknown> {
-    if (!/^(?:catalog|orders(?:\/[0-9a-f-]{36}(?:\/redeem)?)?)$/.test(path)) throw new Error("Unknown supplier request.");
+    if (!/^(?:catalog|network|orders(?:\/[0-9a-f-]{36}(?:\/redeem)?)?)$/.test(path)) throw new Error("Unknown supplier request.");
     if (path !== "catalog" && !this.catalogChecked) await this.request("catalog");
+    if (path === "network" && this.authenticatedUntil <= Date.now() + 120000) this.authenticated = false;
     if (path !== "catalog" && this.requiresAuthentication && !this.authenticated) await this.authenticate();
     let result = await this.fetch(path, body);
     if (result.response.status === 401 && result.value.code === "WALLET_AUTH_REQUIRED") {

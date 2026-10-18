@@ -1,0 +1,2 @@
+// Browser verification uses the installed SDK itself, not a substitute provider.
+export { indexerPublicDataProvider } from '@midnight-ntwrk/midnight-js-indexer-public-data-provider';

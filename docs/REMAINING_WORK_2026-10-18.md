@@ -1,4 +1,18 @@
-# Remaining product work
+# Submission priorities and remaining product work
+
+**Latest owner direction:** prioritize a submission-ready Wave 2 prototype and
+defer production completeness. The active submission checklist is
+[SUBMISSION_READY_2026-10-18.md](SUBMISSION_READY_2026-10-18.md). The full product
+ledger below remains the backlog; it is no longer a requirement to finish every
+production gate before this submission. Public source, a current deck/video,
+reproducible Compact/tests and accurately scoped Preprod evidence are the freeze
+priorities. No automatic entry submission is authorized by the event rules.
+
+Public provider HTTP/WebSocket routing is now implemented and checked with the
+actual browser SDK against Preprod, including same-reader reauthentication.
+Native supplier funding, customer-facility acceptance and public deployment are
+deferred product work. Existing finalized test-token payouts remain the
+prototype's distinct network evidence.
 
 The owner requested all remaining work on 18 October 2026. This ledger preserves
 the complete requested outcome; completed implementation is not a substitute for

@@ -23,13 +23,16 @@ export class OrganizationAuth {
   constructor(origin, now = () => Date.now()) {
     const url = new URL(origin);
     if (url.origin !== origin || url.protocol !== 'https:' && !(url.protocol === 'http:' && ['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname))) throw Error('Configure an HTTPS public origin, or a loopback HTTP origin for local checks.');
-    this.origin = origin; this.now = now; this.challenges = new Map(); this.sessions = new Map();
+    this.origin = origin; this.now = now; this.challenges = new Map(); this.sessions = new Map(); this.sessionListeners = new Set();
     this.cookieName = url.protocol === 'https:' ? '__Host-line_session' : 'line_session';
     this.secure = url.protocol === 'https:';
   }
   prune() {
-    for (const map of [this.challenges, this.sessions]) for (const [id, entry] of map) if (entry.expiresAt <= this.now()) map.delete(id);
+    for (const [id, entry] of this.challenges) if (entry.expiresAt <= this.now()) this.challenges.delete(id);
+    for (const [id, entry] of this.sessions) if (entry.expiresAt <= this.now()) this.invalidateSession(id);
   }
+  onSessionInvalidated(listener) { this.sessionListeners.add(listener); return () => this.sessionListeners.delete(listener); }
+  invalidateSession(token) { const session = this.sessions.get(token); if (!session) return; this.sessions.delete(token); for (const listener of this.sessionListeners) listener(session); }
   requester(cookie,peer){
     const name=this.cookieName+'_init';
     const matches=typeof cookie==='string'&&cookie.length<=8192?cookie.split(';').map(value=>value.trim()).filter(value=>value.startsWith(name+'=')):[];
@@ -58,7 +61,7 @@ export class OrganizationAuth {
     if (!valid) throw new OrganizationAuthError('The wallet signature does not match this sign-in.');
     const existing=[...this.sessions].filter(([,entry])=>entry.recipient===challenge.recipient);
     // Only a verified signature may evict this principal's older sessions.
-    if(existing.length>=4)this.sessions.delete(existing[0][0]);
+    if(existing.length>=4)this.invalidateSession(existing[0][0]);
     if (this.sessions.size >= 1000) throw new OrganizationAuthError('Sign-in is busy. Retry shortly.', 429);
     const token = randomBytes(32).toString('hex'), expiresAt = this.now() + 30 * 60_000;
     this.sessions.set(token, { recipient: challenge.recipient, expiresAt });
@@ -75,8 +78,8 @@ export class OrganizationAuth {
   }
   cookie(token, expiresAt) { return `${this.cookieName}=${token}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${Math.max(0, Math.floor((expiresAt - this.now()) / 1000))}${this.secure ? '; Secure' : ''}`; }
   revoke(cookie) {
-    if (typeof cookie === 'string') for (const value of cookie.split(';')) if (value.trim().startsWith(this.cookieName + '=')) this.sessions.delete(value.trim().slice(this.cookieName.length + 1));
+    if (typeof cookie === 'string') for (const value of cookie.split(';')) if (value.trim().startsWith(this.cookieName + '=')) this.invalidateSession(value.trim().slice(this.cookieName.length + 1));
     return this.cookie('', this.now());
   }
-  close() { this.sessions.clear(); this.challenges.clear(); }
+  close() { for (const token of this.sessions.keys()) this.invalidateSession(token); this.challenges.clear(); }
 }

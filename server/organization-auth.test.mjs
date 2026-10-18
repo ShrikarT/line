@@ -52,3 +52,13 @@ test('browser contexts isolate challenge quotas while verified sessions remain b
   for(let i=0;i<12;i++){const challenge=auth.challenge(owner.address, "aa".repeat(32));auth.finish({nonce:challenge.nonce,proof:owner.sign(challenge.message)});}
   assert.equal(auth.sessions.size,5);assert.equal(auth.require(auth.cookie(otherSession.token,otherSession.expiresAt)).recipient,L.addressFromKey(other.verifyingKey));
 });
+
+test('idle session observers are notified on logout, expiry, principal eviction and shutdown',()=>{
+  let now=Date.now();const auth=new OrganizationAuth('https://line.example',()=>now),owner=wallet(),invalidated=[];
+  const remove=auth.onSessionInvalidated(session=>invalidated.push(session));
+  const signIn=()=>{const challenge=auth.challenge(owner.address,'aa'.repeat(32));return auth.finish({nonce:challenge.nonce,proof:owner.sign(challenge.message)});};
+  const first=signIn(),firstSession=auth.require(auth.cookie(first.token,first.expiresAt));auth.revoke(auth.cookie(first.token,first.expiresAt));assert.deepEqual(invalidated,[firstSession]);
+  const expired=signIn(),expiredSession=auth.require(auth.cookie(expired.token,expired.expiresAt));now+=30*60_000+1;auth.prune();assert.equal(invalidated.at(-1),expiredSession);
+  const evicted=signIn(),evictedSession=auth.require(auth.cookie(evicted.token,evicted.expiresAt));for(let i=0;i<4;i++)signIn();assert.equal(invalidated.at(-1),evictedSession);
+  const before=invalidated.length;auth.close();assert.equal(invalidated.length,before+4);remove();auth.close();
+});

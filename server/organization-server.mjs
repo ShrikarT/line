@@ -5,6 +5,7 @@ import { resolve, sep, extname } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { organizationApi } from './organization-api.mjs';
 import { OrganizationAuth } from './organization-auth.mjs';
+import { organizationNetwork } from './organization-network.mjs';
 
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.webp': 'image/webp', '.jpg': 'image/jpeg', '.woff2': 'font/woff2', '.wasm': 'application/wasm' };
 async function servePublic(req, res, root) {
@@ -31,7 +32,7 @@ export async function startOrganizationServer({ env = process.env, createService
   if (!Number.isInteger(port) || port < 0 || port > 65535) throw Error('Configure a valid service port.');
   const root = await realpath(publicDirectory);
   if (!(await stat(resolve(root, 'index.html'))).isFile()) throw Error('Build the public app before starting its server.');
-  let api, startupFailure = false, closing = false, closeTask, httpStopTask;
+  let api, network, startupFailure = false, closing = false, closeTask, httpStopTask;
   const server = createServer((req, res) => {
     const path = (req.url ?? '').split('?')[0];
     if (path === '/healthz' || path === '/readyz') {
@@ -41,7 +42,8 @@ export async function startOrganizationServer({ env = process.env, createService
     }
     if (path.startsWith('/api/')) {
       if (!api) { res.writeHead(503, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); return res.end(JSON.stringify({ error: 'The supplier wallet is starting. Retry shortly.' })); }
-      void api.middleware(req, res, () => { res.writeHead(404); res.end(); }).catch(() => { if (!res.headersSent) res.writeHead(503); res.end(); });
+      const fallback = () => api.middleware(req, res, () => { res.writeHead(404); res.end(); });
+      void (network ? network.middleware(req, res, fallback) : fallback()).catch(() => { if (!res.headersSent) res.writeHead(503); res.end(); });
       return;
     }
     void servePublic(req, res, root);
@@ -53,13 +55,14 @@ export async function startOrganizationServer({ env = process.env, createService
     closing = true;
     closeTask = (async () => {
       httpStopTask??=new Promise((yes,no)=>server.close(error=>error&&error.code!=='ERR_SERVER_NOT_RUNNING'?no(error):yes()));
-      try{await api?.close();auth.close();}finally{await httpStopTask;}
+      try{await network?.close();await api?.close();auth.close();}finally{await httpStopTask;}
     })().catch(error=>{closeTask=undefined;throw error;});
     return closeTask;
   } };
   try {
     const service = await (createService ? createService() : import('./organization-wallet.mjs').then(module => module.createStandaloneOrganizationMerchants(env)));
     api = organizationApi({ service, origin, auth });
+    network = organizationNetwork({ server, auth, origin, endpoints: service.endpoints });
     return app;
   } catch (error) { startupFailure = true; await app.close(); throw error; }
 }

@@ -13,7 +13,7 @@ test('the production entry serves only the public build and organization API, th
   writeFileSync(join(directory, 'private-control.json'), 'must never be served');
   let opens = 0, closes = 0;
   const app = await startOrganizationServer({ env: { LINE_PUBLIC_ORIGIN: 'https://line.example' }, port: 0, host: '127.0.0.1', publicDirectory: build, createService: async () => {
-    opens++; return { catalog: () => ({ services: [] }), close: async () => { closes++; } };
+    opens++; return { endpoints: { indexerUri: 'http://127.0.0.1:1', indexerWsUri: 'ws://127.0.0.1:1' }, catalog: () => ({ services: [] }), close: async () => { closes++; } };
   } });
   const base = `http://127.0.0.1:${app.server.address().port}`;
   try {
@@ -34,7 +34,7 @@ test('a failed supplier stop retains a retryable close after the HTTP listener h
   t.after(()=>{assert(resolve(directory).startsWith(resolve(tmpdir())+sep+'line-public-server-'));rmSync(directory,{recursive:true,force:true});});
   writeFileSync(join(directory,'index.html'),'<title>Shutdown control</title>');
   let attempts=0;
-  const app=await startOrganizationServer({env:{LINE_PUBLIC_ORIGIN:'https://line.example'},port:0,host:'127.0.0.1',publicDirectory:directory,createService:async()=>({close:async()=>{if(++attempts===1)throw Error('Wallet still owns its lease');}})});
+  const app=await startOrganizationServer({env:{LINE_PUBLIC_ORIGIN:'https://line.example'},port:0,host:'127.0.0.1',publicDirectory:directory,createService:async()=>({endpoints:{indexerUri:'http://127.0.0.1:1',indexerWsUri:'ws://127.0.0.1:1'},close:async()=>{if(++attempts===1)throw Error('Wallet still owns its lease');}})});
   await assert.rejects(app.close(),/still owns/);assert.equal(app.server.listening,false);
   await app.close();assert.equal(attempts,2);
   await app.close();assert.equal(attempts,2);

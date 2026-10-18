@@ -1,6 +1,22 @@
 # Line
 
-## Organization workspace: current product path
+## Midnight Wave 2 submission
+
+**Private spending controls and verifiable checkout for agents, built with Midnight Compact.**
+An organization approves purchasing capacity; an agent proves clearance; a
+merchant redeems its own single-use claim. The Wave 2 prototype includes an
+actual two-merchant Preprod checkout, encrypted recovery and wallet-first UI.
+
+- **Confirmed network result:** 21 finalized transactions on the separate test-token facility; Merchant A received 25 test units and Merchant B received 20. [Receipt, raw-output and wallet evidence](docs/TEST_TOKEN_PAYOUT_2026-10-16.md).
+- **Engineering:** twelve Compact circuits, private witnesses/commitments, role and instance separation, replay controls, and crash/retry recovery. Current regression: 626 passes, one intentional skip.
+- **Review:** [submission package and walkthrough](docs/SUBMISSION_READY_2026-10-18.md), [eight-slide deck](artifacts/wave2/line-wave2.html), [privacy boundary](docs/PRIVACY.md).
+
+This is a working prototype, not a production credit service. Test assets have
+no monetary value. Public amounts, recipients and history remain observable;
+complete historical credit-book privacy is not claimed. New customer-facility
+acceptance and public production hosting are future work, not the Wave 2 freeze.
+
+## Organization workspace: next product path
 
 Each organization funds and controls its own agents' spending. Open `/app` in the local server, connect Midnight Lace on Preprod, and open the wallet-scoped encrypted organization vault. Create the organization's own facility, finish its circuit keys, deposit existing assets, set an allowance and purchase a supplier's authenticated quote. This path does not use the historical operator credit book or mint its reserve.
 

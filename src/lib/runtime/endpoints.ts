@@ -47,8 +47,9 @@ export function resolveMidnightEndpoints(options: EndpointOptions = {}): Midnigh
   };
 }
 /** Call before network I/O, allowing unconfigured setup screens to render first. */
-export function assertEndpointCredentials(endpoints: MidnightEndpoints): void {
-  for (const value of [endpoints.indexerUri, endpoints.indexerWsUri, endpoints.nodeUri]) {
+export function assertEndpointCredentials(endpoints: MidnightEndpoints, services: readonly ("indexerUri" | "indexerWsUri" | "nodeUri")[] = ["indexerUri", "indexerWsUri", "nodeUri"]): void {
+  for (const service of services) {
+    const value = endpoints[service];
     const url = new URL(value);
     if (url.hostname.endsWith(".blockfrost.io")) {
       if (!url.hostname.includes(`midnight-${endpoints.networkId}.`)) throw new Error("Provider endpoint does not match the selected Midnight network.");
