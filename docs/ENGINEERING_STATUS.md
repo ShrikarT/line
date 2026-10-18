@@ -1,5 +1,22 @@
 # Engineering status and acceptance evidence
 
+## Submission freeze and verified Preprod readers: 18 October 2026
+
+The owner narrowed the immediate target to a submission-ready Wave 2 prototype;
+production completeness is deferred. The existing test-token facility has 21
+independently verified finalized transactions and actual payouts of 25 and 20
+test units to two merchant recipients. This is the submission's settlement
+evidence; it does not certify a new wallet-owned customer facility.
+
+The standalone authenticated HTTP/WebSocket read path now works with the actual
+browser SDK and Preprod, including same-reader sign-in recovery and a historical
+state subscription, without exposing the provider token. It does not submit
+transactions. Full core: 627 discovered, 626 passed, one intentional skip, zero
+failures/cancellations. Nine organization browser cases pass. A local Vite 500
+caused by a cached partial package.json/PostCSS search is fixed by explicitly
+configuring the existing empty PostCSS pipeline; `/app` returns 200 again.
+[Reader implementation and evidence scope](PROVIDER_ROUTING_2026-10-18.md).
+
 ## Authenticated production entry and durable publication: 18 October 2026
 
 The standalone server now serves the public build and an organization-only API.

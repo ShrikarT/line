@@ -42,6 +42,9 @@ const checkoutEvaluation: Plugin = {
 
 export default defineConfig({
   plugins: [tailwindcss(), react(), wasm(), checkoutEvaluation],
+  // Tailwind runs through its Vite plugin. An explicit empty PostCSS pipeline
+  // avoids caching a failed package.json search during dependency updates.
+  css: { postcss: { plugins: [] } },
   resolve: {
     tsconfigPaths: true,
   },
