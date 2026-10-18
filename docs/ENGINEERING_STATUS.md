@@ -32,7 +32,7 @@ state and receipts must be verified before updating these checkpoint counts.
 | Dependency and credential scans | 90 production modules checked; no fixture keys; no configured secrets in 558 text/build files |
 | Review | Standards/spec findings for session renewal and idle revocation fixed; no remaining actionable increment finding |
 
-[Machine-readable current verification](../artifacts/organization-product/provider-routing-verification.json).
+[Machine-readable current verification](../artifacts/organization-product/submission-verification.json).
 Local ignored logs retain the full output and unsuccessful attempts.
 
 ## Important fixes
@@ -73,8 +73,11 @@ observation is from that checkpoint, not a fresh observation of the partial run.
 [Recording diagnostic](../artifacts/wave2/line-review-video/assets/capture/pending-check.json).
 
 The organization-preview Docker image builds and validates all 52 full-release
-files. SDK imports succeed inside the image; Compose configuration validates
-without starting another wallet. This verifies packaging, not funded startup
+files. The latest `line-organization:submission` image is
+`sha256:d90816d203a939a9b2317debcbce9ea9219929aed3e129abb81aac94ce750fa9`.
+SDK imports succeed inside the image, temporary diagnostic pages and the checked
+private paths are absent, and the configured user is `node`. Compose configuration
+validates without starting another wallet. This verifies packaging, not funded startup
 or hosting of the separate operator test-payout endpoints. See [deployment](DEPLOYMENT.md).
 
 Actual Lace connection and organization vault opening were owner-confirmed.
