@@ -32,7 +32,7 @@ followed by further privacy and custody work.
    linked machine-readable raw-output/receipt evidence.
 5. Reproduce with `npm ci`, `npm test`, `npm run typecheck`, and the pinned
    Compact toolchain described in the project configuration. The full suite
-   currently discovers 641 cases: 640 pass and one is intentionally skipped.
+   currently discovers 644 cases: 643 pass and one is intentionally skipped.
 
 The configured local app is `http://127.0.0.1:5174`. `/test-payout` is the actual
 test-token prototype; `/preprod` is the separate accounting profile. `/app` is the
@@ -60,6 +60,15 @@ walkthrough take priority over production feature expansion.
 - State the Wave 1-to-2 changes and submit personally through AKINDO. The event
   prohibits automated entry; no entry has been submitted by this agent.
 
-The requested GitHub push, repository cleanup, deployment handoff and professional
-recorded walkthrough are being finalized. The historical audit corpus stays in
-Git history; runtime fixtures and evidence required for evaluation must remain.
+The verified wallet increment is public on `feat/line-ui-redesign` at `59b06bd`.
+Lace connection, the Preprod address and the organization vault were observed in
+the actual app; the wallet reports 5,000 tNIGHT. A new organization deployment
+has not been confirmed. The Cap recording reached the actual approval boundary,
+then the approval wait ended and the vault locked. This is not transaction-success
+footage. The edited wallet-and-transaction walkthrough still needs that live
+approval and finality verification; do not use the dated video as its replacement.
+
+Repository cleanup and the deployment handoff are prepared. The historical audit
+corpus stays in Git history; runtime fixtures and evidence required for evaluation
+remain. Temporary diagnostic pages and browser-test report directories are
+archived outside the repository.
