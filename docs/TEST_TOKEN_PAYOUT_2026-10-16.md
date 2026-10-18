@@ -57,7 +57,7 @@ npm run settlement:release
 npm run settlement:validate
 ```
 
-Release building generates fresh keys in an isolated directory. Do not rebuild or replace a live profile casually: its encrypted controller is pinned to the source hash. Start the already configured local app and proof server using [DEMO_READY.md](DEMO_READY.md); do not run a second signer alongside it. The test page exposes explicit setup and purchase actions, while status reads do not submit test-settlement transactions.
+Release building generates fresh keys in an isolated directory. Do not rebuild or replace a live profile casually: its encrypted controller is pinned to the source hash. Start the already configured local app and proof server using [DEMO_READY.md](https://github.com/ShrikarT/line/blob/1088cf9/docs/DEMO_READY.md); do not run a second signer alongside it. The test page exposes explicit setup and purchase actions, while status reads do not submit test-settlement transactions.
 
 The manual `artifacts/preprod-2026-10-16/run-token-check.mjs --submit-preprod` requires an explicit funded-run flag and refuses a second run after its request marker exists. Retain and reconcile an interrupted request. It is never part of automated tests.
 

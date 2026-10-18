@@ -83,7 +83,8 @@
     "organization:export-assets": "node --experimental-strip-types scripts/publish-organization-assets.mjs",
     "build:deploy": "npm run build && npm run organization:export-assets",
     "start:organization": "node --env-file-if-exists=.env.local --experimental-strip-types server/organization-server.mjs",
-    "organization:check-provider": "node --env-file-if-exists=.env.local --experimental-strip-types scripts/check-organization-provider.mjs"
+    "organization:check-provider": "node --env-file-if-exists=.env.local --experimental-strip-types scripts/check-organization-provider.mjs",
+    "deployment:prepare": "node scripts/prepare-deployment.mjs"
   },
   "compact": {
     "compiler": "0.31.1",

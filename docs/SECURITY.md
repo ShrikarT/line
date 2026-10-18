@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-This is a historical security review of an earlier implementation snapshot. Its version numbers, circuit details and test references do not describe the current worktree and must not be used as release evidence. See the current [full audit](FULL_AUDIT_2026-10-07.md), [product direction and acceptance gates](PRODUCT_DIRECTION.md), and [privacy specification](PRIVACY.md).
+This is a historical security review of an earlier implementation snapshot. Its version numbers, circuit details and test references do not describe the current worktree and must not be used as release evidence. See the current [full audit](https://github.com/ShrikarT/line/blob/1088cf9/docs/FULL_AUDIT_2026-10-07.md), [product direction and acceptance gates](https://github.com/ShrikarT/line/blob/1088cf9/docs/PRODUCT_DIRECTION.md), and [privacy specification](PRIVACY.md).
 
 This document details the threat model, formal protocol invariants, attack defenses, circuit constraints, automated tests, and remaining operational limitations.
 

@@ -1,200 +1,93 @@
 # Line
 
-## Midnight Wave 2 submission
+Agent spending controls and verifiable merchant checkout on Midnight.
 
-**Private spending controls and verifiable checkout for agents, built with Midnight Compact.**
-An organization approves purchasing capacity; an agent proves clearance; a
-merchant redeems its own single-use claim. The Wave 2 prototype includes an
-actual two-merchant Preprod checkout, encrypted recovery and wallet-first UI.
+An organization approves purchasing capacity. An agent proves each purchase fits
+its allowance. A merchant redeems its own single-use claim before releasing its
+service. Line is a working prototype; private credit is the longer-term goal.
 
-- **Confirmed network result:** 21 finalized transactions on the separate test-token facility; Merchant A received 25 test units and Merchant B received 20. [Receipt, raw-output and wallet evidence](docs/TEST_TOKEN_PAYOUT_2026-10-16.md).
-- **Engineering:** twelve Compact circuits, private witnesses/commitments, role and instance separation, replay controls, and crash/retry recovery. Current regression: 626 passes, one intentional skip.
-- **Review:** [submission package and walkthrough](docs/SUBMISSION_READY_2026-10-18.md), [eight-slide deck](artifacts/wave2/line-wave2.html), [privacy boundary](docs/PRIVACY.md).
+[Submission package](docs/SUBMISSION_READY_2026-10-18.md) |
+[Slide deck](artifacts/wave2/line-wave2.html) |
+[Privacy](docs/PRIVACY.md) |
+[Deployment](docs/DEPLOYMENT.md)
 
-This is a working prototype, not a production credit service. Test assets have
-no monetary value. Public amounts, recipients and history remain observable;
-complete historical credit-book privacy is not claimed. New customer-facility
-acceptance and public production hosting are future work, not the Wave 2 freeze.
+## Verified for Wave 2
 
-## Organization workspace: next product path
+- A two-merchant Preprod test-token checkout: 21 finalized transactions in the
+  published checkpoint, with 25 test units paid to A and 20 to B. Raw outputs,
+  registered recipients and wallet balances agree. [Settlement evidence](docs/TEST_TOKEN_PAYOUT_2026-10-16.md).
+- Twelve Compact circuits with private witnesses, role authentication,
+  contract-instance separation, one-time redemption and reserve accounting.
+- Encrypted account/transaction recovery, retained request identities, replay
+  rejection and generic failed-clearance feedback.
+- 627 regression cases: 626 pass, one intentional skip. Nine organization browser
+  checks pass. The actual browser SDK also reads Preprod over authenticated HTTP
+  and WebSocket routes without receiving the server's provider token.
 
-Each organization funds and controls its own agents' spending. Open `/app` in the local server, connect Midnight Lace on Preprod, and open the wallet-scoped encrypted organization vault. Create the organization's own facility, finish its circuit keys, deposit existing assets, set an allowance and purchase a supplier's authenticated quote. This path does not use the historical operator credit book or mint its reserve.
+Wave 1 exposed five circuits. Wave 2 adds merchant registration, claim redemption,
+reserve controls, expiry/recovery, a two-supplier checkout and actual test-token
+settlement. The new wallet-owned organization product is a separate preview.
 
-- [Product model and contract behavior](docs/ORGANIZATION_PRODUCT.md)
-- [Current readiness audit, verification and unresolved items](docs/ORGANIZATION_READINESS_2026-10-18.md)
-- Organization source: `contracts/organization/line.compact`; managed bindings: `contracts/managed/organization/`.
-- `npm run organization:compile`, `npm run organization:release`, `npm run organization:validate`, `npm run test:organization`.
+## Run and evaluate
 
-Actual Lace connection and vault opening are owner-confirmed. A new organization facility's funded end-to-end lifecycle still needs its own finalized receipts; historical operator receipts do not certify it. The first-party merchant backend/proof server must be running and configured. Authenticated encrypted backup restore and expired-request recovery are implemented. Public hosting is authorized after verification; the user reports facility creation failing without a visible error, so funded acceptance and full-history privacy remain open. See the [remaining-work ledger](docs/REMAINING_WORK_2026-10-18.md).
-
-`npm run build:deploy` includes the validated organization proving assets in the frontend build. It requires a full `organization:release` first. The durable supplier backend still needs its own production runtime; [hosting preparation](docs/HOSTING_PREPARATION_2026-10-18.md) documents the remaining deployment requirements.
-
-## Historical protocol and external-credit research
-
-The sections below retain the earlier prototype/research context and its original evidence scopes. They do not describe an outside credit provider for the organization-funded product above.
-
-**A protocol prototype testing issuer-authorized agent purchasing. Private credit is the unproven destination.**
-
-Line's intended product lets organizations delegate revolving purchasing capacity to agents, lets merchants independently verify authorization and own single-use claims, and reconciles purchases with service delivery and actual payment. The first customer hypothesis is enterprise API/data/compute procurement. It is unvalidated: no customer interviews, pilots or revenue are established by this repository.
-
-**Current audit and Wave 2 evidence:** [13 October consolidated report](docs/AUDIT_REPORT_2026-10-13.md). Private-offer source has 65 historical local native-verified calls across twelve names. Current coordinator [generated compensation/recovery](docs/COORDINATOR_COMPENSATION_2026-10-13.md) covers all twelve names and three modes: 30 calls/92 exits/82 controls with synthetic owner receipts/time. Historical native coordinator recovery covers six names; reported canonical Preprod flow covers eight. Native/network proof of the new lifecycle, full-history privacy, independent custody, real settlement and customer demand remain open. Older descriptions retain their historical source scopes.
-
-The executable starting point is [`/checkout`](docs/PRODUCT_WALKTHROUGH.md): a deterministic agent buys document analysis and a processing estimate through compiler-generated Compact execution and local HTTP services. **This is a local evaluation, with no submitted ZK proofs, public-network finality or token payout.** Full fleet credit, historical confidentiality, funded settlement, independent custody, risk/default controls and durable recovery remain product requirements, with evidence gates in [the product direction](docs/PRODUCT_DIRECTION.md) and [roadmap](docs/ROADMAP.md).
-
-The [private-book pool experiment](docs/PRIVATE_POOL_2026-10-11.md) adds compiled two-borrower/key-separated feasibility checks. It still fails historical privacy and its real proof coverage is incomplete. The owner has authorized [a versioned amount/reserve disclosure redesign](docs/PRIVACY_REDESIGN_2026-10-11.md); neither the canonical contract nor checkout has migrated.
-
-The [signed private-finance candidate](docs/SIGNED_PRIVATE_FINANCE_2026-10-11.md) compiles and exercises all twelve names with committed reserve/note/quote state and external role approvals. Signing scalars stay in child signers; reserve openings stay with the trusted prover. The current lifecycle passes 38 accepted calls and 40 rejection controls. Current source `a8d14adf` passes 38 native-verified contract calls across all twelve names, including all five normal cancellation transitions; a separate Rust verifier rejects five corrupted draw proofs. The isolated zero-cash branch remains generated-only. Full-history privacy, durable institutional custody, network execution and migration remain open.
-
-The [merchant-membership prototype](docs/PRIVATE_MERCHANT_2026-10-11.md) replaces selected-merchant lookups with current-root proofs. Fresh generated execution passes 39 lifecycle calls / 55 rejection controls. Native verification covers those 39 calls and all seven isolated branches across all twelve circuits; a separate Rust verifier rejects six corrupted draws. The paired refund acknowledgments differ by one serialized byte, and complete observer privacy remains unproven. It is a separate experimental source, not the deployed contract or checkout. A separate [encrypted software signer](docs/DURABLE_APPROVAL_SIGNER_2026-10-11.md) preserves approvals across restart but is not yet integrated into that native lifecycle.
-
-New `main` reports a canonical Preprod deployment and eight circuit calls. [Independent receipt checks and recovery findings](docs/NETWORK_RECEIPT_AUDIT_2026-10-11.md) distinguish those reported calls from twelve verifier registrations and actual asset settlement. The read-only live check is pending a Preprod project token.
-
-## Try the procurement evaluation
-
-The [consolidated 11 October audit](docs/FULL_AUDIT_2026-10-11.md) covers the latest deployment, product direction, code, privacy, custody, settlement and submission readiness. The [detailed update](docs/AUDIT_UPDATE_2026-10-11.md) retains current findings. A separate [local proof experiment](docs/LOCAL_PROOF_VERIFICATION_2026-10-11.md) generates and cryptographically verifies 19 contract proofs across all twelve circuits, with invalid-proof controls. It uses synthetic ledger state with fee balancing disabled; it establishes no network finality, independent canonical custody, historical privacy or asset payment. The checkout and consoles remain separate execution paths.
-
-Use **Node.js 22.18 or later** for native TypeScript stripping; the evaluated environment uses Node 26.7.0. A Compact compiler is needed to regenerate the contract, but the checked-in managed JavaScript supports the local evaluation.
+Use Node.js 22.18 or newer; the current checks use 26.7.0.
 
 ```bash
-git clone https://github.com/ShrikarT/line.git
-cd line
 npm ci
+npm test
+npm run typecheck
 npm run dev
 ```
 
-Open `http://localhost:5173/checkout`:
+Open the URL printed by Vite. The configured local recording instance uses
+`http://127.0.0.1:5174`. Private network credentials and custody records are not
+in Git. Read [deployment instructions](docs/DEPLOYMENT.md) before enabling funded
+Preprod operations. A second signer must not open the running operator wallet.
 
-1. Open an evaluation line with the default **40-unit credit limit** and **200-unit accounting reserve**. No cash is deposited.
-2. Run the purchase plan on a document. Merchant A's analysis costs **25 units** and succeeds. Merchant B's processing estimate costs **20 units** and declines because `25 + 20 > 40`, showing **"Clearance could not be proven."**
-3. Use the issuer panel to acknowledge **25 evaluation units**. This changes credit capacity; it is not an incoming payment or reserve replenishment.
-4. Keep the document unchanged and choose **Retry declined purchase**. A's fulfilled order/result is reused without another debit; B receives a fresh attempt and succeeds for 20. Both useful local results complete the task. The processing/token estimate is a disclosed heuristic, not a vendor bill.
-5. Review claim references, service outcomes and public accounting. **Payout is not connected.**
+| Route | Scope |
+| --- | --- |
+| `/test-payout` | Actual operator-run Preprod test-token checkout and receipts |
+| `/preprod` | Separate deployed accounting profile; no token payout |
+| `/app` | Wallet-owned organization workspace preview; full funded acceptance pending |
+| `/checkout` | Local generated-Compact evaluation; no network transaction |
+| `/contracts` | Circuit and contract reference |
 
-The agent API capability cannot configure its limit, fund reserves or acknowledge repayment. Merchant secrets are distinct. All roles/private state still live in one evaluation server and the browser receives both issuer and agent tokens; independent production custody remains open. Sessions expire after 30 minutes. The default is volatile; optional encrypted checkpoints recover generated state and purchase stages after server restart. Browser reload still loses capabilities/IDs. [Configure checkout recovery](docs/CHECKOUT_DURABILITY_2026-10-10.md). Consoles separately journal candidates before execution and reconcile unknown outcomes against exact receipts/public state; [recovery evidence and limits](docs/OPERATION_RECOVERY_2026-10-10.md).
-
-`npm run build` followed by `npm run preview` also serves the evaluation. A static deployment of `dist/` alone has **no checkout API**; Vite development/preview middleware supplies `/api/checkout`. See [the demo guide](docs/WAVE2_DEMO.md) for exact API and retry behavior.
-
-## Product and economic boundaries
-
-An organization is the liable borrower; its agent exercises bounded authority. A capital provider supplies liquidity and takes the documented risk. The protocol does not create capital, decide creditworthiness or collect debts automatically.
-
-| Event | Evidence it provides | Separate requirement |
-|---|---|---|
-| Credit authorization | Authenticated transition satisfying private credit constraints | Underwriting, policy and responsible borrower |
-| Reserve accounting | Capacity counters consistent with the declared invariant | Actual asset/cash custody and funding |
-| Merchant claim redemption | Intended merchant consumed the note once | Delivery and actual payout |
-| Asset payout | Finalized rail-specific payment receipt | Invoice/claim/recipient reconciliation and recovery |
-
-The current Compact contract implements authorization and claim **accounting**. `fundReserve` increases a counter; `redeemDraw` moves accounting from encumbered to redeemed. Neither transfers tokens. Reserve units currently have no demonstrated cash backing, asset denomination or redeemable cash value. Issuer opening now fixes a public flat/basis-point schedule, quotes bind that schedule, and Compact enforces the exact rounded fee. Consoles disclose merchant price, fee and added debt before authorization. Fee accounting remains separate from actual collection or earned revenue. [Verified pricing and remaining economics work](docs/FEE_POLICY_2026-10-10.md).
-
-The accounting invariant includes fees:
-
-```text
-encumberedReserve + redeemedReserve + feeReserve + pendingFeeReserve + refundReserve + reportedRefundReserve <= totalReserve
-withdrawableReserve = totalReserve - encumberedReserve - redeemedReserve - feeReserve - pendingFeeReserve - refundReserve - reportedRefundReserve
-draw: outstanding + amount + fee <= limit
-```
-
-Credit repayment restores capacity separately from reserve replenishment. Expiry uses supported ledger block-time comparisons and the merchant-authenticated quote deadline. Permissionless expiry retains the full claim cost while debt/refund allocation is unresolved; issuer or original agent can allocate note-bound debt relief, and the issuer can report the privately committed refund remainder against an exact stable payment reference. Reported refund backing remains locked: this records no actual payout, cash authenticity, or general dispute resolution. [Compensation evidence](docs/COMPENSATION_2026-10-10.md), [expiry evidence](docs/EXPIRY_2026-10-10.md).
-
-Compact now rejects exact payment-reference reuse within one issuer/domain even after later purchases or reopening. Closing requires proof that the authentic current debt is zero; default/resume preserves the book and old merchant claims survive a clean reopening. This does not verify genuine cash or cross-facility payment allocations. Public closure reveals zero debt. [Verified changes and source-migration limits](docs/REPAYMENT_LIFECYCLE_2026-10-10.md).
-
-## Privacy: private witnesses, observable history
-
-Credit limit, outstanding debt and epoch are private witnesses, and the line commitment hides its opening. The current `LinePreimage` is `{domain, identity, limit, outstanding, epoch}`; the private credit-book commitment is bound to the constructor-derived `contractDomain`. Quotes, merchant notes and nullifiers are also domain-separated. This encoding change requires a fresh matching Compact compile and managed-artifact check; existing deployments/openings require an explicit migration plan. `contracts/line.compact` and its generated encoding are authoritative.
-
-| Data | Current disclosure boundary |
-|---|---|
-| Limit and remaining capacity | Not plaintext public fields; accepted purchases reveal bounds |
-| Outstanding debt | Private opening, but from zero initial debt public draws/fees reconstruct it before the first private repayment |
-| Purchase amount and fees | Note amounts and reserve/fee deltas are public |
-| Merchant pseudonym | Public registry and merchant lookups in public execution transcripts; quote-to-note activity can link it |
-| Invoice contents, secrets and salts | Private inputs/off-chain records; require secure transport/storage and correct role handling |
-| Identity/activity | Singleton line/identity state, timing and wallet metadata can link purchases |
-
-The explorer must never print private credit books. That UI boundary does not establish confidentiality against a complete history observer. Public note amounts, reserve changes, registered merchant keys and transaction history reveal purchasing activity. Full credit-book privacy remains a release-blocking target that needs a proven ledger redesign plus transcript/history/metadata tests. [Privacy specification](docs/PRIVACY.md), [audit evidence](docs/FULL_AUDIT_2026-10-07.md).
-
-## Why this product, alongside existing payments
-
-Agent wallets already offer spending controls and paid service requests; x402 also documents escrow-funded vouchers with later batched claim/settlement. Line's proposed difference is confidential, independently verifiable revolving eligibility coupled to merchant claims and a complete reconciled purchase. Claims or deferred settlement alone are not unique. A centralized private-budget gateway is another baseline to evaluate. [Coinbase spending controls](https://docs.cdp.coinbase.com/agentic-wallet/mcp/mcp-tools/show-wallet-app), [paid APIs](https://docs.cdp.coinbase.com/agentic-wallet/cli/skills/pay-for-service), [x402 batch settlement](https://docs.x402.org/schemes/batch-settlement).
-
-Compare actual information disclosure, integration effort, task reliability, settlement delay, capital exposure and total cost. Do not assume corporate cards publish credit books or competing wallets lack budgets. No x402 interoperability, superior economics or customer preference is established until implemented and measured. [Validation and alternatives](docs/PRODUCT_VALIDATION.md).
-
-## Twelve Compact circuits
-
-| Circuit | Authority | Current purpose |
-|---|---|---|
-| `registerMerchant` | Issuer | Add merchant public key |
-| `disableMerchant` | Issuer | Block new quotes; existing quotes retain their current semantics |
-| `fundReserve` | Issuer | Increase reserve accounting |
-| `withdrawUnencumberedReserve` | Issuer | Decrease free accounting capacity within the invariant |
-| `withdrawFees` | Issuer | Release fee accounting; no asset payout |
-| `openLine` | Issuer | Establish one active agent line with a private limit |
-| `postQuote` | Merchant | Authenticate and commit invoice terms |
-| `draw` | Agent | Check books/quote/backing, rotate commitment and issue merchant note |
-| `redeemDraw` | Intended merchant | Consume valid note once; move reserve accounting |
-| `cancelOrExpireNote` | Action-dependent | Expire into held backing; issuer/original-agent compensation; issuer refund report |
-| `acknowledgeRepayment` | Issuer | Rotate books after authorized repayment acknowledgment |
-| `setStatus` | Issuer | Control status; closure proves the current debt is zero |
-
-Compact is the source of truth. Canonical code is [contracts/line.compact](contracts/line.compact); generated bindings are [contracts/managed/line](contracts/managed/line). Preserve `persistentHash`/`persistentCommit` and supported encoding. [Protocol](docs/PROTOCOL.md), [encoding reference](docs/ENCODING.md).
-
-## Runtime paths
-
-| Path | Actual execution |
-|---|---|
-| `/checkout` and `server/checkout-engine.ts` | Compiler-generated Compact circuits via the harness, with local service results |
-| `LocalDevelopmentRuntime` | TypeScript reference model in `src/lib/line/protocol.ts`, not generated Compact |
-| `InMemoryTestRuntime` | Isolated reference-model runtime for tests |
-| `MidnightNetworkRuntime` | Browser network integration; its live lifecycle remains independently unverified. Separate canonical CLI deployment/call receipts are recorded in the audit |
-| `/lab` and scripted demo | Development/reference-model fixtures and attack illustrations |
-
-Existing `/issuer`, `/agent`, `/merchant`, `/explorer` and `/circuits` desks expose technical workflows. Runtime/session/recovery controls have regression coverage; choosing a page does not establish independent custody. The executable `/checkout` capability scopes remain a separate evaluation path with the limits recorded in the audit.
-
-## Development checks
+Install the compiler separately from npm with `bash scripts/install-compact.sh`
+(Linux or WSL). On Windows, the wrapper uses the `Ubuntu` WSL distribution;
+`WSL_DISTRO` and `COMPACT_BIN` select a different distribution/compiler manager.
+Compile with the pinned Compact 0.31.1 toolchain:
 
 ```bash
 npm run compact:compile
-npm run compact:check
-# CI also checks committed managed artifacts with git diff.
-npm test
-npm run test:checkout
-npm run compact:test
-npm run test:leakage
-npm run typecheck
-npm run check:keys
-npm run check:secrets
-npm run test:e2e
-npm run build
+npm run organization:compile
+git diff --exit-code contracts/managed/
+npm run build:deploy
 ```
 
-`npm run compact:compile` skips proving-key generation; `npm run compact:compile:release` creates a fresh versioned release and validated pointer; `compact:release:validate` verifies it. Vite dev/preview serves validated assets at `/line-zk`; static hosting requires separate publication. Unit/integration tests include generated execution, reference-model, store/vault, network-adapter and HTTP checkout checks. Assess what each test proves rather than equating counts with complete correctness, formal verification or deployed behavior. Use current command output for release counts. Browser tests may require Playwright's browser installation.
+The deploy build requires the validated full organization proving release;
+`npm run organization:release` creates it. Release generation is not a deployment
+and does not submit a transaction.
 
-The selected migration stack is Compact toolchain **0.31.1**, language **0.23**, runtime **0.16.0** and compiler ledger model **8.0.2**, paired with Midnight.js **4.1.1**, connector **4.0.1** and proof server **8.1.3**. Public environments use ledger major 8. Canonical regeneration, release integrity and local SDK construction checks passed; actual network proving/finality remains required. [The official compatibility matrix](https://docs.midnight.network/relnotes/support-matrix) identifies the supported stack and excludes the previous toolchain **0.34.0** / runtime **0.19.0** / ledger-9 combination.
+## Scope and source
 
-Do not reuse older generated artifacts or the historical 0.34 proving-key size/constraint metrics for this release. Regenerate managed code, ZKIR and all twelve circuit proving/verifying keys together under the selected toolchain, then rerun encoding, lifecycle and network acceptance. Compiler success alone still does not establish deployment.
+Test assets have no monetary value. Amounts, recipients and public history remain
+observable; private witnesses do not establish complete historical book privacy.
+The suppliers are first-party deterministic services. No customer traction,
+independent commercial custody or production credit service is claimed.
 
-## MCP and network work
+- `contracts/line.compact`: canonical accounting source.
+- `contracts/experimental/line-test-settlement.compact`: the deployed test-token settlement profile.
+- `contracts/organization/line.compact`: organization-funded asset profile.
+- `src/`: browser product and runtime adapters.
+- `server/`: durable checkout, wallet ownership and authenticated readers.
+- `tests/`, `e2e/`: generated, transport, recovery and browser checks.
+- `artifacts/`: scoped machine-readable evidence and submission assets.
 
-`npm run mcp` and `npm run mcp:dev` currently invoke the local JSON-RPC simulator in `mcp/line-mcp.mjs`. Its demo tools include fixture seeding and issuer operations, and its state file can contain plaintext development private data. It is **not** a production role-isolated agent payment server. Use it only as development evidence; the intended agent integration must expose bounded purchasing capabilities and exclude issuer repayment/funding/status tools. [MCP reference](docs/MCP.md).
+[Architecture](docs/PRODUCT_ARCHITECTURE.md), [protocol](docs/PROTOCOL.md),
+[encoding](docs/ENCODING.md), [engineering status](docs/ENGINEERING_STATUS.md),
+[roadmap](docs/ROADMAP.md), [contributing](CONTRIBUTING.md).
+Historical audit reports are retained in
+[Git history at 1088cf9](https://github.com/ShrikarT/line/tree/1088cf9/docs).
 
-The repository records canonical Preprod deployment, twelve registered verifier keys and eight circuit call receipts. Independent authenticated receipt/state/key reconciliation remains pending; these records do not deploy the experimental privacy candidates or prove token payouts. The deployment script can attempt funded-wallet actions; **`npm run contract:deploy` is not a dry run**. Acceptance still requires compatible release assets, provider configuration, canonical role-key derivation, secure recoverable state and receipt reconciliation. Consult [the current audit](docs/FULL_AUDIT_2026-10-11.md) alongside [deployment guidance](docs/DEPLOYMENT.md).
-
-As announced on 9 October, Midnight-hosted Preprod RPC/indexer endpoints shut down from **03:30 IST on 10 October 2026**. Use the configured Blockfrost Preprod endpoints and a matching project token; Preview has unchanged public endpoints. CLI/browser defaults and token handling must agree before network use. [Official endpoints and migration notice](https://docs.midnight.network/relnotes/network).
-
-## Product and engineering documents
-
-- [Product direction and acceptance contract](docs/PRODUCT_DIRECTION.md)
-- [Customer validation and alternatives](docs/PRODUCT_VALIDATION.md)
-- [Complete product roadmap](docs/ROADMAP.md)
-- [Executable walkthrough](docs/PRODUCT_WALKTHROUGH.md) and [Wave demonstration](docs/WAVE2_DEMO.md)
-- [Pitch and evidence checklist](docs/PITCH.md)
-- [Architecture](docs/PRODUCT_ARCHITECTURE.md), [protocol](docs/PROTOCOL.md), [privacy](docs/PRIVACY.md), [security](docs/SECURITY.md)
-- [Current full audit](docs/FULL_AUDIT_2026-10-11.md), [historical reproductions](docs/FULL_AUDIT_2026-10-07.md), [engineering status](docs/ENGINEERING_STATUS.md)
-- [Development](docs/DEVELOPMENT.md), [deployment](docs/DEPLOYMENT.md), [MCP](docs/MCP.md)
-
-The [AKINDO Midnight wave](https://app.akindo.io/wave-hacks/jaMZjqPOBsLXvjdG) evaluates incremental evidence. Full requirements remain in scope beyond interim demonstrations: independent merchants/custody, durable checkout/recovery, correct repayment/refunds/expiry, history privacy, actual settlement, fleets/policies, risk/default economics, syndication/underwriting credentials and additional rails. No deadline substitutes for those acceptance gates.
-
-## License
-
-Apache-2.0. See [LICENSE](LICENSE). No independent external security audit or production certification is established by this README.
+Midnight-related code is licensed under [Apache 2.0](LICENSE). Built with Midnight
+Compact, Midnight.js, the Wallet SDK and the DApp Connector API.

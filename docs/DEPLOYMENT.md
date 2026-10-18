@@ -1,156 +1,115 @@
-# Deployment and release operations
+# Build and deployment
 
-Updated: 11 October 2026. The repository now reports a canonical Preprod deployment and eight circuit calls, recorded below. Independent transaction/state/key verification is pending; no asset payout is established. Neither experimental privacy candidate is deployed by those receipts. Local `/checkout` executes generated logic without submitting proofs or payments. [Readiness](PRODUCT_DIRECTION.md) needs separate network, funding, delivery and payout evidence.
+Updated 18 October 2026. Line has three separate contract profiles. The canonical
+profile records accounting; the experimental test-settlement profile has verified
+Preprod token payouts; the organization profile receives existing assets and is
+still awaiting complete funded user acceptance. [Current evidence](ENGINEERING_STATUS.md).
 
-## Selected compatible stack
+## Reproducible build
 
-| Component | Selected target / requirement |
-|---|---|
-| Compact compiler | `0.31.1` |
-| Compact language | `0.23` |
-| Compact runtime | `0.16.0` |
-| Compiler ledger model | `8.0.2`; public ledger major 8 |
-| Midnight.js | `4.1.1` |
-| DApp Connector API | `4.0.1` |
-| Proof server | `8.1.3` |
-| Wallet SDK | Pinned `1.2.0`; browser adapter locally tested, funded CLI execution unverified |
-| Node.js | `22.18+`; locally evaluated with `26.7.0` |
-
-Migration must regenerate artifacts and pass current checks; this is a selected stack, not proof every installed component matches or a transaction succeeded. Inspect package metadata, compiler queries, compiler/contract-info.json, Line-owned line-release.json and service versions. [Official matrix](https://docs.midnight.network/relnotes/support-matrix).
-
-Previous compiler 0.34 / runtime 0.19 artifacts target ledger 9 and are incompatible with the public stack. Changing endpoints or combining old JavaScript with the new runtime does not fix this. Historical 0.34 proving-key metrics are not current release evidence. Native/WSL installations must select the same compiler; avoid bare updates selecting a different newest version.
-
-## Compile and verify without funded activity
+Use Node.js 22.18+ (verified locally with 26.7.0), npm and the pinned Compact
+compiler manager. `npm ci` installs JavaScript dependencies, not the compiler.
 
 ```bash
 npm ci
+bash scripts/install-compact.sh
 npm run compact:compile
+npm run organization:compile
 git diff --exit-code contracts/managed/
-npm run compact:test
 npm test
 npm run typecheck
 ```
 
-`compact:compile` uses `--skip-zk`, emitting managed code/types and ZKIR, not the full key package. For intentional source/compiler changes review the regenerated delta; after accepting that baseline, repeat compilation should produce zero content drift.
+Windows compilation uses WSL, default distribution `Ubuntu`. Set `WSL_DISTRO`
+and `COMPACT_BIN` when using another distribution or compiler-manager path.
+The project selects compiler 0.31.1, language 0.23, runtime 0.16.0 and ledger 8.
+Do not replace those pins with the newest toolchain without a migration.
 
-Before a deployable release:
-
-```bash
-npm run compact:compile:release
-npm run compact:release:validate
-```
-
-The command compiles into a new versioned directory under `.compact-keys/releases/`, refuses existing output, validates and seals hashes in `line-release.json`, and publishes `.compact-keys/current-release.json` only after success. Deployment validates that pointer or explicit `LINE_ZK_DIR` before wallet initialization. Older `.compact-keys/line` is not overwritten.
-
-Generate all twelve binary `.bzkir`, `.prover` and `.verifier` artifacts for the exact source/compiler/runtime. Record hashes, sizes, source commit and proof-server version; verify every key matches the release. Do not reuse 0.34 keys or metrics, invent minimum hardware requirements or equate key generation with a proving benchmark. Resource/time requirements need actual release-environment measurement.
-
-The pinned wrapper forwards these compiler queries:
+For organization proving assets:
 
 ```bash
-node scripts/compile-compact.mjs --version
-node scripts/compile-compact.mjs --language-version
-node scripts/compile-compact.mjs --runtime-version
-node scripts/compile-compact.mjs --ledger-version
+npm run organization:release
+npm run organization:validate
+npm run build:deploy
 ```
 
-Inspect actual output. Compilation/tests need no wallet credentials.
+Release generation creates full public proving/verifier keys in `.compact-keys`.
+The build exports 37 allowlisted files under `dist/organization-zk`; it copies
+no wallet records or environment files. Regenerating keys does not submit a
+transaction. Preserve the validated release matching any existing facility.
 
-## Preprod endpoints changed on 9 October
+## Configured local Preprod prototype
 
-The public `indexer.preprod.midnight.network` endpoint was decommissioned 2026-10-09 — Blockfrost is now the indexer/RPC provider. Blockfrost supplies replacement Preprod endpoints requiring a Midnight Preprod project token. Preview endpoints remain unchanged; do not silently substitute Preview for Preprod. [Official endpoints](https://docs.midnight.network/relnotes/network).
+Keep credentials in an ignored `.env.local`, never in a `VITE_` variable or Git.
+The local operator needs `LINE_LIVE_PREPROD=1`,
+`MIDNIGHT_BLOCKFROST_PROJECT_ID`, `MIDNIGHT_DEPLOYER_MNEMONIC` and
+`MIDNIGHT_STORAGE_PASSWORD`. Use a funded test wallet and preserve its encrypted
+controller/cache. Do not replace a retained wallet or lose the storage password.
 
-| Service | Preprod base |
-|---|---|
-| Node RPC | `https://rpc.midnight-preprod.blockfrost.io` |
-| Node WebSocket | `wss://rpc.midnight-preprod.blockfrost.io` |
-| Indexer GraphQL | `https://midnight-preprod.blockfrost.io/api/v0` |
-| Indexer WebSocket | `wss://midnight-preprod.blockfrost.io/api/v0/ws` |
-
-Append `?project_id=<PREPROD_PROJECT_TOKEN>` as the provider documents. A Mainnet token does not authenticate Preprod. Configure node/indexer/WebSocket consistently in browser and CLI. Treat token-containing URLs as credentials in logs/evidence; browser-delivered tokens are visible to that operator and require an intentional provider/proxy policy.
-
-## Reported Midnight Preprod deployment and execution (11 October 2026)
-
-`deployment-evidence.json` reports deployment with `registerMerchant`, registration of eleven additional verifier keys, and eight subsequent canonical circuit calls. Registration is not execution of all twelve circuits. Independent raw-transaction, finality, state and verifier-key checks are pending.
-
-[Independent receipt-check command and recovery findings](NETWORK_RECEIPT_AUDIT_2026-10-11.md) cover the newly added incremental script. The read-only command currently lacks a Preprod project token; local metadata tests do not validate live receipts.
-
-- **Contract Address:** `b2254962147c9cc2e5b9fbcf39f8a4e0d1f149b7801a651df2e41dda1e4410d9`
-- **Contract Shell Deploy:**
-  - Tx Hash: `ff9979c39d98137421f75d18e835fc8715c867c29cc9b27cbfc44ca6b6c97528` (Block `2923936`)
-  - Initial Circuit: `registerMerchant`
-
-### On-Chain Verifier Key Insertions (11 Circuits)
-
-| Circuit | Transaction Hash | Block Height |
-|---|---|---|
-| `disableMerchant` | `e7db093b16232fbec89b845068260ec67e8bfc64cf37551b67a0c54a648596f0` | `2923941` |
-| `fundReserve` | `7c67c424d34eb14451c52edaf1b97e4528ccc5a6be1016f0fc12e2d04c223b13` | `2923950` |
-| `withdrawUnencumberedReserve` | `ad55be7972f9297cfd4aa5ce6b4d5e71a1777b0ace45deda22b1905351b02149` | `2923955` |
-| `withdrawFees` | `28ccf8f1d41eb7e3ccf2f8b0bbe3fd6ea93caf5cda705a5a12dae782e4d43424` | `2923960` |
-| `openLine` | `964196bbe2488c40d6cb80655234ad50b2a6aa58b7df5d93bff50a1a7dd43984` | `2923966` |
-| `postQuote` | `30cfa1c5fccf96e3591c6cbf1a43125d12874ca187ade0a15ca13b1379d572fe` | `2923971` |
-| `draw` | `e7880c51f4641b06305fd3e6f065ad0c73ad8619cd833aa39ae75c3fe862c4b9` | `2923977` |
-| `redeemDraw` | `725b7041655e9c3a13a75aec93593d0ffd6c293166fe08581ff13915975123ad` | `2923985` |
-| `cancelOrExpireNote` | `8f91bdedd0386e61a1e9ea31af07ae8c64f79bf5b5dc289bb9077df83959a6bb` | `2923992` |
-| `acknowledgeRepayment` | `fbb8e368381a6c547a96899251c22f6d034d1ac070cbe726d958807e1ebc574c` | `2923998` |
-| `setStatus` | `6ac11b767323350b4144f91e3f209b157e69262ff5df53009e0e6c95a6a39d6f` | `2924004` |
-
-### Full 8-Step On-Chain Circuit Flow Execution
-
-The deployment script recorded these eight reported confirmations. Roles share a mnemonic/process, and the accounting calls do not move settlement assets:
-
-| Step | Circuit | Transaction Hash | Block Height |
-|---|---|---|---|
-| 1 | `fundReserve` | `26cd6a2b4bf9913a8c0a2537d215997d31d4897bfa88defd179fd88d729d26e6` | `2929747` |
-| 2 | `registerMerchant` | `177c80674a5d3f9ab4938cfad6f2456d7a49f5db9d3848b775ea4fc7ffd5f9d0` | `2929754` |
-| 3 | `openLine` | `a98d6669bfd96540b0e5e7e8f559b6b48ce3a72d8beef617ce77c9cd4d03881b` | `2929762` |
-| 4 | `postQuote` | `d88019c45dc9656ebcedcd9d2f01c5dc43a8dd0b766da0dcf037a37b673157e0` | `2929769` |
-| 5 | `draw` | `8ba4f33de34bd8b64cc853117491b921ecff591f7fd5cf77430ef0422a373b17` | `2929778` |
-| 6 | `redeemDraw` | `b473e6a048d5d351233350c7a92e1318f7a79e1562b8cbdcafd12d383306ad1e` | `2929786` |
-| 7 | `acknowledgeRepayment` | `179f46cfa63d5e8289fe23c1d126f8f91b52dfca82d456aecf60565a96977cf6` | `2929793` |
-| 8 | `withdrawFees` | `e0291939c52cf0ebf269429c77d95556f2be4a0bb48e3508e5f4f5c836e0bc24` | `2929800` |
-
-Browser runtime and deploy/join/smoke scripts share current defaults and accept `MIDNIGHT_BLOCKFROST_PROJECT_ID`. Retired endpoints are rejected; explicit custom services remain supported. Verify transport before network operations. A proof service, commonly configured at `http://127.0.0.1:6300`, is separate; its URL does not prove version 8.1.3 or its witness-confidentiality boundary.
-
-## Deployment preparation
-
-Inspect actual scripts/providers before giving them a funded wallet. **`npm run contract:deploy` is not a dry run** and can attempt funded activity. An absent-credential failure is not deployment validation.
-
-1. Complete migration and exact encoding/generated-execution checks. Validate provider/wallet key/transaction interfaces against installed SDK types.
-2. Generate/verify full assets and configure the ZK provider to their exact release.
-3. Prepare a network-matching wallet and supported resource/faucet flow. A wallet resource balance or reserve counter does not prove a cash deposit.
-4. Use secure environment/secret management. The script reads `MIDNIGHT_DEPLOYER_MNEMONIC` and legacy `MIDNIGHT_DEPLOYER_SEED`; inspect its exact phrase validation. Never place recovery phrases in tracked files/public evidence.
-5. Configure `MIDNIGHT_NETWORK_ID`, `MIDNIGHT_NODE_URI`, `MIDNIGHT_INDEXER_URI`, `MIDNIGHT_INDEXER_WS_URI`, `MIDNIGHT_PROOF_SERVER_URI`. Match the SDK/wallet canonical network identifier rather than substituting prose labels.
-6. Required: supply exact 32-byte `MIDNIGHT_ISSUER_PK` / `MIDNIGHT_INITIAL_MERCHANT_PK` public keys and instance nonce. Derive keys with `encoding.ts` tagged Compact primitives, not untagged shortcuts. Verify intended secrets authenticate generated circuits.
-7. `MIDNIGHT_STORAGE_PASSWORD` is required (at least 16 characters), through the SDK password callback. Make private-state encryption recoverable with the correct provider password callback and durable secrets. An ephemeral generated password is not recovery.
-8. Use bounded sync/submission/finalization waits and cleanup. Repair unresolved audit blockers before funded operations; scripts existing is not acceptance.
-
-The deployment header describes other key/domain/storage/cache settings. Preserve legitimate local wallet configuration during integration and never print/overwrite credentials to diagnose version mismatches.
-
-## Execution and acceptance
-
-After preparation, `npm run contract:deploy` is the deployment action. Successful deployment needs finalized success, exact address, independently decoded constructor/public state and artifact hashes. Submission hash or connected wallet alone is insufficient.
-
-Inspect an already confirmed deployment with:
+The proof server is `midnightntwrk/proof-server:8.1.3`, on loopback port 6300.
+For the already configured container:
 
 ```bash
-npm run contract:join -- <CONTRACT_ADDRESS>
+docker start line-preprod-proof-8-1-3
+npm run dev -- --host 127.0.0.1 --port 5174 --strictPort
 ```
 
-Configure its address and use:
+Run `node scripts/check-preprod-readiness.mjs` and require the proof server/API
+to be healthy, idle and free of pending transactions. `/test-payout` uses actual
+transparent test tokens, `/preprod` uses accounting, and `/checkout` is a local
+simulation. Their request identifiers and receipts are separate. Never run a
+second signer process against the operator wallet. Resolve the exact saved
+transaction through the existing reconciliation action before another purchase.
+
+## Persistent organization service
+
+`npm run start:organization` serves the built app and authenticated organization
+API in one process. Supply runtime configuration:
+
+| Variable | Meaning |
+| --- | --- |
+| `LINE_PUBLIC_ORIGIN` | Exact HTTPS origin; loopback HTTP allowed for local checks |
+| `LINE_SUPPLIER_DATA_DIR` | Persistent private data directory |
+| `MIDNIGHT_SUPPLIER_MNEMONIC` | Dedicated supplier fee-wallet seed; preserve its identity |
+| `MIDNIGHT_STORAGE_PASSWORD` | Encryption password for retained custody |
+| `MIDNIGHT_BLOCKFROST_PROJECT_ID` | Private Preprod provider credential |
+| `MIDNIGHT_PROOF_SERVER_URI` | Supplier prover URL, default loopback 6300 |
+| `PORT` | HTTP listen port, default 3000 |
+
+The runtime needs the same full validated organization release. It acquires an
+exclusive encrypted storage lease and drains admitted work before releasing
+ownership. Wallet sign-in protects orders and same-origin provider readers.
+`/healthz` reports liveness; `/readyz` reports initialized availability, not funding
+or a successful payment. A static upload of `dist` alone supplies no supplier API.
+
+A dedicated supplier wallet still needs native synchronization, DUST funding and
+funded acceptance before operating the complete organization product. The latest
+isolated empty-wallet cold-sync attempt exceeded its 180-second startup bound.
+The browser HTTP/WebSocket read path is separately verified against Preprod.
+No public production deployment or customer-facility acceptance is claimed.
+
+## Container handoff (organization preview)
+
+After the validated release and frontend build above:
 
 ```bash
-npm run network:smoke
+npm run deployment:prepare
+docker build -t line-organization .
+cp .env.example .env
+# Fill dedicated supplier credentials and the exact public origin locally.
+docker compose --env-file .env config --quiet
+docker compose --env-file .env up -d
 ```
 
-Connectivity does not prove a write lifecycle. Capture confirmed fund/open/quote/draw/redemption/repayment/status transactions and independently decode state. Exercise wrong merchant, replay, rejected clearance and recovery through actual providers/roles.
+The context contains only source, the built frontend and the allowlisted full
+public release. Private caches and environment files are excluded. The app runs
+as a non-root user, and the named `supplier-data` volume preserves custody. Use
+a reverse proxy with HTTPS/WebSocket support in front of loopback port 3000.
+Run exactly one app replica; do not run the same supplier seed elsewhere.
 
-Actual funding/payout is separate. Current Compact reserve/redemption counters do not move tokens. Attach rail-specific payment receipts and reconciliation before claiming settlement.
-
-## Browser asset serving
-
-Vite dev/preview serves only validated keys and binary ZKIR at `/line-zk`, verifies requested file hashes and rejects missing/stale releases. Network setup resolves an absolute root. Static hosting does not publish the ignored release directory automatically; supply matching assets and a suitable CORS/cache policy.
-
-## CI and evidence
-
-Read `.github/workflows/ci.yml` for actual executed CI. Do not list browser/network checks as CI when absent. Retain current compiler/tests/build/scanner/artifact results and separately authorized network/payment evidence. [Engineering status](ENGINEERING_STATUS.md), [audit](FULL_AUDIT_2026-10-07.md), [pitch checklist](PITCH.md).
+This image serves the organization preview and its authenticated API. It does
+**not** serve the historical operator `/test-payout` or `/preprod` endpoints;
+those require the configured local runtime above. Hosting the recorded prototype
+publicly remains open. Do not advertise the organization image as the recorded
+funded checkout. Native startup, funding and a complete new facility still need
+acceptance on the chosen persistent host. No public deployment is claimed.

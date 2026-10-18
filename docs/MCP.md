@@ -15,7 +15,7 @@ This allows autonomous AI agents (running in Claude, Gemini, or custom orchestra
 | `npm run mcp:dev` | Same local simulator entry point |
 | `npm run mcp:test` | Automated integration test suite for MCP tools |
 
-The current server includes development fixture seeding and issuer privileges and may store plaintext private development state. It is not an independently scoped production agent payment tool. New state files require `deadlineUnits: "unix-seconds"`; old/unlabelled action-count state rejects. `line.seed` explicitly replaces a development snapshot with a fresh matching one. It is not a migration of a live credit book. Deadlines use local Unix time; `actionClock` is ordering only. [Expiry evidence](EXPIRY_2026-10-10.md).
+The current server includes development fixture seeding and issuer privileges and may store plaintext private development state. It is not an independently scoped production agent payment tool. New state files require `deadlineUnits: "unix-seconds"`; old/unlabelled action-count state rejects. `line.seed` explicitly replaces a development snapshot with a fresh matching one. It is not a migration of a live credit book. Deadlines use local Unix time; `actionClock` is ordering only. [Expiry evidence](https://github.com/ShrikarT/line/blob/1088cf9/docs/EXPIRY_2026-10-10.md).
 
 ---
 
@@ -92,4 +92,4 @@ Issuer development authority allocates expired unredeemed cost once against auth
 ### 13. `line.refund.acknowledge`
 Input: `{noteCommitment, paymentRef}`. Issuer development authority proves the exact positive private cash remainder and records its report. The stable payment reference cannot be reused as repayment or for another refund. The note records its exact payment nullifier for attribution; a globally spent reference alone does not identify a note's refund. Original full-cost backing moves into reportedRefundReserve and stays locked.
 
-Current development state requires `compensationPolicy: "private-refund-full-cost-lock-v1"`, all six reserve counters, private refund storage, and valid note-bound receipt metadata. Incompatible state rejects until explicit `line.seed` reset; this is not migration of live commitments. MCP still exposes issuer fixture tools and plaintext development state, so it is not the production agent tool surface. [Compensation evidence and remaining scope](COMPENSATION_2026-10-10.md).
+Current development state requires `compensationPolicy: "private-refund-full-cost-lock-v1"`, all six reserve counters, private refund storage, and valid note-bound receipt metadata. Incompatible state rejects until explicit `line.seed` reset; this is not migration of live commitments. MCP still exposes issuer fixture tools and plaintext development state, so it is not the production agent tool surface. [Compensation evidence and remaining scope](https://github.com/ShrikarT/line/blob/1088cf9/docs/COMPENSATION_2026-10-10.md).
