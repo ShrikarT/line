@@ -12,7 +12,9 @@ funded network acceptance or privacy evidence.
 | Real organization Preprod lifecycle | Matching twelve-key deployment, existing-asset deposit, allowance, two suppliers, actual payouts, replenishment/withdrawal and reload/recovery receipts | Owner reports creation failed without an error; exact failing stage is not yet reproduced |
 | Full-history privacy | Observer-visible history cannot reconstruct protected books under explicit adversaries; generated/native/network evidence for the resulting contract profile | Open; current transparent-asset profile does not satisfy this |
 | Public hosting | App, proving assets and durable merchant backend work for outside users; complete the same user flow at public URL | Public proving export implemented; actual release exported. Production backend, persistence and public end-to-end verification remain pending |
-| Verification/report | Current build, complete regression results, source/release drift checks, public-secret checks and updated readiness audit | Verified locally: core 598 passed / one intentional skip; eight organization browser cases; deploy build, drift and scans pass |
+| Independent supplier runtime | No historical issuer/test-token bootstrap; stable supplier keys, encrypted wallet snapshot, exclusive owner and safe shutdown/reopen | Core implemented; seven storage/lifecycle tests pass. First-start native sync timed out; production HTTP/auth/routing and funded operation remain pending |
+| User-controlled proving | Organization proofs use the user's wallet-supported prover without a localhost fallback | Wallet adapter implemented; actual SDK maintenance/rejection check passes. Actual Lace circuit proving remains unverified |
+| Verification/report | Current build, complete regression results, source/release drift checks, public-secret checks and updated readiness audit | Verified locally: core 605 passed / one intentional skip; eight organization browser cases; deploy build, drift and scans pass |
 
 Public deployment is authorized after the product is verified. Existing
 operator/test-token receipts cannot satisfy a new customer facility's acceptance.
@@ -21,18 +23,21 @@ institutional custody can be invented as evidence.
 
 ## Verification boundary
 
-The full core run discovers 599 tests: 598 pass, none fail or cancel, and one is
-intentionally skipped. All 36 focused organization checks and eight organization
-browser cases pass. Both Compact regenerations have zero managed drift; the full
-organization release, production build/typecheck and credential scans pass.
-The production graph scan inspects 85 modules. The broader historical browser
+The current full core run discovers 606 tests: 605 pass, none fail or cancel, and
+one is intentionally skipped. Seven new wallet storage/lifecycle checks and all
+eight organization browser cases pass. The earlier 36-check focused organization
+run is retained as historical evidence. Both Compact regenerations have zero
+managed drift; the full organization release, deploy build/typecheck and
+credential scans pass. The production graph scan inspects 86 modules. The broader historical browser
 suite is not represented as a fresh full run.
 
-The creation check executes the actual SDK through a deliberately rejecting
-connector at desktop and phone widths and verifies visible failure feedback. It
+The creation check executes the actual SDK through the wallet proving adapter
+and a deliberately rejecting connector at desktop and phone widths. It verifies
+visible failure feedback. It
 does not approve or submit a wallet transaction. The owner's reported silent
-creation failure is still unreproduced. The next acceptance step is a new attempt
-in the updated workspace with the displayed stage or public pending address.
+creation failure is still unreproduced. The owner cannot retry the wallet now;
+independent product work continues, with actual Lace acceptance retained as an
+explicit later check.
 [Machine-readable recovery evidence](../artifacts/organization-product/recovery-verification.json).
 
 Creation feedback follow-up: an empty required field reproducibly prevented
@@ -40,4 +45,6 @@ submission without an application alert. This path now shows actionable feedback
 with zero signatures. It does not establish the cause of the owner's reported
 Lace failure. [Deployment preparation](HOSTING_PREPARATION_2026-10-18.md) records
 the actual exported asset scope and the durable-backend work still required.
+[Supplier runtime and wallet-proving progress](STANDALONE_SUPPLIER_2026-10-18.md)
+records the subsequent implementation and the unsuccessful native sync check.
 [Current verification scope](../artifacts/organization-product/hosting-preparation-verification.json).

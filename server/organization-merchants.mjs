@@ -8,7 +8,7 @@ import { httpClientProofProvider } from '@midnight-ntwrk/midnight-js-http-client
 import { levelPrivateStateProvider } from '@midnight-ntwrk/midnight-js-level-private-state-provider';
 import { OrganizationTransactions } from '../src/lib/organization/transactions.ts';
 import { ORGANIZATION_SERVICES, fulfillOrganizationService } from './organization-services.mjs';
-import { PreprodLive } from './preprod-live.mjs';
+import { NativeOperationJournal } from './native-operation-journal.mjs';
 // Keep this new product profile independent of the legacy operator module cache.
 import { resolveContractRelease, validateContractArtifacts } from '../scripts/contract-artifacts.mjs?organization=v1';
 import { canonicalInvoiceIdBytes, merchantPublicKey, quoteCommit, toHex, hexToBytes } from '../src/lib/line/encoding.ts';
@@ -21,9 +21,9 @@ const equal=(a,b)=>a instanceof Uint8Array&&b instanceof Uint8Array&&Buffer.from
 const digest=value=>createHash('sha256').update(value).digest('hex');
 const clone=value=>structuredClone(value);
 /** Line's two first-party API suppliers. They never receive organization role keys. */
-export class OrganizationMerchants extends PreprodLive {
+export class OrganizationMerchants extends NativeOperationJournal {
  static async create(parent,recipients){
-  const service=new OrganizationMerchants();service.parent=parent;service.directory='.midnight-cache/organization-merchants';mkdirSync(service.directory,{recursive:true});
+  const service=new OrganizationMerchants();service.parent=parent;service.directory=parent.dataDirectory?join(parent.dataDirectory,'organization-merchants'):'.midnight-cache/organization-merchants';mkdirSync(service.directory,{recursive:true});
   service.release=validateContractArtifacts({artifactDir:resolveContractRelease({profile:'organization'}),profile:'organization'});
   const generated=await import(pathToFileURL(join(service.release.artifactDir,'contract/index.js')).href);service.decodeLedger=generated.ledger;
   for(const name of ['endpoints','facade','shieldedKeys','dustKey','keystore','api','publicProvider','reader'])service[name]=parent[name];
@@ -67,11 +67,20 @@ export class OrganizationMerchants extends PreprodLive {
   const order=this.state.orders.find(order=>order.id===id);if(!order)return null;
   return {id:order.id,contractAddress:order.address,service:order.service,status:order.status,quotePackage:order.status==='created'?null:encodeQuote(order.quote),result:order.status==='delivered'?order.result:null,receipts:this.state.receipts.filter(receipt=>receipt.id===`quote-${id}`||receipt.id===`redeem-${id}`).map(({name,contractAddress,txHash,blockHeight})=>({circuit:name,contractAddress,txHash,blockHeight})),pending:this.state.pending?.id===`quote-${id}`||this.state.pending?.id===`redeem-${id}`};
  }
- async quote(id,address,serviceId,document){
+ runMutation(action){
+  if(this.closed)return Promise.reject(Error('The supplier service is closed.'));
+  this.parent.assertOpen?.();
+  if(this.activeMutation)return Promise.reject(Error('The supplier wallet is completing another operation.'));
+  const task=Promise.resolve().then(action).finally(()=>{if(this.activeMutation===task)this.activeMutation=null;});
+  this.activeMutation=task;return task;
+ }
+ recoverPending(){return this.runMutation(()=>super.recoverPending());}
+ quote(id,address,serviceId,document){return this.runMutation(()=>this.quoteOrder(id,address,serviceId,document));}
+ async quoteOrder(id,address,serviceId,document){
   if(!/^[a-f0-9-]{36}$/.test(id))throw Error('A stable purchase request is required.');
   const service=ORGANIZATION_SERVICES.find(service=>service.id===serviceId);if(!service)throw Error('Unknown merchant service.');
   fulfillOrganizationService(serviceId,document);
-  if(this.state.pending)await this.recoverPending();
+  if(this.state.pending)await super.recoverPending();
   let order=this.state.orders.find(order=>order.id===id);
   if(order&&(order.address!==address||order.service!==serviceId||order.inputDigest!==digest(document)))throw Error('The purchase request is already bound to different terms.');
   if(order&&order.status!=='created')return this.order(id);
@@ -89,8 +98,9 @@ export class OrganizationMerchants extends PreprodLive {
   await this.operation(`quote-${id}`,'call','postQuote',{callerSecret:this.merchantKeys[service.merchant],invoiceId:hexToBytes(order.quote.invoiceId),quoteNonce:hexToBytes(order.quote.quoteNonce),quoteAmount:order.quote.amount},after,async()=>{const bound=await this.bindOrganization(address);return bound.callTx.postQuote(order.quote.expiry);});
   return this.order(id);
  }
- async redeem(id,claim){
-  if(this.state.pending)await this.recoverPending();
+ redeem(id,claim){return this.runMutation(()=>this.redeemOrder(id,claim));}
+ async redeemOrder(id,claim){
+  if(this.state.pending)await super.recoverPending();
   const order=this.state.orders.find(order=>order.id===id);if(!order)throw Error('Unknown merchant order.');
   if(order.status==='delivered')return this.order(id);
   const service=ORGANIZATION_SERVICES.find(service=>service.id===order.service),note=decodeNote(claim);
@@ -103,5 +113,16 @@ export class OrganizationMerchants extends PreprodLive {
   const retained=this.state.orders.find(order=>order.id===id);retained.result=fulfillOrganizationService(order.service,retained.document);retained.status='delivered';await this.save();
   return this.order(id);
  }
- async close(){/* The parent owns the shared merchant fee wallet. */}
+ async persistWallet(){return this.parent.persistWallet();}
+ close(){
+  if(this.closeTask)return this.closeTask;
+  this.closed=true;
+  this.closeTask=(async()=>{
+   // An admitted proof/balance/submission retains sole custody until it settles.
+   await this.activeMutation?.catch(()=>{});
+   if(this.ownsParent)await this.parent.close();
+   // Otherwise the local parent owns the shared fee wallet.
+  })().catch(error=>{this.closeTask=undefined;throw error;});
+  return this.closeTask;
+ }
 }

@@ -2,6 +2,16 @@
 
 Date: 18 October 2026 (IST). Local worktree: `line-audit-review`, branch `feat/line-ui-redesign`. GitHub main `cc5cb71` is an ancestor of this worktree; checked again against the remote. This supplements the [full audit](AUDIT_REPORT_2026-10-13.md), whose earlier architecture and evidence must be read with their original scope.
 
+Latest increment: the independent supplier custody core and connected-wallet
+proving adapter are implemented. The current full core result is 605 passes out
+of 606 discovered cases with one intentional skip; all eight organization browser
+cases, deploy build, both Compact/drift checks and credential scans pass. The
+local proof container was restarted after Docker was found stopped; the actual
+read-only readiness check is healthy with 29 historical receipts and no pending
+operation. An isolated empty wallet's full native synchronization timed out and
+remains unverified. [Detailed scope](STANDALONE_SUPPLIER_2026-10-18.md),
+[current evidence](../artifacts/organization-product/standalone-supplier-verification.json).
+
 ## Decision and present verdict
 
 The owner selected **each organization funds and controls its own agents' spending**. The primary `/app` flow now implements that model. An organization's deposit is its own capital, not an outside loan. No mock payment, minted reserve or operator-owned credit book is selected by connecting a wallet.
@@ -49,7 +59,7 @@ The owner selected **each organization funds and controls its own agents' spendi
 - Full organization release validation passes. Canonical regeneration has zero drift across 16 managed files. Canonical and earlier test-token sources remain unchanged.
 - All 36 focused organization checks pass, covering generated contract effects/conservation, public transport, real service computations, HTTP signer admission, encrypted backup validation, stale refund openings, exact finality, safe request retirement, public asset export and actual SDK maintenance construction. Synthetic ledger/unit adapters are not on-chain acceptance.
 - Production build/typecheck passes. The SDK produces browser externalization/WebSocket-default warnings and the WASM bundle is large; the organization provider explicitly supplies the native WebSocket.
-- The fresh full core run discovers **599 tests: 598 passed, zero failed or cancelled, one intentional skip**. Earlier failed/cancelled logs are retained separately; this fresh run is the current result.
+- The current full core run discovers **606 tests: 605 passed, zero failed or cancelled, one intentional skip**. Earlier failed/cancelled logs are retained separately.
 - Browser review includes real IndexedDB/Web Locks and metadata-only connector stubs. Those stubs never approve a funded transaction. Actual Lace connection/vault opening is owner-reported evidence, distinct from these tests.
 - Fixture-key graph and banned-credential scans pass. A separate exact-value scan checks the three configured credentials against eleven public build/report text files and finds no matches. No credentials are included in the report or public proving manifest.
 - A fresh read-only supplier catalog returns HTTP 200 with both actual merchant public keys/receiving wallets and the exact organization source fingerprint. Catalog readiness does not establish a customer purchase.
@@ -67,7 +77,7 @@ These are acceptance steps, not a statement that the network operations have alr
 
 ## Items needing owner input or a later decision
 
-- **Needed now:** public facility address or the exact wallet/deployment error; wallet approvals and spendable Preprod assets. The current toolset cannot operate the owner's existing Lace extension. The owner now reports creation failing without an error. Explicit deployment progress and focused error feedback were added, but this is not yet a reproduced or fixed network failure.
+- **Owner check remains unresolved:** public facility address or the exact wallet/deployment error; actual wallet approvals and spendable Preprod assets. The current toolset cannot operate the owner's existing Lace extension. The owner cannot retry now and asked for independent work to continue. Explicit deployment progress and focused error feedback were added, but the reported silent failure is not yet a reproduced or fixed network failure.
 - **Authorized after verification:** public app/backend deployment. Read-only account inspection found no existing Line project in the connected Vercel account; the durable supplier backend and proving assets still need deployment preparation.
 - **Implemented recovery follow-up:** backup restore, expired/unconsumed request cancellation and re-quoting, and bounded initial finality. Review corrections reject stale refund openings and bound connector identity reads. See the [current work ledger](REMAINING_WORK_2026-10-18.md) for verification.
 - **Before public operations:** monitored durable hosting, production operator authentication/admission and the funded user-facility acceptance above. Uncertain charged claims continue to block replacement payments.

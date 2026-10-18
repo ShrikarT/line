@@ -1,5 +1,33 @@
 # Engineering status and acceptance evidence
 
+## Independent supplier custody and wallet proving: 18 October 2026
+
+The new standalone supplier core uses its own deterministic supplier-only keys,
+an encrypted wallet cache and an identity-bound process lease. It no longer needs
+the historical operator facilities or their wallet snapshots. Seven focused
+storage/lifecycle checks pass, including actual encrypted SDK controller reopen
+and draining an admitted quote before releasing custody. Shared durable
+submission and independent finality checks remain in a common journal.
+
+Organization browser proofs now use the connected wallet's supported proving API
+through the installed SDK adapter. The actual maintenance construction/rejection
+check passes with zero submissions, including no late continuation after a
+provider-acquisition timeout. This does not prove actual Lace circuit proving.
+
+An isolated empty native wallet's sync timed out without a submission. Subsequent
+read-only HTTP, WebSocket handshake and DUST event probes succeeded; full native
+sync remains unverified. Production HTTP/auth/routing, funded organization
+acceptance and public hosting remain open. This is a new supplier profile, not a
+migration of the legacy receiving keys or obligations. [Scope and limits](STANDALONE_SUPPLIER_2026-10-18.md).
+
+Current verification: **606 tests discovered, 605 passed, zero failed/cancelled,
+one intentional skip**; all eight organization browser cases pass, including
+wallet-delegated creation preparation at desktop and phone widths. Both Compact
+regenerations have zero managed drift. Deploy build, typecheck and credential
+scans pass (86 production modules). Both review axes accepted the lifecycle fix
+with no remaining actionable finding in this increment. Public hosting and
+funded user acceptance are not established by these checks.
+
 ## Creation feedback and public-asset preparation: 18 October 2026
 
 A new browser regression reproduces a pre-submission silent rejection: native required-field validation prevents submission without an application alert. The form now displays and focuses actionable feedback, with zero signatures. This is a verified UX defect, not a confirmed diagnosis of the owner's exact Lace failure. Actual SDK maintenance construction/signing and proof conversion also reach a deliberately rejecting wallet without submission.

@@ -6,7 +6,6 @@ import { FailEntirely, SucceedEntirely, type FinalizedTxData } from "@midnight-n
 import { setNetworkId } from "@midnight-ntwrk/midnight-js-network-id";
 import { indexerPublicDataProvider } from "@midnight-ntwrk/midnight-js-indexer-public-data-provider";
 import { FetchZkConfigProvider } from "@midnight-ntwrk/midnight-js-fetch-zk-config-provider";
-import { httpClientProofProvider } from "@midnight-ntwrk/midnight-js-http-client-proof-provider";
 import { Contract, Status, ledger, type Witnesses } from "../../../contracts/managed/organization/contract/index.js";
 import generatedJavascript from "../../../contracts/managed/organization/contract/index.js?raw";
 import { createWalletProviders, getWalletConfiguration } from "../runtime/wallet";
@@ -20,6 +19,7 @@ import { OrganizationTransactions } from "./transactions";
 import { withinDeadline } from "./finality";
 import { activeServiceOrder, requireReplaceableOrder, retireServiceAttempt, serviceOrderNote, supplierRequestId } from "./orders";
 import { matchesRestoredFacility, matchesRestoredNotes } from "./recovery";
+import { organizationProofProvider } from "./proving";
 
 type Circuit = keyof Contract<LinePrivateWitnessContext>["provableCircuits"];
 type Providers = ContractProviders<Contract<LinePrivateWitnessContext>>;
@@ -73,7 +73,7 @@ export class OrganizationNetwork {
         queryZSwapAndContractState: (...args) => withinDeadline(publicData.queryZSwapAndContractState(...args), 25_000, "The contract state service is unavailable. Try again after it recovers."),
         queryUnshieldedBalances: (...args) => withinDeadline(publicData.queryUnshieldedBalances(...args), 25_000, "The asset balance service is unavailable."),
       },
-      proofProvider: httpClientProofProvider(endpoints.proofServerUri, zkConfigProvider),
+      proofProvider: organizationProofProvider(account.wallet, zkConfigProvider.asKeyMaterialProvider(), () => account.assertSession(), report),
     }, { sourceFingerprint: release.inputs.source.sha256, files: release.files }, report);
     const baseWallet = client.providers.walletProvider;
     client.providers = { ...client.providers,
