@@ -1,0 +1,140 @@
+{
+  "recordedAt": "2026-10-18T12:22:40.798Z",
+  "deck": [
+    {
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "slide": 1,
+      "issues": []
+    },
+    {
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "slide": 2,
+      "issues": []
+    },
+    {
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "slide": 3,
+      "issues": []
+    },
+    {
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "slide": 4,
+      "issues": []
+    },
+    {
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "slide": 5,
+      "issues": []
+    },
+    {
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "slide": 6,
+      "issues": []
+    },
+    {
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "slide": 7,
+      "issues": []
+    },
+    {
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "slide": 8,
+      "issues": []
+    },
+    {
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "slide": 1,
+      "issues": []
+    },
+    {
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "slide": 2,
+      "issues": []
+    },
+    {
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "slide": 3,
+      "issues": []
+    },
+    {
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "slide": 4,
+      "issues": []
+    },
+    {
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "slide": 5,
+      "issues": []
+    },
+    {
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "slide": 6,
+      "issues": []
+    },
+    {
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "slide": 7,
+      "issues": []
+    },
+    {
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "slide": 8,
+      "issues": []
+    }
+  ],
+  "watch": {
+    "before": 1,
+    "after": 1,
+    "artifactEditReloaded": false
+  },
+  "errors": [],
+  "pass": true
+}

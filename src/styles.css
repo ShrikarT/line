@@ -1,4 +1,5 @@
-@import "tailwindcss";
+@import "tailwindcss" source("./");
+@source "../index.html";
 
 @font-face {
   font-family: "Manrope";

@@ -1,0 +1,35 @@
+{
+  "checkedAt": "2026-10-18T12:00:34.730Z",
+  "contractAddress": "a159597495b52ea7a703a29562b17fcb042bf7eaa984ec1e05e7e8935208304b",
+  "operation": "f79840f6-79f7-43c6-b552-700bdc81d727-1-draw",
+  "txId": "00e133763cf434106773bc04474609ce372795448543157999382be2203d79c2b4",
+  "txHash": "0ee3ee5117bbf5cee996c130c1c19bc2e3aa8722dedb075d46c3339e98279dde",
+  "submissionError": {
+    "code": 1010,
+    "message": "Invalid Transaction",
+    "data": "Custom error: 170"
+  },
+  "expiresAt": [
+    "2026-10-18T12:44:23.000Z",
+    "2026-10-18T12:15:04.000Z"
+  ],
+  "indexedMatches": 0,
+  "matches": [],
+  "newMerchantARedemption": {
+    "txHash": "9b9504378719b1390a7eae7a72f11cdefb4a86650a88a8999824d834dc123400",
+    "block": {
+      "height": 3034322,
+      "hash": "88cd374854c3e108fbb53b6f3ba776a667984b68b169921217c1a34420a167a7",
+      "timestamp": 1792323768001
+    },
+    "status": "SUCCESS",
+    "finalizedHead": {
+      "hash": "827a6b337f073f03f10bea4325dafa614c46e4f7849e30c20092ddf920e42f91",
+      "height": 3034496
+    },
+    "rawTransactionChecked": true
+  },
+  "action": "Retained pending original transaction. No resend, no replacement, no private accounting mutation.",
+  "limitation": "New recording is partial; the earlier independently verified two-merchant payout remains the accepted checkpoint.",
+  "reference": "https://docs.midnight.network/guides/manage-dust#dust-troubleshooting"
+}
