@@ -4,14 +4,19 @@ import { bech32m } from "@scure/base";
 async function wallets(page: Page) {
   const identity = (n: number) => ({ coin: bech32m.encodeFromBytes("mn_shield-cpk_preprod", new Uint8Array(32).fill(n)), encryption: bech32m.encodeFromBytes("mn_shield-epk_preprod", new Uint8Array(32).fill(n + 20)), receiving: bech32m.encodeFromBytes("mn_addr_preprod", new Uint8Array(32).fill(n + 40)) });
   await page.addInitScript(({ a, b }) => {
-    const target = window as unknown as { midnight: Record<string, unknown>; organizationSignatures: number };
+    const target = window as unknown as { midnight: Record<string, unknown>; organizationSignatures: number; organizationProofRequests: number };
     target.organizationSignatures = 0;
+    target.organizationProofRequests = 0;
     target.midnight = Object.fromEntries([["a", a], ["b", b]].map(([id, keys]) => {
       const identity = keys as { coin: string; encryption: string; receiving: string };
       return [id as string, { name: `Organization wallet ${id}`, rdns: `test.org.${id}`, apiVersion: "4.0.1", connect: async () => ({
         getConfiguration: async () => ({ networkId: "preprod", indexerUri: "https://midnight-preprod.blockfrost.io/api/v0", indexerWsUri: "wss://midnight-preprod.blockfrost.io/api/v0/ws", substrateNodeUri: "https://rpc.midnight-preprod.blockfrost.io", proverServerUri: "http://127.0.0.1:6300" }),
         getShieldedAddresses: async () => ({ shieldedCoinPublicKey: identity.coin, shieldedEncryptionPublicKey: identity.encryption, shieldedAddress: "unused" }),
         getUnshieldedAddress: async () => ({ unshieldedAddress: identity.receiving }), getUnshieldedBalances: async () => ({}),
+        getProvingProvider: async () => {
+          target.organizationProofRequests++;
+          return { check: async () => { throw new Error("Account-isolation tests do not check circuit preimages"); }, prove: async () => { throw new Error("Account-isolation tests do not produce circuit proofs"); } };
+        },
         balanceUnsealedTransaction: async () => { target.organizationSignatures++; throw new Error("No payment is authorized by an account-isolation test"); },
         submitTransaction: async () => { throw new Error("Account-isolation tests never submit"); },
       }) }];
@@ -106,6 +111,7 @@ for (const width of [1440, 390]) test(`real facility preparation reaches wallet 
   await expect(page.getByRole("alert")).toContainText("No payment is authorized", { timeout: 150_000 });
   await expect(page.getByRole("alert")).toBeInViewport();
   expect(await page.evaluate(() => (window as unknown as { organizationSignatures: number }).organizationSignatures)).toBe(1);
+  expect(await page.evaluate(() => (window as unknown as { organizationProofRequests: number }).organizationProofRequests)).toBe(1);
   await expect(page.getByRole("button", { name: "Create facility", exact: true })).toBeEnabled();
   await expect(page.getByText("Facility address", { exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Reconcile original transaction", exact: true })).toHaveCount(0);

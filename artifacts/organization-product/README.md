@@ -1,13 +1,23 @@
 # Organization product verification
 
-The latest creation-feedback and hosting-preparation increment is recorded in
+The latest supplier-custody and wallet-proving increment is recorded in
+[standalone-supplier-verification.json](standalone-supplier-verification.json):
+605 core passes plus one intentional skip, seven focused wallet lifecycle checks
+and eight organization browser passes. Deploy build, both Compact regenerations
+with zero managed drift, typecheck and credential scans pass. Actual SDK creation
+preparation uses the wallet proving adapter before deliberate rejection. Full
+native synchronization of an isolated empty wallet timed out without submission.
+No funded new organization or public hosting is claimed. See
+[scope and unresolved gates](../../docs/STANDALONE_SUPPLIER_2026-10-18.md).
+
+The earlier creation-feedback and hosting-preparation increment is recorded in
 [hosting-preparation-verification.json](hosting-preparation-verification.json):
 598 core passes plus one intentional skip, 36 focused organization passes and
 eight organization browser passes. The deploy build exports the actual public
 proving release, and its SDK static-transport checks pass. No new customer
 deployment, funded payout or public hosting is claimed.
 
-The current recovery increment is recorded in [recovery-verification.json](recovery-verification.json): 594 core passes, one intentional skip, 32 focused organization passes and seven organization browser passes; build, release/drift checks and scans pass. The evidence below describes the earlier checkpoint.
+The earlier recovery increment is recorded in [recovery-verification.json](recovery-verification.json): 594 core passes, one intentional skip, 32 focused organization passes and seven organization browser passes; build, release/drift checks and scans pass. The evidence below describes an older checkpoint.
 
 See [the readiness report](../../docs/ORGANIZATION_READINESS_2026-10-18.md) and [machine-readable scope](verification.json).
 
