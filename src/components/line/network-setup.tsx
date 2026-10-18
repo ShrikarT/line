@@ -10,6 +10,7 @@ interface NetworkSetupProps { onConnected?: () => void; onSwitchToLocal?: () => 
 export function NetworkSetupScreen({ onConnected, onSwitchToLocal }: NetworkSetupProps) {
   const initialRuntime = getRuntime();
   const [wallets, setWallets] = useState<WalletInfo[]>([]);
+  const [selectedWalletId, setSelectedWalletId] = useState("");
   const [networkId, setNetworkId] = useState(initialRuntime.networkId === "preview" ? "preview" : "preprod");
   const [projectToken, setProjectToken] = useState("");
   const [proofServerUri, setProofServerUri] = useState("http://127.0.0.1:6300");
@@ -22,7 +23,9 @@ export function NetworkSetupScreen({ onConnected, onSwitchToLocal }: NetworkSetu
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const busy = connecting || joiningContract;
   useEffect(() => {
-    setWallets(getAvailableWallets());
+    const discover = () => setWallets(getAvailableWallets().filter(wallet => wallet.isAvailable));
+    discover();
+    const discoveryTimer = window.setInterval(discover, 1500);
     const controller = new AbortController();
     void fetch("/api/line/network-session", { method: "POST", headers: { "X-Line-Session": "network-setup" }, signal: controller.signal })
       .then(async response => {
@@ -32,7 +35,7 @@ export function NetworkSetupScreen({ onConnected, onSwitchToLocal }: NetworkSetu
           setProjectToken(current => current || config.blockfrostProjectId);
         }
       }).catch(() => { /* Manual token input remains available outside local setup. */ });
-    return () => controller.abort();
+    return () => { controller.abort(); window.clearInterval(discoveryTimer); };
   }, []);
 
   const handleConnectWallet = async () => {
@@ -41,7 +44,7 @@ export function NetworkSetupScreen({ onConnected, onSwitchToLocal }: NetworkSetu
       if (networkId === "preprod" && !projectToken.trim()) throw new Error("Enter a Blockfrost Midnight Preprod project token.");
       const runtime = new MidnightNetworkRuntime({ networkId, blockfrostProjectId: projectToken.trim() || undefined,
         proofServerUri, zkConfigBaseUrl: new URL(zkConfigBaseUrl, window.location.origin).href });
-      await runtime.attachWallet();
+      await runtime.attachWallet(selectedWalletId || (wallets.length === 1 ? wallets[0].id : undefined));
       setRuntime(runtime);
       setConnectedWalletName(networkId);
       setSuccessMsg("Wallet connected. Join your deployed Line contract to continue.");
@@ -92,6 +95,7 @@ export function NetworkSetupScreen({ onConnected, onSwitchToLocal }: NetworkSetu
       </fieldset>
       <div className="space-y-3 rounded-lg border border-border bg-subtle-fill p-4">
         <div className="flex justify-between text-xs text-muted"><span>1. Browser Wallet</span><span>{connectedWalletName ? `Connected (${connectedWalletName})` : "Not connected"}</span></div>
+        {wallets.length > 0 && <label className="block text-xs text-muted">Wallet<select className={inputClass} disabled={busy} value={selectedWalletId || (wallets.length === 1 ? wallets[0].id : "")} onChange={event => changeConfiguration(() => setSelectedWalletId(event.target.value))}><option value="">Choose a wallet</option>{wallets.map(wallet => <option key={wallet.id} value={wallet.id}>{wallet.name}</option>)}</select></label>}
         <Button onClick={handleConnectWallet} disabled={busy}>{connecting ? "Connecting..." : "Connect Midnight Wallet"}</Button>
         <p className="text-xs text-subtle">{wallets.length ? `Detected: ${wallets.map(w => w.name).join(", ")}` : "No extension detected in browser window."}</p>
       </div>

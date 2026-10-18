@@ -8,11 +8,15 @@ import { sanitizeServiceError } from "@/lib/runtime/endpoints";
 
 const WalletContext = createContext<{ connected: boolean; connecting: boolean; name: string; address: string; openWallet: () => void } | null>(null);
 const connectionMessages: Record<WalletConnectionPhase, string> = {
-  "requesting-access": "Waiting for Lace to open the connection request. Unlock the extension and select your Midnight Preprod account.",
-  "verifying-network": "Lace answered. Checking that your wallet is on Midnight Preprod…",
-  "reading-address": "Reading your receiving address from Lace. Approve address access if the extension asks.",
+  "requesting-access": "Waiting for your wallet to open the connection request. Unlock the extension and select your Midnight Preprod account.",
+  "verifying-network": "Your wallet answered. Checking Midnight Preprod…",
+  "reading-address": "Reading your receiving address. Approve address access if the extension asks.",
   "checking-session": "Confirming your wallet session…",
 };
+const walletDownloads = [
+  { name: "1AM", matches: /1am|1 am|one.?am/i, href: "https://chromewebstore.google.com/detail/1am/bphnkdkcnfhompoegfpgnkidcjfbojjp" },
+  { name: "Lace", matches: /lace/i, href: "https://www.lace.io/" },
+];
 
 export function useWalletSession() {
   const context = useContext(WalletContext);
@@ -55,7 +59,7 @@ export function WalletSessionProvider({ children }: { children: ReactNode }) {
     connectionAttempt.current++;
     cancelWalletConnection();
     busy.current = false; setConnecting(false);
-    setError("Connection cancelled. Unlock Lace, select Preprod and close any old connection prompt before trying again.");
+    setError("Connection cancelled. Unlock your wallet, select Preprod and close any old connection prompt before trying again.");
   }
   function changeOpen(next: boolean) {
     if (!next && busy.current) cancelConnection();
@@ -65,7 +69,7 @@ export function WalletSessionProvider({ children }: { children: ReactNode }) {
     if (busy.current) return;
     const attempt = ++connectionAttempt.current;
     busy.current = true; setConnecting(true); setError("");
-    try { await connectWallet(wallet.rdns, "preprod", phase => { if (connectionAttempt.current === attempt) setConnectionPhase(phase); }); }
+    try { await connectWallet(wallet.id, "preprod", phase => { if (connectionAttempt.current === attempt) setConnectionPhase(phase); }); }
     catch (failure) {
       if (connectionAttempt.current !== attempt) return;
       const code = failure instanceof Error && "code" in failure ? failure.code : "";
@@ -101,9 +105,10 @@ export function WalletSessionProvider({ children }: { children: ReactNode }) {
           <Button variant="ghost" onClick={() => void disconnect()}><Plugs aria-hidden="true" />Disconnect from Line</Button>
           <p className="text-xs text-muted">To revoke the site permission, remove Line from connected sites in your wallet. After refreshing the page, reconnect to approve a new session.</p>
         </div> : <div className="wallet-options" aria-busy={connecting}>
-          {wallets.length ? wallets.map(wallet => <Button key={wallet.rdns} variant="outline" className="wallet-option" disabled={connecting} onClick={() => void connect(wallet)}><Wallet aria-hidden="true" /><span>{wallet.name}</span>{connecting ? <CircleNotch className="animate-spin" aria-hidden="true" /> : <ArrowRight aria-hidden="true" />}</Button>) : <div className="wallet-empty"><strong>No Midnight wallet detected yet.</strong><p>Install a Midnight-compatible browser wallet, enable it for this site, then refresh this page. On mobile, open Line in a browser that supports your wallet extension.</p><Button variant="outline" asChild><a href="https://docs.midnight.network/getting-started/installation" target="_blank" rel="noreferrer">Wallet setup guide <ArrowSquareOut aria-hidden="true" /></a></Button></div>}
+          {wallets.length ? wallets.map(wallet => <Button key={wallet.id} variant="outline" className="wallet-option" disabled={connecting} onClick={() => void connect(wallet)}><Wallet aria-hidden="true" /><span>{wallet.name}</span>{connecting ? <CircleNotch className="animate-spin" aria-hidden="true" /> : <ArrowRight aria-hidden="true" />}</Button>) : <div className="wallet-empty"><strong>No compatible Midnight wallet detected yet.</strong><p>Install a Midnight wallet below, create or unlock its Preprod account, then refresh Line. Any wallet implementing Midnight DApp Connector v4 can appear here.</p><Button variant="outline" asChild><a href="https://docs.midnight.network/getting-started/installation" target="_blank" rel="noreferrer">Wallet setup guide <ArrowSquareOut aria-hidden="true" /></a></Button></div>}
           {connecting && <><p role="status" className="text-sm text-muted">{connectionMessages[connectionPhase]}</p><Button variant="ghost" onClick={cancelConnection}>Cancel connection</Button></>}
         </div>}
+        {!api && !connecting && <div className="flex flex-col gap-3"><p className="text-xs text-muted">Use another Midnight wallet</p><div className="flex flex-wrap gap-2">{walletDownloads.filter(option => !wallets.some(wallet => option.matches.test(`${wallet.name} ${wallet.rdns}`))).map(option => <Button key={option.name} variant="outline" size="sm" asChild><a href={option.href} target="_blank" rel="noreferrer">Get {option.name}<ArrowSquareOut aria-hidden="true" /></a></Button>)}<Button variant="ghost" size="sm" onClick={() => window.location.reload()}>Refresh wallets</Button></div></div>}
         <div className="wallet-scope"><CheckCircle aria-hidden="true" /><p>Connecting shares your wallet address and sends no transaction. Your organization’s records stay encrypted in its wallet-scoped vault. Deposits and purchases require separate wallet approvals.</p></div>
         <Button variant="secondary" asChild><a href="/app" onClick={() => changeOpen(false)}>Continue to workspace <ArrowRight aria-hidden="true" /></a></Button>
         {!["/", "/app", "/organization", "/agents", "/suppliers"].includes(window.location.pathname) && <a className="text-center text-xs text-muted underline underline-offset-4" href="/connect" onClick={() => changeOpen(false)}>Advanced: connect an existing canonical contract</a>}

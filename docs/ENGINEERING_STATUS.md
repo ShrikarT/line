@@ -25,7 +25,7 @@ state and receipts must be verified before updating these checkpoint counts.
 
 | Check | Result |
 | --- | --- |
-| Full core `npm test` | 641 discovered; 640 passed; one intentional skip; no failures/cancellations |
+| Full core `npm test` | 644 discovered; 643 passed; one intentional skip; no failures/cancellations |
 | Organization browser | Nine passed; includes actual SDK preparation and deliberately rejected approval |
 | Compact regeneration | Canonical and organization compile; zero managed drift |
 | Build/typecheck | `npm run build:deploy` passes and exports 37 public proving files |
@@ -42,10 +42,13 @@ Local ignored logs retain the full output and unsuccessful attempts.
   late responses cannot replace or clear a newer account. A wallet is published
   as connected only after its receiving address and Preprod session are read.
   The dialog reports the actual waiting stage rather than a single indefinite
-  spinner. Fourteen focused connector lifecycle regressions pass. The owner's
-  real Lace approval prompt still does not appear; live wallet acceptance and
-  the requested wallet/transaction recording remain incomplete. The last direct
-  browser observation was an actionable locked-wallet error with retry enabled.
+  spinner. Seventeen focused connector lifecycle regressions pass. Compatible
+  injected v4 providers are selected by their actual injection key; ambiguous
+  selections cannot silently switch wallets. The real Lace connection, verified
+  Preprod receiving address and organization vault opening were observed in the
+  running app. The connected wallet reports 5,000 tNIGHT. Facility preparation
+  reached wallet approval, but no new organization deployment is confirmed yet.
+  Alternative-wallet dispatch is tested; an actual 1AM transaction is unverified.
 - Browser fetch retains its required global receiver.
 - Incomplete facility forms display useful feedback; SDK preparation reaches the
   wallet approval boundary on desktop and phone.

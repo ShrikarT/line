@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, mock, test } from "node:test";
 import assert from "node:assert/strict";
-import { cancelWalletConnection, connectWallet, disconnectWallet, getConnectedWallet, getConnectedWalletAccount, getWalletAccount } from "../src/lib/runtime/wallet.ts";
+import { cancelWalletConnection, connectWallet, disconnectWallet, getAvailableWallets, getConnectedWallet, getConnectedWalletAccount, getWalletAccount } from "../src/lib/runtime/wallet.ts";
 
 const originalWindow = Object.getOwnPropertyDescriptor(globalThis, "window");
 const flush = async () => { for (let i = 0; i < 20; i++) await Promise.resolve(); };
@@ -139,4 +139,34 @@ test("session verification also times out without claiming a connection", async 
   await flush(); mock.timers.tick(20_000); await flush();
   assert.match(failure?.message ?? "still checking session", /session check timed out/i);
   await attempt; assert.equal(getConnectedWallet(), null);
+});
+
+test("the selected 1AM provider is used without calling Lace or incompatible wallets", async () => {
+  const calls = []; const oneAm = connected();
+  Object.defineProperty(globalThis, "window", { configurable: true, value: { midnight: {
+    "lace-uuid": { name: "Lace", rdns: "io.lace.wallet", apiVersion: "4.0.1", connect: async () => { calls.push("lace"); return connected(); } },
+    "1am-uuid": { name: "1AM", rdns: "xyz.1am", apiVersion: "4.0.1", connect: async () => { calls.push("1am"); return oneAm; } },
+    legacy: { name: "Legacy", apiVersion: "3.0.0", connect: async () => { throw new Error("Unsupported wallet selected"); } },
+  } } });
+  assert.deepEqual(getAvailableWallets().filter(w => w.isAvailable).map(w => w.id), ["lace-uuid", "1am-uuid"]);
+  assert.equal(await connectWallet("1am-uuid"), oneAm);
+  assert.deepEqual(calls, ["1am"]);
+});
+
+test("multiple injected wallets require explicit choice and duplicate rdns values cannot redirect it", async () => {
+  const a = connected(); const b = connected();
+  Object.defineProperty(globalThis, "window", { configurable: true, value: { midnight: {
+    first: { name: "First", rdns: "same.rdns", apiVersion: "4.0.1", connect: async () => a },
+    second: { name: "Second", rdns: "same.rdns", apiVersion: "4.0.1", connect: async () => b },
+  } } });
+  await assert.rejects(connectWallet(), /Choose which Midnight wallet/);
+  await assert.rejects(connectWallet("same.rdns"), /Choose which Midnight wallet/);
+  assert.equal(await connectWallet("second"), b);
+});
+
+test("locked errors identify the selected alternative wallet", async () => {
+  Object.defineProperty(globalThis, "window", { configurable: true, value: { midnight: {
+    "1am-uuid": { name: "1AM", rdns: "xyz.1am", apiVersion: "4.0.1", connect: async () => { throw { reason: "Wallet is locked" }; } },
+  } } });
+  await assert.rejects(connectWallet("1am-uuid"), /1AM is locked/);
 });
