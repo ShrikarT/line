@@ -11,10 +11,12 @@ funded network acceptance or privacy evidence.
 | Bounded transaction UX | Initial submission and reconciliation return within a bound, preserve original bytes, and resume exact finality without late state promotion | Implemented; 36 focused organization checks pass; exact signed uncertainty remains retained |
 | Real organization Preprod lifecycle | Matching twelve-key deployment, existing-asset deposit, allowance, two suppliers, actual payouts, replenishment/withdrawal and reload/recovery receipts | Owner reports creation failed without an error; exact failing stage is not yet reproduced |
 | Full-history privacy | Observer-visible history cannot reconstruct protected books under explicit adversaries; generated/native/network evidence for the resulting contract profile | Open; current transparent-asset profile does not satisfy this |
-| Public hosting | App, proving assets and durable merchant backend work for outside users; complete the same user flow at public URL | Public proving export implemented; actual release exported. Production backend, persistence and public end-to-end verification remain pending |
-| Independent supplier runtime | No historical issuer/test-token bootstrap; stable supplier keys, encrypted wallet snapshot, exclusive owner and safe shutdown/reopen | Core implemented; seven storage/lifecycle tests pass. First-start native sync timed out; production HTTP/auth/routing and funded operation remain pending |
+| Public hosting | App, proving assets and durable merchant backend work for outside users; complete the same user flow at public URL | Public proving export, persistent server entry and wallet-authenticated API implemented. Provider routing, deployment and public end-to-end verification remain pending |
+| Independent supplier runtime | No historical issuer/test-token bootstrap; stable supplier keys, encrypted wallet snapshot, exclusive owner and safe shutdown/reopen | Core and authenticated HTTP implemented; nine storage/lifecycle checks pass. First-start native sync timed out; routing and funded operation remain pending |
+| Production API and wallet admission | Signed wallet sessions, immutable organization ownership, serialized operations, bounded caller admission and safe shutdown | Implemented; actual signature/HTTP/client tests pass. Public provider routing, funded operation and deployment remain pending |
+| Durable result publication | A failed controller write cannot expose a confirmed candidate/result or permit another operation | Reproduced and fixed; encrypted delivery recovery avoids a second redemption |
 | User-controlled proving | Organization proofs use the user's wallet-supported prover without a localhost fallback | Wallet adapter implemented; actual SDK maintenance/rejection check passes. Actual Lace circuit proving remains unverified |
-| Verification/report | Current build, complete regression results, source/release drift checks, public-secret checks and updated readiness audit | Verified locally: core 605 passed / one intentional skip; eight organization browser cases; deploy build, drift and scans pass |
+| Verification/report | Current build, complete regression results, source/release drift checks, public-secret checks and updated readiness audit | Verified locally: core 617 passed / one intentional skip; final affected 55 organization checks and nine browser cases pass; deploy build, drift and scans pass |
 
 Public deployment is authorized after the product is verified. Existing
 operator/test-token receipts cannot satisfy a new customer facility's acceptance.
@@ -23,12 +25,14 @@ institutional custody can be invented as evidence.
 
 ## Verification boundary
 
-The current full core run discovers 606 tests: 605 pass, none fail or cancel, and
-one is intentionally skipped. Seven new wallet storage/lifecycle checks and all
-eight organization browser cases pass. The earlier 36-check focused organization
-run is retained as historical evidence. Both Compact regenerations have zero
+The current full core run discovers 618 tests: 617 pass, none fail or cancel, and
+one is intentionally skipped. After the final browser fetch receiver fix, all
+55 focused organization checks and nine organization browser cases pass. The
+full core run precedes only that receiver fix; the affected checks and deploy
+build were rerun afterward. Earlier results remain historical evidence.
+Both Compact regenerations have zero
 managed drift; the full organization release, deploy build/typecheck and
-credential scans pass. The production graph scan inspects 86 modules. The broader historical browser
+credential scans pass. The production graph scan inspects 88 modules. The broader historical browser
 suite is not represented as a fresh full run.
 
 The creation check executes the actual SDK through the wallet proving adapter

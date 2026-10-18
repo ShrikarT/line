@@ -1,5 +1,27 @@
 # Engineering status and acceptance evidence
 
+## Authenticated production entry and durable publication: 18 October 2026
+
+The standalone server now serves the public build and an organization-only API.
+Wallet sign-in verifies actual ledger signatures over a single-use, origin-bound
+challenge. Order access checks the contract's immutable organization recipient
+and exact supported verifier keys. Browser sign-in retains exact request IDs and
+retries only explicit authentication rejection. Sign-in and new quote admission
+have bounded budgets; shutdown drains work and can retry a failed wallet stop.
+
+Reproduced storage bugs are fixed: confirmed candidates and computed service
+results are published only after encrypted commits. Failed controller persistence
+blocks another mutation until reopen; delivery recovery does not redeem again.
+Storage-only tests no longer depend on ignored full proving releases, while the
+production factory still requires them. The full regression run passes 617 of
+618 discovered tests, with one intentional skip and no failures or cancellations.
+After the final browser fetch receiver fix, all 55 focused organization checks
+and nine organization browser cases pass. The deploy build, typecheck, both
+Compact regenerations with zero drift and credential scans pass. No public
+deployment or new funded facility is claimed. Public
+provider routing, native funded bootstrap and actual Lace acceptance remain
+open. [Implementation and verification scope](PRODUCTION_API_2026-10-18.md).
+
 ## Independent supplier custody and wallet proving: 18 October 2026
 
 The new standalone supplier core uses its own deterministic supplier-only keys,

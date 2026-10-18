@@ -1,0 +1,56 @@
+{
+  "schema": "line-organization-production-api-verification/v1",
+  "date": "2026-10-18",
+  "baselineCommit": "05695eb",
+  "latestFetchedMain": "cc5cb71",
+  "sourceFingerprint": "057aa57267c0b8afd537cfb8950946db99bda45954a259c521877bdbb23e5157",
+  "core": {
+    "command": "npm test",
+    "discovered": 618,
+    "passed": 617,
+    "failed": 0,
+    "cancelled": 0,
+    "skipped": 1,
+    "scope": "Before only the final native browser fetch receiver fix; affected checks and deploy build rerun afterward",
+    "log": "production-api-final-core.log"
+  },
+  "finalAffectedOrganizationChecks": {
+    "command": "npm run test:organization",
+    "passed": 55,
+    "failed": 0,
+    "log": "production-api-final-organization.log",
+    "actualLedgerSignaturesAndLoopbackHttp": true,
+    "actualEncryptedControllerAndGeneratedRecipients": true,
+    "nativeFacadeStarted": false
+  },
+  "organizationBrowser": {
+    "passed": 9,
+    "failed": 0,
+    "log": "production-api-final-browser.log",
+    "creationWidths": [1440, 390],
+    "nativeBrowserFetchRegression": "Reproduced Illegal invocation, fixed global receiver and verified in Chromium",
+    "connector": "metadata-only or deliberately rejecting test connectors",
+    "approvedTransactions": 0
+  },
+  "buildDeploy": "passed after final receiver fix",
+  "buildLog": "production-api-deploy-build-final.log",
+  "exportedPublicFiles": 37,
+  "typecheck": "passed",
+  "compactSourceChanged": false,
+  "managedDrift": 0,
+  "credentialScans": { "productionModules": 88, "fixtureKeys": "passed", "bannedSecrets": "passed", "configuredValuesInPublicArtifacts": "passed" },
+  "review": {
+    "standards": "No remaining actionable finding in reviewed increment",
+    "spec": "No remaining actionable finding in reviewed increment"
+  },
+  "newOnChainSubmissions": 0,
+  "publicDeployment": false,
+  "newFundedOrganizationAccepted": false,
+  "remaining": [
+    "Public credential routing over HTTP and WebSocket",
+    "Native supplier cold start, funding and fee balancing",
+    "Actual Lace proving and funded twelve-key organization lifecycle with both payouts",
+    "Persistent public deployment and restart recovery acceptance",
+    "Full-history privacy and autonomous external-agent integration"
+  ]
+}

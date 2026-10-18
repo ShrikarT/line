@@ -20,6 +20,7 @@ import { withinDeadline } from "./finality";
 import { activeServiceOrder, requireReplaceableOrder, retireServiceAttempt, serviceOrderNote, supplierRequestId } from "./orders";
 import { matchesRestoredFacility, matchesRestoredNotes } from "./recovery";
 import { organizationProofProvider } from "./proving";
+import { OrganizationSupplierClient } from "./supplier-client";
 
 type Circuit = keyof Contract<LinePrivateWitnessContext>["provableCircuits"];
 type Providers = ContractProviders<Contract<LinePrivateWitnessContext>>;
@@ -32,7 +33,8 @@ const asAddress = (value: string) => ({ bytes: receivingAddressBytes(value) });
 
 /** Actual wallet -> Compact -> proof -> wallet signature -> finalized receipt. */
 export class OrganizationNetwork {
-  private constructor(readonly account: OrganizationAccount, private providers: Providers, private release: { sourceFingerprint: string; files: Record<string, { sha256: string }> }, private report: (message: string) => void) {}
+  private constructor(readonly account: OrganizationAccount, private providers: Providers, private release: { sourceFingerprint: string; files: Record<string, { sha256: string }> }, private report: (message: string) => void) { this.supplier = new OrganizationSupplierClient(account, location.origin, report); }
+  private supplier: OrganizationSupplierClient;
   private input: LinePrivateWitnessContext | null = null;
   private verifierKeys = new Map<Circuit, Uint8Array>();
   private transactions: OrganizationTransactions | null = null;
@@ -346,12 +348,7 @@ export class OrganizationNetwork {
     });
   }
   private async supplierRequest(path: string, body?: object): Promise<unknown> {
-    this.account.assertSession();
-    const response = await fetch(`/api/organization/${path}`, { method: body ? "POST" : "GET", headers: { "X-Line-Organization": "wallet", ...(body ? { "Content-Type": "application/json" } : {}) }, ...(body ? { body: JSON.stringify(body) } : {}), signal: AbortSignal.timeout(30_000) });
-    const value = await response.json();
-    this.account.assertSession();
-    if (!response.ok) throw new Error(typeof value.error === "string" ? value.error : "The API supplier could not complete the request.");
-    return value;
+    return this.supplier.request(path, body);
   }
   async catalog(): Promise<OrganizationCatalog> {
     const value = await this.supplierRequest("catalog") as OrganizationCatalog;

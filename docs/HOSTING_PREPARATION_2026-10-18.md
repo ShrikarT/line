@@ -3,6 +3,13 @@
 The owner authorized publication after verification. This is preparation, not a
 public deployment or acceptance of the failed customer facility creation.
 
+Subsequent progress: the [authenticated production entry](PRODUCTION_API_2026-10-18.md)
+now serves the built app and organization API under a configured origin, with
+standalone supplier custody, wallet ownership checks, bounded sign-in/quote
+admission and retryable shutdown. Public provider credential routing, packaging,
+funded acceptance and deployment remain pending. The original checkpoint below
+retains its historical test counts.
+
 ## Verified build artifact
 
 `npm run build:deploy` builds the frontend and runs `organization:export-assets`.

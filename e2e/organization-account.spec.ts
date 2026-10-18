@@ -95,9 +95,22 @@ test("two real account namespaces isolate encrypted identities and recover only 
 test("incomplete facility fields show actionable feedback without requesting a signature", async ({ page }) => {
   await wallets(page); await page.goto("/app"); await connect(page, "a"); await unlock(page);
   await page.getByRole("button", { name: "Create facility", exact: true }).click();
-  await expect(page.getByRole("alert")).toContainText("Complete the required name, asset and supplier profile");
-  await expect(page.getByRole("alert")).toBeInViewport();
+  const requiredFeedback = page.getByRole("alert").filter({ hasText: "Complete the required name, asset and supplier profile" });
+  await expect(requiredFeedback).toBeVisible();
+  await expect(requiredFeedback).toBeInViewport();
   expect(await page.evaluate(() => (window as unknown as { organizationSignatures: number }).organizationSignatures)).toBe(0);
+});
+
+test("the actual supplier client calls browser fetch with its required global receiver", async ({ page }) => {
+  await page.route("**/api/organization/catalog", route => route.fulfill({ json: { network: "preprod", services: [] } }));
+  await page.goto("/app");
+  const result = await page.evaluate(async () => {
+    const { browserModuleUrl } = await import("/e2e/browser-module.ts" as any);
+    const { OrganizationSupplierClient } = await import(browserModuleUrl("/src/lib/organization/supplier-client.ts"));
+    const account = { receivingAddress: "unused-read-only-control", assertSession() {}, async assertWallet() {}, wallet: { async signData() { throw new Error("A public catalog must not request a signature"); } } };
+    return new OrganizationSupplierClient(account, location.origin).request("catalog");
+  });
+  expect(result).toEqual({ network: "preprod", services: [] });
 });
 
 for (const width of [1440, 390]) test(`real facility preparation reaches wallet approval and a rejection creates no confirmed facility at ${width}px`, async ({ page }) => {
