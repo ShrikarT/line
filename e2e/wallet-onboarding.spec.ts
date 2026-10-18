@@ -37,7 +37,7 @@ for (const width of [1440, 390]) {
     await page.goto("/");
     await page.getByRole("button", { name: "Connect wallet", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Connect your wallet.", exact: true })).toBeVisible();
-    await expect(page.getByText("No Midnight wallet detected yet.")).toBeVisible();
+    await expect(page.getByText("No compatible Midnight wallet detected yet.")).toBeVisible();
     await expect(page.getByRole("link", { name: "Wallet setup guide" })).toHaveAttribute("href", "https://docs.midnight.network/getting-started/installation");
     await page.getByRole("link", { name: "Continue to workspace" }).click();
     await expect(page).toHaveURL(/\/app$/);

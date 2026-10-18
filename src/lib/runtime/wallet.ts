@@ -13,6 +13,7 @@ import { WalletNotConnectedError, WalletApprovalRejectedError } from "./errors.t
 import { lockVaultSession } from "../security/vault.ts";
 
 export interface WalletInfo {
+  id: string;
   rdns: string;
   name: string;
   icon: string;
@@ -39,7 +40,7 @@ const walletListeners = new Set<() => void>();
 
 /** A cancelled extension prompt may still answer later; it must never own a session. */
 function cancelledConnection(): WalletNotConnectedError {
-  return new WalletNotConnectedError("Wallet connection cancelled. Close any old connection prompt in Lace before trying again.");
+  return new WalletNotConnectedError("Wallet connection cancelled. Close any old connection prompt in your wallet before trying again.");
 }
 
 function walletResponse<T>(request: () => Promise<T>, milliseconds: number, message: string, signal?: AbortSignal): Promise<T> {
@@ -94,7 +95,7 @@ export async function getWalletConfiguration(api: ConnectedAPI, networkId: strin
     if (typeof api[method] !== "function") throw new WalletNotConnectedError(`Wallet does not implement connector v4 capability: ${method}.`);
   }
   const configuration = await walletResponse(() => api.getConfiguration(), 20_000,
-    "Wallet network verification timed out. Unlock Lace, select Preprod and reconnect.", signal);
+    "Wallet network verification timed out. Unlock your wallet, select the requested network and reconnect.", signal);
   if (configuration.networkId !== networkId) throw new WalletNotConnectedError("Wallet network does not match the selected contract network.");
   return configuration;
 }
@@ -102,9 +103,9 @@ export async function getWalletConfiguration(api: ConnectedAPI, networkId: strin
 async function readWalletAddress(api: ConnectedAPI, signal?: AbortSignal): Promise<string> {
   if (typeof api.getUnshieldedAddress !== "function") throw new WalletNotConnectedError("Wallet does not implement connector v4 capability: getUnshieldedAddress.");
   const account = await walletResponse(() => api.getUnshieldedAddress(), 20_000,
-    "Wallet address request timed out. Unlock Lace and reconnect.", signal);
+    "Wallet address request timed out. Unlock your wallet and reconnect.", signal);
   if (typeof account?.unshieldedAddress !== "string" || !account.unshieldedAddress.trim()) {
-    throw new WalletNotConnectedError("Wallet did not return a receiving address. Open your Midnight Preprod account in Lace and reconnect.");
+    throw new WalletNotConnectedError("Wallet did not return a receiving address. Open your Midnight account in the extension and reconnect.");
   }
   return account.unshieldedAddress;
 }
@@ -157,11 +158,12 @@ export function getAvailableWallets(): WalletInfo[] {
   if (!midnight || typeof midnight !== "object") return [];
 
   return Object.entries(midnight).map(([key, w]) => ({
+    id: key,
     rdns: w?.rdns ?? key,
     name: w?.name ?? (key.toLowerCase().includes("lace") ? "Midnight Lace" : key),
     icon: w?.icon ?? "",
     apiVersion: w?.apiVersion ?? "unknown",
-    isAvailable: typeof w?.connect === "function",
+    isAvailable: typeof w?.connect === "function" && /^4\./.test(w?.apiVersion ?? ""),
   }));
 }
 
@@ -199,9 +201,10 @@ export async function connectWallet(
   }
 
   const walletEntries = Object.entries(midnight);
-  const targetEntry = preferredRdns
-    ? walletEntries.find(([key, w]) => (w?.rdns === preferredRdns || key === preferredRdns))
-    : walletEntries[0];
+  const exactEntry = preferredRdns ? walletEntries.find(([key]) => key === preferredRdns) : undefined;
+  const matches = walletEntries.filter(([, w]) => preferredRdns ? w?.rdns === preferredRdns : typeof w?.connect === "function" && /^4\./.test(w?.apiVersion ?? ""));
+  if (!exactEntry && matches.length > 1) throw new WalletNotConnectedError("Choose which Midnight wallet to connect.");
+  const targetEntry = exactEntry ?? matches[0];
 
   if (!targetEntry || !targetEntry[1]) {
     throw new WalletNotConnectedError("Selected Midnight wallet is unavailable.");
@@ -229,7 +232,7 @@ export async function connectWallet(
     notifyWalletChanged();
     report("requesting-access");
     const connectedApi = await walletResponse(() => targetWallet.connect(networkId), 90_000,
-      "Wallet connection timed out. Unlock Lace, select Preprod, close any old connection prompt and try again.", attempt.signal);
+      "Wallet connection timed out. Unlock your wallet, select the requested network, close any old connection prompt and try again.", attempt.signal);
     if (!connectedApi) {
       throw new WalletNotConnectedError("Wallet connect resolved with empty API instance.");
     }
@@ -241,15 +244,16 @@ export async function connectWallet(
     if (typeof connectedApi.getConnectionStatus !== "function") throw new WalletNotConnectedError("Wallet does not implement connector v4 capability: getConnectionStatus.");
     report("checking-session");
     const status = await walletResponse(() => connectedApi.getConnectionStatus(), 20_000,
-      "Wallet session check timed out. Unlock Lace and reconnect.", attempt.signal);
+      "Wallet session check timed out. Unlock your wallet and reconnect.", attempt.signal);
     if (status?.status !== "connected" || status.networkId !== networkId) {
-      throw new WalletNotConnectedError(`Lace has not established a ${networkId} session. Open your Midnight account in Lace and reconnect.`);
+      throw new WalletNotConnectedError(`Your wallet has not established a ${networkId} session. Open your Midnight account in the extension and reconnect.`);
     }
     if (attempt.signal.aborted || pendingConnection !== attempt) throw cancelledConnection();
 
     activeConnectedApi = connectedApi;
     activeWalletAccount = { address, network: networkId };
     activeWalletInfo = {
+      id: walletKey,
       rdns: targetWallet.rdns ?? walletKey,
       name: targetWallet.name ?? walletKey,
       icon: targetWallet.icon ?? "",
@@ -276,7 +280,7 @@ export async function connectWallet(
     {
       const msg = message.toLowerCase();
       if (msg.includes("locked")) {
-        throw new WalletNotConnectedError("Lace is locked. Unlock it in the extension, select Preprod, then try connecting again.");
+        throw new WalletNotConnectedError(`${targetWallet.name ?? walletKey} is locked. Unlock it in the extension, select the requested network, then try connecting again.`);
       }
       if (msg.includes("reject") || msg.includes("denied") || msg.includes("user declined")) {
         throw new WalletApprovalRejectedError();
