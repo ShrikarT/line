@@ -1,5 +1,14 @@
 # Organization product verification
 
+The latest authenticated API and durable publication increment is recorded in
+[production-api-verification.json](production-api-verification.json): 617 core
+passes plus one intentional skip, followed by 55 focused organization passes and
+nine browser passes after the final native fetch receiver fix. Deploy build,
+both Compact/drift checks and credential scans pass. These checks submit no
+customer wallet transaction. Public provider routing, funded supplier bootstrap,
+actual new organization acceptance and public deployment remain open. See
+[scope](../../docs/PRODUCTION_API_2026-10-18.md).
+
 The latest supplier-custody and wallet-proving increment is recorded in
 [standalone-supplier-verification.json](standalone-supplier-verification.json):
 605 core passes plus one intentional skip, seven focused wallet lifecycle checks

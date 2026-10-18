@@ -12,7 +12,9 @@ const copy=value=>structuredClone(value);
  * releasing wallet custody. A pending signed operation survives restart.
  */
 export class NativeOperationJournal {
+ assertJournalWritable(){if(this.persistenceUncertain)throw Error('Supplier storage is uncertain. Stop and reopen its retained state before continuing.');}
  async journalAndSubmit(tx){
+    this.assertJournalWritable();
     if(!this.state.pending)throw Error('Submission has no durable operation context.');
     const pending=this.state.pending,identifier=tx.identifiers().at(-1);if(!identifier)throw Error('Transaction has no identifier.');
     const actions=[...tx.intents.values()].flatMap(intent=>intent.actions);if(actions.length!==1)throw Error('Expected one contract action.');
@@ -32,6 +34,7 @@ export class NativeOperationJournal {
   return {schema:'line-live-checkout-operation/v1',id:pending.id,kind:pending.kind,name:pending.name,contractAddress:action.address,txId,txHash:tx.transactionHash(),disposition:'prepared',createdAt:new Date().toISOString()};
  }
  async submitPrepared(tx){
+  this.assertJournalWritable();
   const pending=this.state.pending,row=pending?.record;if(row?.disposition!=='prepared')throw Error('Only a provably unsubmitted transaction can be submitted.');
   const actual=this.transactionRecord(pending,tx);for(const key of ['id','kind','name','contractAddress','txId','txHash'])if(actual[key]!==row[key])throw Error('Saved transaction journal mismatch.');
   const extHex=this.api.tx.midnight.sendMnTransaction(u8aToHex(tx.serialize())).toHex();
@@ -47,6 +50,7 @@ export class NativeOperationJournal {
   row.extrinsicHash=result.result;row.disposition='submitted';await this.save();writeFileSync(`${this.directory??DIR}/${pending.id}.json`,JSON.stringify(row,null,2)+'\n');
  }
  async recoverPending(){
+  this.assertJournalWritable();
   const pending=this.state.pending;if(!pending)return;
   const directory=this.directory??DIR,path=`${directory}/${pending.id}.bin`;
   if(!pending.record&&!existsSync(path)){this.state.pending=null;await this.save();return;}
@@ -57,14 +61,20 @@ export class NativeOperationJournal {
   }
   return this.reconcile();
  }
- async save(){await this.control.set('application',this.state);}
+ async save(candidate=this.state){
+  this.assertJournalWritable();
+  try{await this.control.set('application',copy(candidate));}
+  catch(error){this.persistenceUncertain=true;throw error;}
+ }
  async reconcile(){
+  this.assertJournalWritable();
   const pending=this.state.pending;if(!pending?.record)return;
   const row=pending.record;const observed=await this.reader.read({kind:row.kind,name:row.name,identifier:row.txId},row.contractAddress);
   const receipt={...row,disposition:'confirmed-success',blockHeight:observed.transaction.block.height,finalizedHead:observed.finalizedHead,feePaid:observed.transaction.fees?.paidFees??null,verifiedAt:new Date().toISOString()};
-  this.state={...pending.after,receipts:[...this.state.receipts.filter(x=>x.id!==row.id),receipt],pending:null};await this.save();writeFileSync(`${this.directory??DIR}/${row.id}.json`,JSON.stringify(receipt,null,2)+'\n');this.progress='Confirmed on Midnight Preprod';return receipt;
+  const next={...pending.after,receipts:[...this.state.receipts.filter(x=>x.id!==row.id),receipt],pending:null};await this.save(next);this.state=next;writeFileSync(`${this.directory??DIR}/${row.id}.json`,JSON.stringify(receipt,null,2)+'\n');this.progress='Confirmed on Midnight Preprod';return receipt;
  }
  async operation(id,kind,name,input,after,execute){
+  this.assertJournalWritable();
   if(!/^[a-z0-9-]{1,100}$/.test(id))throw Error('Invalid operation identifier.');
   if(this.state.pending)throw Error('Reconcile the pending transaction before preparing another operation.');
   const retained=this.state.receipts.find(x=>x.id===id);

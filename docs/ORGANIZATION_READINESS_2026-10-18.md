@@ -2,15 +2,16 @@
 
 Date: 18 October 2026 (IST). Local worktree: `line-audit-review`, branch `feat/line-ui-redesign`. GitHub main `cc5cb71` is an ancestor of this worktree; checked again against the remote. This supplements the [full audit](AUDIT_REPORT_2026-10-13.md), whose earlier architecture and evidence must be read with their original scope.
 
-Latest increment: the independent supplier custody core and connected-wallet
-proving adapter are implemented. The current full core result is 605 passes out
-of 606 discovered cases with one intentional skip; all eight organization browser
-cases, deploy build, both Compact/drift checks and credential scans pass. The
-local proof container was restarted after Docker was found stopped; the actual
-read-only readiness check is healthy with 29 historical receipts and no pending
-operation. An isolated empty wallet's full native synchronization timed out and
-remains unverified. [Detailed scope](STANDALONE_SUPPLIER_2026-10-18.md),
-[current evidence](../artifacts/organization-product/standalone-supplier-verification.json).
+Latest increment: the persistent organization server, wallet-authenticated API
+and durable result publication are implemented. The full core run passes 617 of
+618 discovered cases with one intentional skip. After a browser fetch receiver
+regression was fixed, all 55 focused organization checks and nine browser cases
+pass; the deploy build, both Compact/drift checks and credential scans pass.
+The full core run precedes only that final receiver fix. Public provider routing,
+funded supplier bootstrap and actual new organization acceptance remain open.
+The earlier isolated empty wallet's native synchronization timeout remains
+unresolved. [Detailed scope](PRODUCTION_API_2026-10-18.md),
+[current evidence](../artifacts/organization-product/production-api-verification.json).
 
 ## Decision and present verdict
 
