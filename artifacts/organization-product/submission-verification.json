@@ -1,59 +1,59 @@
-﻿{
-    "schema":  "line-submission-verification/v1",
-    "checkedAt":  "2026-10-18T17:18:46.8546344Z",
-    "sourceCommit":  "59b06bd484af597af5fa7a9fc73c9786029d8e51",
-    "publicBranch":  "feat/line-ui-redesign",
-    "core":  {
-                 "command":  "npm test",
-                 "discovered":  644,
-                 "passed":  643,
-                 "failed":  0,
-                 "cancelled":  0,
-                 "skipped":  1,
-                 "logSha256":  "1865523ba2f556d2ceb25d899e8f990017a466f2eb207edbaf32c3de232bd5b6"
-             },
-    "buildDeploy":  "passed",
-    "typecheck":  "passed",
-    "connectorRegressions":  17,
-    "secretPatternScan":  "passed",
-    "compactSourceChangedInIncrement":  false,
-    "priorBrowserEvidence":  "provider-routing-verification.json",
-    "actualLace":  {
-                       "connected":  true,
-                       "verifiedNetwork":  "preprod",
-                       "receivingAddressRead":  true,
-                       "organizationVaultOpened":  true,
-                       "reportedNativeBalanceBaseUnits":  "5000000000",
-                       "facilityPreparationReached":  "wallet approval",
-                       "newFacilityDeploymentConfirmed":  false,
-                       "approvalWaitEnded":  true,
-                       "vaultNowLocked":  true
-                   },
-    "container":  {
-                      "image":  "line-organization:submission",
-                      "imageId":  "sha256:d90816d203a939a9b2317debcbce9ea9219929aed3e129abb81aac94ce750fa9",
-                      "user":  "node",
-                      "validatedReleaseFiles":  52,
-                      "exportedPublicProvingFiles":  37,
-                      "sdkImports":  "passed",
-                      "temporaryDiagnosticPagesAbsent":  true,
-                      "namedPrivatePathsAbsent":  true,
-                      "nativeFundedStartupVerified":  false,
-                      "historicalOperatorEndpointsIncluded":  false
-                  },
-    "video":  {
-                  "recorder":  "Cap CLI",
-                  "actualChromeAndLacePromptCaptured":  true,
-                  "transactionSuccessCaptured":  false,
-                  "editedCurrentWalkthroughDelivered":  false,
-                  "rawProjectPublished":  false
-              },
-    "publicDeployment":  false,
-    "unresolved":  [
-                       "Owner must reopen the organization vault and approve fresh Lace transactions for funded user acceptance and recording.",
-                       "Complete, verify and edit the actual wallet-and-transaction walkthrough.",
-                       "Confirm persistent hosting target and funded supplier startup before public operation.",
-                       "Entrant must complete AKINDO entry personally."
-                   ],
-    "historicalSettlementEvidence":  "../../docs/TEST_TOKEN_PAYOUT_2026-10-16.md"
+{
+  "schema": "line-submission-verification/v1",
+  "checkedAt": "2026-10-18T17:18:46.8546344Z",
+  "sourceCommit": "59b06bd484af597af5fa7a9fc73c9786029d8e51",
+  "publicBranch": "feat/line-ui-redesign",
+  "core": {
+    "command": "npm test",
+    "discovered": 644,
+    "passed": 643,
+    "failed": 0,
+    "cancelled": 0,
+    "skipped": 1,
+    "logSha256": "1865523ba2f556d2ceb25d899e8f990017a466f2eb207edbaf32c3de232bd5b6"
+  },
+  "buildDeploy": "passed",
+  "typecheck": "passed",
+  "connectorRegressions": 17,
+  "secretPatternScan": "passed",
+  "compactSourceChangedInIncrement": false,
+  "priorBrowserEvidence": "provider-routing-verification.json",
+  "actualLace": {
+    "connected": true,
+    "verifiedNetwork": "preprod",
+    "receivingAddressRead": true,
+    "organizationVaultOpened": true,
+    "reportedNativeBalanceBaseUnits": "5000000000",
+    "facilityPreparationReached": "wallet approval",
+    "newFacilityDeploymentConfirmed": false,
+    "approvalWaitEnded": true,
+    "vaultNowLocked": true
+  },
+  "container": {
+    "image": "line-organization:submission",
+    "imageId": "sha256:d90816d203a939a9b2317debcbce9ea9219929aed3e129abb81aac94ce750fa9",
+    "user": "node",
+    "validatedReleaseFiles": 52,
+    "exportedPublicProvingFiles": 37,
+    "sdkImports": "passed",
+    "temporaryDiagnosticPagesAbsent": true,
+    "namedPrivatePathsAbsent": true,
+    "nativeFundedStartupVerified": false,
+    "historicalOperatorEndpointsIncluded": false
+  },
+  "video": {
+    "recorder": "Cap CLI",
+    "actualChromeAndLacePromptCaptured": true,
+    "transactionSuccessCaptured": false,
+    "editedCurrentWalkthroughDelivered": false,
+    "rawProjectPublished": false
+  },
+  "publicDeployment": false,
+  "unresolved": [
+    "Owner must reopen the organization vault and approve fresh Lace transactions for funded user acceptance and recording.",
+    "Complete, verify and edit the actual wallet-and-transaction walkthrough.",
+    "Confirm persistent hosting target and funded supplier startup before public operation.",
+    "Entrant must complete AKINDO entry personally."
+  ],
+  "historicalSettlementEvidence": "../../docs/TEST_TOKEN_PAYOUT_2026-10-16.md"
 }
