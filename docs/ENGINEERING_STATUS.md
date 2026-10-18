@@ -25,7 +25,7 @@ state and receipts must be verified before updating these checkpoint counts.
 
 | Check | Result |
 | --- | --- |
-| Full core `npm test` | 627 discovered; 626 passed; one intentional skip; no failures/cancellations |
+| Full core `npm test` | 641 discovered; 640 passed; one intentional skip; no failures/cancellations |
 | Organization browser | Nine passed; includes actual SDK preparation and deliberately rejected approval |
 | Compact regeneration | Canonical and organization compile; zero managed drift |
 | Build/typecheck | `npm run build:deploy` passes and exports 37 public proving files |
@@ -37,6 +37,15 @@ Local ignored logs retain the full output and unsuccessful attempts.
 
 ## Important fixes
 
+- Wallet connection, network verification, address access and session checks have
+  bounded waits. Cancel/close/disconnect invalidates pending connection work;
+  late responses cannot replace or clear a newer account. A wallet is published
+  as connected only after its receiving address and Preprod session are read.
+  The dialog reports the actual waiting stage rather than a single indefinite
+  spinner. Fourteen focused connector lifecycle regressions pass. The owner's
+  real Lace approval prompt still does not appear; live wallet acceptance and
+  the requested wallet/transaction recording remain incomplete. The last direct
+  browser observation was an actionable locked-wallet error with retry enabled.
 - Browser fetch retains its required global receiver.
 - Incomplete facility forms display useful feedback; SDK preparation reaches the
   wallet approval boundary on desktop and phone.

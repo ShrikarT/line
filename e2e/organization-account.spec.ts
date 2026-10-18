@@ -13,6 +13,7 @@ async function wallets(page: Page) {
         getConfiguration: async () => ({ networkId: "preprod", indexerUri: "https://midnight-preprod.blockfrost.io/api/v0", indexerWsUri: "wss://midnight-preprod.blockfrost.io/api/v0/ws", substrateNodeUri: "https://rpc.midnight-preprod.blockfrost.io", proverServerUri: "http://127.0.0.1:6300" }),
         getShieldedAddresses: async () => ({ shieldedCoinPublicKey: identity.coin, shieldedEncryptionPublicKey: identity.encryption, shieldedAddress: "unused" }),
         getUnshieldedAddress: async () => ({ unshieldedAddress: identity.receiving }), getUnshieldedBalances: async () => ({}),
+        getConnectionStatus: async () => ({ status: "connected", networkId: "preprod" }),
         getProvingProvider: async () => {
           target.organizationProofRequests++;
           return { check: async () => { throw new Error("Account-isolation tests do not check circuit preimages"); }, prove: async () => { throw new Error("Account-isolation tests do not produce circuit proofs"); } };

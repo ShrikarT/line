@@ -17,6 +17,7 @@ async function injectWallet(page: Page, behavior: "success" | "reject-once" | "w
           return {
             getConfiguration: async () => ({ networkId: behavior === "wrong-network" ? "preview" : network }),
             getUnshieldedAddress: async () => ({ unshieldedAddress: address }),
+            getConnectionStatus: async () => ({ status: "connected", networkId: network }),
             getShieldedAddresses: async () => ({}),
             balanceUnsealedTransaction: async () => { testWindow.walletCalls.push("balance"); throw new Error("Must never balance during onboarding"); },
             submitTransaction: async () => { testWindow.walletCalls.push("submit"); throw new Error("Must never submit during onboarding"); },
