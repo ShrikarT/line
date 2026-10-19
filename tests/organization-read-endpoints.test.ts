@@ -34,5 +34,30 @@ test("network fallback rejects external URLs, credentials and a different networ
   for (const value of [{ ...metadata, networkId: "mainnet" }, { ...metadata, indexerUri: "https://attacker.example/read" }, { ...metadata, indexerWsUri: metadata.indexerWsUri + "?project_id=leaked-control" }]) {
     await assert.rejects(organizationReadEndpoints(configuration, { request: async () => value }, origin), /invalid Preprod read connection/);
   }
-  await assert.rejects(organizationReadEndpoints({ ...configuration, indexerUri: "https://rpc.preprod.midnight.network" }, { request: async () => metadata }, origin), /retired/);
+  await assert.rejects(organizationReadEndpoints({ ...configuration, indexerUri: "https://indexer.mainnet.midnight.network" }, { request: async () => metadata }, origin), /retired/);
+});
+
+test("retired Preprod wallet readers use authenticated Line reads without using the wallet's retired node", async () => {
+  const wallet = { ...configuration, indexerUri: "https://indexer.preprod.midnight.network/api/v3/graphql", indexerWsUri: "wss://indexer.preprod.midnight.network/api/v3/graphql/ws", substrateNodeUri: "https://rpc.preprod.midnight.network" };
+  const calls: string[] = [];
+  const reads = await organizationReadEndpoints(wallet, { request: async path => { calls.push(path); return metadata; } }, origin);
+  assert.equal(reads.indexerUri, metadata.indexerUri);
+  assert.equal(reads.indexerWsUri, metadata.indexerWsUri);
+  await reads.authorize?.();
+  assert.deepEqual(calls, ["network", "network"]);
+  assert.equal(wallet.substrateNodeUri, "https://rpc.preprod.midnight.network");
+});
+
+test("an unused retired submission node cannot block working wallet readers", async () => {
+  const wallet = { ...configuration, indexerUri: "https://indexer.example.test/graphql", indexerWsUri: "wss://indexer.example.test/graphql/ws", substrateNodeUri: "https://rpc.preprod.midnight.network" };
+  const reads = await organizationReadEndpoints(wallet, { request: async () => { throw Error("Working wallet readers need no fallback"); } }, origin);
+  assert.equal(reads.indexerUri, wallet.indexerUri);
+  assert.equal(reads.indexerWsUri, wallet.indexerWsUri);
+});
+
+test("retired reader recovery does not accept credentials, invalid protocols or a different wallet network", async () => {
+  for (const indexerUri of ["https://user:password@indexer.preprod.midnight.network/graphql", "ftp://indexer.preprod.midnight.network/graphql", "not-a-url"]) {
+    await assert.rejects(organizationReadEndpoints({ ...configuration, indexerUri }, { request: async () => metadata }, origin));
+  }
+  await assert.rejects(organizationReadEndpoints({ ...configuration, networkId: "mainnet" }, { request: async () => metadata }, origin), /network|Preprod/);
 });

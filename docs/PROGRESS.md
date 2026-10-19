@@ -39,7 +39,7 @@ milestone established a local protocol prototype, not customer-funded settlement
 | --- | --- |
 | Canonical accounting | Facility `8990864c6f80c517c7458fa9b2526d3500f3a9814399fc836097ee409da9bed0`; retained checkpoint has 29 receipts, with no token-payout claim |
 | Test-token settlement | Facility `a159597495b52ea7a703a29562b17fcb042bf7eaa984ec1e05e7e8935208304b`; complete 21-transaction two-merchant checkpoint |
-| Organization wallet | Actual Lace connection and vault opening observed; deployment preparation reached wallet approval; fresh funded lifecycle not yet accepted |
+| Organization wallet | Actual 1AM connection on Preprod verified. Earlier Lace connection and vault opening reached deployment approval; fresh funded lifecycle not yet accepted |
 | Regression checks | Local core: 643 passed/one skip. Full CI: four jobs and 49 browser cases passed; Linux core: 642 passed/two Windows-only skips, with the separate Windows ACL job passing |
 | Public host | Free wallet-only server, source-matched proving files, signed reader sessions and actual historical Preprod reads verified |
 
@@ -55,12 +55,17 @@ submitted. The accepted complete checkpoint remains the earlier 21-transaction r
 
 ### Current priority — organization funding
 
-Deploy a fresh organization facility through Lace, register its verifier keys and
+Deploy a fresh organization facility through a compatible wallet, register its verifier keys and
 fund its reserve with existing Preprod assets. Confirm the original transactions
 and actual asset inputs against finalized receipts. This acceptance is not yet
 complete. Wave 2 submission is finished; this acceptance remains the first
 post-submission product task. A closed wallet-extension channel now produces
 refresh/reconnect guidance without publishing an unverified connected account.
+1AM is the current working connection path. Its retired Preprod read URLs now
+select Line's authenticated same-origin reader; the wallet retains proving,
+signing and submission. Malformed URLs, credentials and different networks still
+fail validation. A retired wallet submission-node URL no longer blocks selection
+of working readers, because Line does not submit through that URL.
 
 ## Wave 3 — pilots and hardening
 
