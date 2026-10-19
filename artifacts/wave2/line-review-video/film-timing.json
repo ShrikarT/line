@@ -1,0 +1,53 @@
+{
+  "duration": 168.658,
+  "scenes": [
+    {
+      "id": "scene-01-intro",
+      "start": 0,
+      "duration": 16.656,
+      "voice": "flow-1",
+      "spoken": 14.656
+    },
+    {
+      "id": "scene-02-wallet",
+      "start": 16.656,
+      "duration": 26,
+      "voice": "final-wallet",
+      "spoken": 21.248
+    },
+    {
+      "id": "scene-03-purchase",
+      "start": 42.656,
+      "duration": 34,
+      "voice": "final-purchase-clean",
+      "spoken": 25.92
+    },
+    {
+      "id": "scene-04-evidence",
+      "start": 76.656,
+      "duration": 36.402,
+      "voice": "final-evidence-clean",
+      "spoken": 33.402
+    },
+    {
+      "id": "scene-05-privacy",
+      "start": 113.058,
+      "duration": 27.363,
+      "voice": "flow-7",
+      "spoken": 24.363
+    },
+    {
+      "id": "scene-06-close",
+      "start": 140.421,
+      "duration": 28.237,
+      "voice": "final-close",
+      "spoken": 25.237
+    }
+  ],
+  "illustratedChapters": [
+    "scene-02-wallet",
+    "scene-03-purchase"
+  ],
+  "actualEvidence": "scene-04-evidence",
+  "freshOrganizationDeploymentClaimed": false
+}

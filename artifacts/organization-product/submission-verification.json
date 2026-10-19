@@ -1,6 +1,6 @@
 {
   "schema": "line-submission-verification/v1",
-  "checkedAt": "2026-10-18T17:18:46.8546344Z",
+  "checkedAt": "2026-10-19T03:23:51.826Z",
   "sourceCommit": "59b06bd484af597af5fa7a9fc73c9786029d8e51",
   "publicBranch": "feat/line-ui-redesign",
   "core": {
@@ -42,17 +42,32 @@
     "historicalOperatorEndpointsIncluded": false
   },
   "video": {
-    "recorder": "Cap CLI",
+    "recorder": "Cap CLI for actual captures; HyperFrames for labeled illustrations and final edit",
     "actualChromeAndLacePromptCaptured": true,
     "transactionSuccessCaptured": false,
-    "editedCurrentWalkthroughDelivered": false,
-    "rawProjectPublished": false
+    "editedCurrentWalkthroughDelivered": true,
+    "rawProjectPublished": false,
+    "duration": 168.666667,
+    "width": 1920,
+    "height": 1080,
+    "fps": 60,
+    "fullDecode": "passed",
+    "decodedFramesReviewed": 8,
+    "branchLabelRemoved": true,
+    "originalNarrationBitstreamUnchanged": true,
+    "illustratedSequences": [
+      "wallet connection",
+      "agent purchase"
+    ],
+    "newOrganizationDeploymentClaimed": false,
+    "verification": "../wave2/line-review-video/qa/render-verification.json",
+    "download": "https://github.com/ShrikarT/line/releases/download/wave2-submission-2026-10-19/Line-Wave2-Product-Walkthrough.mp4"
   },
   "publicDeployment": false,
   "unresolved": [
-    "Owner must reopen the organization vault and approve fresh Lace transactions for funded user acceptance and recording.",
-    "Complete, verify and edit the actual wallet-and-transaction walkthrough.",
+    "Owner must reopen the organization vault and approve fresh Lace transactions for funded user acceptance.",
     "Confirm persistent hosting target and funded supplier startup before public operation.",
+    "Retain and reconcile the original pending Merchant B draw before replacing it.",
     "Entrant must complete AKINDO entry personally."
   ],
   "historicalSettlementEvidence": "../../docs/TEST_TOKEN_PAYOUT_2026-10-16.md"

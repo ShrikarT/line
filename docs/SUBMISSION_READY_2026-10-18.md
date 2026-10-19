@@ -25,9 +25,10 @@ followed by further privacy and custody work.
 
 1. Read the current README and privacy boundary.
 2. Open the [deck](../artifacts/wave2/line-wave2.html) in a browser.
-3. Watch the current recorded user-flow video when the edited candidate is
-   delivered; the older `line-review.mp4` is a dated technical review, not the
-   current product walkthrough.
+3. Watch the current [product walkthrough source and verification](../artifacts/wave2/line-review-video/README.md).
+   Wallet and purchase sequences are labeled illustrations; the receipt chapter
+   uses actual Preprod evidence. The older `line-review.mp4` is a dated technical review.
+   [Download the final 1080p/60 fps MP4](https://github.com/ShrikarT/line/releases/download/wave2-submission-2026-10-19/Line-Wave2-Product-Walkthrough.mp4).
 4. Review [confirmed Preprod settlement](TEST_TOKEN_PAYOUT_2026-10-16.md) and its
    linked machine-readable raw-output/receipt evidence.
 5. Reproduce with `npm ci`, `npm test`, `npm run typecheck`, and the pinned
@@ -65,8 +66,10 @@ Lace connection, the Preprod address and the organization vault were observed in
 the actual app; the wallet reports 5,000 tNIGHT. A new organization deployment
 has not been confirmed. The Cap recording reached the actual approval boundary,
 then the approval wait ended and the vault locked. This is not transaction-success
-footage. The edited wallet-and-transaction walkthrough still needs that live
-approval and finality verification; do not use the dated video as its replacement.
+footage. The owner authorized illustrated wallet and purchase sequences for the
+submission film. Those sequences are explicitly labeled and accompanied by the
+confirmed historical settlement evidence. Fresh funded organization acceptance
+still requires owner approval and separate finality verification.
 
 Repository cleanup and the deployment handoff are prepared. The historical audit
 corpus stays in Git history; runtime fixtures and evidence required for evaluation

@@ -1,0 +1,20 @@
+{
+  "duration": 27.363,
+  "assertions": [
+    {
+      "kind": "appearsBy",
+      "selector": ".privacy-book",
+      "bySec": 2
+    },
+    {
+      "kind": "appearsBy",
+      "selector": ".privacy-public",
+      "bySec": 3
+    },
+    {
+      "kind": "appearsBy",
+      "selector": ".privacy-leak:last-child",
+      "bySec": 19
+    }
+  ]
+}

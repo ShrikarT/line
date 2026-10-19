@@ -9,5 +9,17 @@
   "media": {
     "autoProxy": true
   },
-  "authoringSkill": "general-video"
+  "authoringSkill": "general-video",
+  "registryItems": [
+    {
+      "name": "text-stagger",
+      "type": "hyperframes:component",
+      "target": "compositions/components/text-stagger.html"
+    },
+    {
+      "name": "agent-cursor",
+      "type": "hyperframes:component",
+      "target": "compositions/components/agent-cursor.html"
+    }
+  ]
 }

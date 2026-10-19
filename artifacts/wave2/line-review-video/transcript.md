@@ -1,31 +1,27 @@
-## scene-1
+# Line - current Wave 2 narration
 
-Line is private credit and checkout infrastructure for autonomous agents. Its goal is to let an organization delegate purchasing capacity while each supplier receives a verifiable claim. This review shows the protocol engineering completed for Midnight Wave Two, and the evidence still needed before Line becomes operating credit.
+Wallet and purchase interactions are illustrated. Chapter 4 uses actual Preprod evidence.
 
-## scene-2
+## 1. scene-01-intro
 
-The customer hypothesis is an enterprise agent that buys API data, then compute to finish a task. The budget owner delegates capacity across agents. Suppliers need valid clearance and reliable reconciliation. We still need to validate whether shared repayable credit solves a problem beyond existing wallets, billing and procurement.
+Agents can choose a service in seconds. Giving them permission to spend is harder. Line explores organization-approved purchasing on Midnight: a task becomes a merchant quote, a proven clearance, and a single-use claim.
 
-## scene-3
+## 2. scene-02-wallet
 
-The issuer and agent approve a credit line. A merchant posts a committed quote. A draw checks the private credit book, charges the agreed fee and creates a note bound to one merchant. Only that merchant can redeem it once. A claim is accounting evidence; delivery and actual payout require separate verification.
+Start with a Midnight wallet. Line discovers compatible connector wallets, checks Preprod, and reads the receiving address before opening the organization workspace. This connection and approval sequence is illustrated; it does not claim a newly signed transaction. Organization records stay encrypted in the browser.
 
-## scene-4
+## 3. scene-03-purchase
 
-Compact is the accounting source of truth. Private witnesses and commitments bind book and reserve transitions. But hiding an opening does not hide arithmetic someone can reconstruct from public history. The canonical amounts reveal debt from a known zero starting point. The privacy candidate reduces disclosure; complete observer privacy remains unproved.
+An organization supplies its own assets and sets the agent's spending permission. The agent requests a supplier quote. Compact checks the private book and exact reserve constraints, then creates a claim bound to that merchant. The merchant authenticates redemption, and the claim can be consumed only once. This animation explains the user flow. The next receipts show what was actually finalized.
 
-## scene-5
+## 4. scene-04-evidence
 
-The latest generated coordinator completes thirty calls across all twelve circuits, with ninety two deliberate process exits and eighty two controls. Four role owners and two suppliers exercise repayment, reopening, and all three compensation modes. Older claims and refund openings survive later purchases. This is synthetic execution and receipt admission, not asset settlement.
+Here is the confirmed Preprod evidence. In the accepted complete checkpoint, the operator facility finalized twenty-one transactions, registered all twelve circuit verifiers, and paid twenty-five test units to Merchant A and twenty to Merchant B. Raw outputs, registered recipient addresses and wallet balances agreed. The assets have no monetary value. A later repeat confirmed Merchant A, while Merchant B's original draw remains pending after a DUST proof rejection.
 
-## scene-6
+## 5. scene-05-privacy
 
-Keep the evidence lanes separate. The corrected integrated native run verifies thirty calls across all twelve circuits, with one hundred deliberate exits, eighty two controls, and four corrupted proof rejections. Both earlier failures are preserved. This remains local synthetic execution. The repository reports twelve registered Preprod keys and eight executed calls. Independent finalized receipt reconciliation remains pending.
+Why Midnight? Compact can prove a spending constraint without placing its private witness opening in plaintext ledger fields. That is useful, but it is not complete history privacy. Public amounts and reserve changes still leak activity. One operator controls this prototype's role keys, and repayment acknowledgement is an issuer report, not an incoming payment.
 
-## scene-7
+## 6. scene-06-close
 
-The next release needs fee funded network verification, full history privacy review, and owners under independent administration. It also needs authentic deposits, service delivery, repayment, payout and refund evidence, plus a real buyer and supplier pilot. Proof counts cannot establish payment, secure custody or customer demand.
-
-## scene-8
-
-Line's Wave Two contribution is recoverable private credit accounting with exact merchant claims and honest evidence boundaries. Review the pinned source, tests and preserved failures in the audit and draft pull request. The next milestone is a verified private credit flow connected to real fulfillment and settlement.
+Wave one had five circuits. Wave two has twelve, two merchant roles, encrypted recovery and actual Preprod test-token payouts. Six hundred forty-three regression tests pass, with one intentional skip. The next acceptance milestone is a funded wallet-owned organization. Explore the public source and exact settlement evidence. Line: purchasing power, with permission.
