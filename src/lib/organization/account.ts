@@ -150,11 +150,15 @@ export class OrganizationAccount {
     this.record = next;
   }
   async exclusive<T>(action: () => Promise<T>): Promise<T> {
+    return this.withAccountLock(action, true);
+  }
+  private async withAccountLock<T>(action: () => Promise<T>, verifyWallet: boolean): Promise<T> {
     this.assertSession();
     if (!navigator.locks) throw new Error("This browser does not support the account lock required for safe transactions.");
     return navigator.locks.request(this.key(), { mode: "exclusive", ifAvailable: true }, async lock => {
       if (!lock) throw new Error("This organization is active in another tab. Wait for its operation to finish.");
-      await this.assertWallet();
+      if (verifyWallet) await this.assertWallet();
+      this.assertSession();
       const password = getVaultSessionPassphrase()!;
       const current = await loadEncryptedJson<OrganizationRecord>(this.key(), password);
       this.assertSession();
@@ -202,10 +206,14 @@ export class OrganizationAccount {
     await this.commit({ snapshot: this.record.snapshot, pending: null });
   }
   async encryptedBackup() {
-    return this.exclusive(async () => {
+    // Recovery must remain available when the wallet's remote API is offline.
+    // Keep the session guard, durable reload and lock; only omit the RPC check.
+    return this.withAccountLock(async () => {
       this.assertSession();
-      return encryptSecret(this.key(), encodeVaultJson(this.record), getVaultSessionPassphrase()!);
-    });
+      const backup = await encryptSecret(this.key(), encodeVaultJson(this.record), getVaultSessionPassphrase()!);
+      this.assertSession();
+      return backup;
+    }, false);
   }
   async restoreBackup(file: string, backupPassword: string, verify: (record: OrganizationRecord) => Promise<void>) {
     // Authenticate before taking the write lock. Decryption never changes the
