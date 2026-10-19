@@ -32,6 +32,10 @@ failed or uncertain operation retains the evidence needed for reconciliation.
 Partial failure does not trigger a replacement payment. Backup restoration checks
 wallet scope, private openings and observed contract state before replacing data.
 
+Wallet identity probes are sequential. Only explicit rate-limit responses on
+configuration/address reads may retry within a bounded deadline; each retry checks
+session validity. Signing, proving and submission are outside that retry path.
+
 ## Contract rules
 
 Exactly twelve public circuit names are shared across the profiles:

@@ -3,7 +3,7 @@ import { bech32m } from "@scure/base";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 
-async function wallets(page: Page, walletOnly = false, retiredReaders = false) {
+async function wallets(page: Page, walletOnly = false, retiredReaders = false, identityRateLimit = false) {
   // CI has no developer provider credential; account tests must not borrow one.
   await page.route("**/api/line/network-session", route => route.fulfill({ status: 404, json: { error: "No developer credential in this test." } }));
   if (retiredReaders) await page.route("**/api/organization/network", route => {
@@ -19,15 +19,19 @@ async function wallets(page: Page, walletOnly = false, retiredReaders = false) {
     hostedSupplierAutomation: !walletOnly,
     services: walletOnly ? [] : [{ id: "test-service", name: "Account test supplier", price: "25", description: "No fulfillment or settlement in this test.", profile: { name: "Account test supplier", publicKey: "11".repeat(32), address: identity(12).receiving } }],
   } }));
-  await page.addInitScript(({ a, b, retiredReaders }) => {
+  await page.addInitScript(({ a, b, retiredReaders, identityRateLimit }) => {
     const target = window as unknown as { midnight: Record<string, unknown>; organizationSignatures: number; organizationProofRequests: number };
     target.organizationSignatures = 0;
     target.organizationProofRequests = 0;
+    let identityReads = 0;
     target.midnight = Object.fromEntries([["a", a], ["b", b]].map(([id, keys]) => {
       const identity = keys as { coin: string; encryption: string; receiving: string };
       return [id as string, { name: `Organization wallet ${id}`, rdns: `test.org.${id}`, apiVersion: "4.0.1", connect: async () => ({
         getConfiguration: async () => ({ networkId: "preprod", indexerUri: retiredReaders ? "https://indexer.preprod.midnight.network/api/v3/graphql" : "https://indexer.example.test/graphql", indexerWsUri: retiredReaders ? "wss://indexer.preprod.midnight.network/api/v3/graphql/ws" : "wss://indexer.example.test/graphql/ws", substrateNodeUri: retiredReaders ? "https://rpc.preprod.midnight.network" : "https://node.example.test", proverServerUri: "http://127.0.0.1:6300" }),
-        getShieldedAddresses: async () => ({ shieldedCoinPublicKey: identity.coin, shieldedEncryptionPublicKey: identity.encryption, shieldedAddress: "unused" }),
+        getShieldedAddresses: async () => {
+          if (identityRateLimit && ++identityReads === 1) throw { code: 429, message: "Rate limited" };
+          return { shieldedCoinPublicKey: identity.coin, shieldedEncryptionPublicKey: identity.encryption, shieldedAddress: "unused" };
+        },
         getUnshieldedAddress: async () => ({ unshieldedAddress: identity.receiving }), getUnshieldedBalances: async () => ({}),
         getConnectionStatus: async () => ({ status: "connected", networkId: "preprod" }),
         getProvingProvider: async () => {
@@ -38,7 +42,7 @@ async function wallets(page: Page, walletOnly = false, retiredReaders = false) {
         submitTransaction: async () => { throw new Error("Account-isolation tests never submit"); },
       }) }];
     }));
-  }, { a: identity(11), b: identity(12), retiredReaders });
+  }, { a: identity(11), b: identity(12), retiredReaders, identityRateLimit });
 }
 async function connect(page: Page, id: "a" | "b") {
   await page.locator("header").getByRole("button", { name: "Connect wallet", exact: true }).click();
@@ -87,6 +91,17 @@ test("a Preprod wallet with retired readers opens its organization through the h
   await connect(page, "a"); await unlock(page);
   await expect(page.getByRole("alert")).toHaveCount(0);
   expect(await page.evaluate(() => (window as unknown as { organizationSignatures: number }).organizationSignatures)).toBe(0);
+});
+
+test("organization opening recovers a temporary wallet identity limit without requesting a transaction", async ({ page }) => {
+  await wallets(page, true, true, true); await page.goto("/app");
+  await connect(page, "a"); await unlock(page);
+  await expect(page.getByRole("alert")).toHaveCount(0);
+  const requests = await page.evaluate(() => {
+    const state = window as unknown as { organizationSignatures: number; organizationProofRequests: number };
+    return { signatures: state.organizationSignatures, proofs: state.organizationProofRequests };
+  });
+  expect(requests).toEqual({ signatures: 0, proofs: 0 });
 });
 
 test("two real account namespaces isolate encrypted identities and recover only the selected wallet", async ({ page }) => {

@@ -1,8 +1,9 @@
 import type { ConnectedAPI } from "@midnight-ntwrk/dapp-connector-api";
 import { withinDeadline } from "./finality.ts";
 import { organizationSignInMessage } from "./sign-in.ts";
+import { sanitizeServiceError } from "../runtime/endpoints.ts";
 
-type Account = { wallet: Pick<ConnectedAPI, "signData">; receivingAddress: string; assertSession(): void; assertWallet(): Promise<void> };
+type Account = { wallet: Pick<ConnectedAPI, "signData">; receivingAddress: string; assertSession(): void; assertWallet(): Promise<unknown> };
 
 /** HTTP-only session cookies belong to the server; no bearer token or role key
  * is persisted in the client. Each unlocked account establishes its own sign-in.
@@ -36,7 +37,13 @@ export class OrganizationSupplierClient {
       const { nonce, expiresAt, message } = challenge.value;
       if (typeof nonce !== "string" || !/^[0-9a-f]{64}$/.test(nonce) || !Number.isSafeInteger(expiresAt) || expiresAt <= Date.now() || expiresAt > Date.now() + 180_000 || message !== organizationSignInMessage(this.origin, this.account.receivingAddress, nonce, expiresAt)) throw new Error("The supplier returned an invalid wallet sign-in challenge.");
       this.report("Sign in to Line with your wallet");
-      const proof = await withinDeadline(this.account.wallet.signData(message, { encoding: "text", keyType: "unshielded" }), 180_000, "Wallet sign-in timed out. Close the old wallet prompt before retrying.");
+      let proof: Awaited<ReturnType<ConnectedAPI["signData"]>>;
+      try {
+        proof = await withinDeadline(this.account.wallet.signData(message, { encoding: "text", keyType: "unshielded" }), 180_000, "Wallet sign-in timed out. Close the old wallet prompt before retrying.");
+      } catch (failure) {
+        const detail = failure instanceof Error ? failure.message : typeof failure === "string" ? failure : "The wallet did not return a sign-in proof.";
+        throw new Error(`Wallet sign-in did not complete: ${sanitizeServiceError(detail)}. The sign-in request was not automatically retried.`);
+      }
       await this.account.assertWallet();
       const verified = await this.fetch("auth/verify", { nonce, proof });
       if (!verified.response.ok || verified.value.authenticated !== true || !Number.isSafeInteger(verified.value.expiresAt) || verified.value.expiresAt <= Date.now()) throw new Error(verified.value.error ?? "Wallet sign-in failed.");

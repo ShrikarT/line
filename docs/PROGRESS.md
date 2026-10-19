@@ -74,9 +74,19 @@ of working readers, because Line does not submit through that URL.
 The next live 1AM attempt returned `Rate limited` during organization opening.
 Line's queried service logs showed no HTTP 429 for that attempt; the browser
 recorded a 1AM forwarding error. The exact failing wallet method is not yet
-established. Confirm whether this occurred before or after the wallet sign-in
-message before changing retry behavior. Fresh facility/funding acceptance remains
-unverified; no financial approval or submission is automatically retried.
+established. Identity probes now run sequentially and retry only explicit
+rate-limit responses, at most three attempts inside the existing 25-second wait.
+Timeout or session revocation prevents later probes. Network configuration from
+the same verified identity read is reused during setup instead of requested twice.
+Persistent limits identify the failing identity check; sign-in failures identify
+the signature stage and never repeat the signing request automatically.
+
+This handling passed 75 organization tests, 15 focused browser tests, the
+deployment build and key/secret checks. An injected temporary wallet identity
+limit recovered without a proof or transaction request. These controls do not
+establish that the live 1AM attempt recovered. Fresh facility/funding acceptance
+still needs the owner's wallet and local vault entry; no financial approval or
+submission is automatically retried.
 
 ## Wave 3 — pilots and hardening
 
