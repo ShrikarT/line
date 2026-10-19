@@ -1,0 +1,125 @@
+{
+  "duration": 168.658,
+  "assertions": [
+    {
+      "kind": "appearsBy",
+      "selector": "#scene-01-intro #scene-1 .title",
+      "bySec": 1
+    },
+    {
+      "kind": "appearsBy",
+      "selector": "#scene-01-intro .hero-process",
+      "bySec": 2.5
+    },
+    {
+      "kind": "appearsBy",
+      "selector": "#scene-02-wallet .wallet-copy",
+      "bySec": 17.656
+    },
+    {
+      "kind": "appearsBy",
+      "selector": "#scene-02-wallet #wallet-picker",
+      "bySec": 21.656
+    },
+    {
+      "kind": "appearsBy",
+      "selector": "#scene-02-wallet #wallet-approval",
+      "bySec": 25.656
+    },
+    {
+      "kind": "appearsBy",
+      "selector": "#scene-02-wallet #wallet-open",
+      "bySec": 30.656
+    },
+    {
+      "kind": "appearsBy",
+      "selector": "#scene-02-wallet #wallet-actual",
+      "bySec": 36.656
+    },
+    {
+      "kind": "appearsBy",
+      "selector": "#scene-03-purchase .purchase-copy",
+      "bySec": 43.656
+    },
+    {
+      "kind": "appearsBy",
+      "selector": "#scene-03-purchase #purchase-task",
+      "bySec": 44.656
+    },
+    {
+      "kind": "appearsBy",
+      "selector": "#scene-03-purchase #purchase-quote",
+      "bySec": 49.656
+    },
+    {
+      "kind": "appearsBy",
+      "selector": "#scene-03-purchase #purchase-proof",
+      "bySec": 55.656
+    },
+    {
+      "kind": "appearsBy",
+      "selector": "#scene-03-purchase #purchase-approve-panel",
+      "bySec": 62.656
+    },
+    {
+      "kind": "appearsBy",
+      "selector": "#scene-03-purchase #purchase-result",
+      "bySec": 68.656
+    },
+    {
+      "kind": "appearsBy",
+      "selector": "#scene-04-evidence .film-title",
+      "bySec": 77.656
+    },
+    {
+      "kind": "appearsBy",
+      "selector": "#scene-04-evidence .evidence-big",
+      "bySec": 78.656
+    },
+    {
+      "kind": "appearsBy",
+      "selector": "#scene-04-evidence #evidence-partial",
+      "bySec": 105.558
+    },
+    {
+      "kind": "appearsBy",
+      "selector": "#scene-05-privacy .privacy-book",
+      "bySec": 115.058
+    },
+    {
+      "kind": "appearsBy",
+      "selector": "#scene-05-privacy .privacy-public",
+      "bySec": 116.058
+    },
+    {
+      "kind": "appearsBy",
+      "selector": "#scene-05-privacy .privacy-leak:last-child",
+      "bySec": 132.058
+    },
+    {
+      "kind": "appearsBy",
+      "selector": "#scene-06-close .close-delta",
+      "bySec": 142.421
+    },
+    {
+      "kind": "appearsBy",
+      "selector": "#scene-06-close .close-checks",
+      "bySec": 151.421
+    },
+    {
+      "kind": "appearsBy",
+      "selector": "#scene-06-close .close-source",
+      "bySec": 161.421
+    },
+    {
+      "kind": "before",
+      "a": "#scene-02-wallet #wallet-picker",
+      "b": "#scene-02-wallet #wallet-approval"
+    },
+    {
+      "kind": "before",
+      "a": "#scene-03-purchase #purchase-quote",
+      "b": "#scene-03-purchase #purchase-result"
+    }
+  ]
+}

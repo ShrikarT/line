@@ -8,6 +8,7 @@ service. Line is a working prototype; private credit is the longer-term goal.
 
 [Submission package](docs/SUBMISSION_READY_2026-10-18.md) |
 [Slide deck](artifacts/wave2/line-wave2.html) |
+[Video](https://github.com/ShrikarT/line/releases/download/wave2-submission-2026-10-19/Line-Wave2-Product-Walkthrough.mp4) |
 [Privacy](docs/PRIVACY.md) |
 [Deployment](docs/DEPLOYMENT.md)
 
@@ -20,7 +21,7 @@ service. Line is a working prototype; private credit is the longer-term goal.
   contract-instance separation, one-time redemption and reserve accounting.
 - Encrypted account/transaction recovery, retained request identities, replay
   rejection and generic failed-clearance feedback.
-- 641 regression cases: 640 pass, one intentional skip. Nine organization browser
+- 644 regression cases: 643 pass, one intentional skip. Nine organization browser
   checks pass. The actual browser SDK also reads Preprod over authenticated HTTP
   and WebSocket routes without receiving the server's provider token.
 

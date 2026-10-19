@@ -1,0 +1,20 @@
+{
+  "duration": 36.402,
+  "assertions": [
+    {
+      "kind": "appearsBy",
+      "selector": ".film-title",
+      "bySec": 1
+    },
+    {
+      "kind": "appearsBy",
+      "selector": ".evidence-big",
+      "bySec": 2
+    },
+    {
+      "kind": "appearsBy",
+      "selector": "#evidence-partial",
+      "bySec": 28.902
+    }
+  ]
+}

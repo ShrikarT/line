@@ -2,64 +2,43 @@
   "tts_provider": "kokoro",
   "voice_id": "am_michael",
   "bgm": null,
-  "bgm_pending": false,
-  "bgm_provider": null,
-  "bgm_pid": null,
-  "bgm_log": null,
-  "bgm_mode": null,
-  "bgm_target_duration_s": null,
-  "bgm_seed_duration_s": null,
-  "bgm_loop_count": null,
   "voices": [
     {
-      "id": "scene-1",
-      "path": "assets/voice/scene-1.wav",
-      "duration_s": 22.571,
+      "id": "flow-1",
+      "path": "assets/voice/flow-1.wav",
+      "duration_s": 14.656,
       "words": []
     },
     {
-      "id": "scene-2",
-      "path": "assets/voice/scene-2.wav",
-      "duration_s": 23.211,
+      "id": "final-wallet",
+      "path": "assets/voice/final-wallet.wav",
+      "duration_s": 21.248,
       "words": []
     },
     {
-      "id": "scene-3",
-      "path": "assets/voice/scene-3.wav",
-      "duration_s": 21.419,
+      "id": "final-purchase-clean",
+      "path": "assets/voice/final-purchase-clean.wav",
+      "duration_s": 25.92,
       "words": []
     },
     {
-      "id": "scene-4",
-      "path": "assets/voice/scene-4.wav",
-      "duration_s": 24.235,
+      "id": "final-evidence-clean",
+      "path": "assets/voice/final-evidence-clean.wav",
+      "duration_s": 33.402,
       "words": []
     },
     {
-      "id": "scene-5",
-      "path": "assets/voice/scene-5.wav",
-      "duration_s": 26.112,
+      "id": "flow-7",
+      "path": "assets/voice/flow-7.wav",
+      "duration_s": 24.363,
       "words": []
     },
     {
-      "id": "scene-6",
-      "path": "assets/voice/scene-6-current.wav",
-      "duration_s": 29.312,
-      "words": []
-    },
-    {
-      "id": "scene-7",
-      "path": "assets/voice/scene-7-current.wav",
-      "duration_s": 23.339,
-      "words": []
-    },
-    {
-      "id": "scene-8",
-      "path": "assets/voice/scene-8.wav",
-      "duration_s": 21.675,
+      "id": "final-close",
+      "path": "assets/voice/final-close.wav",
+      "duration_s": 25.237,
       "words": []
     }
   ],
-  "sfx": [],
-  "total_duration_s": 191.874
+  "captionAlignmentGenerated": false
 }

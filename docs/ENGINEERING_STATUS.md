@@ -1,6 +1,6 @@
 # Engineering status
 
-Updated 18 October 2026. The immediate target is a submission-ready Wave 2
+Updated 19 October 2026. The immediate target is a submission-ready Wave 2
 prototype, with public source, current demo assets and deployment preparation.
 Production customer onboarding and full-history privacy remain later work.
 
@@ -18,8 +18,14 @@ Production customer onboarding and full-history privacy remain later work.
   server's authenticated HTTP/WebSocket routes, including same-reader recovery
   after sign-out. [Read-only report](../artifacts/organization-product/provider-routing-preprod-read.json).
 
-A fresh recorded test-token purchase is being captured separately; its final
-state and receipts must be verified before updating these checkpoint counts.
+The submission film combines labeled wallet/purchase illustrations with actual
+Preprod receipt captures. These illustrations do not establish a fresh funded
+organization lifecycle or change the historical checkpoint counts.
+The final 168.667-second MP4 is 1080p at 60 fps. Full decoding and eight decoded
+frame checks passed; the closing branch label is removed and narration is
+bitstream-identical to the first export. Composition checks passed with 300
+motion samples and 74/74 contrast checks.
+[Video and measured verification](../artifacts/wave2/line-review-video/README.md).
 
 ## Current verification
 

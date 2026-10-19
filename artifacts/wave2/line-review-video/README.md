@@ -1,23 +1,22 @@
-# Line narrated evidence review
+# Line - Wave 2 product walkthrough
 
-Eight scenes explain the enterprise API/compute purchasing hypothesis, private-credit architecture, verified recovery work and remaining release gates. This is an evidence presentation with local synthetic narration, rather than recorded live application operation.
+Six chapters illustrate wallet connection and agent purchases, show actual Preprod receipts, and explain the privacy boundary. Wallet and transaction animations are labeled as illustrated; they do not certify a new organization deployment. The accepted operator checkpoint paid 25 and 20 valueless test units in 21 finalized transactions. The later 26-call repeat is a separate partial run.
 
-The user approved the concrete Studio preview for local MP4 rendering. Publication and hackathon submission are separate actions. The composition lasts **204.674 seconds** at **1920 × 1080**, with a requested render rate of **30 fps**.
+The [final MP4](https://github.com/ShrikarT/line/releases/download/wave2-submission-2026-10-19/Line-Wave2-Product-Walkthrough.mp4) is **168.667 seconds**, **1920 x 1080**, H.264 at **60 fps** with AAC narration. It contains 10,120 frames and is 16,827,047 bytes. Full decoding passed; eight decoded frames were visually reviewed, including the corrected closing shot. The requested branch label is absent. Measured verification is in [qa/render-verification.json](qa/render-verification.json).
 
-From this directory:
+The authored duration is 168.658 seconds; export rounds to the next whole frame. The closing shot was rendered separately after removing the label and replaced at frame 8,426. The original narration bitstream is unchanged. Measured loudness is -22.0 LUFS with a -1.5 dBFS true peak. These are technical measurements, not a listening review.
 
-```powershell
-npm run dev
+With Node.js and FFmpeg/ffprobe installed:
+
+```bash
+node build-submission-film.mjs
 npm run check
-npm run render -- --output ../line-review.mp4 --fps 30 --workers 1 --quality delivery
+npx --yes hyperframes@0.8.171 preview --background
+npm run render -- --output ../Line-Wave2-Product-Walkthrough.mp4 --fps 60 --quality delivery --no-best-effort
 ```
 
-The CLI is pinned to HyperFrames 0.8.152. Single-worker rendering streams frames; the initial two-worker attempt stopped before capture because its estimated 12.7 GB temporary-frame requirement exceeded available disk space. The MP4 remains a local ignored artifact.
+The CLI is pinned. The builder uses bundled voice files and measured durations, submits no Midnight transaction and needs no wallet credentials. Six sub-compositions have explicit motion assertions. The latest check passed without lint, runtime, layout or motion errors: 300 motion samples and all 74 contrast checks passed.
 
-`transcript.md` is the narration script. Voice assets are locally generated Kokoro `am_michael` PCM audio. No music or paid voice provider was used. Word-level transcription/caption timings were not generated. The eight clips each provide a short opening/closing hold around their measured narration duration.
+Narration uses local Kokoro am_michael. Speech alone is the audio identity; no music or paid voice service was used. Word captions were not generated. The current script and media provenance accompany the composition. Older drafts, recordings and QA are archived outside the repository.
 
-`qa/composition-check.json` preserves a passing composition check: zero runtime, layout and motion errors, and all 54 contrast checks pass AA. Nine structural lint warnings recommend splitting the single HTML's eight scenes into sub-compositions; they remain documented. `qa/animation-map.json` records the motion review, and `qa/scene-midpoints.jpg` is the inspected pre-render contact sheet. `qa/render-verification.json` records the finished MP4: **204.7 seconds, H.264 1080p/30 fps, AAC stereo, 9,863,848 bytes**. Full-file decoding passes. Audio mean/max are −25.4/−1.5 dBFS after the renderer applied 0.9 dB peak attenuation; these signal checks do not substitute for a listening review. All eight MP4 midpoint images were visually inspected; `qa/rendered-midpoints.jpg` preserves the contact sheet.
-
-The native lifecycle evidence covers 30 calls across all 12 circuits, 100 deliberate exits, 82 controls and four interruption/corruption checks. Its ledger, time and receipt records are synthetic; fee balancing is disabled. Reported canonical Preprod deployment, network finality, authentic asset movement, full-history privacy, independent institutional custody and customer adoption are separate evidence gates. The two earlier seven-call native failures remain preserved in the linked audit.
-
-Font licensing is in `../OFL.txt`; GSAP's license notice is retained in `assets/gsap.min.js`.
+Manrope's license is bundled in assets/OFL.txt. GSAP's notice is retained in assets/gsap.min.js. Registry text-stagger and agent-cursor informed the motion; the registry files and lock retain their source references.

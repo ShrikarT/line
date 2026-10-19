@@ -1,18 +1,76 @@
 ---
 mode: autonomous
-message: "Line's verified Wave 2 engineering and remaining evidence gates"
-audience: Midnight judges and technical reviewers
+message: "Line controls agent spending; illustrated wallet flow and actual Preprod settlement are distinguished."
 ---
 
-Eight scenes reuse the verified deck. Narration files are local synthetic Kokoro speech, with actual measured durations. Each scene holds its evidence boundary and chapter number. Waterfall-entry brings in eyebrow, heading and explanation; spring-pop-entrance settles supporting groups. No background music, asset transfer simulation or live application footage.
+## Frame 1
+status: built
+src: compositions/frames/scene-01-intro.html
+scene: Opening
+duration: 16.656
+blueprint: compose
+rules: spring-pop-entrance
+transition_in: cut
+voiceover: flow-1
 
-- scene-1: 0s–24.171s; midpoint 12.085s; narration starts 0.8s.
-- scene-2: 24.171s–48.982s; midpoint 36.576s; narration starts 24.971s.
-- scene-3: 48.982s–72.001s; midpoint 60.492s; narration starts 49.782s.
-- scene-4: 72.001s–97.836s; midpoint 84.919s; narration starts 72.801s.
-- scene-5: 97.836s–125.548s; midpoint 111.692s; narration starts 98.636s.
-- scene-6: 125.548s–156.46s; midpoint 141.004s; narration starts 126.348s.
-- scene-7: 156.46s–181.399s; midpoint 168.93s; narration starts 157.26s.
-- scene-8: 181.399s–204.674s; midpoint 193.036s; narration starts 182.199s.
+Preserve the chapter’s measured narration, stagger the supporting evidence, and hold the final read. No fabricated network identifier.
 
-Total duration: 204.674 seconds. Complete Hyperframes quality checks and inspect all scene midpoints before final preview. The skill's render approval gate remains pending.
+## Frame 2
+status: built
+src: compositions/frames/scene-02-wallet.html
+scene: Illustrated wallet connection
+duration: 26
+blueprint: compose
+rules: spring-pop-entrance, cursor-click-ripple
+transition_in: cut
+voiceover: final-wallet
+
+Scene 1 (0–4s): Line workspace and connect target → Scene 2 (4–8s): wallet choice → Scene 3 (8–12s): network/address request → Scene 4 (12–18s): encrypted organization → Scene 5 (18s–end): actual connected-app capture.
+
+## Frame 3
+status: built
+src: compositions/frames/scene-03-purchase.html
+scene: Illustrated purchasing workflow
+duration: 34
+blueprint: compose
+rules: spring-pop-entrance, cursor-click-ripple
+transition_in: cut
+voiceover: final-purchase-clean
+
+Scene 1 (0–5s): task request → Scene 2 (5–11s): two merchant quotes → Scene 3 (11–17.5s): Compact clearance → Scene 4 (17.5–23s): explicitly illustrated wallet approval → Scene 5 (23s–end): single-use redemption and service result.
+
+## Frame 4
+status: built
+src: compositions/frames/scene-04-evidence.html
+scene: Actual Preprod evidence
+duration: 36.402
+blueprint: compose
+rules: spring-pop-entrance
+transition_in: cut
+voiceover: final-evidence-clean
+
+Preserve the chapter’s measured narration, stagger the supporting evidence, and hold the final read. No fabricated network identifier.
+
+## Frame 5
+status: built
+src: compositions/frames/scene-05-privacy.html
+scene: Privacy boundary
+duration: 27.363
+blueprint: compose
+rules: spring-pop-entrance
+transition_in: cut
+voiceover: flow-7
+
+Preserve the chapter’s measured narration, stagger the supporting evidence, and hold the final read. No fabricated network identifier.
+
+## Frame 6
+status: built
+src: compositions/frames/scene-06-close.html
+scene: Wave delta and source
+duration: 28.237
+blueprint: compose
+rules: spring-pop-entrance
+transition_in: cut
+voiceover: final-close
+
+Preserve the chapter’s measured narration, stagger the supporting evidence, and hold the final read. No fabricated network identifier.
