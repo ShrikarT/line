@@ -5,6 +5,7 @@ import { bech32m } from "@scure/base";
 import * as L from "@midnight-ntwrk/midnight-js-protocol/ledger";
 import { organizationApi } from "../server/organization-api.mjs";
 import { OrganizationSupplierClient } from "../src/lib/organization/supplier-client.ts";
+import { organizationSignInMessage } from "../src/lib/organization/sign-in.ts";
 
 test("the browser supplier client signs in, renews expired sessions and retries only the exact saved request", async () => {
   const key = L.sampleSigningKey(), verifyingKey = L.signatureVerifyingKey(key);
@@ -44,4 +45,28 @@ test("the browser supplier client signs in, renews expired sessions and retries 
     await assert.rejects(fresh.request("orders", body), /invalid wallet sign-in challenge/);
     assert.equal(signatures, 2); assert.equal(quotes, 2);
   } finally { await api.close(); await new Promise<void>(resolve => server.close(() => resolve())); }
+});
+
+test("a rate-limited sign-in is identified and never automatically signed again", async () => {
+  const origin = "https://line.example", receivingAddress = "test-receiving-address";
+  const nonce = "ab".repeat(32), expiresAt = Date.now() + 60_000;
+  let signatures = 0;
+  const paths: string[] = [];
+  const client = new OrganizationSupplierClient({ receivingAddress, assertSession() {}, async assertWallet() {}, wallet: {
+    async signData() { signatures++; throw Error("Rate limited https://wallet.example/api?project_id=fixture-provider"); },
+  } }, origin, () => {}, async url => {
+    const path = new URL(String(url)).pathname; paths.push(path);
+    if (path.endsWith("/catalog")) return Response.json({ walletAuthentication: "required", services: [] });
+    if (path.endsWith("/auth/challenge")) return Response.json({ nonce, expiresAt, message: organizationSignInMessage(origin, receivingAddress, nonce, expiresAt) });
+    throw Error("A failed signature cannot reach verification or a supplier action");
+  });
+  await assert.rejects(client.request("network"), error => {
+    assert(error instanceof Error);
+    assert.match(error.message, /Wallet sign-in did not complete: Rate limited/);
+    assert.match(error.message, /not.*retried/);
+    assert(!error.message.includes("fixture-provider"));
+    return true;
+  });
+  assert.equal(signatures, 1);
+  assert.deepEqual(paths, ["/api/organization/catalog", "/api/organization/auth/challenge"]);
 });

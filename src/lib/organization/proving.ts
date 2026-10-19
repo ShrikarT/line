@@ -17,10 +17,10 @@ export function organizationProofProvider(
   return {
     async proveTx(tx, config) {
       assertSession();
-      if (typeof wallet.getProvingProvider !== "function") throw new Error("Your wallet must support Midnight Connector v4 proving. Update Lace and reconnect before trying again.");
+      if (typeof wallet.getProvingProvider !== "function") throw new Error("Your wallet must support Midnight Connector v4 proving. Update your wallet and reconnect before trying again.");
       report("Prepare the proof with your wallet");
       provider ??= withinDeadline(wallet.getProvingProvider(keys), acquisitionTimeoutMs,
-        "The wallet proving service is not responding. Reopen Lace and try again.")
+        "The wallet proving service is not responding. Reopen your wallet and try again.")
         .then(proving => {
           if (!proving || typeof proving.check !== "function" || typeof proving.prove !== "function") throw new Error("The wallet returned an incompatible proving service.");
           return createProofProvider(proving);

@@ -4,14 +4,51 @@ import { decodeWalletPublicKey, getConnectedWallet, getWalletConfiguration } fro
 import { encodeVaultJson, encryptSecret, getVaultSessionPassphrase, getVaultSessionRevision, isVaultSessionUnlocked, loadEncryptedJson, lockVaultSession, saveEncryptedJson, unlockVaultSession } from "../security/vault.ts";
 import { hexToBytes, randomBytes32, toHex } from "../line/encoding.ts";
 import { decodeOrganizationBackup, isOrganizationEmpty } from "./backup.ts";
-import { withinDeadline } from "./finality.ts";
+import { OrganizationTimeoutError, withinDeadline } from "./finality.ts";
 
-/** Read-only connector probes can be abandoned without approving a late action. */
-export async function readOrganizationWallet(wallet: ConnectedAPI, timeoutMs = 25_000) {
-  const [configuration, shielded, receiving] = await withinDeadline(Promise.all([
-    getWalletConfiguration(wallet, "preprod"), wallet.getShieldedAddresses(), wallet.getUnshieldedAddress(),
-  ]), timeoutMs, "The wallet is not responding. Reopen Lace and try again; no transaction was submitted by this wallet check.");
-  return { configuration, shielded, receiving };
+function rateLimited(failure: unknown): boolean {
+  if (!failure || typeof failure !== "object") return typeof failure === "string" && /rate[\s_-]*limit|too many requests/i.test(failure);
+  const error = failure as { code?: unknown; status?: unknown; message?: unknown; reason?: unknown };
+  return error.code === 429 || error.status === 429 || /rate[\s_-]*limit|too many requests/i.test(String(error.message ?? error.reason ?? ""));
+}
+
+/** Only these three read-only probes may retry. No proof, signature, balance or
+ * submission request is admitted here. Every retry rechecks the caller's session.
+ */
+export async function readOrganizationWallet(wallet: ConnectedAPI, timeoutMs = 25_000, assertCurrent: () => void = () => {}) {
+  const controller = new AbortController(), signal = controller.signal;
+  const timeoutMessage = "The wallet is not responding. Reopen your wallet and try again; no transaction was submitted by this wallet check.";
+  const expired = () => new OrganizationTimeoutError(timeoutMessage);
+  const current = () => { if (signal.aborted) throw expired(); assertCurrent(); };
+  async function pause(milliseconds: number) {
+    current();
+    await new Promise<void>((resolve, reject) => {
+      const abort = () => { clearTimeout(timer); reject(expired()); };
+      const timer = setTimeout(() => { signal.removeEventListener("abort", abort); resolve(); }, milliseconds);
+      signal.addEventListener("abort", abort, { once: true });
+    });
+    current();
+  }
+  async function read<T>(label: string, request: () => Promise<T>): Promise<T> {
+    for (let attempt = 0; ; attempt++) {
+      current();
+      try { const value = await request(); current(); return value; }
+      catch (failure) {
+        current();
+        if (!rateLimited(failure)) throw failure;
+        if (attempt === 2) throw new Error(`Your wallet rate limited the ${label} check. Wait before reopening the organization. No signature or payment was retried.`);
+        await pause(attempt === 0 ? 500 : 1500);
+      }
+    }
+  }
+  const task = async () => {
+    const configuration = await read("network configuration", () => getWalletConfiguration(wallet, "preprod", signal));
+    const shielded = await read("shielded identity", () => wallet.getShieldedAddresses());
+    const receiving = await read("receiving address", () => wallet.getUnshieldedAddress());
+    return { configuration, shielded, receiving };
+  };
+  try { return await withinDeadline(task(), timeoutMs, timeoutMessage); }
+  finally { controller.abort(); }
 }
 
 export type OrganizationReceipt = { kind: "deploy" | "key" | "call"; circuit: string; contractAddress: string; txId: string; txHash: string; blockHeight: number; recordedAt: string };
@@ -63,7 +100,9 @@ export class OrganizationAccount {
   static async unlock(wallet: ConnectedAPI, passphrase: string): Promise<OrganizationAccount> {
     if (wallet !== getConnectedWallet()) throw new Error("Connect your wallet before opening an organization.");
     if (passphrase.length < 8) throw new Error("Use at least eight characters for the organization vault password.");
-    const { shielded, receiving: unshielded } = await readOrganizationWallet(wallet);
+    const { shielded, receiving: unshielded } = await readOrganizationWallet(wallet, 25_000, () => {
+      if (wallet !== getConnectedWallet()) throw new Error("Wallet changed while opening the organization.");
+    });
     const accountId = decodeWalletPublicKey(shielded.shieldedCoinPublicKey, "shield-cpk", "preprod");
     receivingAddressBytes(unshielded.unshieldedAddress);
     // Authenticate existing ciphertext before replacing any open vault session.
@@ -87,11 +126,13 @@ export class OrganizationAccount {
   };
   async assertWallet() {
     this.assertSession();
-    const { shielded, receiving } = await readOrganizationWallet(this.wallet);
+    const identity = await readOrganizationWallet(this.wallet, 25_000, this.assertSession);
+    const { shielded, receiving } = identity;
     this.assertSession();
     if (decodeWalletPublicKey(shielded.shieldedCoinPublicKey, "shield-cpk", "preprod") !== this.accountId) { this.close(); throw new Error("Wallet account changed. Unlock the selected account’s own vault."); }
     if (receiving.unshieldedAddress !== this.receivingAddress) { this.close(); throw new Error("Wallet receiving account changed. Reopen its organization vault."); }
     this.assertSession();
+    return identity;
   }
   private key() { return organizationAccountKey("preprod", this.accountId); }
   snapshot(): OrganizationSnapshot { this.assertSession(); return copyAccount(this.record.snapshot); }
