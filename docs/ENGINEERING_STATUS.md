@@ -32,16 +32,28 @@ motion samples and 74/74 contrast checks.
 | Check | Result |
 | --- | --- |
 | Full core `npm test` | 644 discovered; 643 passed; one intentional skip; no failures/cancellations |
-| Organization browser | Nine passed; includes actual SDK preparation and deliberately rejected approval |
+| Organization browser | Ten passed; includes actual SDK preparation and deliberately rejected approval |
 | Compact regeneration | Canonical and organization compile; zero managed drift |
 | Build/typecheck | `npm run build:deploy` passes and exports 37 public proving files |
-| Dependency and credential scans | 90 production modules checked; no fixture keys; no configured secrets in 558 text/build files |
+| Dependency and credential scans | 90 production modules checked; no fixture keys; no configured secrets in 495 current text/build files |
 | Review | Standards/spec findings for session renewal and idle revocation fixed; no remaining actionable increment finding |
 
 [Machine-readable current verification](../artifacts/organization-product/submission-verification.json).
 Local ignored logs retain the full output and unsuccessful attempts.
 
 ## Important fixes
+
+- CI account tests no longer borrow a developer's provider credential or hosted
+  supplier catalog. The prior vault-opening timeout was reproduced without the
+  local credential, then corrected with explicitly offline test readers. CI now
+  installs the exact source-validated public proving release before browser
+  tests. The archive importer rejects modified/truncated downloads and preserves
+  a different existing release.
+- The free Render configuration runs the wallet-operated workspace with
+  authenticated Preprod readers. It starts no hosted custody wallet and rejects
+  hosted supplier orders. Independent merchants and wallet-signed contract actions
+  retain their existing workspaces. A hosted funded organization lifecycle still
+  needs actual owner approval; automated API suppliers need persistent hosting.
 
 - Wallet connection, network verification, address access and session checks have
   bounded waits. Cancel/close/disconnect invalidates pending connection work;

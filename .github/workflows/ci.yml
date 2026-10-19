@@ -173,7 +173,11 @@ jobs:
         run: npm run check:secrets
 
       - name: Frontend build
-        run: npm run build
+        run: |
+          node --test tests/organization-download.test.mjs
+          npm run organization:install-release
+          npm run build:deploy
+          node --experimental-strip-types --test tests/organization-wallet-only.test.mjs
 
       - name: Install browser for role and recovery verification
         run: npx playwright install --with-deps chromium

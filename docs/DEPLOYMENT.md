@@ -1,6 +1,6 @@
 # Build and deployment
 
-Updated 18 October 2026. Line has three separate contract profiles. The canonical
+Updated 19 October 2026. Line has three separate contract profiles. The canonical
 profile records accounting; the experimental test-settlement profile has verified
 Preprod token payouts; the organization profile receives existing assets and is
 still awaiting complete funded user acceptance. [Current evidence](ENGINEERING_STATUS.md).
@@ -25,7 +25,17 @@ and `COMPACT_BIN` when using another distribution or compiler-manager path.
 The project selects compiler 0.31.1, language 0.23, runtime 0.16.0 and ledger 8.
 Do not replace those pins with the newest toolchain without a migration.
 
-For organization proving assets:
+To install the exact published organization proving release without regenerating keys:
+
+```bash
+npm run organization:install-release
+npm run organization:validate
+npm run build:deploy
+```
+
+The download metadata pins the archive and release-manifest hashes. Installation
+validates all 52 public files against the current source and refuses to replace
+different existing keys. No wallet data is included. To generate a new release instead:
 
 ```bash
 npm run organization:release
@@ -37,6 +47,28 @@ Release generation creates full public proving/verifier keys in `.compact-keys`.
 The build exports 37 allowlisted files under `dist/organization-zk`; it copies
 no wallet records or environment files. Regenerating keys does not submit a
 transaction. Preserve the validated release matching any existing facility.
+
+## Free Render host: wallet-operated workspace
+
+The repository's `render.yaml` selects one free Node service, the `main` branch,
+and `LINE_ORGANIZATION_MODE=wallet-only`. It installs the pinned public release,
+builds all 37 browser proving assets and serves the app with authenticated HTTP
+and WebSocket Preprod readers. `LINE_PUBLIC_ORIGIN` uses Render's actual HTTPS
+URL; the provider credential stays in a private environment variable or
+`/etc/secrets/line.env`. Automatic deployments are disabled until verified.
+
+This mode starts no supplier signing wallet, writes no hosted custody records
+and needs no persistent disk or hosted proof server. The user's encrypted
+organization records stay in their browser, and their wallet handles signing and
+proving. Independent merchants exchange public profiles, quotes and claims using
+the existing role workspaces. Native facility setup and funding still require
+the user's actual wallet approvals and confirmed receipts.
+
+Hosted API suppliers are explicitly unavailable in this mode; order mutations
+return 503 rather than accepting work. The existing persistent supplier service
+below remains available under the default `supplier` mode. Render's free service
+can sleep, so initial requests can take longer and a restart requires sign-in
+again. Do not describe a live wallet connection as a funded facility acceptance.
 
 ## Configured local Preprod prototype
 

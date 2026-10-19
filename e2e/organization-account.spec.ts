@@ -1,8 +1,19 @@
 import { expect, test, type Page } from "@playwright/test";
 import { bech32m } from "@scure/base";
+import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
 
-async function wallets(page: Page) {
+async function wallets(page: Page, walletOnly = false) {
+  // CI has no developer provider credential; account tests must not borrow one.
+  await page.route("**/api/line/network-session", route => route.fulfill({ status: 404, json: { error: "No developer credential in this test." } }));
   const identity = (n: number) => ({ coin: bech32m.encodeFromBytes("mn_shield-cpk_preprod", new Uint8Array(32).fill(n)), encryption: bech32m.encodeFromBytes("mn_shield-epk_preprod", new Uint8Array(32).fill(n + 20)), receiving: bech32m.encodeFromBytes("mn_addr_preprod", new Uint8Array(32).fill(n + 40)) });
+  // This suite tests browser custody and rejected approval, not supplier hosting.
+  const sourceFingerprint = createHash("sha256").update(readFileSync(new URL("../contracts/organization/line.compact", import.meta.url))).digest("hex");
+  await page.route("**/api/organization/catalog", route => route.fulfill({ json: {
+    network: "preprod", assetColor: "0".repeat(64), decimals: 6, sourceFingerprint,
+    hostedSupplierAutomation: !walletOnly,
+    services: walletOnly ? [] : [{ id: "test-service", name: "Account test supplier", price: "25", description: "No fulfillment or settlement in this test.", profile: { name: "Account test supplier", publicKey: "11".repeat(32), address: identity(12).receiving } }],
+  } }));
   await page.addInitScript(({ a, b }) => {
     const target = window as unknown as { midnight: Record<string, unknown>; organizationSignatures: number; organizationProofRequests: number };
     target.organizationSignatures = 0;
@@ -10,7 +21,7 @@ async function wallets(page: Page) {
     target.midnight = Object.fromEntries([["a", a], ["b", b]].map(([id, keys]) => {
       const identity = keys as { coin: string; encryption: string; receiving: string };
       return [id as string, { name: `Organization wallet ${id}`, rdns: `test.org.${id}`, apiVersion: "4.0.1", connect: async () => ({
-        getConfiguration: async () => ({ networkId: "preprod", indexerUri: "https://midnight-preprod.blockfrost.io/api/v0", indexerWsUri: "wss://midnight-preprod.blockfrost.io/api/v0/ws", substrateNodeUri: "https://rpc.midnight-preprod.blockfrost.io", proverServerUri: "http://127.0.0.1:6300" }),
+        getConfiguration: async () => ({ networkId: "preprod", indexerUri: "https://indexer.example.test/graphql", indexerWsUri: "wss://indexer.example.test/graphql/ws", substrateNodeUri: "https://node.example.test", proverServerUri: "http://127.0.0.1:6300" }),
         getShieldedAddresses: async () => ({ shieldedCoinPublicKey: identity.coin, shieldedEncryptionPublicKey: identity.encryption, shieldedAddress: "unused" }),
         getUnshieldedAddress: async () => ({ unshieldedAddress: identity.receiving }), getUnshieldedBalances: async () => ({}),
         getConnectionStatus: async () => ({ status: "connected", networkId: "preprod" }),
@@ -99,6 +110,14 @@ test("incomplete facility fields show actionable feedback without requesting a s
   const requiredFeedback = page.getByRole("alert").filter({ hasText: "Complete the required name, asset and supplier profile" });
   await expect(requiredFeedback).toBeVisible();
   await expect(requiredFeedback).toBeInViewport();
+  expect(await page.evaluate(() => (window as unknown as { organizationSignatures: number }).organizationSignatures)).toBe(0);
+});
+
+test("wallet-only hosting opens the actual encrypted account with an explicit independent-merchant path", async ({ page }) => {
+  await wallets(page, true); await page.goto("/app"); await connect(page, "a"); await unlock(page);
+  await expect(page.getByRole("heading", { name: "Choose an independent merchant." })).toBeVisible();
+  await expect(page.getByLabel("Initial merchant profile", { exact: false })).toBeVisible();
+  await expect(page.getByRole("alert")).toHaveCount(0);
   expect(await page.evaluate(() => (window as unknown as { organizationSignatures: number }).organizationSignatures)).toBe(0);
 });
 

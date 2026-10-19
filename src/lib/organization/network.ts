@@ -25,7 +25,7 @@ import { authenticatedOrganizationReads } from "./authenticated-reads";
 
 type Circuit = keyof Contract<LinePrivateWitnessContext>["provableCircuits"];
 type Providers = ContractProviders<Contract<LinePrivateWitnessContext>>;
-export type OrganizationCatalog = { network: "preprod"; assetColor: string; decimals: number; sourceFingerprint: string; services: { id: string; name: string; price: string; description: string; profile: MerchantBinding }[] };
+export type OrganizationCatalog = { network: "preprod"; assetColor: string; decimals: number; sourceFingerprint: string; hostedSupplierAutomation?: boolean; services: { id: string; name: string; price: string; description: string; profile: MerchantBinding }[] };
 type SupplierOrder = { id: string; contractAddress: string; service: string; status: string; quotePackage: string | null; result: Record<string, unknown> | null; receipts: { circuit: string; contractAddress: string; txHash: string; blockHeight: number }[] };
 const CIRCUITS: Circuit[] = ["registerMerchant", "disableMerchant", "fundReserve", "withdrawUnencumberedReserve", "withdrawFees", "openLine", "postQuote", "draw", "redeemDraw", "cancelOrExpireNote", "acknowledgeRepayment", "setStatus"];
 const same = (a: Uint8Array, b: Uint8Array) => a.length === b.length && a.every((byte, i) => byte === b[i]);
@@ -350,7 +350,7 @@ export class OrganizationNetwork {
   }
   async catalog(): Promise<OrganizationCatalog> {
     const value = await this.supplierRequest("catalog") as OrganizationCatalog;
-    if (value.network !== "preprod" || value.sourceFingerprint !== this.release.sourceFingerprint || !Array.isArray(value.services) || !value.services.length || value.services.length > 20 || !Number.isInteger(value.decimals) || value.decimals < 0 || value.decimals > 18) throw new Error("The supplier catalog does not match your organization contract release.");
+    if (value.network !== "preprod" || value.sourceFingerprint !== this.release.sourceFingerprint || !Array.isArray(value.services) || (!value.services.length && value.hostedSupplierAutomation !== false) || (value.hostedSupplierAutomation === false && value.services.length !== 0) || (value.hostedSupplierAutomation !== undefined && typeof value.hostedSupplierAutomation !== "boolean") || value.services.length > 20 || !Number.isInteger(value.decimals) || value.decimals < 0 || value.decimals > 18) throw new Error("The supplier catalog does not match your organization contract release.");
     bytes32(value.assetColor);
     for (const service of value.services) {
       if (!/^[a-z-]{1,80}$/.test(service.id) || typeof service.name !== "string" || service.name.length > 100 || typeof service.description !== "string" || !/^[0-9]{1,20}$/.test(service.price) || BigInt(service.price) <= 0n || BigInt(service.price) > 18_446_744_073_709_551_615n) throw new Error("Invalid supplier price or description.");

@@ -1,8 +1,8 @@
 {
   "schema": "line-submission-verification/v1",
-  "checkedAt": "2026-10-19T03:23:51.826Z",
-  "sourceCommit": "59b06bd484af597af5fa7a9fc73c9786029d8e51",
-  "publicBranch": "feat/line-ui-redesign",
+  "checkedAt": "2026-10-19T04:13:12.774Z",
+  "sourceCommit": "1ca0b933e52343d7758a36b1f3d064d38b874381",
+  "publicBranch": "main",
   "core": {
     "command": "npm test",
     "discovered": 644,
@@ -10,7 +10,7 @@
     "failed": 0,
     "cancelled": 0,
     "skipped": 1,
-    "logSha256": "1865523ba2f556d2ceb25d899e8f990017a466f2eb207edbaf32c3de232bd5b6"
+    "logSha256": "f38236f3308d4208e8483404f212d1a57c9920dcb8a2b4b22cc23b7065b49868"
   },
   "buildDeploy": "passed",
   "typecheck": "passed",
@@ -65,10 +65,56 @@
   },
   "publicDeployment": false,
   "unresolved": [
-    "Owner must reopen the organization vault and approve fresh Lace transactions for funded user acceptance.",
-    "Confirm persistent hosting target and funded supplier startup before public operation.",
+    "Owner must approve fresh Lace transactions for funded organization acceptance.",
+    "Verify the free Render deployment after the complete source update is pushed to main.",
+    "Automated hosted API suppliers require persistent hosting; free wallet-only hosting does not provide them.",
     "Retain and reconcile the original pending Merchant B draw before replacing it.",
     "Entrant must complete AKINDO entry personally."
   ],
-  "historicalSettlementEvidence": "../../docs/TEST_TOKEN_PAYOUT_2026-10-16.md"
+  "historicalSettlementEvidence": "../../docs/TEST_TOKEN_PAYOUT_2026-10-16.md",
+  "submissionDeck": {
+    "url": "https://shrikart.github.io/line/",
+    "workflowRun": 39195018426,
+    "published": true,
+    "anonymousContentMatchesSource": false,
+    "lineEndingNormalization": true,
+    "pendingSourceLinkRefresh": true
+  },
+  "organizationBrowser": {
+    "focusedCases": 14,
+    "passed": 14,
+    "organizationCases": 10,
+    "actualLace": false,
+    "includesWalletOnlyCatalog": true
+  },
+  "hostingPreparation": {
+    "provider": "Render",
+    "plan": "free",
+    "mode": "wallet-only",
+    "blueprintValidated": true,
+    "hostedSupplierAutomation": false,
+    "supplierSigningWalletStarted": false,
+    "persistentCustodyOnHost": false,
+    "publicDeploymentVerified": false,
+    "blueprintValidation": "passed"
+  },
+  "verificationIncludesWorkingTreeChanges": true,
+  "deploymentSupport": {
+    "tests": 5,
+    "passed": 5,
+    "failed": 0,
+    "archiveVerifiedFromPublicDownload": true,
+    "releaseFilesValidated": 52,
+    "existingDifferentKeysPreserved": true
+  },
+  "sourceTextFingerprint": {
+    "files": 299,
+    "sha256": "840ba44ce2b1e9268e41a54e5bff0e91550d76e8198e5f7e66a0d92f5faf4c1a",
+    "normalization": "CRLF to LF"
+  },
+  "configuredSecretScan": {
+    "files": 495,
+    "configuredValues": 3,
+    "findings": 0
+  }
 }
