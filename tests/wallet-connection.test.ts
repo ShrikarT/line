@@ -90,6 +90,19 @@ test("structured locked errors give recovery instructions and do not prevent ret
   assert.equal(await connectWallet("lace"), next);
 });
 
+for (const stage of ["access", "configuration"]) test(`a closed extension channel during ${stage} explains recovery without publishing an account`, async () => {
+  const failure = { message: "Remote API with channel 'feature-flags' was shutdown: object can no longer be used." };
+  inject(async () => {
+    if (stage === "access") throw failure;
+    return connected(async () => { throw failure; });
+  });
+  await assert.rejects(connectWallet("lace"), /Lace connection channel closed.*Refresh this page.*reconnect/i);
+  assert.equal(getConnectedWallet(), null);
+  assert.equal(getConnectedWalletAccount(), null);
+  const next = connected(); inject(async () => next);
+  assert.equal(await connectWallet("lace"), next);
+});
+
 test("an unresponsive receiving-address request does not wait indefinitely", async () => {
   let failure;
   const api = { ...connected(), getUnshieldedAddress: () => new Promise(() => {}) };

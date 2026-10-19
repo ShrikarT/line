@@ -279,6 +279,9 @@ export async function connectWallet(
       : String(err);
     {
       const msg = message.toLowerCase();
+      if (msg.includes("remote api") && (msg.includes("was shutdown") || msg.includes("object can no longer be used"))) {
+        throw new WalletNotConnectedError(`${targetWallet.name ?? walletKey} connection channel closed. Refresh this page, unlock the extension, select ${networkId}, and reconnect.`);
+      }
       if (msg.includes("locked")) {
         throw new WalletNotConnectedError(`${targetWallet.name ?? walletKey} is locked. Unlock it in the extension, select the requested network, then try connecting again.`);
       }
