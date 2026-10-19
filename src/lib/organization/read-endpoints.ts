@@ -5,11 +5,28 @@ import type { OrganizationSupplierClient } from "./supplier-client.ts";
 const READS = ["indexerUri", "indexerWsUri"] as const;
 const requiresToken = (value: string) => { const url = new URL(value); return url.hostname.endsWith(".blockfrost.io") && !url.searchParams.get("project_id")?.trim(); };
 
-/** Prefer the wallet's configured readers. Only missing provider credentials use
- * Line's authenticated same-origin readers. Submission/proving stay in the wallet.
+/** Known retired Preprod readers cannot serve ledger observations. Select the
+ * current default instead; missing credentials then require authenticated Line reads.
+ * Invalid URLs and credentials still reach the strict endpoint validator below.
+ */
+function currentReader(value: string, websocket: boolean): string | undefined {
+  try {
+    const url = new URL(value);
+    const protocols = websocket ? ["wss:", "ws:"] : ["https:", "http:"];
+    if (protocols.includes(url.protocol) && !url.username && !url.password &&
+      /^(?:indexer|rpc)\.preprod\.midnight\.network$/.test(url.hostname)) return undefined;
+  } catch { /* The shared validator reports malformed configuration. */ }
+  return value;
+}
+
+/** Prefer usable wallet readers. Missing credentials and known retired Preprod
+ * readers use Line's authenticated same-origin readers. Submission/proving stay in the wallet.
  */
 export async function organizationReadEndpoints(configuration: Configuration, supplier: Pick<OrganizationSupplierClient, "request">, origin: string, transport: typeof fetch = fetch): Promise<{ indexerUri: string; indexerWsUri: string; authorize?: () => Promise<void> }> {
-  const endpoints = resolveMidnightEndpoints({ networkId: "preprod", indexerUri: configuration.indexerUri, indexerWsUri: configuration.indexerWsUri, nodeUri: configuration.substrateNodeUri });
+  if (configuration.networkId !== "preprod") throw new Error("Organization reads require a Midnight Preprod wallet network.");
+  // This adapter only selects read services. The wallet owns submission and its
+  // node configuration must not prevent an otherwise valid read connection.
+  const endpoints = resolveMidnightEndpoints({ networkId: "preprod", indexerUri: currentReader(configuration.indexerUri, false), indexerWsUri: currentReader(configuration.indexerWsUri, true) });
   if (READS.some(key => requiresToken(endpoints[key])) && ["127.0.0.1", "localhost", "[::1]"].includes(new URL(origin).hostname)) {
     // The historical local operator helper is never requested by a public site.
     const response = await transport.call(globalThis, new URL("/api/line/network-session", origin), { method: "POST", headers: { "X-Line-Session": "network-setup" }, signal: AbortSignal.timeout(10000) }).catch(() => null);
