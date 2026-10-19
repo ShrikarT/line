@@ -43,6 +43,10 @@ Local ignored logs retain the full output and unsuccessful attempts.
 
 ## Important fixes
 
+- The backup tampering assertion now flips a ciphertext bit. Its old replacement
+  with `00` left an already-zero first byte unchanged in 1/256 runs; a valid
+  encrypted fixture reproduced the CI failure. All three backup tests pass with
+  the guaranteed mutation; encryption and restore behavior are unchanged.
 - CI account tests no longer borrow a developer's provider credential or hosted
   supplier catalog. The prior vault-opening timeout was reproduced without the
   local credential, then corrected with explicitly offline test readers. CI now
