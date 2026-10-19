@@ -1,5 +1,5 @@
 {
-  "checkedAt": "2026-10-18T16:40:09.195Z",
+  "checkedAt": "2026-10-19T03:27:04.995Z",
   "contractAddress": "a159597495b52ea7a703a29562b17fcb042bf7eaa984ec1e05e7e8935208304b",
   "operation": "f79840f6-79f7-43c6-b552-700bdc81d727-1-draw",
   "txId": "00e133763cf434106773bc04474609ce372795448543157999382be2203d79c2b4",
@@ -24,8 +24,8 @@
     },
     "status": "SUCCESS",
     "finalizedHead": {
-      "hash": "77ea9f4d4d1a94ed71ed295c95388b33223b73189e4edc5a40ae12a9bb725d6e",
-      "height": 3037292
+      "hash": "c519c1cdc11f418f61e1785a2828f900cb240dc32a7a7af18b8d5e06f273eac0",
+      "height": 3043420
     },
     "rawTransactionChecked": true
   },
