@@ -26,7 +26,10 @@ test("backup rejects wrong password, another wallet, relocation and authenticate
   await assert.rejects(decodeOrganizationBackup(JSON.stringify(envelope), "BackupControl123!", organizationAccountKey("preprod", "ff".repeat(32)), "ff".repeat(32)));
   const changed = { ...envelope, id: organizationAccountKey("preprod", "ff".repeat(32)) };
   await assert.rejects(decodeOrganizationBackup(JSON.stringify(changed), "BackupControl123!", changed.id, "ff".repeat(32)));
-  await assert.rejects(decodeOrganizationBackup(JSON.stringify({ ...envelope, ciphertextHex: "00" + envelope.ciphertextHex.slice(2) }), "BackupControl123!", key, accountId));
+  // Flip a bit: replacing the first byte with 00 is a no-op in 1/256 runs.
+  const ciphertextHex = (parseInt(envelope.ciphertextHex.slice(0, 2), 16) ^ 1).toString(16).padStart(2, "0") + envelope.ciphertextHex.slice(2);
+  assert.notEqual(ciphertextHex, envelope.ciphertextHex);
+  await assert.rejects(decodeOrganizationBackup(JSON.stringify({ ...envelope, ciphertextHex }), "BackupControl123!", key, accountId));
   await assert.rejects(decodeOrganizationBackup(JSON.stringify({ ...envelope, version: undefined }), "BackupControl123!", key, accountId));
 });
 test("decrypted malformed books cannot cross restore validation", () => {
