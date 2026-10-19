@@ -107,6 +107,14 @@ reserve accounting. Thirteen organization transactions are confirmed. These
 checks use configured TLS indexer/RPC data, not independent full-node or local
 proof verification; they do not establish merchant payout or cash settlement.
 
+The subsequent allowance attempt reached the wallet's balancing/signature step
+but exceeded its 180-second wait. No Line submission was recorded. The owner
+reported approving the request; the wallet's current pending-task state still
+needs confirmation before another request is prepared. A fresh read at
+14:17 UTC on 19 October found status `NONE` and the full 1,000,000 native-asset
+base units still held by the contract. Allowance and merchant checkout are not
+yet accepted; the timed-out request is not reported as a successful transaction.
+
 Encrypted backup export now uses the unlocked vault session and account lock
 without depending on the wallet's remote API. It reloads the current durable
 record, retains pending transaction identities and rejects session revocation
