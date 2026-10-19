@@ -1,7 +1,0 @@
-# Line review video design
-
-Reuse Line's current brand: warm cream `#faf2e7`, navy `#1e3a6e`, coral accents `#f47457`, readable dark coral `#c8513e`, cream borders `#e4daca`, and muted navy secondary copy `#4a5b7c`. Manrope is embedded locally at `assets/Manrope.ttf`, with 600/700 headlines and 400 body text. Use a flat cream field, generous space and large editorial typography. Product illustrations are explicitly authorized by the owner; label their connection and transaction states as illustrated throughout. Actual receipt evidence remains a separate chapter.
-
-Fixed 1920×1080 canvas. A short eyebrow anchors the upper left; a large heading and concise explanation occupy the left zone; existing role flow, evidence or metrics occupy the right zone. A plainly worded evidence boundary anchors the lower left and a chapter number the lower right. Maintain ample space between the body and boundary. Real narration durations determine scene lengths.
-
-Use smooth title settles, deliberate pointer choreography, staged wallet panels and a clear quote-to-redemption progression. Animate inner wrappers with seek-safe timelines and no bouncy decoration. Speech is the current audio identity; no music is required. Never give an illustrated transaction a fabricated real hash or block number or relabel it as confirmed network footage. Text and narration must agree on the verification scope. Readable labels and captions use at least 22px; primary headings use 64–100px.

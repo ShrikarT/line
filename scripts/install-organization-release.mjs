@@ -13,7 +13,7 @@ export function verifyOrganizationDownload(bytes, metadata) {
 
 export async function installOrganizationRelease({ projectRoot = process.cwd(), transport = fetch } = {}) {
   projectRoot = resolve(projectRoot);
-  const metadata = JSON.parse(readFileSync(join(projectRoot, 'deployment/organization-release.json'), 'utf8'));
+  const metadata = JSON.parse(readFileSync(join(projectRoot, 'contracts/organization/release-download.json'), 'utf8'));
   if (metadata.schema !== 'line-organization-download/v1' || !/^https:\/\/github\.com\/ShrikarT\/line\/releases\/download\/[A-Za-z0-9._-]+\/Line-Organization-Release-[a-f0-9]+\.tar\.gz$/.test(metadata.url) ||
       !Number.isSafeInteger(metadata.bytes) || metadata.bytes <= 0 || metadata.bytes > 150_000_000 || !/^[a-f0-9]{64}$/.test(metadata.sha256) || !/^[a-f0-9]{64}$/.test(metadata.releaseSha256)) throw Error('Invalid pinned organization download metadata.');
   const pointerPath = join(projectRoot, '.compact-keys/organization-release.json');

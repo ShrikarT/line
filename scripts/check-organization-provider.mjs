@@ -3,7 +3,7 @@
  * its injected catalog boundary is not acceptance of a funded supplier runtime.
  */
 import { createServer } from 'node:http';
-import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve, sep } from 'node:path';
 import { chromium } from '@playwright/test';
@@ -69,7 +69,8 @@ try {
   }, { receivingAddress, modulesOrigin });
   if (requests.some(value => value.includes('project_id=') || value.includes(process.env.MIDNIGHT_BLOCKFROST_PROJECT_ID))) throw Error('A browser URL exposed a provider credential');
   const evidence = { schema: 'line-organization-provider-read/v1', observedAt: new Date().toISOString(), network: 'preprod', ...result, walletSignInSignatures: signatures, browserProviderCredentialUrls: 0, nativeWalletStarted: false, submittedTransactions: 0, historicalContractOnly: true, supplierRuntimeBoundary: 'isolated catalog only; no funded supplier acceptance', actualLace: false };
-  writeFileSync('artifacts/organization-product/provider-routing-preprod-read.json', JSON.stringify(evidence, null, 2) + '\n');
+  mkdirSync('test-results', { recursive: true });
+  writeFileSync('test-results/provider-routing-preprod-read.json', JSON.stringify(evidence, null, 2) + '\n');
   console.log(JSON.stringify(evidence));
 } finally {
   await browser?.close(); await app.close();

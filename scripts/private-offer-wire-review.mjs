@@ -11,7 +11,7 @@ const sha=b=>createHash('sha256').update(b).digest('hex');
 const [input,binary]=process.argv.slice(2);assert(input);
 const dir=resolve(input),exe=resolve(binary??`.compact-keys/native-proof-target/debug/line-native-public-components${process.platform==='win32'?'.exe':''}`);
 let corpus,rawReport;
-const publicReportPath='docs/private-signed-2026-10-11-evidence/offer-native-proof.json';
+const publicReportPath='tests/fixtures/private-offer-public-pairs/native-proof.json';
 if(existsSync(join(dir,'manifest.json'))){
  corpus=JSON.parse(readFileSync(join(dir,'manifest.json')));assert.equal(corpus.schema,'line-private-offer-public-corpus/v1');
  assert.equal(corpus.publicNativeReport,publicReportPath);rawReport=readFileSync(publicReportPath);assert.equal(sha(rawReport),corpus.publicNativeReportSha256);

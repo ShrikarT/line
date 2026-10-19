@@ -61,10 +61,10 @@ test("test-token setup uses its own endpoint and renders observed balances witho
   await expect(page.getByText("25 test units received", { exact: true })).toBeVisible();
   expect(requests).toHaveLength(2);
   await page.setViewportSize({ width: 1440, height: 1000 });
-  await page.screenshot({ path: "artifacts/preprod-2026-10-16/token-mocked-desktop.png", fullPage: true });
+  await page.screenshot({ path: "test-results/preprod-2026-10-16/token-mocked-desktop.png", fullPage: true });
   await page.setViewportSize({ width: 390, height: 844 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
-  await page.screenshot({ path: "artifacts/preprod-2026-10-16/token-mocked-mobile.png", fullPage: true });
+  await page.screenshot({ path: "test-results/preprod-2026-10-16/token-mocked-mobile.png", fullPage: true });
 });
 
 test("pending live transaction has a serialized reconciliation action without starting another purchase", async ({ page }) => {

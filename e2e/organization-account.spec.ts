@@ -98,10 +98,10 @@ test("two real account namespaces isolate encrypted identities and recover only 
   expect((await profile(page)).publicKey).toBe(a.publicKey);
   expect(await page.evaluate(() => (window as unknown as { organizationSignatures: number }).organizationSignatures)).toBe(0);
   expect(mutations).toEqual([]);
-  await page.screenshot({ path: "artifacts/organization-product/merchant-account-desktop.png", fullPage: true });
+  await page.screenshot({ path: "test-results/organization-product/merchant-account-desktop.png", fullPage: true });
   await page.setViewportSize({ width: 390, height: 844 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
-  await page.screenshot({ path: "artifacts/organization-product/merchant-account-mobile.png", fullPage: true });
+  await page.screenshot({ path: "test-results/organization-product/merchant-account-mobile.png", fullPage: true });
 });
 
 test("incomplete facility fields show actionable feedback without requesting a signature", async ({ page }) => {

@@ -3,7 +3,7 @@ import { mkdir } from "node:fs/promises";
 import path from "node:path";
 
 const routes = ["/", "/app", "/organization", "/agents", "/suppliers", "/connect", "/preprod", "/test-payout", "/checkout", "/issuer", "/agent", "/merchant", "/explorer", "/circuits", "/lab", "/roadmap", "/privacy", "/missing-page"];
-const output = path.resolve(process.env.LINE_UI_ARTIFACT_DIR ?? "artifacts/ui-redesign");
+const output = path.resolve(process.env.LINE_UI_ARTIFACT_DIR ?? "test-results/ui-redesign");
 test.beforeEach(async ({ page }) => {
   // Visual review must never submit a funded transaction or access wallet material.
   await page.route("**/api/preprod/**", route => route.fulfill({ json: {

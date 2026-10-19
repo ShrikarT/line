@@ -45,8 +45,8 @@ for (const width of [1440, 390]) {
     await expect(page.getByRole("heading", { name: "Start with your wallet." })).toBeVisible();
     await expect(page.getByRole("link", { name: "Open test-token checkout" })).toHaveCount(0);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
-    await mkdir("artifacts/wallet-onboarding", { recursive: true });
-    await page.screenshot({ path: `artifacts/wallet-onboarding/workspace-${width}.png`, fullPage: true });
+    await mkdir("test-results/wallet-onboarding", { recursive: true });
+    await page.screenshot({ path: `test-results/wallet-onboarding/workspace-${width}.png`, fullPage: true });
     expect(posts).toEqual([]);
   });
 }
@@ -63,10 +63,10 @@ test("selected wallet connects, survives navigation, copies and disconnects with
   await page.getByRole("button", { name: "Copy address", exact: true }).click();
   await expect(page.getByRole("button", { name: "Address copied", exact: true })).toBeVisible();
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(address);
-  await page.screenshot({ path: "artifacts/wallet-onboarding/connected.png" });
+  await page.screenshot({ path: "test-results/wallet-onboarding/connected.png" });
   await page.setViewportSize({ width: 390, height: 844 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
-  await page.screenshot({ path: "artifacts/wallet-onboarding/connected-mobile.png" });
+  await page.screenshot({ path: "test-results/wallet-onboarding/connected-mobile.png" });
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.getByRole("link", { name: "Continue to workspace" }).click();
   await page.getByRole("link", { name: "Agent purchases", exact: true }).click();

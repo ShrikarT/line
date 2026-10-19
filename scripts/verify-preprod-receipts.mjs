@@ -16,7 +16,8 @@ export { validateReceiptMetadata } from './finalized-contract-receipt.mjs';
 const sha=value=>createHash('sha256').update(value).digest('hex');
 const need=(condition,code)=>{if(!condition)throw new ReceiptError(code);};
 async function main(){
- const evidenceFile=resolve(process.argv[2]??'deployment-evidence.json');
+ need(!!process.argv[2],'SUPPLY_RECEIPT_EVIDENCE_FILE');
+ const evidenceFile=resolve(process.argv[2]);
  const output=resolve(process.argv[3]??`.compact-keys/preprod-receipts-${Date.now()}/verification.json`);
  const bytes=readFileSync(evidenceFile),evidence=JSON.parse(bytes),source=readFileSync('contracts/line.compact');
  const fixture=JSON.parse(readFileSync('tests/fixtures/line-public-verifiers.json','utf8'));
