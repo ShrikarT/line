@@ -4,6 +4,7 @@ test("role consoles display the agreed UTC deadline and confirmed redeemed statu
   const errors: string[] = [];
   page.on("pageerror", error => errors.push(error.message));
   await page.goto("/merchant");
+  await expect(page.getByRole("heading", { name: "Merchant settlement", exact: true })).toBeVisible();
   const expiry = await page.evaluate(async () => {
     const { browserModuleUrl } = await import("/e2e/browser-module.ts" as any);
     const { useAppStore } = await import(browserModuleUrl("/src/app/store.ts"));
@@ -41,6 +42,7 @@ test("issuer sets fixed fee terms and both buyer and merchant see the complete p
   const errors: string[] = [];
   page.on("pageerror", error => errors.push(error.message));
   await page.goto("/issuer");
+  await expect(page.getByRole("heading", { name: "Credit operations", exact: true })).toBeVisible();
   await page.evaluate(async () => {
     const { browserModuleUrl } = await import("/e2e/browser-module.ts" as any);
     const { useAppStore } = await import(browserModuleUrl("/src/app/store.ts"));

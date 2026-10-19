@@ -32,6 +32,10 @@ milestone established a local protocol prototype, not customer-funded settlement
 - Facility onboarding can use the connected account's actual merchant role and
   receiving address, or an independent merchant's public profile. Selecting a
   profile requests no signature; contract deployment still needs wallet approval.
+- Wallet connection and public workspaces no longer wait for contract engines.
+  Local production measurements reduced initial resource bodies from 12.30 MB to
+  0.34–0.36 MB, with no WASM request before vault opening. These are downloaded-byte
+  measurements, not a guarantee of faster rendering on every device or network.
 
 ### Verified checkpoints
 
@@ -40,11 +44,11 @@ milestone established a local protocol prototype, not customer-funded settlement
 | Canonical accounting | Facility `8990864c6f80c517c7458fa9b2526d3500f3a9814399fc836097ee409da9bed0`; retained checkpoint has 29 receipts, with no token-payout claim |
 | Test-token settlement | Facility `a159597495b52ea7a703a29562b17fcb042bf7eaa984ec1e05e7e8935208304b`; complete 21-transaction two-merchant checkpoint |
 | Organization wallet | Actual 1AM connection on Preprod verified. Earlier Lace connection and vault opening reached deployment approval; fresh funded lifecycle not yet accepted |
-| Regression checks | Local core: 643 passed/one skip. Full CI: four jobs and 49 browser cases passed; Linux core: 642 passed/two Windows-only skips, with the separate Windows ACL job passing |
+| Regression checks | Local core: 645 passed/one skip before the reader fix; 12 focused reader/authentication tests passed afterward. Current browser suite: 54 passed; deployment build and secret/key checks passed. Prior full CI checkpoint: four jobs and 50 browser cases passed |
 | Public host | Free wallet-only server, source-matched proving files, signed reader sessions and actual historical Preprod reads verified |
 
 [Finalized test-token evidence](https://github.com/ShrikarT/line/blob/bbb2fdf/docs/TEST_TOKEN_PAYOUT_2026-10-16.md)
-and [CI run](https://github.com/ShrikarT/line/actions/runs/39221733238) retain the
+and [CI run](https://github.com/ShrikarT/line/actions/runs/39232393804) retain the
 underlying checks. Historical reports and presentation assets remain in Git
 history or release downloads rather than the product source tree.
 
@@ -66,6 +70,13 @@ select Line's authenticated same-origin reader; the wallet retains proving,
 signing and submission. Malformed URLs, credentials and different networks still
 fail validation. A retired wallet submission-node URL no longer blocks selection
 of working readers, because Line does not submit through that URL.
+
+The next live 1AM attempt returned `Rate limited` during organization opening.
+Line's queried service logs showed no HTTP 429 for that attempt; the browser
+recorded a 1AM forwarding error. The exact failing wallet method is not yet
+established. Confirm whether this occurred before or after the wallet sign-in
+message before changing retry behavior. Fresh facility/funding acceptance remains
+unverified; no financial approval or submission is automatically retried.
 
 ## Wave 3 — pilots and hardening
 

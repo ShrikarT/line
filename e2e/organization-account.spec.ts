@@ -3,9 +3,14 @@ import { bech32m } from "@scure/base";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 
-async function wallets(page: Page, walletOnly = false) {
+async function wallets(page: Page, walletOnly = false, retiredReaders = false) {
   // CI has no developer provider credential; account tests must not borrow one.
   await page.route("**/api/line/network-session", route => route.fulfill({ status: 404, json: { error: "No developer credential in this test." } }));
+  if (retiredReaders) await page.route("**/api/organization/network", route => {
+    const indexerUri = new URL("/api/organization/network/indexer", route.request().url()).href;
+    const indexerWsUri = new URL(indexerUri); indexerWsUri.protocol = indexerWsUri.protocol === "https:" ? "wss:" : "ws:"; indexerWsUri.pathname += "/ws";
+    return route.fulfill({ json: { networkId: "preprod", indexerUri, indexerWsUri: indexerWsUri.href } });
+  });
   const identity = (n: number) => ({ coin: bech32m.encodeFromBytes("mn_shield-cpk_preprod", new Uint8Array(32).fill(n)), encryption: bech32m.encodeFromBytes("mn_shield-epk_preprod", new Uint8Array(32).fill(n + 20)), receiving: bech32m.encodeFromBytes("mn_addr_preprod", new Uint8Array(32).fill(n + 40)) });
   // This suite tests browser custody and rejected approval, not supplier hosting.
   const sourceFingerprint = createHash("sha256").update(readFileSync(new URL("../contracts/organization/line.compact", import.meta.url))).digest("hex");
@@ -14,14 +19,14 @@ async function wallets(page: Page, walletOnly = false) {
     hostedSupplierAutomation: !walletOnly,
     services: walletOnly ? [] : [{ id: "test-service", name: "Account test supplier", price: "25", description: "No fulfillment or settlement in this test.", profile: { name: "Account test supplier", publicKey: "11".repeat(32), address: identity(12).receiving } }],
   } }));
-  await page.addInitScript(({ a, b }) => {
+  await page.addInitScript(({ a, b, retiredReaders }) => {
     const target = window as unknown as { midnight: Record<string, unknown>; organizationSignatures: number; organizationProofRequests: number };
     target.organizationSignatures = 0;
     target.organizationProofRequests = 0;
     target.midnight = Object.fromEntries([["a", a], ["b", b]].map(([id, keys]) => {
       const identity = keys as { coin: string; encryption: string; receiving: string };
       return [id as string, { name: `Organization wallet ${id}`, rdns: `test.org.${id}`, apiVersion: "4.0.1", connect: async () => ({
-        getConfiguration: async () => ({ networkId: "preprod", indexerUri: "https://indexer.example.test/graphql", indexerWsUri: "wss://indexer.example.test/graphql/ws", substrateNodeUri: "https://node.example.test", proverServerUri: "http://127.0.0.1:6300" }),
+        getConfiguration: async () => ({ networkId: "preprod", indexerUri: retiredReaders ? "https://indexer.preprod.midnight.network/api/v3/graphql" : "https://indexer.example.test/graphql", indexerWsUri: retiredReaders ? "wss://indexer.preprod.midnight.network/api/v3/graphql/ws" : "wss://indexer.example.test/graphql/ws", substrateNodeUri: retiredReaders ? "https://rpc.preprod.midnight.network" : "https://node.example.test", proverServerUri: "http://127.0.0.1:6300" }),
         getShieldedAddresses: async () => ({ shieldedCoinPublicKey: identity.coin, shieldedEncryptionPublicKey: identity.encryption, shieldedAddress: "unused" }),
         getUnshieldedAddress: async () => ({ unshieldedAddress: identity.receiving }), getUnshieldedBalances: async () => ({}),
         getConnectionStatus: async () => ({ status: "connected", networkId: "preprod" }),
@@ -33,7 +38,7 @@ async function wallets(page: Page, walletOnly = false) {
         submitTransaction: async () => { throw new Error("Account-isolation tests never submit"); },
       }) }];
     }));
-  }, { a: identity(11), b: identity(12) });
+  }, { a: identity(11), b: identity(12), retiredReaders });
 }
 async function connect(page: Page, id: "a" | "b") {
   await page.locator("header").getByRole("button", { name: "Connect wallet", exact: true }).click();
@@ -75,6 +80,13 @@ test("real product routes require a wallet and expose no operator or simulator s
     }
   }
   expect(posts).toEqual([]); expect(errors).toEqual([]);
+});
+
+test("a Preprod wallet with retired readers opens its organization through the hosted read connection", async ({ page }) => {
+  await wallets(page, true, true); await page.goto("/app");
+  await connect(page, "a"); await unlock(page);
+  await expect(page.getByRole("alert")).toHaveCount(0);
+  expect(await page.evaluate(() => (window as unknown as { organizationSignatures: number }).organizationSignatures)).toBe(0);
 });
 
 test("two real account namespaces isolate encrypted identities and recover only the selected wallet", async ({ page }) => {

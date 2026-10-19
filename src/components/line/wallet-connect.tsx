@@ -3,7 +3,7 @@ import { ArrowRight, ArrowSquareOut, CheckCircle, CircleNotch, Copy, Plugs, Wall
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cancelWalletConnection, connectWallet, disconnectWallet, getActiveWalletInfo, getAvailableWallets, getConnectedWallet, getConnectedWalletAccount, subscribeWallet, type WalletConnectionPhase, type WalletInfo } from "@/lib/runtime/wallet";
-import { getRuntime, MidnightNetworkRuntime } from "@/lib/runtime";
+import { getActiveRuntime } from "@/lib/runtime/active";
 import { sanitizeServiceError } from "@/lib/runtime/endpoints";
 
 const WalletContext = createContext<{ connected: boolean; connecting: boolean; name: string; address: string; openWallet: () => void } | null>(null);
@@ -78,8 +78,8 @@ export function WalletSessionProvider({ children }: { children: ReactNode }) {
   }
   async function disconnect() {
     if (busy.current) cancelConnection();
-    const runtime = getRuntime();
-    if (runtime instanceof MidnightNetworkRuntime) await runtime.detachWallet();
+    const runtime = getActiveRuntime();
+    if (runtime?.detachWallet) await runtime.detachWallet();
     else await disconnectWallet();
     setError(""); setCopied(false);
   }

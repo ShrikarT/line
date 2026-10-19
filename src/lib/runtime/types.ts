@@ -97,6 +97,8 @@ export interface LineRuntime {
   readonly mode: RuntimeMode;
   readonly networkId: string;
   isConnected(): boolean;
+  /** Revoke any attached browser wallet and cached network providers. */
+  detachWallet?(): Promise<void>;
   getContractAddress(): string | null;
   getStatus(): Promise<LedgerPublicStatus>;
   getReserveStatus(): Promise<ReserveStatus>;

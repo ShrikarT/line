@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { getConnectedWallet, subscribeWallet } from "@/lib/runtime/wallet";
-import { OrganizationAccount, type OrganizationPending, type OrganizationSnapshot } from "@/lib/organization/account";
-import { OrganizationNetwork } from "@/lib/organization/network";
+import type { OrganizationAccount, OrganizationPending, OrganizationSnapshot } from "@/lib/organization/account";
+import type { OrganizationNetwork } from "@/lib/organization/network";
 import { onVaultSessionLock } from "@/lib/security/vault";
 import { sanitizeServiceError } from "@/lib/runtime/endpoints";
 
@@ -22,6 +22,10 @@ export function OrganizationSessionProvider({ children }: { children: ReactNode 
     if (working.current || !wallet) return;
     working.current = true; setBusy(true); setError(""); setProgress("Opening your encrypted organization vault");
     try {
+      const [{ OrganizationAccount }, { OrganizationNetwork }] = await Promise.all([
+        import("@/lib/organization/account"), import("@/lib/organization/network"),
+      ]);
+      if (getConnectedWallet() !== wallet) return;
       const opened = await OrganizationAccount.unlock(wallet, password);
       if (currentWallet.current !== wallet) return;
       setAccount(opened); setSnapshot(opened.snapshot()); setPending(opened.pending());

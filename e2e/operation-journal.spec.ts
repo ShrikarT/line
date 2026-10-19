@@ -13,6 +13,7 @@ test("console recovery button reconciles a lost local draw response without anot
   const pageErrors: string[] = [];
   page.on("pageerror", error => pageErrors.push(error.message));
   await page.goto("/agent");
+  await expect(page.getByRole("heading", { name: "Agent purchases", exact: true })).toBeVisible();
   const outcome = await page.evaluate(async () => {
     const { browserModuleUrl } = await import("/e2e/browser-module.ts" as any);
     const { useAppStore } = await import(browserModuleUrl("/src/app/store.ts"));

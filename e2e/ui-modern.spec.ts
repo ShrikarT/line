@@ -44,12 +44,14 @@ test("workspace command palette searches, handles empty results and preserves na
   await search.fill("Agent console");
   await search.press("Enter");
   await expect(page).toHaveURL(/\/agent$/);
+  await expect(page.getByRole("heading", { name: "Agent purchases", exact: true })).toBeVisible();
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await page.keyboard.press("Control+k");
   await expect(search).toBeVisible();
   await search.fill("merchant");
   await page.getByRole("option", { name: /Merchant console/ }).click();
   await expect(page).toHaveURL(/\/merchant$/);
+  await expect(page.getByRole("heading", { name: "Merchant settlement", exact: true })).toBeVisible();
   await page.keyboard.press("Control+k");
   await search.fill("issuer");
   await page.screenshot({ path: path.join(output, "workspace-search.png") });
