@@ -61,7 +61,7 @@ Compact is the source of truth. Commitments use Midnight's `persistentCommit` an
 | Wave | Delivered / planned |
 | --- | --- |
 | **Wave 1 — foundation** | Five-circuit spending prototype, compiled Compact, issuer/agent/merchant consoles, reference execution and MCP integration |
-| **Wave 2 — checkout** | Twelve circuits, two merchants, reserve controls, redemption, expiry and recovery, confirmed Preprod test-token settlement, wallet-first organization workspace and public app; fresh Lace-funded facility acceptance is the active final task |
+| **Wave 2 — checkout** | Twelve circuits, two merchants, reserve controls, redemption, expiry and recovery, confirmed Preprod test-token settlement, wallet-first organization workspace and public app; fresh organization funding verified through 1AM, with checkout acceptance continuing |
 | **Wave 3 — pilots and hardening** | Independent supplier operation, complete purchasing/recovery acceptance, stronger historical privacy and a real API/compute purchasing pilot |
 
 See [progress](docs/PROGRESS.md) for what is verified and what remains open.

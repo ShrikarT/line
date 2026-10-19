@@ -215,6 +215,36 @@ test("an aborted organization receipt commit retains the exact pending candidate
   expect(result).toEqual({ rejected: true, memoryUnchanged: true, diskUnchanged: true, retainedCandidate: true, memoryTx: "cd".repeat(32), diskTx: "cd".repeat(32), signatures: 0 });
 });
 
+test("refresh recovers a failed facility read without signing or recreating the organization", async ({ page }) => {
+  await wallets(page, true, true); await page.goto("/app"); await connect(page, "a"); await unlock(page);
+  await page.evaluate(async () => {
+    const { browserModuleUrl } = await import("/e2e/browser-module.ts" as any);
+    const { OrganizationAccount } = await import(browserModuleUrl("/src/lib/organization/account.ts"));
+    const { OrganizationNetwork } = await import(browserModuleUrl("/src/lib/organization/network.ts"));
+    const { getConnectedWallet } = await import(browserModuleUrl("/src/lib/runtime/wallet.ts"));
+    const account = await OrganizationAccount.unlock(getConnectedWallet()!, "Organization123!");
+    // Synthetic facility and controlled read failure exercise UI recovery only.
+    await account.edit(snapshot => snapshot.facilities.push({ id: "read-recovery", name: "Read recovery", address: "ab".repeat(32), instanceNonce: "12".repeat(32), maintenanceKey: "13".repeat(32), assetColor: "0".repeat(64), issuerRecipient: account.receivingAddress, merchants: [], agentSecret: "14".repeat(32), salt: "15".repeat(32), limit: 0n, outstanding: 0n, epoch: 0n, generation: 0n }));
+    const state = window as unknown as { facilityReads: number; facilityAvailable: boolean }; state.facilityReads = 0; state.facilityAvailable = false;
+    OrganizationNetwork.prototype.facilitySummary = async () => {
+      state.facilityReads++;
+      if (!state.facilityAvailable) throw Error("Temporary facility read limit");
+      return { status: "NONE", registeredCircuits: 10, assetColor: "0".repeat(64), reserve: "0", encumbered: "0", paid: "0", domain: "16".repeat(32), balances: [] };
+    };
+  });
+  await page.getByLabel("Organization vault password", { exact: true }).fill("Organization123!");
+  await page.getByRole("button", { name: "Open organization", exact: true }).click();
+  await expect(page.getByRole("alert")).toContainText("Temporary facility read limit");
+  await expect(page.getByRole("button", { name: "Deposit assets", exact: true })).toBeDisabled();
+  const before = await page.evaluate(() => { (window as any).facilityAvailable = true; return (window as any).facilityReads; });
+  await page.getByRole("button", { name: "Refresh balances and suppliers", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Finish facility setup", exact: true })).toBeVisible({ timeout: 5_000 });
+  await expect(page.getByText("NONE · 10/12 circuit keys · Reserve inflow 0 · Principal paid 0", { exact: true })).toBeVisible();
+  await expect(page.getByRole("alert")).toHaveCount(0);
+  const requests = await page.evaluate(() => ({ reads: (window as any).facilityReads, signatures: (window as any).organizationSignatures, proofs: (window as any).organizationProofRequests }));
+  expect(requests.reads).toBeGreaterThan(before); expect(requests.signatures).toBe(0); expect(requests.proofs).toBe(0);
+});
+
 test("verifier registrations are visibly distinct from financial calls to the same circuit", async ({ page }) => {
   await wallets(page); await page.goto("/app"); await connect(page, "a"); await unlock(page);
   await page.evaluate(async () => {
