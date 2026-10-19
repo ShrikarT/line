@@ -53,12 +53,14 @@ B's original draw returned node error 170 and remains retained for reconciliatio
 It is not a second complete two-merchant acceptance run, and no replacement was
 submitted. The accepted complete checkpoint remains the earlier 21-transaction run.
 
-### Active final Wave 2 task
+### Current priority — organization funding
 
 Deploy a fresh organization facility through Lace, register its verifier keys and
 fund its reserve with existing Preprod assets. Confirm the original transactions
 and actual asset inputs against finalized receipts. This acceptance is not yet
-complete and is the next task after repository cleanup.
+complete. Wave 2 submission is finished; this acceptance remains the first
+post-submission product task. A closed wallet-extension channel now produces
+refresh/reconnect guidance without publishing an unverified connected account.
 
 ## Wave 3 — pilots and hardening
 

@@ -2,7 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { mkdir } from "node:fs/promises";
 
 const address = "mn_addr_preprod1vflat69hjj5n2m8ftfwwspp2vssf7ckjay22qcp8p9lxedv4hgjszhshk3";
-async function injectWallet(page: Page, behavior: "success" | "reject-once" | "wrong-network" = "success") {
+async function injectWallet(page: Page, behavior: "success" | "reject-once" | "wrong-network" | "closed-channel" = "success") {
   await page.addInitScript(({ address, behavior }) => {
     let attempts = 0;
     const testWindow = window as unknown as { midnight: unknown; walletCalls: string[] };
@@ -13,6 +13,7 @@ async function injectWallet(page: Page, behavior: "success" | "reject-once" | "w
         name: "Midnight Lace", rdns: "io.test.lace", apiVersion: "4.0.1",
         connect: async (network: string) => {
           testWindow.walletCalls.push(`connect:${network}`);
+          if (behavior === "closed-channel") throw new Error("Remote API with channel 'feature-flags' was shutdown: object can no longer be used.");
           if (behavior === "reject-once" && ++attempts === 1) throw new Error("User rejected connection");
           return {
             getConfiguration: async () => ({ networkId: behavior === "wrong-network" ? "preview" : network }),
@@ -103,7 +104,21 @@ test("wrong network never displays a connected account", async ({ page }) => {
   await expect(page.getByText("Operator-run demo", { exact: true })).toBeVisible();
 });
 
+test("a closed wallet channel offers recovery without showing a connected account or requesting a payment", async ({ page }) => {
+  test.setTimeout(90_000);
+  await injectWallet(page, "closed-channel");
+  await page.goto("/app");
+  await page.locator("header").getByRole("button", { name: "Connect wallet", exact: true }).click();
+  await page.getByRole("button", { name: "Midnight Lace", exact: true }).click();
+  await expect(page.getByRole("alert")).toContainText("connection channel closed. Refresh this page");
+  await expect(page.getByRole("button", { name: "Refresh wallets", exact: true })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "Midnight Lace", exact: true })).toBeEnabled();
+  await expect(page.getByRole("heading", { name: "Your wallet is connected." })).toHaveCount(0);
+  expect(await page.evaluate(() => (window as unknown as { walletCalls: string[] }).walletCalls)).toEqual(["connect:preprod"]);
+});
+
 test("mobile wallet dialog exposes advanced facility setup", async ({ page }) => {
+  test.setTimeout(90_000);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/issuer");
   await page.locator("header").getByRole("button", { name: "Connect wallet", exact: true }).click();
