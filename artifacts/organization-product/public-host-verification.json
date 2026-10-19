@@ -1,0 +1,33 @@
+{
+  "schema": "line-public-host-verification/v1",
+  "checkedAt": "2026-10-19T04:20:24.778Z",
+  "origin": "https://line-midnight.onrender.com",
+  "provider": "Render",
+  "plan": "free",
+  "serviceId": "srv-dbapj2mq1p3s73cjj1h0",
+  "deployId": "dep-dbapj36q1p3s73cjj4cg",
+  "deployedCommit": "9dd2e315c7f199732fb22a8c8467467698b69efd",
+  "mode": "wallet-only",
+  "routes": {
+    "/": 200,
+    "/app": 200,
+    "/readyz": 200,
+    "/api/line/state": 404,
+    "/.env.local": 404,
+    "/wallet-diagnostic.html": 404
+  },
+  "publicProvingFilesVerified": 37,
+  "publicManifestMatchesLocal": true,
+  "readOnlyPreprod": {
+    "httpContractOperations": 12,
+    "websocketContractOperations": 1,
+    "blockHeight": 3043909,
+    "authenticationSignatures": 1,
+    "logoutRevokesAccess": true,
+    "actualLace": false,
+    "submittedTransactions": 0
+  },
+  "hostedSupplierAutomation": false,
+  "providerCredentialInResponses": false,
+  "pagesMatchesCurrentSource": true
+}
