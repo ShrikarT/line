@@ -43,7 +43,7 @@ milestone established a local protocol prototype, not customer-funded settlement
 | --- | --- |
 | Canonical accounting | Facility `8990864c6f80c517c7458fa9b2526d3500f3a9814399fc836097ee409da9bed0`; retained checkpoint has 29 receipts, with no token-payout claim |
 | Test-token settlement | Facility `a159597495b52ea7a703a29562b17fcb042bf7eaa984ec1e05e7e8935208304b`; complete 21-transaction two-merchant checkpoint |
-| Organization wallet | Actual 1AM connection on Preprod verified. Earlier Lace connection and vault opening reached deployment approval; fresh funded lifecycle not yet accepted |
+| Organization wallet | Actual 1AM facility deployment confirmed at block 3,048,990; independent indexer/RPC receipt checks passed. Verifier registration is progressing; fresh reserve funding and the remaining lifecycle are not yet accepted |
 | Regression checks | Full CI for `65cdaf1`: four jobs passed, core 647 passed/two Windows-only skips, separate Windows ACL checks passed, and 54 browser cases passed. Deployment build and secret/key checks passed; four focused browser checks also passed against the public deployment |
 | Public host | Free wallet-only server, source-matched proving files, signed reader sessions and actual historical Preprod reads verified |
 
@@ -59,9 +59,9 @@ submitted. The accepted complete checkpoint remains the earlier 21-transaction r
 
 ### Current priority — organization funding
 
-Deploy a fresh organization facility through a compatible wallet, register its verifier keys and
-fund its reserve with existing Preprod assets. Confirm the original transactions
-and actual asset inputs against finalized receipts. This acceptance is not yet
+Complete verifier registration for the fresh organization facility and fund its
+reserve with existing Preprod assets. Confirm the original transactions and
+actual asset inputs against finalized receipts. This acceptance is not yet
 complete. Wave 2 submission is finished; this acceptance remains the first
 post-submission product task. A closed wallet-extension channel now produces
 refresh/reconnect guidance without publishing an unverified connected account.
@@ -83,10 +83,35 @@ the signature stage and never repeat the signing request automatically.
 
 This handling passed 75 organization tests, 15 focused browser tests, the
 deployment build and key/secret checks. An injected temporary wallet identity
-limit recovered without a proof or transaction request. These controls do not
-establish that the live 1AM attempt recovered. Fresh facility/funding acceptance
-still needs the owner's wallet and local vault entry; no financial approval or
-submission is automatically retried.
+limit recovered without a proof or transaction request. The subsequent actual
+1AM session opened its vault and deployed facility
+`ab428f74f8a8e72dc66a2f521c932d97860525d848a4d7a3acf0c795b3ef7e73`.
+Deployment transaction
+`35308f95c29cd7dd90560ef0d2e2f463298c5aa1b3a2069baed34732be05f257`
+was confirmed at block 3,048,990. A separate read-only check matched the raw
+transaction, successful contract action, identifiers and canonical finalized
+block against the configured TLS indexer/RPC. Eight installed keys matched the
+organization release before the vault session expired during setup. Reopening
+the vault and reconciling the unsubmitted candidate allowed setup to resume to
+ten confirmed keys. The wallet then reported an already-pending transaction;
+the last two registrations await wallet synchronization or resolution. The
+reserve remains zero. This is not independent full-node
+or local proof verification, and does not establish reserve funding.
+
+Encrypted backup export now uses the unlocked vault session and account lock
+without depending on the wallet's remote API. It reloads the current durable
+record, retains pending transaction identities and rejects session revocation
+during encryption. Deployment, restore and financial operations still require
+fresh wallet identity verification. Browser checks cover offline-wallet export,
+blocked deployment during that outage, locking during encryption, and restoring
+the downloaded backup into a fresh browser with a new vault password. No
+financial approval or submission is automatically retried.
+
+Receipt and recovery labels distinguish verifier registrations from financial
+calls, so a `fundReserve` key insertion cannot be mistaken for an asset deposit.
+The recovery changes passed the full local suite (656 passed, one skipped), all
+14 existing account browser cases and the additional registration/call labeling
+case. Deployment build, source/key drift and secret checks passed.
 
 ## Wave 3 — pilots and hardening
 

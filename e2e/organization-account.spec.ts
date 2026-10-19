@@ -215,6 +215,25 @@ test("an aborted organization receipt commit retains the exact pending candidate
   expect(result).toEqual({ rejected: true, memoryUnchanged: true, diskUnchanged: true, retainedCandidate: true, memoryTx: "cd".repeat(32), diskTx: "cd".repeat(32), signatures: 0 });
 });
 
+test("verifier registrations are visibly distinct from financial calls to the same circuit", async ({ page }) => {
+  await wallets(page); await page.goto("/app"); await connect(page, "a"); await unlock(page);
+  await page.evaluate(async () => {
+    const { browserModuleUrl } = await import("/e2e/browser-module.ts" as any);
+    const { OrganizationAccount } = await import(browserModuleUrl("/src/lib/organization/account.ts"));
+    const { getConnectedWallet } = await import(browserModuleUrl("/src/lib/runtime/wallet.ts"));
+    const account = await OrganizationAccount.unlock(getConnectedWallet()!, "Organization123!");
+    // Synthetic receipt metadata exercises presentation only, not chain acceptance.
+    await account.edit(snapshot => snapshot.receipts.push(...(["key", "call"] as const).map((kind, i) => ({
+      kind, circuit: "fundReserve", contractAddress: "ab".repeat(32), txId: String(i + 1).repeat(64),
+      txHash: String(i + 3).repeat(64), blockHeight: i + 1, recordedAt: new Date().toISOString(),
+    }))));
+  });
+  // Direct account reopening revokes the UI's previous vault session.
+  await unlock(page);
+  await expect(page.getByRole("cell", { name: "Register fundReserve verifier", exact: true })).toBeVisible();
+  await expect(page.getByRole("cell", { name: "fundReserve", exact: true })).toBeVisible();
+});
+
 test("the downloaded encrypted backup restores the same organization in a fresh browser with a new vault password", async ({ page, browser }) => {
   test.setTimeout(120_000);
   await wallets(page); await page.goto("/app"); await connect(page, "a"); await unlock(page);
@@ -246,6 +265,57 @@ test("the downloaded encrypted backup restores the same organization in a fresh 
     expect((await profile(recovered)).publicKey).toBe(originalProfile.publicKey);
     expect(await recovered.evaluate(() => (window as unknown as { organizationSignatures: number }).organizationSignatures)).toBe(0);
   } finally { await recoveryContext.close(); }
+});
+
+test("an unlocked organization can export its encrypted backup during a wallet outage while deployment stays blocked", async ({ page }) => {
+  await wallets(page, true, true); await page.goto("/app"); await connect(page, "a"); await unlock(page);
+  await page.getByLabel("Organization / agent name", { exact: true }).fill("Wallet outage recovery");
+  await page.getByRole("button", { name: "Use my receiving wallet", exact: true }).click();
+  await page.evaluate(async () => {
+    const { browserModuleUrl } = await import("/e2e/browser-module.ts" as any);
+    const { getConnectedWallet } = await import(browserModuleUrl("/src/lib/runtime/wallet.ts"));
+    const wallet = getConnectedWallet()!;
+    const state = window as unknown as { failedWalletReads: number }; state.failedWalletReads = 0;
+    for (const method of ["getConfiguration", "getShieldedAddresses", "getUnshieldedAddress"] as const) {
+      wallet[method] = async () => { state.failedWalletReads++; throw Error("Request failed"); };
+    }
+  });
+  const downloadEvent = page.waitForEvent("download", { timeout: 5_000 });
+  await page.getByRole("button", { name: "Encrypted backup", exact: true }).click();
+  const stream = await (await downloadEvent).createReadStream(), chunks: Buffer[] = [];
+  if (!stream) throw Error("The actual encrypted backup download is missing");
+  for await (const chunk of stream) chunks.push(Buffer.from(chunk));
+  const backup = Buffer.concat(chunks).toString();
+  expect(JSON.parse(backup).version).toBe(2); expect(backup).not.toContain("issuerSecret");
+  expect(await page.evaluate(() => (window as unknown as { failedWalletReads: number }).failedWalletReads)).toBe(0);
+  await page.getByRole("button", { name: "Create facility", exact: true }).click();
+  await expect(page.getByRole("alert")).toContainText("Request failed");
+  const requests = await page.evaluate(() => {
+    const state = window as unknown as { failedWalletReads: number; organizationSignatures: number; organizationProofRequests: number };
+    return { reads: state.failedWalletReads, signatures: state.organizationSignatures, proofs: state.organizationProofRequests };
+  });
+  expect(requests).toEqual({ reads: 1, signatures: 0, proofs: 0 });
+});
+
+test("encrypted backup cannot escape a vault lock during encryption", async ({ page }) => {
+  await wallets(page); await page.goto("/app"); await connect(page, "a"); await unlock(page);
+  const result = await page.evaluate(async () => {
+    const { browserModuleUrl } = await import("/e2e/browser-module.ts" as any);
+    const { OrganizationAccount } = await import(browserModuleUrl("/src/lib/organization/account.ts"));
+    const { getConnectedWallet } = await import(browserModuleUrl("/src/lib/runtime/wallet.ts"));
+    const { lockVaultSession } = await import(browserModuleUrl("/src/lib/security/vault.ts"));
+    const account = await OrganizationAccount.unlock(getConnectedWallet()!, "Organization123!");
+    const original = crypto.subtle.encrypt;
+    let encrypted = false, rejected = false;
+    crypto.subtle.encrypt = async function (...args: Parameters<typeof original>) {
+      const output = await original.apply(this, args);
+      encrypted = true; lockVaultSession(); return output;
+    };
+    try { await account.encryptedBackup(); } catch { rejected = true; }
+    finally { crypto.subtle.encrypt = original; }
+    return { encrypted, rejected };
+  });
+  expect(result).toEqual({ encrypted: true, rejected: true });
 });
 
 test("organization restore refuses active-record overwrite before a network check and aborts failed persistence", async ({ page }) => {
