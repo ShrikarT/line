@@ -35,11 +35,18 @@ motion samples and 74/74 contrast checks.
 | Organization browser | Ten passed; includes actual SDK preparation and deliberately rejected approval |
 | Compact regeneration | Canonical and organization compile; zero managed drift |
 | Build/typecheck | `npm run build:deploy` passes and exports 37 public proving files |
+| Free public host | App/readiness and 37 proving files verified; signed sessions and real Preprod HTTP/WebSocket reads pass |
 | Dependency and credential scans | 90 production modules checked; no fixture keys; no configured secrets in 495 current text/build files |
 | Review | Standards/spec findings for session renewal and idle revocation fixed; no remaining actionable increment finding |
 
 [Machine-readable current verification](../artifacts/organization-product/submission-verification.json).
 Local ignored logs retain the full output and unsuccessful attempts.
+
+The public workspace is **https://line-midnight.onrender.com/app**, on Render's
+free plan. [Cloud verification](../artifacts/organization-product/public-host-verification.json)
+uses an ephemeral verification signature and historical public state, not Lace
+approval or a new transaction. The full remote CI run continues after the backup
+test correction; its core test step has passed. No paid resources were created.
 
 ## Important fixes
 

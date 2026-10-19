@@ -7,6 +7,7 @@ its allowance. A merchant redeems its own single-use claim before releasing its
 service. Line is a working prototype; private credit is the longer-term goal.
 
 [Submission package](docs/SUBMISSION_READY_2026-10-18.md) |
+[Open Line](https://line-midnight.onrender.com/app) |
 [Slide deck](https://shrikart.github.io/line/) |
 [Video](https://github.com/ShrikarT/line/releases/download/wave2-submission-2026-10-19/Line-Wave2-Product-Walkthrough.mp4) |
 [Privacy](docs/PRIVACY.md) |
@@ -30,6 +31,12 @@ reserve controls, expiry/recovery, a two-supplier checkout and actual test-token
 settlement. The new wallet-owned organization product is a separate preview.
 
 ## Run and evaluate
+
+The [public workspace](https://line-midnight.onrender.com/app) runs on Render's
+free plan with wallet-operated contracts and authenticated Preprod readers.
+It can take time to wake after inactivity. Automated hosted API suppliers are
+unavailable there; complete funded organization acceptance still needs owner
+wallet approvals. [Deployment verification](artifacts/organization-product/public-host-verification.json).
 
 Use Node.js 22.18 or newer; the current checks use 26.7.0.
 

@@ -24,6 +24,9 @@ followed by further privacy and custody work.
 ## Judge path
 
 1. Read the current README and privacy boundary.
+   Open the [public wallet workspace](https://line-midnight.onrender.com/app).
+   It uses free hosting and real Preprod readers; fresh funding requires wallet
+   approval, and hosted API supplier automation is unavailable on this host.
 2. Open the [public deck](https://shrikart.github.io/line/) in a browser, or use
    its [standalone HTML](../artifacts/wave2/line-wave2.html).
 3. Watch the current [product walkthrough source and verification](../artifacts/wave2/line-review-video/README.md).
@@ -36,7 +39,9 @@ followed by further privacy and custody work.
    Compact toolchain described in the project configuration. The full suite
    currently discovers 644 cases: 643 pass and one is intentionally skipped.
 
-The configured local app is `http://127.0.0.1:5174`. `/test-payout` is the actual
+The public app is `https://line-midnight.onrender.com/app`; its free host can
+sleep between visits. [Verified hosting scope](../artifacts/organization-product/public-host-verification.json).
+The configured local app is `http://127.0.0.1:5174`. Locally, `/test-payout` is the actual
 test-token prototype; `/preprod` is the separate accounting profile. `/app` is the
 new wallet-owned organization workspace, whose complete funded lifecycle remains
 unaccepted. Do not substitute its preview for the confirmed settlement evidence.

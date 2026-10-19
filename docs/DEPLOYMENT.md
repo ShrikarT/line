@@ -50,6 +50,15 @@ transaction. Preserve the validated release matching any existing facility.
 
 ## Free Render host: wallet-operated workspace
 
+Public app: **https://line-midnight.onrender.com/app**. Service
+`srv-dbapj2mq1p3s73cjj1h0` is on the free plan in Singapore, with no paid disk or
+signing wallet. Anonymous readiness and app access, all 37 public proving files,
+signed session authentication, actual historical Preprod HTTP/WebSocket reads
+and sign-out revocation were verified on 19 October.
+[Exact deployment and evidence](../artifacts/organization-product/public-host-verification.json).
+These read-only checks submit no transactions and do not establish fresh funded
+organization acceptance. The Chrome workspace and installed Lace picker render.
+
 The repository's `render.yaml` selects one free Node service, the `main` branch,
 and `LINE_ORGANIZATION_MODE=wallet-only`. It installs the pinned public release,
 builds all 37 browser proving assets and serves the app with authenticated HTTP

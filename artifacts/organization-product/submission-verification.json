@@ -1,7 +1,7 @@
 {
   "schema": "line-submission-verification/v1",
-  "checkedAt": "2026-10-19T04:13:12.774Z",
-  "sourceCommit": "1ca0b933e52343d7758a36b1f3d064d38b874381",
+  "checkedAt": "2026-10-19T04:27:34.671Z",
+  "sourceCommit": "27ce468f44dbb69ab12cb219cf267c26cd6faa5d",
   "publicBranch": "main",
   "core": {
     "command": "npm test",
@@ -10,7 +10,9 @@
     "failed": 0,
     "cancelled": 0,
     "skipped": 1,
-    "logSha256": "f38236f3308d4208e8483404f212d1a57c9920dcb8a2b4b22cc23b7065b49868"
+    "logSha256": "1f3277b0f9a66fc0381eb7d3193c8e0ebbd02f71a422775552482cb2b139c3e6",
+    "sourceCommit": "27ce468f44dbb69ab12cb219cf267c26cd6faa5d",
+    "durationMs": 335742.1467
   },
   "buildDeploy": "passed",
   "typecheck": "passed",
@@ -63,10 +65,9 @@
     "verification": "../wave2/line-review-video/qa/render-verification.json",
     "download": "https://github.com/ShrikarT/line/releases/download/wave2-submission-2026-10-19/Line-Wave2-Product-Walkthrough.mp4"
   },
-  "publicDeployment": false,
+  "publicDeployment": true,
   "unresolved": [
     "Owner must approve fresh Lace transactions for funded organization acceptance.",
-    "Verify the free Render deployment after the complete source update is pushed to main.",
     "Automated hosted API suppliers require persistent hosting; free wallet-only hosting does not provide them.",
     "Retain and reconcile the original pending Merchant B draw before replacing it.",
     "Entrant must complete AKINDO entry personally."
@@ -74,11 +75,12 @@
   "historicalSettlementEvidence": "../../docs/TEST_TOKEN_PAYOUT_2026-10-16.md",
   "submissionDeck": {
     "url": "https://shrikart.github.io/line/",
-    "workflowRun": 39195018426,
+    "workflowRun": 39198427849,
     "published": true,
-    "anonymousContentMatchesSource": false,
+    "anonymousContentMatchesSource": true,
     "lineEndingNormalization": true,
-    "pendingSourceLinkRefresh": true
+    "pendingSourceLinkRefresh": false,
+    "releaseDownloadMatchesSource": true
   },
   "organizationBrowser": {
     "focusedCases": 14,
@@ -95,10 +97,16 @@
     "hostedSupplierAutomation": false,
     "supplierSigningWalletStarted": false,
     "persistentCustodyOnHost": false,
-    "publicDeploymentVerified": false,
-    "blueprintValidation": "passed"
+    "publicDeploymentVerified": true,
+    "blueprintValidation": "passed",
+    "url": "https://line-midnight.onrender.com/app",
+    "serviceId": "srv-dbapj2mq1p3s73cjj1h0",
+    "deployId": "dep-dbapj36q1p3s73cjj4cg",
+    "deployedCommit": "9dd2e315c7f199732fb22a8c8467467698b69efd",
+    "evidence": "public-host-verification.json",
+    "freeTierSleep": true
   },
-  "verificationIncludesWorkingTreeChanges": true,
+  "verificationIncludesWorkingTreeChanges": false,
   "deploymentSupport": {
     "tests": 5,
     "passed": 5,
@@ -110,11 +118,24 @@
   "sourceTextFingerprint": {
     "files": 299,
     "sha256": "840ba44ce2b1e9268e41a54e5bff0e91550d76e8198e5f7e66a0d92f5faf4c1a",
-    "normalization": "CRLF to LF"
+    "normalization": "CRLF to LF",
+    "measuredAtCommit": "9dd2e315c7f199732fb22a8c8467467698b69efd"
   },
   "configuredSecretScan": {
     "files": 495,
     "configuredValues": 3,
     "findings": 0
+  },
+  "backupTamperRegression": {
+    "passed": 3,
+    "failed": 0,
+    "oldNoOpReproduced": true,
+    "guaranteedBitMutation": true
+  },
+  "remoteCI": {
+    "workflowRun": 39198761650,
+    "commit": "27ce468f44dbb69ab12cb219cf267c26cd6faa5d",
+    "coreStep": "passed",
+    "fullRun": "in_progress"
   }
 }
