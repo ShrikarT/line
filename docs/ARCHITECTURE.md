@@ -32,9 +32,17 @@ failed or uncertain operation retains the evidence needed for reconciliation.
 Partial failure does not trigger a replacement payment. Backup restoration checks
 wallet scope, private openings and observed contract state before replacing data.
 
+Encrypted backup export holds the same account lock and reloads the latest durable
+record, including any pending operation. It requires the unlocked vault session
+but remains available when the wallet's remote read API fails. Export rechecks
+session validity after encryption; restore and mutations still verify the wallet.
+
 Wallet identity probes are sequential. Only explicit rate-limit responses on
 configuration/address reads may retry within a bounded deadline; each retry checks
 session validity. Signing, proving and submission are outside that retry path.
+The treasury refresh control retries facility state as well as wallet balances
+and supplier discovery. A failed facility read keeps spending controls disabled
+until a successful read restores the required setup and status checks.
 
 ## Contract rules
 
