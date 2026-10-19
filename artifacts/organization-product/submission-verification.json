@@ -1,6 +1,6 @@
 {
   "schema": "line-submission-verification/v1",
-  "checkedAt": "2026-10-19T04:27:34.671Z",
+  "checkedAt": "2026-10-19T04:41:38.153Z",
   "sourceCommit": "27ce468f44dbb69ab12cb219cf267c26cd6faa5d",
   "publicBranch": "main",
   "core": {
@@ -41,7 +41,9 @@
     "temporaryDiagnosticPagesAbsent": true,
     "namedPrivatePathsAbsent": true,
     "nativeFundedStartupVerified": false,
-    "historicalOperatorEndpointsIncluded": false
+    "historicalOperatorEndpointsIncluded": false,
+    "currentRenderRuntime": false,
+    "scope": "Historical Docker packaging checkpoint before wallet-only mode; Render uses a native Node build."
   },
   "video": {
     "recorder": "Cap CLI for actual captures; HyperFrames for labeled illustrations and final edit",
@@ -87,7 +89,9 @@
     "passed": 14,
     "organizationCases": 10,
     "actualLace": false,
-    "includesWalletOnlyCatalog": true
+    "includesWalletOnlyCatalog": true,
+    "fullRemoteSuiteCases": 49,
+    "fullRemoteSuitePassed": 49
   },
   "hostingPreparation": {
     "provider": "Render",
@@ -101,8 +105,8 @@
     "blueprintValidation": "passed",
     "url": "https://line-midnight.onrender.com/app",
     "serviceId": "srv-dbapj2mq1p3s73cjj1h0",
-    "deployId": "dep-dbapj36q1p3s73cjj4cg",
-    "deployedCommit": "9dd2e315c7f199732fb22a8c8467467698b69efd",
+    "deployId": "dep-dbapoidg1s2s73d1ndcg",
+    "deployedCommit": "308231de54dbcb5e89fa6650c13e990e14763b37",
     "evidence": "public-host-verification.json",
     "freeTierSleep": true
   },
@@ -134,8 +138,41 @@
   },
   "remoteCI": {
     "workflowRun": 39198761650,
+    "url": "https://github.com/ShrikarT/line/actions/runs/39198761650",
     "commit": "27ce468f44dbb69ab12cb219cf267c26cd6faa5d",
     "coreStep": "passed",
-    "fullRun": "in_progress"
+    "fullRun": "success",
+    "core": {
+      "discovered": 644,
+      "passed": 642,
+      "failed": 0,
+      "skipped": 2,
+      "skipReason": "Two Windows-only ACL cases; the separate Windows ACL job passed."
+    },
+    "browser": {
+      "discovered": 49,
+      "passed": 49,
+      "failed": 0
+    },
+    "jobs": [
+      {
+        "name": "native-worker-ownership (ubuntu-latest)",
+        "conclusion": "success"
+      },
+      {
+        "name": "native-worker-ownership (windows-latest)",
+        "conclusion": "success"
+      },
+      {
+        "name": "windows-checkpoint-acl",
+        "conclusion": "success"
+      },
+      {
+        "name": "verify",
+        "conclusion": "success"
+      }
+    ],
+    "logSha256": "8dd46f1fa201510a8413cc083bdf097140b976d81607f5bf115ffd8ba6c3c502",
+    "observedAt": "2026-10-19T04:41:38.153Z"
   }
 }
