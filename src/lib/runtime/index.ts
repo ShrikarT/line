@@ -1,3 +1,4 @@
+import { getActiveRuntime, selectActiveRuntime } from "./active.ts";
 import type { LineRuntime, RuntimeMode } from "./types.ts";
 import { MidnightNetworkRuntime } from "./network.ts";
 import { LocalDevelopmentRuntime } from "./local.ts";
@@ -9,8 +10,6 @@ export { LocalDevelopmentRuntime } from "./local.ts";
 export { InMemoryTestRuntime } from "./memory.ts";
 
 const RUNTIME_MODE_KEY = "line.runtime.mode";
-
-let activeRuntime: LineRuntime | null = null;
 
 function readStoredMode(): RuntimeMode | undefined {
   try {
@@ -33,6 +32,7 @@ function storeMode(mode: RuntimeMode): void {
 }
 
 export function getRuntime(preferredMode?: RuntimeMode): LineRuntime {
+  let activeRuntime = getActiveRuntime();
   if (activeRuntime && (!preferredMode || activeRuntime.mode === preferredMode)) {
     return activeRuntime;
   }
@@ -63,10 +63,11 @@ export function getRuntime(preferredMode?: RuntimeMode): LineRuntime {
       break;
   }
 
+  selectActiveRuntime(activeRuntime);
   return activeRuntime;
 }
 
 export function setRuntime(runtime: LineRuntime): void {
-  activeRuntime = runtime;
+  selectActiveRuntime(runtime);
   storeMode(runtime.mode);
 }

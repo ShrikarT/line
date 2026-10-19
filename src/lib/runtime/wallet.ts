@@ -6,9 +6,8 @@
  */
 import type { InitialAPI, ConnectedAPI, Configuration } from "@midnight-ntwrk/dapp-connector-api";
 import type { WalletProvider, MidnightProvider } from "@midnight-ntwrk/midnight-js-types";
-import { Transaction } from "@midnight-ntwrk/midnight-js-protocol/ledger";
 import { bech32m } from "@scure/base";
-import { hexToBytes, toHex } from "../line/encoding.ts";
+import { hexToBytes, toHex } from "../bytes.ts";
 import { WalletNotConnectedError, WalletApprovalRejectedError } from "./errors.ts";
 import { lockVaultSession } from "../security/vault.ts";
 
@@ -130,6 +129,7 @@ export async function createWalletProviders(api: ConnectedAPI, networkId: string
       getCoinPublicKey: () => coinPublicKey,
       getEncryptionPublicKey: () => encryptionPublicKey,
       balanceTx: async (unboundTx) => {
+        const { Transaction } = await import("@midnight-ntwrk/midnight-js-protocol/ledger");
         const balanced = await api.balanceUnsealedTransaction(toHex(unboundTx.serialize()));
         if (typeof balanced?.tx !== "string" || !/^(?:[a-fA-F0-9]{2})+$/.test(balanced.tx)) throw new WalletNotConnectedError("Wallet returned an invalid finalized transaction encoding.");
         return Transaction.deserialize("signature", "proof", "binding", hexToBytes(balanced.tx));

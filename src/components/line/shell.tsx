@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
 import {
   ArrowRight,
   Bank,
@@ -13,17 +13,8 @@ import {
   Robot,
   ShieldCheck,
   Storefront,
-  X,
 } from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
-import {
-  getRuntime,
-  setRuntime,
-  LocalDevelopmentRuntime,
-  MidnightNetworkRuntime,
-} from "@/lib/runtime";
-import { NetworkSetupScreen } from "./network-setup";
-import { VaultBar } from "./vault-bar";
 import { WalletButton } from "./wallet-connect";
 import {
   Sheet,
@@ -230,71 +221,28 @@ function WorkspaceSearch() {
   );
 }
 
-export function Shell({
-  children,
-  evaluation = false,
-  evaluationMode = "local",
-  hideVault = false,
-}: {
-  children: React.ReactNode;
+export type ShellProps = {
+  children: ReactNode;
   evaluation?: boolean;
   evaluationMode?: "local" | "preprod";
   hideVault?: boolean;
+};
+const ProtocolShell = lazy(() => import("./protocol-shell").then(module => ({ default: module.ProtocolShell })));
+
+export function Shell(props: ShellProps) {
+  const path = typeof window === "undefined" ? "/" : window.location.pathname;
+  return PRODUCT_PATHS.has(path) || props.evaluation
+    ? <ShellLayout {...props} />
+    : <Suspense fallback={<p role="status" className="line-container py-6">Loading protocol tools...</p>}><ProtocolShell {...props} /></Suspense>;
+}
+
+export function ShellLayout({ children, evaluationMode = "local", runtimeControl, setup, vault }: ShellProps & {
+  runtimeControl?: ReactNode; setup?: ReactNode; vault?: ReactNode;
 }) {
+  const [menuOpen, setMenuOpen] = useState(false);
   const pathname =
     typeof window !== "undefined" ? window.location.pathname : "/";
   const landing = pathname === "/";
-  const [showNetworkSetup, setShowNetworkSetup] = useState(false),
-    [menuOpen, setMenuOpen] = useState(false);
-  const runtime = getRuntime(),
-    isNetwork = runtime.mode === "network",
-    isConnected = runtime.isConnected(),
-    contractAddr = runtime.getContractAddress();
-  const handleToggleMode = () => {
-    if (isNetwork) {
-      setRuntime(new LocalDevelopmentRuntime());
-      window.location.reload();
-    } else {
-      setRuntime(new MidnightNetworkRuntime());
-      setShowNetworkSetup(true);
-    }
-  };
-  const runtimeLabel = evaluation
-    ? evaluationMode === "preprod"
-      ? "Midnight Preprod · live proofs"
-      : "Generated Compact · local evaluation"
-    : isNetwork
-      ? isConnected && contractAddr
-        ? "Midnight connected"
-        : "Midnight Network"
-      : "Local Simulator";
-  const runtimeControl = evaluation ? (
-    <span className="line-runtime">
-      <span
-        className={cn(
-          "line-runtime-dot",
-          evaluationMode === "preprod" && "is-live",
-        )}
-      />
-      {runtimeLabel}
-    </span>
-  ) : (
-    <button
-      className="line-runtime"
-      onClick={() =>
-        isNetwork ? setShowNetworkSetup(!showNetworkSetup) : handleToggleMode()
-      }
-      title="Configure runtime and wallet"
-    >
-      <span
-        className={cn(
-          "line-runtime-dot",
-          isNetwork && isConnected && "is-live",
-        )}
-      />
-      {runtimeLabel}
-    </button>
-  );
   const intro = INTRO[pathname];
   return (
     <div className={cn("min-h-dvh", landing ? "line-landing" : "line-app")}>
@@ -330,7 +278,7 @@ export function Shell({
           )}
           <div className="flex items-center gap-3">
             {!landing && <WorkspaceSearch />}
-            <div className="line-header-runtime">{PRODUCT_PATHS.has(pathname) ? <span className="line-runtime">Midnight Preprod</span> : runtimeControl}</div>
+            <div className="line-header-runtime">{PRODUCT_PATHS.has(pathname) ? <span className="line-runtime">Midnight Preprod</span> : runtimeControl ?? <span className="line-runtime">{evaluationMode === "preprod" ? "Midnight Preprod \u00b7 live proofs" : "Generated Compact \u00b7 local evaluation"}</span>}</div>
             <WalletButton />
             {landing && (
               <a
@@ -367,48 +315,7 @@ export function Shell({
           </div>
         </div>
       </header>
-      {!evaluation && showNetworkSetup && (
-        <section aria-label="Network setup" className="line-container py-6">
-          <div className="mb-4 flex justify-end">
-            <button
-              className="line-button line-button-ghost"
-              onClick={() => setShowNetworkSetup(false)}
-            >
-              <X aria-hidden="true" />
-              Close Setup
-            </button>
-          </div>
-          <NetworkSetupScreen
-            onConnected={() => setShowNetworkSetup(false)}
-            onSwitchToLocal={() => {
-              setRuntime(new LocalDevelopmentRuntime());
-              setShowNetworkSetup(false);
-            }}
-          />
-        </section>
-      )}
-      {!evaluation &&
-        isNetwork &&
-        (!isConnected || !contractAddr) &&
-        !showNetworkSetup && (
-          <div className="line-container my-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-red/30 bg-red/5 p-4 text-sm">
-            <span>
-              <strong>Midnight Network Mode:</strong> Connect a wallet and
-              contract to continue.
-            </span>
-            <div className="flex gap-4">
-              <button
-                className="underline"
-                onClick={() => setShowNetworkSetup(true)}
-              >
-                Configure Connection
-              </button>
-              <button className="underline" onClick={handleToggleMode}>
-                Switch to Simulator
-              </button>
-            </div>
-          </div>
-        )}
+      {setup}
       {landing ? (
         <main id="main-content">{children}</main>
       ) : (
@@ -432,11 +339,7 @@ export function Shell({
             </div>
           </aside>
           <div className="line-workspace-main">
-            {!evaluation && !hideVault && (
-              <div className="line-vault-wrap">
-                <VaultBar />
-              </div>
-            )}
+            {vault && <div className="line-vault-wrap">{vault}</div>}
             <main id="main-content">
               {intro && (
                 <div className="line-page-intro">
