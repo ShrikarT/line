@@ -1,105 +1,131 @@
 # Line
 
-Agent spending controls and verifiable merchant checkout on Midnight.
+**Private spending rules. Verifiable checkout.**
 
-An organization approves purchasing capacity. An agent proves each purchase fits
-its allowance. A merchant redeems its own single-use claim before releasing its
-service. Line is a working prototype; private credit is the longer-term goal.
+Line lets organizations fund autonomous agents, set purchasing allowances and settle merchant claims on Midnight. Compact enforces the spending rules; the connected wallet approves transactions; encrypted browser records retain the private books and pending operations.
 
-[Submission package](docs/SUBMISSION_READY_2026-10-18.md) |
-[Open Line](https://line-midnight.onrender.com/app) |
-[Slide deck](https://shrikart.github.io/line/) |
-[Video](https://github.com/ShrikarT/line/releases/download/wave2-submission-2026-10-19/Line-Wave2-Product-Walkthrough.mp4) |
-[Privacy](docs/PRIVACY.md) |
-[Deployment](docs/DEPLOYMENT.md)
+[Live application](https://line-midnight.onrender.com/app) · [Product video](https://github.com/ShrikarT/line/releases/tag/wave2-submission-2026-10-19) · [Wave progress](docs/PROGRESS.md)
 
-## Verified for Wave 2
+**Network:** Midnight Preprod · **Status:** working prototype
 
-- A two-merchant Preprod test-token checkout: 21 finalized transactions in the
-  published checkpoint, with 25 test units paid to A and 20 to B. Raw outputs,
-  registered recipients and wallet balances agree. [Settlement evidence](docs/TEST_TOKEN_PAYOUT_2026-10-16.md).
-- Twelve Compact circuits with private witnesses, role authentication,
-  contract-instance separation, one-time redemption and reserve accounting.
-- Encrypted account/transaction recovery, retained request identities, replay
-  rejection and generic failed-clearance feedback.
-- 644 local regression cases: 643 pass, one intentional skip. Full remote CI
-  passed, including all 49 browser cases and both platform ownership checks.
-  The actual browser SDK also reads Preprod over authenticated HTTP
-  and WebSocket routes without receiving the server's provider token.
+[![CI](https://github.com/ShrikarT/line/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/ShrikarT/line/actions/workflows/ci.yml)
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](LICENSE)
 
-Wave 1 exposed five circuits. Wave 2 adds merchant registration, claim redemption,
-reserve controls, expiry/recovery, a two-supplier checkout and actual test-token
-settlement. The new wallet-owned organization product is a separate preview.
+## What is Line?
 
-## Run and evaluate
+An agent should be able to buy a service within its organization's allowance without exposing its plaintext limit and outstanding balance to the public application. A merchant should be able to verify and redeem a claim exactly once.
 
-The [public workspace](https://line-midnight.onrender.com/app) runs on Render's
-free plan with wallet-operated contracts and authenticated Preprod readers.
-It can take time to wake after inactivity. Automated hosted API suppliers are
-unavailable there; complete funded organization acceptance still needs owner
-wallet approvals. [Deployment verification](artifacts/organization-product/public-host-verification.json).
+Line connects these steps through a twelve-circuit Compact contract and separate organization, agent and merchant workspaces. The initial use case is agents buying APIs and compute with organization-owned funds.
 
-Use Node.js 22.18 or newer; the current checks use 26.7.0.
+## Product
 
-```bash
-npm ci
-npm test
-npm run typecheck
-npm run dev
+| Capability | Implementation |
+| --- | --- |
+| Wallet-owned organizations | Compatible Midnight wallets, Preprod checks and wallet-scoped encrypted accounts |
+| Spending controls | Private book openings, allowance checks, fees, expiry and issuer-controlled status |
+| Merchant checkout | Authenticated quotes, merchant-bound claims and single-use redemption |
+| Reserve management | Funding, unencumbered withdrawals and fee withdrawal |
+| Recovery | Retained transaction identities, encrypted backups and finalized-receipt reconciliation |
+| Multiple merchants | Separate merchant identities and contract-instance domain separation |
+
+**Privacy boundary:** amounts, recipients, reserve changes and transaction history remain observable. Hiding plaintext book fields does not establish full-history balance privacy. See [privacy](docs/PRIVACY.md).
+
+## How it works
+
+```mermaid
+flowchart LR
+    O[Organization funds a facility] --> A[Agent receives an allowance]
+    M[Merchant posts a quote] --> P[Compact checks the purchase]
+    A --> P
+    P --> N[Merchant-bound claim]
+    N --> R[Merchant redeems once]
 ```
 
-Open the URL printed by Vite. The configured local recording instance uses
-`http://127.0.0.1:5174`. Private network credentials and custody records are not
-in Git. Read [deployment instructions](docs/DEPLOYMENT.md) before enabling funded
-Preprod operations. A second signer must not open the running operator wallet.
+The canonical contract records accounting. A separate test-settlement profile has confirmed two-merchant Preprod test-token payouts. The newer organization-funded profile receives existing assets and pays registered recipients; its fresh, wallet-approved end-to-end acceptance remains in progress. These profiles are not interchangeable.
 
-| Route | Scope |
+## Midnight contracts
+
+All profiles retain the same twelve circuit names:
+
+| Role | Circuits |
 | --- | --- |
-| `/test-payout` | Actual operator-run Preprod test-token checkout and receipts |
-| `/preprod` | Separate deployed accounting profile; no token payout |
-| `/app` | Wallet-owned organization workspace preview; full funded acceptance pending |
-| `/checkout` | Local generated-Compact evaluation; no network transaction |
-| `/contracts` | Circuit and contract reference |
+| Organization / issuer | `registerMerchant`, `disableMerchant`, `fundReserve`, `withdrawUnencumberedReserve`, `withdrawFees`, `openLine`, `acknowledgeRepayment`, `setStatus` |
+| Agent | `draw` |
+| Merchant | `postQuote`, `redeemDraw` |
+| Expiry / compensation | `cancelOrExpireNote` with its circuit-specific authorization |
 
-Install the compiler separately from npm with `bash scripts/install-compact.sh`
-(Linux or WSL). On Windows, the wrapper uses the `Ubuntu` WSL distribution;
-`WSL_DISTRO` and `COMPACT_BIN` select a different distribution/compiler manager.
-Compile with the pinned Compact 0.31.1 toolchain:
+Compact is the source of truth. Commitments use Midnight's `persistentCommit` and `persistentHash`; TypeScript encodings are checked against generated execution.
+
+## Wave 1 → Wave 3
+
+| Wave | Delivered / planned |
+| --- | --- |
+| **Wave 1 — foundation** | Five-circuit spending prototype, compiled Compact, issuer/agent/merchant consoles, reference execution and MCP integration |
+| **Wave 2 — checkout** | Twelve circuits, two merchants, reserve controls, redemption, expiry and recovery, confirmed Preprod test-token settlement, wallet-first organization workspace and public app; fresh Lace-funded facility acceptance is the active final task |
+| **Wave 3 — pilots and hardening** | Independent supplier operation, complete purchasing/recovery acceptance, stronger historical privacy and a real API/compute purchasing pilot |
+
+See [progress](docs/PROGRESS.md) for what is verified and what remains open.
+
+## Getting started
+
+Requires Node.js **22.18+**, npm, `tar` and a Midnight wallet on **Preprod**.
 
 ```bash
+git clone https://github.com/ShrikarT/line.git
+cd line
+npm ci
+npm run organization:install-release
+```
+
+Copy `.env.example` to `.env.local` and set `MIDNIGHT_BLOCKFROST_PROJECT_ID` locally. The example selects wallet-only mode: no hosted signing wallet or supplier seed is needed.
+
+```bash
+npm run build:deploy
+npm run start:organization
+```
+
+Open **http://127.0.0.1:3000/app**, connect your wallet and open your organization. Facility creation, verifier registration and funding each need wallet approval. Preprod assets have no monetary value.
+
+For UI development, run `npm run dev`. For the complete wallet-only server, use the build/start commands above. The public free host can sleep between visits and does not run automated API suppliers.
+
+## Development
+
+```bash
+npm test
+npm run typecheck
+npx playwright install chromium
+npm run test:e2e
+```
+
+To regenerate Compact bindings, install the pinned compiler first:
+
+```bash
+bash scripts/install-compact.sh
 npm run compact:compile
 npm run organization:compile
 git diff --exit-code contracts/managed/
-npm run build:deploy
 ```
 
-The deploy build requires the validated full organization proving release;
-`npm run organization:install-release` installs the exact pinned public release,
-and `npm run organization:release` generates a new one. Neither submits a transaction.
-The free Render configuration serves wallet-operated contracts and authenticated
-readers; hosted API supplier automation requires the persistent backend described
-in the deployment guide.
+Windows compilation uses WSL. The compiler manager is pinned to Compact **0.31.1**, language **0.23**, runtime **0.16.0** and ledger generation **8**. Installing the published proving release preserves its existing keys; generating a different release is a separate operation.
 
-## Scope and source
+## Repository
 
-Test assets have no monetary value. Amounts, recipients and public history remain
-observable; private witnesses do not establish complete historical book privacy.
-The suppliers are first-party deterministic services. No customer traction,
-independent commercial custody or production credit service is claimed.
+| Directory | Purpose |
+| --- | --- |
+| `contracts/` | Compact sources, generated bindings and public release metadata |
+| `src/` | React workspaces, wallet adapters, encrypted accounts and protocol clients |
+| `server/` | Organization API, authenticated Preprod readers and optional supplier runtime |
+| `mcp/` | Agent-facing MCP integration |
+| `scripts/` | Compiler, proving, runtime and verification tools |
+| `tests/`, `e2e/` | Protocol, recovery, transport and browser regressions |
+| `docs/` | Architecture, privacy and wave progress |
 
-- `contracts/line.compact`: canonical accounting source.
-- `contracts/experimental/line-test-settlement.compact`: the deployed test-token settlement profile.
-- `contracts/organization/line.compact`: organization-funded asset profile.
-- `src/`: browser product and runtime adapters.
-- `server/`: durable checkout, wallet ownership and authenticated readers.
-- `tests/`, `e2e/`: generated, transport, recovery and browser checks.
-- `artifacts/`: scoped machine-readable evidence and submission assets.
+## Documentation
 
-[Architecture](docs/PRODUCT_ARCHITECTURE.md), [protocol](docs/PROTOCOL.md),
-[encoding](docs/ENCODING.md), [engineering status](docs/ENGINEERING_STATUS.md),
-[roadmap](docs/ROADMAP.md), [contributing](CONTRIBUTING.md).
-Historical audit reports are retained in
-[Git history at 1088cf9](https://github.com/ShrikarT/line/tree/1088cf9/docs).
+- [Architecture](docs/ARCHITECTURE.md)
+- [Privacy](docs/PRIVACY.md)
+- [Wave progress and remaining work](docs/PROGRESS.md)
 
-Midnight-related code is licensed under [Apache 2.0](LICENSE). Built with Midnight
-Compact, Midnight.js, the Wallet SDK and the DApp Connector API.
+## License
+
+[Apache-2.0](LICENSE).

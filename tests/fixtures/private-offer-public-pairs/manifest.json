@@ -2,7 +2,7 @@
   "schema": "line-private-offer-public-corpus/v1",
   "sourceSha256": "ae970672c048c48692ab690554c77285fec19d1943dc3b4574080970b7fa657d",
   "originalNativeReportSha256": "f39aa16c8a19f8fd2a3ff37a8e208118e77f3eac684b7709164748f572ff49ba",
-  "publicNativeReport": "docs/private-signed-2026-10-11-evidence/offer-native-proof.json",
+  "publicNativeReport": "tests/fixtures/private-offer-public-pairs/native-proof.json",
   "publicNativeReportSha256": "73253fc123286434df581ff8621254cc486b10ee8c52876e64f1bb9ae595727f",
   "entries": [
     {

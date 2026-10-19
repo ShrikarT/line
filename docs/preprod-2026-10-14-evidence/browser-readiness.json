@@ -1,8 +1,0 @@
-{
-  "checkedAt": "2026-10-14T02:59:42.269Z",
-  "livePreprodPublicStateLoaded": true,
-  "sessionTokenAutoConfigured": true,
-  "actualLaceWalletConnected": false,
-  "transactionSubmitted": false,
-  "connector": "read-only test stub; real Blockfrost state queries"
-}

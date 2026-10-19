@@ -4,7 +4,7 @@ import path from "node:path";
 
 test("network setup, vault manager and import controls fit the mobile workspace", async ({ page }) => {
   test.setTimeout(60_000);
-  const output = path.resolve(process.env.LINE_UI_ARTIFACT_DIR ?? "artifacts/ui-redesign");
+  const output = path.resolve(process.env.LINE_UI_ARTIFACT_DIR ?? "test-results/ui-redesign");
   await mkdir(output, { recursive: true });
   await page.route("**/api/line/network-session", route => route.fulfill({ status: 404, body: "{}" }));
   await page.setViewportSize({ width: 390, height: 844 });

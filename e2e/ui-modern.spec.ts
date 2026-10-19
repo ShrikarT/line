@@ -2,7 +2,7 @@ import { test, expect } from "@playwright/test";
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
 
-const output = path.resolve("artifacts/ui-revision/rendered");
+const output = path.resolve("test-results/ui-revision/rendered");
 
 test("homepage explains real purchases and opens the wallet-owned workspace", async ({ page }) => {
   test.setTimeout(90_000);

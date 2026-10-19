@@ -347,7 +347,7 @@ describe("production store: full lifecycle, vault custody & witnesses", () => {
 
     const drawOk = await store.doDraw(overQuote.quoteCommitment);
     assert.equal(drawOk, false);
-    // AGENTS.md hard constraint: generic error copy on rejected draws
+    // Protocol invariant: generic error copy on rejected draws
     assert.equal(useAppStore.getState().flash?.text, "Clearance could not be proven.");
   });
 

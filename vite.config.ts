@@ -61,8 +61,8 @@ export default defineConfig({
   server: {
     host: "0.0.0.0",
     port: 5173,
-    // Editing a pitch/video must not reload an active wallet or checkout page.
-    watch: { ignored: ["**/.midnight-cache/**", "**/.compact-keys/**", "**/.line-checkout-private/**", "**/artifacts/**", "**/.deployment/**"] },
+    // Private caches and test output must not reload an active wallet session.
+    watch: { ignored: ["**/.midnight-cache/**", "**/.compact-keys/**", "**/.line-checkout-private/**", "**/test-results/**", "**/.deployment/**"] },
   },
   preview: {
     host: "0.0.0.0",
