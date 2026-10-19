@@ -1,12 +1,12 @@
 {
   "schema": "line-public-host-verification/v1",
-  "checkedAt": "2026-10-19T04:20:24.778Z",
+  "checkedAt": "2026-10-19T04:31:27.107Z",
   "origin": "https://line-midnight.onrender.com",
   "provider": "Render",
   "plan": "free",
   "serviceId": "srv-dbapj2mq1p3s73cjj1h0",
-  "deployId": "dep-dbapj36q1p3s73cjj4cg",
-  "deployedCommit": "9dd2e315c7f199732fb22a8c8467467698b69efd",
+  "deployId": "dep-dbapoidg1s2s73d1ndcg",
+  "deployedCommit": "308231de54dbcb5e89fa6650c13e990e14763b37",
   "mode": "wallet-only",
   "routes": {
     "/": 200,
@@ -21,7 +21,7 @@
   "readOnlyPreprod": {
     "httpContractOperations": 12,
     "websocketContractOperations": 1,
-    "blockHeight": 3043909,
+    "blockHeight": 3044012,
     "authenticationSignatures": 1,
     "logoutRevokesAccess": true,
     "actualLace": false,
@@ -29,5 +29,19 @@
   },
   "hostedSupplierAutomation": false,
   "providerCredentialInResponses": false,
-  "pagesMatchesCurrentSource": true
+  "pagesMatchesCurrentSource": true,
+  "observationLimits": {
+    "subscriptionTimeouts": 1,
+    "subscriptionDeadlineMs": 40000,
+    "subsequentFocusedSubscriptionPasses": 2,
+    "allProvingFileHashesVerifiedBeforeFocusedReads": true,
+    "stableProviderLatencyEstablished": false
+  },
+  "ci": {
+    "run": 39198761650,
+    "coreTests": "passed",
+    "fullRun": "success",
+    "browserCasesPassed": 49,
+    "observedAt": "2026-10-19T04:41:38.153Z"
+  }
 }

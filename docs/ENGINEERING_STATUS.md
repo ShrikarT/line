@@ -33,6 +33,7 @@ motion samples and 74/74 contrast checks.
 | --- | --- |
 | Full core `npm test` | 644 discovered; 643 passed; one intentional skip; no failures/cancellations |
 | Organization browser | Ten passed; includes actual SDK preparation and deliberately rejected approval |
+| Full GitHub CI | Four jobs passed; all 49 browser cases passed; Linux core 642 passed/two Windows-only skips, with the separate Windows ACL job passing |
 | Compact regeneration | Canonical and organization compile; zero managed drift |
 | Build/typecheck | `npm run build:deploy` passes and exports 37 public proving files |
 | Free public host | App/readiness and 37 proving files verified; signed sessions and real Preprod HTTP/WebSocket reads pass |
@@ -45,8 +46,11 @@ Local ignored logs retain the full output and unsuccessful attempts.
 The public workspace is **https://line-midnight.onrender.com/app**, on Render's
 free plan. [Cloud verification](../artifacts/organization-product/public-host-verification.json)
 uses an ephemeral verification signature and historical public state, not Lace
-approval or a new transaction. The full remote CI run continues after the backup
-test correction; its core test step has passed. No paid resources were created.
+approval or a new transaction. [The full remote CI run](https://github.com/ShrikarT/line/actions/runs/39198761650)
+passed after the backup test correction: all four jobs and all 49 browser cases
+succeeded. Its Linux core run passed 642 cases with two Windows-only skips;
+the separate Windows ACL job passed. Later report changes do not change runtime
+code. No paid resources were created.
 
 ## Important fixes
 
@@ -101,12 +105,14 @@ The accepted **complete** two-merchant payout checkpoint remains the earlier
 observation is from that checkpoint, not a fresh observation of the partial run.
 [Recording diagnostic](../artifacts/wave2/line-review-video/assets/capture/pending-check.json).
 
-The organization-preview Docker image builds and validates all 52 full-release
-files. The latest `line-organization:submission` image is
+The historical organization-preview Docker packaging checkpoint validates all
+52 full-release files. Its `line-organization:submission` image is
 `sha256:d90816d203a939a9b2317debcbce9ea9219929aed3e129abb81aac94ce750fa9`.
 SDK imports succeed inside the image, temporary diagnostic pages and the checked
 private paths are absent, and the configured user is `node`. Compose configuration
-validates without starting another wallet. This verifies packaging, not funded startup
+validates without starting another wallet. This image predates the free-host mode;
+it is not the current Render runtime. The public service builds the current Node
+app directly. The image verifies that packaging checkpoint, not funded startup
 or hosting of the separate operator test-payout endpoints. See [deployment](DEPLOYMENT.md).
 
 Actual Lace connection and organization vault opening were owner-confirmed.

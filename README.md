@@ -22,8 +22,9 @@ service. Line is a working prototype; private credit is the longer-term goal.
   contract-instance separation, one-time redemption and reserve accounting.
 - Encrypted account/transaction recovery, retained request identities, replay
   rejection and generic failed-clearance feedback.
-- 644 regression cases: 643 pass, one intentional skip. Ten organization browser
-  checks pass. The actual browser SDK also reads Preprod over authenticated HTTP
+- 644 local regression cases: 643 pass, one intentional skip. Full remote CI
+  passed, including all 49 browser cases and both platform ownership checks.
+  The actual browser SDK also reads Preprod over authenticated HTTP
   and WebSocket routes without receiving the server's provider token.
 
 Wave 1 exposed five circuits. Wave 2 adds merchant registration, claim redemption,
