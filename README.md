@@ -4,7 +4,7 @@
 
 Line lets organizations fund autonomous agents, set purchasing allowances and settle merchant claims on Midnight. Compact enforces the spending rules; the connected wallet approves transactions; encrypted browser records retain the private books and pending operations.
 
-[Live application](https://line-midnight.onrender.com/app) · [Product video](https://github.com/ShrikarT/line/releases/tag/wave2-submission-2026-10-19) · [Wave progress](docs/PROGRESS.md)
+[Live application](https://line-midnight.onrender.com/app) · [Product video](https://www.youtube.com/watch?v=rijtpesI6fM) · [Wave progress](docs/PROGRESS.md)
 
 **Network:** Midnight Preprod · **Status:** working prototype
 

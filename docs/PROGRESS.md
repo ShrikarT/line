@@ -29,6 +29,9 @@ milestone established a local protocol prototype, not customer-funded settlement
 - Wallet-first organization, agent and merchant workspaces; compatible injected
   Midnight wallet discovery, bounded connection waits and observed Lace connection.
 - Public wallet-only application with authenticated Preprod HTTP/WebSocket readers.
+- Facility onboarding can use the connected account's actual merchant role and
+  receiving address, or an independent merchant's public profile. Selecting a
+  profile requests no signature; contract deployment still needs wallet approval.
 
 ### Verified checkpoints
 
@@ -41,7 +44,7 @@ milestone established a local protocol prototype, not customer-funded settlement
 | Public host | Free wallet-only server, source-matched proving files, signed reader sessions and actual historical Preprod reads verified |
 
 [Finalized test-token evidence](https://github.com/ShrikarT/line/blob/bbb2fdf/docs/TEST_TOKEN_PAYOUT_2026-10-16.md)
-and [CI run](https://github.com/ShrikarT/line/actions/runs/39198761650) retain the
+and [CI run](https://github.com/ShrikarT/line/actions/runs/39221733238) retain the
 underlying checks. Historical reports and presentation assets remain in Git
 history or release downloads rather than the product source tree.
 
