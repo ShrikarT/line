@@ -43,12 +43,12 @@ milestone established a local protocol prototype, not customer-funded settlement
 | --- | --- |
 | Canonical accounting | Facility `8990864c6f80c517c7458fa9b2526d3500f3a9814399fc836097ee409da9bed0`; retained checkpoint has 29 receipts, with no token-payout claim |
 | Test-token settlement | Facility `a159597495b52ea7a703a29562b17fcb042bf7eaa984ec1e05e7e8935208304b`; complete 21-transaction two-merchant checkpoint |
-| Organization wallet | Actual 1AM facility deployment confirmed at block 3,048,990; independent indexer/RPC receipt checks passed. Verifier registration is progressing; fresh reserve funding and the remaining lifecycle are not yet accepted |
-| Regression checks | Full CI for `65cdaf1`: four jobs passed, core 647 passed/two Windows-only skips, separate Windows ACL checks passed, and 54 browser cases passed. Deployment build and secret/key checks passed; four focused browser checks also passed against the public deployment |
+| Organization wallet | Actual 1AM facility deployed; all twelve verifier keys installed; one tNIGHT deposit finalized at block 3,049,290. Independent indexer/RPC checks matched receipts, native asset input and contract balance; checkout and the remaining lifecycle are not yet accepted |
+| Regression checks | Full CI for `3527adc`: four jobs passed. The recovery release passed the full local core suite (656 passed, one skipped). The subsequent treasury refresh change passed all 16 account browser cases, deployment build and key/secret checks |
 | Public host | Free wallet-only server, source-matched proving files, signed reader sessions and actual historical Preprod reads verified |
 
 [Finalized test-token evidence](https://github.com/ShrikarT/line/blob/bbb2fdf/docs/TEST_TOKEN_PAYOUT_2026-10-16.md)
-and [CI run](https://github.com/ShrikarT/line/actions/runs/39236743404) retain the
+and [CI run](https://github.com/ShrikarT/line/actions/runs/39258979430) retain the
 underlying checks. Historical reports and presentation assets remain in Git
 history or release downloads rather than the product source tree.
 
@@ -57,13 +57,12 @@ B's original draw returned node error 170 and remains retained for reconciliatio
 It is not a second complete two-merchant acceptance run, and no replacement was
 submitted. The accepted complete checkpoint remains the earlier 21-transaction run.
 
-### Current priority — organization funding
+### Current priority — organization checkout
 
-Complete verifier registration for the fresh organization facility and fund its
-reserve with existing Preprod assets. Confirm the original transactions and
-actual asset inputs against finalized receipts. This acceptance is not yet
-complete. Wave 2 submission is finished; this acceptance remains the first
-post-submission product task. A closed wallet-extension channel now produces
+Fresh organization deployment, twelve-key setup and funding are verified. Continue
+through allowance, merchant quote, agent claim and redemption, checking original
+transactions and actual asset movements against finalized receipts. Complete
+checkout acceptance remains open after Wave 2 submission. A closed wallet-extension channel now produces
 refresh/reconnect guidance without publishing an unverified connected account.
 1AM is the current working connection path. Its retired Preprod read URLs now
 select Line's authenticated same-origin reader; the wallet retains proving,
@@ -94,9 +93,19 @@ block against the configured TLS indexer/RPC. Eight installed keys matched the
 organization release before the vault session expired during setup. Reopening
 the vault and reconciling the unsubmitted candidate allowed setup to resume to
 ten confirmed keys. The wallet then reported an already-pending transaction;
-the last two registrations await wallet synchronization or resolution. The
-reserve remains zero. This is not independent full-node
-or local proof verification, and does not establish reserve funding.
+the final two registrations subsequently confirmed after reopening the workspace
+and retrying a failed read. All twelve installed keys match the organization
+release. The final setup transaction
+`2c3ee75877479103cc21f6fa21ee0b0e1bbc369058a37ab793a3546caf3628d9`
+was independently checked at finalized block 3,049,250. The owner confirmed an
+encrypted backup download before the first reserve deposit was requested.
+The one-tNIGHT deposit then finalized at block 3,049,290 in transaction
+`59d844efbf8767d63189bafea7a4b8fb865c5c0a6429bc14fcfe2742cb05437d`.
+Independent checks verified the successful raw call, native-asset input and
+1,000,000 base units held in the contract's native-asset balance, matching its
+reserve accounting. Thirteen organization transactions are confirmed. These
+checks use configured TLS indexer/RPC data, not independent full-node or local
+proof verification; they do not establish merchant payout or cash settlement.
 
 Encrypted backup export now uses the unlocked vault session and account lock
 without depending on the wallet's remote API. It reloads the current durable
@@ -113,6 +122,19 @@ The recovery changes passed the full local suite (656 passed, one skipped), all
 14 existing account browser cases and the additional registration/call labeling
 case. Deployment build, source/key drift and secret checks passed.
 
+A failed treasury read could leave setup and funding controls unavailable: its
+refresh button retried balances/catalog but omitted the facility summary. Refresh
+now retries that read and clears its error on success; failed data is shown as
+unavailable rather than indefinitely loading. A browser regression reproduced
+the failure, then verified recovery without a proof, signature or new facility.
+All sixteen account browser cases and the deployment build passed after this fix.
+
+An isolated read-only restart check retained the same browser SDK client across
+a backend restart. It reauthenticated after HTTP 401 and read the actual
+organization's ten-key state before and after restart (1,446 ms and 318 ms).
+It used a separate test signing identity and submitted no blockchain transaction;
+it does not establish the cause of the earlier owner-tab timeout.
+
 ## Wave 3 — pilots and hardening
 
 1. Extend organization acceptance through allowance, independent merchant
@@ -126,6 +148,6 @@ case. Deployment build, source/key drift and secret checks passed.
    including reconciliation and willingness to pay. No customer pilot or revenue
    is currently established.
 
-Fresh funded acceptance requires the owner's actual wallet approvals. Those
+Remaining checkout acceptance requires the owner's actual wallet approvals. Those
 approvals cannot be replaced by illustrated video sequences or browser fixtures.
 Preserve any existing pending operation and its original keys until reconciled.
