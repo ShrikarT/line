@@ -113,10 +113,19 @@ test("incomplete facility fields show actionable feedback without requesting a s
   expect(await page.evaluate(() => (window as unknown as { organizationSignatures: number }).organizationSignatures)).toBe(0);
 });
 
-test("wallet-only hosting opens the actual encrypted account with an explicit independent-merchant path", async ({ page }) => {
+test("wallet-only onboarding uses the account's actual receiving profile without authorizing a transaction", async ({ page }) => {
   await wallets(page, true); await page.goto("/app"); await connect(page, "a"); await unlock(page);
-  await expect(page.getByRole("heading", { name: "Choose an independent merchant." })).toBeVisible();
-  await expect(page.getByLabel("Initial merchant profile", { exact: false })).toBeVisible();
+  const merchant = await profile(page);
+  await page.getByRole("tab", { name: "Organization", exact: true }).click();
+  await expect(page.getByLabel("Initial merchant profile", { exact: false })).toHaveValue("");
+  await page.getByRole("button", { name: "Use my receiving wallet", exact: true }).click();
+  const selected = JSON.parse(await page.getByLabel("Initial merchant profile", { exact: false }).inputValue());
+  expect(selected.schema).toBe("line:organization-merchant/v1");
+  expect(selected.publicKey).toBe(merchant.publicKey);
+  expect(selected.address).toBe(merchant.address);
+  expect(selected).not.toHaveProperty("merchantSecret");
+  await page.getByLabel("Organization / agent name", { exact: true }).fill("My organization");
+  await expect(page.getByText("Facility address", { exact: true })).toHaveCount(0);
   await expect(page.getByRole("alert")).toHaveCount(0);
   expect(await page.evaluate(() => (window as unknown as { organizationSignatures: number }).organizationSignatures)).toBe(0);
 });

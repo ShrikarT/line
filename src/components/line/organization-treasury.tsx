@@ -2,8 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useOrganization } from "./organization-session";
 import { OrganizationField as Field, organizationField as field } from "./organization-ui";
-import { decodeMerchant } from "@/lib/organization/transfers";
-import { encodeMerchant } from "@/lib/organization/transfers";
+import { decodeMerchant, encodeMerchant } from "@/lib/organization/transfers";
 import { units } from "@/lib/organization/account";
 import type { OrganizationCatalog, OrganizationNetwork } from "@/lib/organization/network";
 
@@ -39,13 +38,13 @@ export function OrganizationTreasury({ facilityId, onSelect }: { facilityId: str
     <div className="workspace-section-heading"><div><p className="line-eyebrow">Treasury / Your facilities</p><h2>Fund the work your agents do.</h2></div><span className="text-xs text-muted">Existing assets · explicit wallet approvals</span></div>
     <div className="organization-wallet-balance"><span>Available in connected wallet</span><strong>{walletUnits === null ? "Balance unavailable" : `${walletUnits} asset base units`}</strong><Button variant="ghost" size="sm" disabled={busy} onClick={() => setRefresh(value => value + 1)}>Refresh balances and suppliers</Button></div>
     {catalogError && <p role="alert" className="wallet-error">{catalogError}</p>}
-    {catalog?.hostedSupplierAutomation === false && <section className="workspace-welcome"><h2>Choose an independent merchant.</h2><p>Ask your merchant to copy their public profile from the Merchant workspace, then paste it below. Your wallet signs each contract action. Automated API suppliers are unavailable on this host.</p></section>}
+    {catalog?.hostedSupplierAutomation === false && <section className="workspace-welcome"><h2>Choose your first merchant.</h2><p>Use your connected wallet as the receiving merchant, or paste another merchant’s public profile from their Merchant workspace. Your wallet signs each contract action. Automated API suppliers are unavailable on this host.</p></section>}
     <details className="organization-create" open={!snapshot?.facilities.length}><summary>Create an agent facility</summary><p>Deploy your own contract and delegated agent. Deployment and verifier setup require twelve wallet-approved transactions. Save an encrypted backup before depositing.</p>
       {catalog && catalog.services.length > 0 && <div className="mt-4"><Field label="Initial API supplier"><select className={field} disabled={disabled} onChange={event => { const service = catalog.services.find(service => service.id === event.target.value); if (service) setProfile(encodeMerchant(service.profile)); }}><option value="">Choose a supplier or paste your own profile</option>{catalog.services.map(service => <option key={service.id} value={service.id}>{service.name}</option>)}</select></Field></div>}
       <form className="organization-form-grid" onInvalidCapture={() => { setFormError("Complete the required name, asset and supplier profile before creating your facility."); formErrorRef.current?.focus(); }} onInputCapture={() => setFormError("")} onSubmit={event => { event.preventDefault(); setFormError(""); act(async (client, account) => { await client.createFacility(name, asset, decodeMerchant(profile)); onSelect(account.snapshot().facilities.at(-1)?.id ?? ""); }); }}>
         <Field label="Organization / agent name"><input className={field} value={name} onChange={event => setName(event.target.value)} maxLength={80} disabled={disabled} required /></Field>
         <Field label="Settlement asset color" hint="64 hex characters. All zeroes selects native tNIGHT on Preprod."><input className={`${field} font-mono`} value={asset} onChange={event => setAsset(event.target.value)} pattern="[0-9a-f]{64}" disabled={disabled} required /></Field>
-        <div className="col-span-full"><Field label="Initial merchant profile" hint="Ask the supplier to share their profile from their own Merchant workspace. Only their public key and receiving address are included."><textarea className={field} value={profile} onChange={event => setProfile(event.target.value)} maxLength={16384} rows={4} disabled={disabled} required /></Field></div>
+        <div className="col-span-full flex flex-col items-start gap-3"><Field label="Initial merchant profile" hint="Paste a merchant’s public profile, or choose your own wallet below. Payouts go to the selected address; registering your own wallet does not connect an independent supplier."><textarea className={field} value={profile} onChange={event => setProfile(event.target.value)} maxLength={16384} rows={4} disabled={disabled} required /></Field><Button type="button" variant="outline" size="sm" disabled={disabled} onClick={() => { if (network) { setProfile(encodeMerchant(network.merchantProfile("My receiving wallet"))); setFormError(""); } }}>Use my receiving wallet</Button></div>
         <Button type="submit" disabled={disabled}>Create facility</Button>
         {formError && <p ref={formErrorRef} tabIndex={-1} role="alert" className="wallet-error col-span-full">{formError}</p>}
       </form>
