@@ -44,11 +44,11 @@ milestone established a local protocol prototype, not customer-funded settlement
 | Canonical accounting | Facility `8990864c6f80c517c7458fa9b2526d3500f3a9814399fc836097ee409da9bed0`; retained checkpoint has 29 receipts, with no token-payout claim |
 | Test-token settlement | Facility `a159597495b52ea7a703a29562b17fcb042bf7eaa984ec1e05e7e8935208304b`; complete 21-transaction two-merchant checkpoint |
 | Organization wallet | Actual 1AM facility deployed; all twelve verifier keys installed; one tNIGHT deposit finalized at block 3,049,290. Independent indexer/RPC checks matched receipts, native asset input and contract balance; checkout and the remaining lifecycle are not yet accepted |
-| Regression checks | Full CI for `3527adc`: four jobs passed. The recovery release passed the full local core suite (656 passed, one skipped). The subsequent treasury refresh change passed all 16 account browser cases, deployment build and key/secret checks |
+| Regression checks | Full CI for `65f4798`: four jobs passed. The recovery release passed the full local core suite (656 passed, one skipped). The subsequent treasury refresh change passed all 16 account browser cases, deployment build and key/secret checks |
 | Public host | Free wallet-only server, source-matched proving files, signed reader sessions and actual historical Preprod reads verified |
 
 [Finalized test-token evidence](https://github.com/ShrikarT/line/blob/bbb2fdf/docs/TEST_TOKEN_PAYOUT_2026-10-16.md)
-and [CI run](https://github.com/ShrikarT/line/actions/runs/39258979430) retain the
+and [CI run](https://github.com/ShrikarT/line/actions/runs/39262718026) retain the
 underlying checks. Historical reports and presentation assets remain in Git
 history or release downloads rather than the product source tree.
 
@@ -128,6 +128,9 @@ now retries that read and clears its error on success; failed data is shown as
 unavailable rather than indefinitely loading. A browser regression reproduced
 the failure, then verified recovery without a proof, signature or new facility.
 All sixteen account browser cases and the deployment build passed after this fix.
+The fix is pushed to `main` in `1ee3c06` and deployed on the free public host;
+the deployed treasury module matches the verified local build. The owner tab
+also recovered its failed facility read through the repaired refresh control.
 
 An isolated read-only restart check retained the same browser SDK client across
 a backend restart. It reauthenticated after HTTP 401 and read the actual

@@ -37,6 +37,10 @@ Browser accounts encrypt private records with AES-GCM and password-derived keys.
 They are scoped to the connected Preprod wallet. Pending candidates remain
 encrypted until finalized receipts authorize publication. An uncertain transaction
 is reconciled by its original identity before another mutation is admitted.
+Encrypted backup export requires the unlocked organization session and account
+lock, while remaining available during a wallet API outage. It does not reveal
+the backup plaintext or authorize a transaction. Restore and financial operations
+still require fresh wallet identity verification.
 Keep a recoverable encrypted backup: browser-local storage is not institutional
 custody or a guarantee against device compromise.
 
