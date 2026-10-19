@@ -17,6 +17,7 @@ export function OrganizationCheckout({ facilityId }: { facilityId: string }) {
     return () => { cancelled = true; };
   }, [network]);
   if (!facility) return null;
+  if (catalog?.hostedSupplierAutomation === false) return <section className="workspace-welcome"><p className="line-eyebrow">Direct merchant checkout</p><h2>Use your merchant's quote.</h2><p>Exchange quote and claim packages in the Agent and Merchant workspaces. Your wallet signs the contract actions. Automated API suppliers are unavailable on this host.</p></section>;
   const disabled = busy || !!pending || !network || facility.limit === 0n;
   return <section className="organization-api-checkout">
     <div className="workspace-section-heading"><div><p className="line-eyebrow">API checkout / Organization assets</p><h2>Give your agent a real task.</h2></div><span className="text-xs text-muted">Merchant quote → wallet approval → payout → result</span></div>

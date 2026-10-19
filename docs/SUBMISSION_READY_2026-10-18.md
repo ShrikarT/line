@@ -24,7 +24,8 @@ followed by further privacy and custody work.
 ## Judge path
 
 1. Read the current README and privacy boundary.
-2. Open the [deck](../artifacts/wave2/line-wave2.html) in a browser.
+2. Open the [public deck](https://shrikart.github.io/line/) in a browser, or use
+   its [standalone HTML](../artifacts/wave2/line-wave2.html).
 3. Watch the current [product walkthrough source and verification](../artifacts/wave2/line-review-video/README.md).
    Wallet and purchase sequences are labeled illustrations; the receipt chapter
    uses actual Preprod evidence. The older `line-review.mp4` is a dated technical review.
@@ -61,7 +62,8 @@ walkthrough take priority over production feature expansion.
 - State the Wave 1-to-2 changes and submit personally through AKINDO. The event
   prohibits automated entry; no entry has been submitted by this agent.
 
-The verified wallet increment is public on `feat/line-ui-redesign` at `59b06bd`.
+The complete submission source is on [`main`](https://github.com/ShrikarT/line/tree/main).
+The recorded wallet increment was verified at `59b06bd`, which is retained in its history.
 Lace connection, the Preprod address and the organization vault were observed in
 the actual app; the wallet reports 5,000 tNIGHT. A new organization deployment
 has not been confirmed. The Cap recording reached the actual approval boundary,

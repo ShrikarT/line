@@ -7,7 +7,7 @@ its allowance. A merchant redeems its own single-use claim before releasing its
 service. Line is a working prototype; private credit is the longer-term goal.
 
 [Submission package](docs/SUBMISSION_READY_2026-10-18.md) |
-[Slide deck](artifacts/wave2/line-wave2.html) |
+[Slide deck](https://shrikart.github.io/line/) |
 [Video](https://github.com/ShrikarT/line/releases/download/wave2-submission-2026-10-19/Line-Wave2-Product-Walkthrough.mp4) |
 [Privacy](docs/PRIVACY.md) |
 [Deployment](docs/DEPLOYMENT.md)
@@ -21,7 +21,7 @@ service. Line is a working prototype; private credit is the longer-term goal.
   contract-instance separation, one-time redemption and reserve accounting.
 - Encrypted account/transaction recovery, retained request identities, replay
   rejection and generic failed-clearance feedback.
-- 644 regression cases: 643 pass, one intentional skip. Nine organization browser
+- 644 regression cases: 643 pass, one intentional skip. Ten organization browser
   checks pass. The actual browser SDK also reads Preprod over authenticated HTTP
   and WebSocket routes without receiving the server's provider token.
 
@@ -66,8 +66,11 @@ npm run build:deploy
 ```
 
 The deploy build requires the validated full organization proving release;
-`npm run organization:release` creates it. Release generation is not a deployment
-and does not submit a transaction.
+`npm run organization:install-release` installs the exact pinned public release,
+and `npm run organization:release` generates a new one. Neither submits a transaction.
+The free Render configuration serves wallet-operated contracts and authenticated
+readers; hosted API supplier automation requires the persistent backend described
+in the deployment guide.
 
 ## Scope and source
 

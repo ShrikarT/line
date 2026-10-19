@@ -27,6 +27,8 @@ async function servePublic(req, res, root) {
  * A runtime factory is injectable solely for transport/lifecycle tests.
  */
 export async function startOrganizationServer({ env = process.env, createService, port = Number(env.PORT ?? 3000), host = '0.0.0.0', publicDirectory = resolve('dist') } = {}) {
+  const mode = env.LINE_ORGANIZATION_MODE ?? 'supplier';
+  if (!['supplier', 'wallet-only'].includes(mode)) throw Error('Configure supplier or wallet-only organization mode.');
   const origin = env.LINE_PUBLIC_ORIGIN;
   const auth = new OrganizationAuth(origin); // Reject invalid public configuration before listening.
   if (!Number.isInteger(port) || port < 0 || port > 65535) throw Error('Configure a valid service port.');
@@ -38,7 +40,7 @@ export async function startOrganizationServer({ env = process.env, createService
     if (path === '/healthz' || path === '/readyz') {
       const ready = !!api && !closing;
       res.writeHead(path === '/healthz' ? 200 : ready ? 200 : 503, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
-      return res.end(JSON.stringify({ ready, ...(startupFailure ? { error: 'Supplier initialization failed.' } : {}) }));
+      return res.end(JSON.stringify({ ready, ...(mode === 'wallet-only' ? { mode } : {}), ...(startupFailure ? { error: 'Supplier initialization failed.' } : {}) }));
     }
     if (path.startsWith('/api/')) {
       if (!api) { res.writeHead(503, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); return res.end(JSON.stringify({ error: 'The supplier wallet is starting. Retry shortly.' })); }
@@ -60,7 +62,9 @@ export async function startOrganizationServer({ env = process.env, createService
     return closeTask;
   } };
   try {
-    const service = await (createService ? createService() : import('./organization-wallet.mjs').then(module => module.createStandaloneOrganizationMerchants(env)));
+    const service = await (createService ? createService() : mode === 'wallet-only'
+      ? import('./organization-wallet-only.mjs').then(module => module.createWalletOnlyOrganizationService(env))
+      : import('./organization-wallet.mjs').then(module => module.createStandaloneOrganizationMerchants(env)));
     api = organizationApi({ service, origin, auth });
     network = organizationNetwork({ server, auth, origin, endpoints: service.endpoints });
     return app;

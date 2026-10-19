@@ -22,6 +22,7 @@
     "organization:compile": "node scripts/compile-compact.mjs --skip-zk contracts/organization/line.compact contracts/managed/organization",
     "organization:release": "node scripts/organization-release.mjs build",
     "organization:validate": "node scripts/organization-release.mjs validate",
+    "organization:install-release": "node scripts/install-organization-release.mjs",
     "test:organization": "node --experimental-strip-types --test --test-concurrency=4 tests/organization-settlement.test.mjs tests/organization-transfers.test.ts server/organization-services.test.mjs server/organization-http.test.ts tests/organization-backup.test.ts tests/organization-finality.test.ts tests/organization-orders.test.ts tests/organization-recovery.test.ts tests/organization-public-assets.test.mjs tests/organization-transactions.test.ts tests/organization-wallet.test.mjs server/native-operation-journal.test.mjs server/organization-auth.test.mjs server/organization-api.test.mjs server/organization-server.test.mjs tests/organization-supplier-client.test.ts server/organization-network.test.mjs tests/organization-read-endpoints.test.ts tests/organization-authenticated-reads.test.ts",
     "compact:test": "node --experimental-strip-types --test src/lib/line/compact.test.ts src/lib/line/encoding.test.ts",
     "contract:deploy": "node --env-file-if-exists=.env.local --experimental-strip-types scripts/contract-deploy.mjs",
