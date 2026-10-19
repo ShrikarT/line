@@ -67,7 +67,8 @@ explicitly unavailable in wallet-only mode.
 
 ## Build and verification
 
-Public pages and wallet connection do not load the ledger or Compact WASM engines.
+The landing page, disconnected organization workspaces and wallet connection do
+not load the ledger or Compact WASM engines.
 Routes, protocol consoles and organization tools load when needed; vault opening
 loads the organization SDK. Disconnecting during that load revokes the pending
 unlock. A failed route download offers an explicit refresh instead of a blank page.

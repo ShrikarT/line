@@ -44,11 +44,11 @@ milestone established a local protocol prototype, not customer-funded settlement
 | Canonical accounting | Facility `8990864c6f80c517c7458fa9b2526d3500f3a9814399fc836097ee409da9bed0`; retained checkpoint has 29 receipts, with no token-payout claim |
 | Test-token settlement | Facility `a159597495b52ea7a703a29562b17fcb042bf7eaa984ec1e05e7e8935208304b`; complete 21-transaction two-merchant checkpoint |
 | Organization wallet | Actual 1AM connection on Preprod verified. Earlier Lace connection and vault opening reached deployment approval; fresh funded lifecycle not yet accepted |
-| Regression checks | Local core: 645 passed/one skip before the reader fix; 12 focused reader/authentication tests passed afterward. Current browser suite: 54 passed; deployment build and secret/key checks passed. Prior full CI checkpoint: four jobs and 50 browser cases passed |
+| Regression checks | Full CI for `65cdaf1`: four jobs passed, core 647 passed/two Windows-only skips, separate Windows ACL checks passed, and 54 browser cases passed. Deployment build and secret/key checks passed; four focused browser checks also passed against the public deployment |
 | Public host | Free wallet-only server, source-matched proving files, signed reader sessions and actual historical Preprod reads verified |
 
 [Finalized test-token evidence](https://github.com/ShrikarT/line/blob/bbb2fdf/docs/TEST_TOKEN_PAYOUT_2026-10-16.md)
-and [CI run](https://github.com/ShrikarT/line/actions/runs/39232393804) retain the
+and [CI run](https://github.com/ShrikarT/line/actions/runs/39236743404) retain the
 underlying checks. Historical reports and presentation assets remain in Git
 history or release downloads rather than the product source tree.
 
