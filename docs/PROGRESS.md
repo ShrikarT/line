@@ -252,7 +252,12 @@ publishing zero custody. The final owner-tab display check remains unaccepted;
 it requires a working wallet read channel. A separate read-only check at
 2026-10-20 11:59 UTC still matched all selected receipts and twelve installed
 keys, with status OPEN, 900,000 units held and 1,000,000 reserve accounting.
-No financial request was retried.
+No financial request was retried. A later reload of the deployed app and fresh
+1AM connection also returned "Failed to connect to 1AM: Request failed", before
+vault opening or a contract read. The owner must restore the local wallet
+connection before further funded acceptance; the extension cannot be operated
+through the available browser control. The existing 21-transaction backup is
+retained, and no replacement facility or payment was created.
 
 Encrypted backup export now uses the unlocked vault session and account lock
 without depending on the wallet's remote API. It reloads the current durable
