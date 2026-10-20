@@ -224,6 +224,16 @@ the earlier unexpected failure. The trace was removed. The final production
 build, key/secret scans and zero managed-binding drift checks passed. No Compact
 source, verifier key, financial authorization or automatic retry policy changed.
 
+Recovery release `82f3d90` is pushed to `main` and deployed on the free public
+host. Its published network, workspace and recovery JavaScript match the tested
+local build byte for byte; the public proving manifest is unchanged and
+`/readyz` returns HTTP 200 in wallet-only mode. Its
+[full CI run](https://github.com/ShrikarT/line/actions/runs/39483250056) is still
+running. The owner's final live recovery check requires reconnecting Chrome
+browser control and reopening the existing vault locally: the browser tool
+currently reports zero connected browsers. No production resubmission was
+performed, and the old signed allowance remains unresolved.
+
 A fresh configured-provider read at 19:17 UTC on 20 October still returned no
 indexed transaction for the retained identifier, with status CLOSED, generation
 1, fees 0/0 and 900,000 units held. This is neither a new finalized receipt nor
