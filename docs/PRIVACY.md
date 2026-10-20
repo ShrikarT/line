@@ -37,6 +37,9 @@ Browser accounts encrypt private records with AES-GCM and password-derived keys.
 They are scoped to the connected Preprod wallet. Pending candidates remain
 encrypted until finalized receipts authorize publication. An uncertain transaction
 is reconciled by its original identity before another mutation is admitted.
+The organization vault stays unlocked for up to twelve hours in the current tab,
+as shown in the workspace. Its passphrase is held only in memory; manual locking,
+wallet disconnect/account changes and reloading the tab end that session.
 Encrypted backup export requires the unlocked organization session and account
 lock, while remaining available during a wallet API outage. It does not reveal
 the backup plaintext or authorize a transaction. Restore and financial operations

@@ -153,6 +153,19 @@ invoice regression passed. One combined browser run hit its old 30-second cold
 startup budget before connecting; the new case passed separately with the same
 120-second startup budget used by the route checks.
 
+Recovery also now reports when an unsubmitted request has been cleared. It
+previously left the generic "Working" message visible after the candidate was
+discarded. A browser regression reproduced that stale status, then verified the
+completion message, enabled controls and durable clearance after locking and
+reopening the vault, with no proof or signature request.
+
+At the owner's request, organization vault sessions now last twelve hours rather
+than fifteen minutes. The workspace states that duration; the password remains
+in tab memory. A browser clock regression failed at minute 31 before the change,
+then verified an unlocked session through hour 11:59, expiration after hour 12,
+manual locking and disconnect locking. Account isolation and backup-lock guards
+also passed. The default timeout for other consoles is unchanged.
+
 Encrypted backup export now uses the unlocked vault session and account lock
 without depending on the wallet's remote API. It reloads the current durable
 record, retains pending transaction identities and rejects session revocation
