@@ -162,6 +162,17 @@ configured TLS indexer/RPC services; they are not independent full-node or local
 proof verification. All twelve installed verifier keys still match the pinned
 organization release. The owner is also the receiving merchant in this run.
 
+Fresh organization receipts cover eight distinct call names: `fundReserve`,
+`withdrawUnencumberedReserve`, `openLine`, `postQuote`, `draw`, `redeemDraw`,
+`acknowledgeRepayment` and `setStatus`. Installed verifier keys are not call
+acceptance. This facility has not yet established live acceptance for an
+additional `registerMerchant` call, `disableMerchant`, `withdrawFees`, or the
+`cancelOrExpireNote` cancellation/refund modes. Closing/reopening an allowance
+also remains outside this run. Those paths have automated protocol/recovery
+coverage, which does not replace fresh wallet-approved receipt checks. The
+organization UI currently opens zero-fee allowances; fee-bearing organization
+policy and its fee withdrawal flow need product work before that acceptance.
+
 The treasury now reads custody from `ContractState.balance`, avoiding a redundant
 wallet-style output lookup that could report an empty or unrelated balance. It
 shows assets held separately from reserve accounting, and failed reads remain
