@@ -37,6 +37,11 @@ record, including any pending operation. It requires the unlocked vault session
 but remains available when the wallet's remote read API fails. Export rechecks
 session validity after encryption; restore and mutations still verify the wallet.
 
+Organization vault sessions last twelve hours per unlock, allowing multi-step
+wallet workflows to finish without the previous fifteen-minute cutoff. The
+passphrase stays in tab memory; manual locking, wallet disconnect/account changes
+and tab reload still end the session. Other consoles retain their existing timeout.
+
 Wallet identity probes are sequential. Only explicit rate-limit responses on
 configuration/address reads may retry within a bounded deadline; each retry checks
 session validity. Signing, proving and submission are outside that retry path.

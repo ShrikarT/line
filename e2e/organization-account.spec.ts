@@ -239,6 +239,52 @@ test("an aborted organization receipt commit retains the exact pending candidate
   expect(result).toEqual({ rejected: true, memoryUnchanged: true, diskUnchanged: true, retainedCandidate: true, memoryTx: "cd".repeat(32), diskTx: "cd".repeat(32), signatures: 0 });
 });
 
+test("organization sessions last twelve hours and still lock on request or wallet disconnect", async ({ page }) => {
+  test.setTimeout(120_000);
+  await wallets(page, true); await page.goto("/app"); await connect(page, "a"); await unlock(page);
+  const sessionAt = (elapsed: number) => page.evaluate(async elapsed => {
+    const { browserModuleUrl } = await import("/e2e/browser-module.ts" as any);
+    const { isVaultSessionUnlocked } = await import(browserModuleUrl("/src/lib/security/vault.ts"));
+    const originalNow = Date.now, now = originalNow();
+    try { Date.now = () => now + elapsed; return isVaultSessionUnlocked(); }
+    finally { Date.now = originalNow; }
+  }, elapsed);
+  expect(await sessionAt(31 * 60_000)).toBe(true);
+  expect(await sessionAt((12 * 60 - 1) * 60_000)).toBe(true);
+  await page.getByRole("button", { name: "Lock organization", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Open your organization.", exact: true })).toBeVisible();
+  await unlock(page); await disconnect(page);
+  await expect(page.getByRole("heading", { name: "Start with your wallet.", exact: true })).toBeVisible();
+  await connect(page, "a"); await unlock(page);
+  expect(await sessionAt((12 * 60 + 1) * 60_000)).toBe(false);
+  await expect(page.getByRole("heading", { name: "Open your organization.", exact: true })).toBeVisible();
+});
+
+test("clearing an unsubmitted candidate reports completion without preparing another transaction", async ({ page }) => {
+  test.setTimeout(120_000);
+  await wallets(page, true, true); await page.goto("/app"); await connect(page, "a"); await unlock(page);
+  await page.evaluate(async () => {
+    const { browserModuleUrl } = await import("/e2e/browser-module.ts" as any);
+    const { OrganizationAccount } = await import(browserModuleUrl("/src/lib/organization/account.ts"));
+    const { getConnectedWallet } = await import(browserModuleUrl("/src/lib/runtime/wallet.ts"));
+    const account = await OrganizationAccount.unlock(getConnectedWallet()!, "Organization123!");
+    // Synthetic unsubmitted candidate exercises the recovery UI and durable
+    // discard, not financial acceptance or an actual wallet approval.
+    await account.prepare({ id: crypto.randomUUID(), kind: "call", circuit: "redeemDraw", facilityId: null, contractAddress: "ab".repeat(32), sourceFingerprint: "ef".repeat(32), after: account.snapshot(), txId: null, transaction: null });
+  });
+  await page.getByLabel("Organization vault password", { exact: true }).fill("Organization123!");
+  await page.getByRole("button", { name: "Open organization", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Resolve the saved operation first.", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Check original transaction", exact: true }).click();
+  await expect(page.getByRole("status")).toContainText("Unsubmitted request cleared");
+  await expect(page.getByRole("heading", { name: "Resolve the saved operation first.", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Create facility", exact: true })).toBeEnabled();
+  await page.getByRole("button", { name: "Lock organization", exact: true }).click();
+  await unlock(page);
+  await expect(page.getByRole("heading", { name: "Resolve the saved operation first.", exact: true })).toHaveCount(0);
+  expect(await page.evaluate(() => ({ proof: (window as any).organizationProofRequests, signatures: (window as any).organizationSignatures }))).toEqual({ proof: 0, signatures: 0 });
+});
+
 test("refresh recovers a failed facility read without signing or recreating the organization", async ({ page }) => {
   await wallets(page, true, true); await page.goto("/app"); await connect(page, "a"); await unlock(page);
   await page.evaluate(async () => {

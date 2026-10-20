@@ -5,6 +5,7 @@ import { encodeVaultJson, encryptSecret, getVaultSessionPassphrase, getVaultSess
 import { hexToBytes, randomBytes32, toHex } from "../line/encoding.ts";
 import { decodeOrganizationBackup, isOrganizationEmpty } from "./backup.ts";
 import { OrganizationTimeoutError, withinDeadline } from "./finality.ts";
+import { ORGANIZATION_SESSION_MINUTES } from "./session-policy.ts";
 
 function rateLimited(failure: unknown): boolean {
   if (!failure || typeof failure !== "object") return typeof failure === "string" && /rate[\s_-]*limit|too many requests/i.test(failure);
@@ -113,7 +114,7 @@ export class OrganizationAccount {
     const retained = await loadEncryptedJson<OrganizationRecord>(key, passphrase);
     if (wallet !== getConnectedWallet()) throw new Error("Wallet changed while opening the organization.");
     if (retained && (retained.snapshot?.schema !== ORGANIZATION_SCHEMA || retained.snapshot.accountId !== accountId || retained.snapshot.networkId !== "preprod")) throw new Error("Organization record belongs to another wallet or schema.");
-    unlockVaultSession(passphrase);
+    unlockVaultSession(passphrase, ORGANIZATION_SESSION_MINUTES);
     const account = new OrganizationAccount(wallet, accountId, unshielded.unshieldedAddress, getVaultSessionRevision(), retained ?? {
       snapshot: { schema: ORGANIZATION_SCHEMA, networkId: "preprod", accountId, issuerSecret: toHex(randomBytes32()), merchantSecret: toHex(randomBytes32()), facilities: [], quotes: [], notes: [], receipts: [] }, pending: null,
     });

@@ -473,7 +473,11 @@ export class OrganizationNetwork {
     return this.account.exclusive(async () => {
       const pending = this.account.pending();
       if (!pending) return;
-      if (!pending.txId) { await this.account.discardUnsubmitted(); return; }
+      if (!pending.txId) {
+        await this.account.discardUnsubmitted();
+        this.report("Unsubmitted request cleared. No transaction was submitted by Line");
+        return;
+      }
       if (pending.sourceFingerprint !== this.release.sourceFingerprint) throw new Error("Recover with the original organization contract release.");
       this.report("Checking the original signed transaction. No replacement will be created");
       await this.finish(await this.tx().finality.wait(pending.txId));
