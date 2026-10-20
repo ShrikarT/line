@@ -1,6 +1,6 @@
 import { CompiledContract, ContractExecutable } from "@midnight-ntwrk/midnight-js-protocol/compact-js";
 import { ProvableCircuitId, VerifierKey, type Contract as CompactContract } from "@midnight-ntwrk/midnight-js-protocol/compact-js/effect/Contract";
-import { Intent, Transaction } from "@midnight-ntwrk/midnight-js-protocol/ledger";
+import { ContractCall, ContractDeploy, Intent, MaintenanceUpdate, Transaction } from "@midnight-ntwrk/midnight-js-protocol/ledger";
 import { createUnprovenDeployTx, submitCallTxAsync, submitTxAsync, type ContractProviders } from "@midnight-ntwrk/midnight-js-contracts";
 import { asContractAddress, makeContractExecutableRuntime, type FinalizedTxData } from "@midnight-ntwrk/midnight-js-types";
 import { ttlOneHour } from "@midnight-ntwrk/midnight-js-utils";
@@ -8,10 +8,26 @@ import { getNetworkId } from "@midnight-ntwrk/midnight-js-network-id";
 import type { Contract } from "../../../contracts/managed/organization/contract/index.js";
 import type { LinePrivateWitnessContext } from "../runtime/network.ts";
 import { OrganizationFinality } from "./finality.ts";
+import type { OrganizationPending } from "./account.ts";
+import { hexToBytes, toHex } from "../bytes.ts";
 
 type LineContract = Contract<LinePrivateWitnessContext>;
 type Circuit = keyof LineContract["provableCircuits"];
 type Compiled = CompiledContract.CompiledContract<LineContract, LinePrivateWitnessContext>;
+
+/** Decode only the immutable transaction already retained at the submission boundary. */
+export function originalOrganizationTransaction(pending: OrganizationPending, sourceFingerprint: string, now = Date.now()) {
+  if (pending.sourceFingerprint !== sourceFingerprint) throw new Error("Recover with the original organization contract release.");
+  if (!pending.txId || !pending.transaction || !pending.contractAddress) throw new Error("No signed organization transaction is saved for resubmission.");
+  const transaction = Transaction.deserialize("signature", "proof", "binding", hexToBytes(pending.transaction));
+  if (toHex(transaction.serialize()) !== pending.transaction || transaction.identifiers().at(-1) !== pending.txId) throw new Error("Saved transaction bytes differ from the original signed identifier.");
+  const intents = [...(transaction.intents?.values() ?? [])], actions = intents.flatMap(intent => intent.actions);
+  if (actions.length !== 1 || actions[0].address !== pending.contractAddress) throw new Error("Saved transaction differs from the prepared organization action.");
+  const action = actions[0];
+  if (pending.kind === "deploy" ? !(action instanceof ContractDeploy) : pending.kind === "key" ? !(action instanceof MaintenanceUpdate) : pending.kind !== "call" || !(action instanceof ContractCall) || (typeof action.entryPoint === "string" ? action.entryPoint : new TextDecoder().decode(action.entryPoint)) !== pending.circuit) throw new Error("Saved transaction differs from the prepared organization action.");
+  if (intents.some(intent => !Number.isFinite(intent.ttl.getTime()) || intent.ttl.getTime() <= now)) throw new Error("The original signed transaction has expired. Keep it for reconciliation; expiry alone does not prove it was never applied.");
+  return transaction;
+}
 
 /** SDK asynchronous submission, with application-owned durable finality handling.
  * No SDK continuation writes private state after a timed-out observation.

@@ -2,13 +2,77 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { CompiledContract } from "@midnight-ntwrk/midnight-js-protocol/compact-js";
-import { ContractMaintenanceAuthority, ContractState, MaintenanceUpdate, sampleSigningKey, signatureVerifyingKey, type UnprovenTransaction } from "@midnight-ntwrk/midnight-js-protocol/ledger";
+import { ContractDeploy, ContractMaintenanceAuthority, ContractState, CostModel, Intent, MaintenanceUpdate, Transaction, sampleSigningKey, signatureVerifyingKey, type UnprovenTransaction } from "@midnight-ntwrk/midnight-js-protocol/ledger";
 import { setNetworkId } from "@midnight-ntwrk/midnight-js-network-id";
 import type { ContractProviders } from "@midnight-ntwrk/midnight-js-contracts";
 import { Contract } from "../contracts/managed/organization/contract/index.js";
 import { WITNESSES } from "../src/lib/line/compact-harness.ts";
-import { OrganizationTransactions } from "../src/lib/organization/transactions.ts";
+import { OrganizationTransactions, originalOrganizationTransaction } from "../src/lib/organization/transactions.ts";
+import type { OrganizationPending } from "../src/lib/organization/account.ts";
 import { organizationProofProvider } from "../src/lib/organization/proving.ts";
+
+const fingerprint = "12".repeat(32);
+async function originalFixture(kind: "deploy" | "key" = "key") {
+  const intent = Intent.new(new Date(Date.now() + 3600_000));
+  const action = kind === "deploy" ? new ContractDeploy(new ContractState()) : new MaintenanceUpdate("ab".repeat(32), [], 0n);
+  const unproven = Transaction.fromParts("preprod", undefined, undefined, action instanceof ContractDeploy ? intent.addDeploy(action) : intent.addMaintenanceUpdate(action));
+  const unexpected = async () => { throw Error("Serialization fixtures must not generate a circuit proof"); };
+  const transaction = (await unproven.prove({ check: unexpected, prove: unexpected }, CostModel.initialCostModel())).bind();
+  const pending: OrganizationPending = {
+    id: "original", kind, circuit: kind === "deploy" ? "deploy" : "draw", facilityId: null, contractAddress: action.address,
+    sourceFingerprint: fingerprint, after: { schema: "line:organization-account/v1", networkId: "preprod", accountId: "13".repeat(32), issuerSecret: "14".repeat(32), merchantSecret: "15".repeat(32), facilities: [], quotes: [], notes: [], receipts: [] },
+    txId: transaction.identifiers().at(-1)!, transaction: Buffer.from(transaction.serialize()).toString("hex"),
+  };
+  return { pending, transaction };
+}
+
+test("original submission validation preserves exact public bytes and every action kind", async () => {
+  for (const kind of ["deploy", "key"] as const) {
+    const { pending } = await originalFixture(kind), before = structuredClone(pending);
+    assert.equal(Buffer.from(originalOrganizationTransaction(pending, fingerprint).serialize()).toString("hex"), pending.transaction);
+    assert.deepEqual(pending, before);
+  }
+  // Previously published public proof bytes establish call decoding, not this release's validity.
+  const raw = readFileSync(new URL("fixtures/private-offer-public-pairs/3-openLine.proven-public-tx.bin", import.meta.url));
+  const transaction = Transaction.deserialize("signature", "proof", "binding", raw);
+  const action = [...transaction.intents!.values()].flatMap(intent => intent.actions)[0];
+  const { pending } = await originalFixture();
+  Object.assign(pending, { kind: "call", circuit: "openLine", contractAddress: action.address, transaction: raw.toString("hex"), txId: transaction.identifiers().at(-1) });
+  assert.equal(Buffer.from(originalOrganizationTransaction(pending, fingerprint, 0).serialize()).toString("hex"), raw.toString("hex"));
+});
+
+test("original submission rejects changed bytes, identity, release and action metadata", async () => {
+  const { pending } = await originalFixture();
+  for (const change of [
+    { transaction: null }, { txId: null }, { txId: "00" + "ff".repeat(32) },
+    { transaction: pending.transaction! + "00" }, { transaction: "abcd" },
+    { contractAddress: "cd".repeat(32) }, { sourceFingerprint: "ff".repeat(32) },
+    { kind: "call" as const }, { kind: "deploy" as const },
+  ]) assert.throws(() => originalOrganizationTransaction({ ...pending, ...change }, fingerprint));
+  const raw = readFileSync(new URL("fixtures/private-offer-public-pairs/3-openLine.proven-public-tx.bin", import.meta.url));
+  const transaction = Transaction.deserialize("signature", "proof", "binding", raw);
+  const action = [...transaction.intents!.values()].flatMap(intent => intent.actions)[0];
+  assert.throws(() => originalOrganizationTransaction({ ...pending, kind: "call", circuit: "draw", contractAddress: action.address, transaction: raw.toString("hex"), txId: transaction.identifiers().at(-1)! }, fingerprint, 0), /prepared organization action/);
+});
+
+test("an expired original transaction cannot be resubmitted or treated as failed", async () => {
+  const { pending, transaction } = await originalFixture(), before = structuredClone(pending);
+  const expiry = Math.min(...[...transaction.intents!.values()].map(intent => intent.ttl.getTime()));
+  assert.throws(() => originalOrganizationTransaction(pending, fingerprint, expiry), /expired.*reconciliation/i);
+  assert.deepEqual(pending, before);
+});
+
+test("resubmission rejects an original containing more than one contract action", async () => {
+  const { pending } = await originalFixture();
+  const intent = Intent.new(new Date(Date.now() + 3600_000))
+    .addMaintenanceUpdate(new MaintenanceUpdate(pending.contractAddress!, [], 0n))
+    .addMaintenanceUpdate(new MaintenanceUpdate("cd".repeat(32), [], 0n));
+  const unproven = Transaction.fromParts("preprod", undefined, undefined, intent);
+  const unexpected = async () => { throw Error("No circuit proof is needed"); };
+  const transaction = (await unproven.prove({ check: unexpected, prove: unexpected }, CostModel.initialCostModel())).bind();
+  Object.assign(pending, { transaction: Buffer.from(transaction.serialize()).toString("hex"), txId: transaction.identifiers().at(-1) });
+  assert.throws(() => originalOrganizationTransaction(pending, fingerprint), /prepared organization action/);
+});
 
 test("actual SDK maintenance construction signs and proves before wallet rejection, without submitting", async () => {
   setNetworkId("preprod");

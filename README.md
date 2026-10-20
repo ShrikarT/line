@@ -25,7 +25,7 @@ Line connects these steps through a twelve-circuit Compact contract and separate
 | Spending controls | Private book openings, allowance checks, fees, expiry and issuer-controlled status |
 | Merchant checkout | Authenticated quotes, merchant-bound claims and single-use redemption |
 | Reserve management | Funding, unencumbered withdrawals and fee withdrawal |
-| Recovery | Retained transaction identities, encrypted backups and finalized-receipt reconciliation |
+| Recovery | Retained transaction identities, encrypted backups, explicit resubmission of original signed bytes and finalized-receipt reconciliation |
 | Multiple merchants | Separate merchant identities and contract-instance domain separation |
 
 **Privacy boundary:** amounts, recipients, reserve changes and transaction history remain observable. Hiding plaintext book fields does not establish full-history balance privacy. See [privacy](docs/PRIVACY.md).
