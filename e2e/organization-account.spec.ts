@@ -181,6 +181,56 @@ test("wallet-only onboarding uses the account's actual receiving profile without
   expect(await page.evaluate(() => (window as unknown as { organizationSignatures: number }).organizationSignatures)).toBe(0);
 });
 
+test("treasury serializes wallet reads across refreshes and does not refetch balances while typing an asset", async ({ page }) => {
+  test.setTimeout(120_000);
+  await wallets(page, true, true); await page.goto("/app"); await connect(page, "a"); await unlock(page);
+  await page.evaluate(async () => {
+    const { browserModuleUrl } = await import("/e2e/browser-module.ts" as any);
+    const { OrganizationAccount, readOrganizationWallet } = await import(browserModuleUrl("/src/lib/organization/account.ts"));
+    const { OrganizationNetwork } = await import(browserModuleUrl("/src/lib/organization/network.ts"));
+    const { getConnectedWallet } = await import(browserModuleUrl("/src/lib/runtime/wallet.ts"));
+    const wallet = getConnectedWallet()!, account = await OrganizationAccount.unlock(wallet, "Organization123!");
+    await account.edit(snapshot => snapshot.facilities.push({ id: "serial-reads", name: "Serial reads", address: "ab".repeat(32), instanceNonce: "12".repeat(32), maintenanceKey: "13".repeat(32), assetColor: "0".repeat(64), issuerRecipient: account.receivingAddress, merchants: [], agentSecret: "14".repeat(32), salt: "15".repeat(32), limit: 100n, outstanding: 0n, epoch: 0n, generation: 1n }));
+    const state = window as any; state.walletReadActive = 0; state.walletReadPeak = 0; state.walletReadOverlaps = 0; state.walletBalanceReads = 0;
+    const probe = async (request: () => Promise<unknown>) => {
+      state.walletReadPeak = Math.max(state.walletReadPeak, ++state.walletReadActive);
+      try {
+        if (state.walletReadActive > 1) { state.walletReadOverlaps++; throw Error("Request failed"); }
+        await new Promise(resolve => setTimeout(resolve, 80));
+        return await request();
+      } finally { state.walletReadActive--; }
+    };
+    for (const name of ["getConfiguration", "getShieldedAddresses", "getUnshieldedAddress"] as const) {
+      const original = wallet[name].bind(wallet); (wallet as any)[name] = () => probe(original);
+    }
+    wallet.getUnshieldedBalances = () => probe(async () => { state.walletBalanceReads++; return { ["0".repeat(64)]: 5000000n }; }) as ReturnType<typeof wallet.getUnshieldedBalances>;
+    // Exercise the actual identity reader at the public-summary seam. Synthetic
+    // chain state and a concurrency-sensitive wallet establish no live receipt.
+    OrganizationNetwork.prototype.facilitySummary = async () => {
+      await readOrganizationWallet(wallet);
+      return { status: "OPEN", registeredCircuits: 12, assetColor: "0".repeat(64), reserve: "1000000", encumbered: "0", paid: "0", feeFlat: "0", feeBps: "0", fees: "0", pendingFees: "0", domain: "16".repeat(32), balances: [{ color: "0".repeat(64), units: "1000000" }] };
+    };
+  });
+  await page.getByLabel("Organization vault password", { exact: true }).fill("Organization123!");
+  await page.getByRole("button", { name: "Open organization", exact: true }).click();
+  await expect(page.getByText("OPEN · 12/12 circuit keys · Reserve accounting 1000000 · Principal paid 0", { exact: true })).toBeVisible();
+  await expect(page.getByText("5000000 asset base units", { exact: true })).toBeVisible();
+  for (let i = 0; i < 3; i++) {
+    await page.getByRole("button", { name: "Refresh balances and suppliers", exact: true }).click();
+    await expect(page.getByRole("button", { name: "Pause agent", exact: true })).toBeDisabled();
+  }
+  await expect(page.getByText("5000000 asset base units", { exact: true })).toBeVisible();
+  await expect.poll(() => page.evaluate(() => (window as any).walletReadActive)).toBe(0);
+  await expect(page.getByRole("button", { name: "Pause agent", exact: true })).toBeEnabled();
+  const before = await page.evaluate(() => (window as any).walletBalanceReads);
+  await page.getByText("Create an agent facility", { exact: true }).click();
+  await page.getByRole("textbox", { name: /Settlement asset color/ }).fill("11".repeat(32));
+  await page.getByRole("textbox", { name: /Settlement asset color/ }).fill("22".repeat(32));
+  await expect(page.getByText("5000000 asset base units", { exact: true })).toBeVisible();
+  expect(await page.evaluate(() => ({ peak: (window as any).walletReadPeak, overlaps: (window as any).walletReadOverlaps, balanceReads: (window as any).walletBalanceReads }))).toEqual({ peak: 1, overlaps: 0, balanceReads: before });
+  expect(await page.evaluate(() => ({ signatures: (window as any).organizationSignatures, proofs: (window as any).organizationProofRequests }))).toEqual({ signatures: 0, proofs: 0 });
+});
+
 test("facility custody uses the contract ledger balance instead of wallet-style outputs", async ({ page }) => {
   test.setTimeout(120_000);
   await page.goto("/app");

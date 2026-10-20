@@ -5,6 +5,7 @@ import { OrganizationField as Field, organizationField as field } from "./organi
 import { decodeMerchant, encodeMerchant } from "@/lib/organization/transfers";
 import { units } from "@/lib/organization/account";
 import { requiredDrawFee } from "@/lib/line/encoding";
+import { withinDeadline } from "@/lib/organization/finality";
 import type { OrganizationCatalog, OrganizationNetwork } from "@/lib/organization/network";
 
 export function OrganizationTreasury({ facilityId, onSelect }: { facilityId: string; onSelect: (id: string) => void }) {
@@ -18,17 +19,16 @@ export function OrganizationTreasury({ facilityId, onSelect }: { facilityId: str
   const [formError, setFormError] = useState("");
   const formErrorRef = useRef<HTMLParagraphElement>(null);
   useEffect(() => { if (formError) formErrorRef.current?.focus(); }, [formError]);
-  const [catalogError, setCatalogError] = useState(""), [refresh, setRefresh] = useState(0), [walletUnits, setWalletUnits] = useState<string | null>(null);
+  const [catalogError, setCatalogError] = useState(""), [refresh, setRefresh] = useState(0), [walletBalances, setWalletBalances] = useState<Record<string, bigint> | null>(null);
+  const [reading, setReading] = useState(false);
+  const readQueue = useRef<Promise<void>>(Promise.resolve());
+  const walletUnits = walletBalances === null ? null : (walletBalances[facility?.assetColor ?? asset] ?? 0n).toString();
   useEffect(() => {
     let cancelled = false;
     if (network) void network.catalog().then(value => { if (!cancelled) { setCatalog(value); setCatalogError(""); const first = value.services[0]; if (first) setProfile(current => current || encodeMerchant(first.profile)); } }).catch(() => { if (!cancelled) setCatalogError("API suppliers could not be loaded. Retry, or paste an independent supplier's public profile."); });
     return () => { cancelled = true; };
   }, [network, refresh]);
-  useEffect(() => {
-    let cancelled = false; setWalletUnits(null);
-    if (account) void account.wallet.getUnshieldedBalances().then(balances => { if (!cancelled) setWalletUnits((balances[facility?.assetColor ?? asset] ?? 0n).toString()); }).catch(() => {});
-    return () => { cancelled = true; };
-  }, [account, facility?.assetColor, asset, snapshot?.receipts.length, refresh]);
+
   const feeTerms = (() => {
     if (!/^[0-9]{1,20}$/.test(flatFee) || !/^[0-9]{1,5}$/.test(feeBps)) return null;
     try {
@@ -38,13 +38,28 @@ export function OrganizationTreasury({ facilityId, onSelect }: { facilityId: str
     } catch { return null; }
   })();
   const feesWithdrawable = !!status && status.registeredCircuits === 12 && status.fees !== undefined && BigInt(status.fees) > 0n;
-  const disabled = busy || !!pending || !network;
+  const disabled = busy || reading || !!pending || !network || !!facility?.address && !status;
   const contractUnits = status ? status.balances.find(balance => balance.color === facility?.assetColor)?.units ?? "0" : null;
   useEffect(() => {
-    let stopped = false; setStatus(null); setError("");
-    if (network && facility?.address) void network.facilitySummary(facility.id).then(value => { if (!stopped) setStatus(value); }).catch(failure => { if (!stopped) setError(failure instanceof Error ? failure.message : "Could not read the facility."); });
+    let stopped = false; setStatus(null); setWalletBalances(null); setError(""); setReading(!!account && !!network);
+    // The summary verifies wallet identity. Keep its RPCs separate from balance
+    // requests, including refreshes that arrive before an older read settles.
+    readQueue.current = readQueue.current.catch(() => {}).then(async () => {
+      if (stopped || !account || !network) return;
+      try {
+        if (facility?.address) {
+          try { const value = await network.facilitySummary(facility.id); if (!stopped) setStatus(value); }
+          catch (failure) { if (!stopped) setError(failure instanceof Error ? failure.message : "Could not read the facility."); }
+        }
+        if (stopped) return;
+        try {
+          const balances = await withinDeadline(account.wallet.getUnshieldedBalances(), 25_000, "The wallet balance request timed out.");
+          if (!stopped) setWalletBalances(balances);
+        } catch { /* A missing wallet balance stays unavailable, not zero. */ }
+      } finally { if (!stopped) setReading(false); }
+    });
     return () => { stopped = true; };
-  }, [network, facility?.id, snapshot?.receipts.length, refresh]);
+  }, [account, network, facility?.id, facility?.address, snapshot?.receipts.length, refresh]);
   const act = (action: Parameters<typeof run>[0]) => void run(action);
   return <div className="organization-tab">
     <div className="workspace-section-heading"><div><p className="line-eyebrow">Treasury / Your facilities</p><h2>Fund the work your agents do.</h2></div><span className="text-xs text-muted">Existing assets · explicit wallet approvals</span></div>
