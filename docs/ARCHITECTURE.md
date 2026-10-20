@@ -76,6 +76,12 @@ requires asset inputs and emits actual recipient-bound asset outputs. Its
 acceptance must be established with new finalized receipts, not inferred from
 the canonical accounting tests.
 
+The treasury reads held transparent assets directly from `ContractState.balance`
+in the same inspected contract snapshot. Wallet-style unshielded output queries
+are not a source of contract custody. The UI distinguishes actual held assets
+from `totalReserve` accounting and treats a failed summary as unavailable.
+Redemptions and replenishments can make those two quantities differ.
+
 ## Runtime modes
 
 **Wallet-only** serves the app and authenticated Preprod readers. The organization

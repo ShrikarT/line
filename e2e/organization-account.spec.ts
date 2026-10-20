@@ -181,6 +181,32 @@ test("wallet-only onboarding uses the account's actual receiving profile without
   expect(await page.evaluate(() => (window as unknown as { organizationSignatures: number }).organizationSignatures)).toBe(0);
 });
 
+test("facility custody uses the contract ledger balance instead of wallet-style outputs", async ({ page }) => {
+  test.setTimeout(120_000);
+  await page.goto("/app");
+  const result = await page.evaluate(async () => {
+    const { browserModuleUrl } = await import("/e2e/browser-module.ts" as any);
+    const { OrganizationNetwork } = await import(browserModuleUrl("/src/lib/organization/network.ts"));
+    let walletBalanceReads = 0;
+    // Controlled public-state read exercises the actual summary method only;
+    // finalized custody acceptance is checked separately against Preprod.
+    const contractState = { operations: () => Array.from({ length: 12 }, (_, i) => String(i)), balance: new Map([
+      [{ tag: "unshielded", raw: "0".repeat(64) }, 900000n],
+      [{ tag: "shielded", raw: "11".repeat(32) }, 123n],
+    ]) };
+    const book = { status: 1, settlementTokenColor: new Uint8Array(32), totalReserve: 1000000n, encumberedReserve: 0n, redeemedReserve: 100000n, contractDomain: new Uint8Array(32) };
+    const client = {
+      facility: () => ({ address: "ab".repeat(32) }), inspect: async () => ({ state: contractState, book }),
+      providers: { publicDataProvider: { queryUnshieldedBalances: async () => { walletBalanceReads++; return [{ tokenType: "0".repeat(64), balance: 999999n }]; } } },
+    };
+    const funded = await OrganizationNetwork.prototype.facilitySummary.call(client as any, "controlled-read");
+    contractState.balance.clear();
+    const empty = await OrganizationNetwork.prototype.facilitySummary.call(client as any, "controlled-read");
+    return { funded: funded.balances, reserve: funded.reserve, paid: funded.paid, empty: empty.balances, walletBalanceReads };
+  });
+  expect(result).toEqual({ funded: [{ color: "0".repeat(64), units: "900000" }], reserve: "1000000", paid: "100000", empty: [], walletBalanceReads: 0 });
+});
+
 test("the actual supplier client calls browser fetch with its required global receiver", async ({ page }) => {
   await page.route("**/api/organization/catalog", route => route.fulfill({ json: { network: "preprod", services: [] } }));
   await page.goto("/app");
@@ -305,11 +331,13 @@ test("refresh recovers a failed facility read without signing or recreating the 
   await page.getByLabel("Organization vault password", { exact: true }).fill("Organization123!");
   await page.getByRole("button", { name: "Open organization", exact: true }).click();
   await expect(page.getByRole("alert")).toContainText("Temporary facility read limit");
+  await expect(page.locator(".organization-contract").getByText("Balance unavailable", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Deposit assets", exact: true })).toBeDisabled();
   const before = await page.evaluate(() => { (window as any).facilityAvailable = true; return (window as any).facilityReads; });
   await page.getByRole("button", { name: "Refresh balances and suppliers", exact: true }).click();
   await expect(page.getByRole("button", { name: "Finish facility setup", exact: true })).toBeVisible({ timeout: 5_000 });
-  await expect(page.getByText("NONE · 10/12 circuit keys · Reserve inflow 0 · Principal paid 0", { exact: true })).toBeVisible();
+  await expect(page.getByText("NONE · 10/12 circuit keys · Reserve accounting 0 · Principal paid 0", { exact: true })).toBeVisible();
+  await expect(page.locator(".organization-contract").getByText("0 base units", { exact: true })).toBeVisible();
   await expect(page.getByRole("alert")).toHaveCount(0);
   const requests = await page.evaluate(() => ({ reads: (window as any).facilityReads, signatures: (window as any).organizationSignatures, proofs: (window as any).organizationProofRequests }));
   expect(requests.reads).toBeGreaterThan(before); expect(requests.signatures).toBe(0); expect(requests.proofs).toBe(0);

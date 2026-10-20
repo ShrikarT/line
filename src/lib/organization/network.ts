@@ -143,8 +143,8 @@ export class OrganizationNetwork {
   }
   async facilitySummary(id: string) {
     const facility = this.facility(id), { state, book } = await this.inspect(facility.address!, false);
-    const balances = await this.providers.publicDataProvider.queryUnshieldedBalances(facility.address!);
-    return { status: Status[book.status], registeredCircuits: state.operations().length, assetColor: toHex(book.settlementTokenColor), reserve: book.totalReserve.toString(), encumbered: book.encumberedReserve.toString(), paid: book.redeemedReserve.toString(), domain: toHex(book.contractDomain), balances: balances?.map(balance => ({ color: balance.tokenType, units: balance.balance.toString() })) ?? [] };
+    const balances = [...state.balance].flatMap(([type, balance]) => type.tag === "unshielded" ? [{ color: type.raw, units: balance.toString() }] : []);
+    return { status: Status[book.status], registeredCircuits: state.operations().length, assetColor: toHex(book.settlementTokenColor), reserve: book.totalReserve.toString(), encumbered: book.encumberedReserve.toString(), paid: book.redeemedReserve.toString(), domain: toHex(book.contractDomain), balances };
   }
   private async finish(receipt: FinalizedTxData) {
     const pending = this.account.pending();
