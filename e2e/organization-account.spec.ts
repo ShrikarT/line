@@ -50,6 +50,97 @@ async function connect(page: Page, id: "a" | "b") {
   await expect(page.getByRole("heading", { name: "Your wallet is connected." })).toBeVisible();
   await page.getByRole("link", { name: "Continue to workspace" }).click();
 }
+
+test("explicit resubmission retains the original signed bytes without another proof or balance request", async ({ page }) => {
+  test.setTimeout(120_000);
+  const reopenPending = async () => {
+    await page.getByLabel("Organization vault password", { exact: true }).fill("Organization123!");
+    await page.getByRole("button", { name: "Open organization", exact: true }).click();
+    await expect(page.getByRole("status").filter({ hasText: "Your wallet and organization contract release are ready" })).toBeVisible();
+  };
+  const L = await import("@midnight-ntwrk/ledger-v8");
+  // Serialization fixture only; it is not a signed network-valid maintenance approval.
+  const address = "ab".repeat(32), intent = L.Intent.new(new Date(Date.now() + 3600_000));
+  const unproven = L.Transaction.fromParts("preprod", undefined, undefined, intent.addMaintenanceUpdate(new L.MaintenanceUpdate(address, [], 0n)));
+  const unexpected = async () => { throw Error("No circuit proof is needed for this serialization fixture"); };
+  const signed = (await unproven.prove({ check: unexpected, prove: unexpected }, L.CostModel.initialCostModel())).bind();
+  const transaction = Buffer.from(signed.serialize()).toString("hex"), txId = signed.identifiers().at(-1)!;
+  const sourceFingerprint = createHash("sha256").update(readFileSync(new URL("../contracts/organization/line.compact", import.meta.url))).digest("hex");
+  await wallets(page, true, true); await page.goto("/app"); await connect(page, "a"); await unlock(page);
+  await page.evaluate(async ({ address, transaction, txId, sourceFingerprint }) => {
+    const { browserModuleUrl } = await import("/e2e/browser-module.ts" as any);
+    const { OrganizationAccount } = await import(browserModuleUrl("/src/lib/organization/account.ts"));
+    const { getConnectedWallet } = await import(browserModuleUrl("/src/lib/runtime/wallet.ts"));
+    const wallet = getConnectedWallet()!;
+    (window as any).originalSubmissionBytes = [];
+    wallet.submitTransaction = async (bytes: string) => {
+      (window as any).originalSubmissionBytes.push(bytes);
+      throw Error("Deliberate wallet submission rejection");
+    };
+    const account = await OrganizationAccount.unlock(wallet, "Organization123!");
+    await account.exclusive(async () => {
+      await account.prepare({ id: "original-maintenance", kind: "key", circuit: "draw", facilityId: null, contractAddress: address, sourceFingerprint, after: account.snapshot(), txId: null, transaction: null });
+      await account.submitted(txId, transaction, address);
+    });
+  }, { address, transaction, txId, sourceFingerprint });
+  await reopenPending();
+  await expect(page.getByRole("heading", { name: "Resolve the saved operation first.", exact: true })).toBeVisible();
+  expect(await page.evaluate(() => (window as any).originalSubmissionBytes)).toEqual([]);
+  const retry = page.getByRole("button", { name: "Retry original submission", exact: true });
+  await expect(retry).toBeVisible({ timeout: 5000 });
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+  await retry.click();
+  await expect(page.getByRole("dialog")).toContainText("same signed bytes");
+  expect(await page.getByRole("dialog").evaluate(element => element.scrollWidth <= element.clientWidth + 1)).toBe(true);
+  await page.screenshot({ path: "test-results/organization-product/original-submission-mobile.png", fullPage: true });
+  await page.setViewportSize({ width: 1280, height: 720 });
+  expect(await page.evaluate(() => (window as any).originalSubmissionBytes)).toEqual([]);
+  await page.getByRole("button", { name: "Resubmit same signed transaction", exact: true }).click();
+  await expect(page.getByRole("alert")).toContainText("Deliberate wallet submission rejection");
+  await expect(page.getByText(new RegExp(txId))).toBeVisible();
+  expect(await page.evaluate(() => ({ bytes: (window as any).originalSubmissionBytes, signatures: (window as any).organizationSignatures, proofs: (window as any).organizationProofRequests }))).toEqual({ bytes: [transaction], signatures: 0, proofs: 0 });
+  await page.getByRole("button", { name: "Lock organization", exact: true }).click(); await reopenPending();
+  await expect(page.getByText(new RegExp(txId))).toBeVisible();
+  expect(await page.evaluate(() => (window as any).originalSubmissionBytes)).toEqual([transaction]);
+  const staleReview = await page.evaluate(async ({ txId }) => {
+    const { browserModuleUrl } = await import("/e2e/browser-module.ts" as any);
+    const { OrganizationNetwork } = await import(browserModuleUrl("/src/lib/organization/network.ts"));
+    let submissions = 0, checks = 0;
+    const client = { account: {
+      exclusive: async (action: () => Promise<void>) => { checks++; return action(); },
+      pending: () => ({ id: "different-operation", txId }),
+      wallet: { submitTransaction: async () => { submissions++; } },
+    } };
+    let rejected = false;
+    try { await OrganizationNetwork.prototype.resubmitOriginal.call(client as any, { operationId: "reviewed-operation", txId }); }
+    catch (error) { rejected = /saved operation changed/i.test((error as Error).message); }
+    return { rejected, submissions, checks };
+  }, { txId });
+  expect(staleReview).toEqual({ rejected: true, submissions: 0, checks: 1 });
+  await page.evaluate(async ({ txId }) => {
+    const { browserModuleUrl } = await import("/e2e/browser-module.ts" as any);
+    const { OrganizationNetwork } = await import(browserModuleUrl("/src/lib/organization/network.ts"));
+    const { getConnectedWallet } = await import(browserModuleUrl("/src/lib/runtime/wallet.ts"));
+    getConnectedWallet()!.submitTransaction = async (bytes: string) => { (window as any).originalSubmissionBytes.push(bytes); };
+    // Controlled receipt seam verifies durable promotion only, not network acceptance.
+    (OrganizationNetwork.prototype as any).tx = () => ({ finality: {
+      wait: async (id: string) => {
+        if (id !== txId) throw Error("A replacement transaction was observed");
+        return { identifiers: [txId], blockHeight: 321, txHash: "ee".repeat(32), status: "SucceedEntirely" };
+      }, forget: () => {},
+    } });
+  }, { txId });
+  await page.getByRole("button", { name: "Retry original submission", exact: true }).click();
+  await page.getByRole("button", { name: "Resubmit same signed transaction", exact: true }).click();
+  await expect(page.getByRole("status")).toContainText("Confirmed on Midnight Preprod");
+  await expect(page.getByRole("heading", { name: "Resolve the saved operation first.", exact: true })).toHaveCount(0);
+  await expect(page.getByText("1 finalized transactions", { exact: true })).toBeVisible();
+  expect(await page.evaluate(() => ({ bytes: (window as any).originalSubmissionBytes, signatures: (window as any).organizationSignatures, proofs: (window as any).organizationProofRequests }))).toEqual({ bytes: [transaction, transaction], signatures: 0, proofs: 0 });
+  await page.getByRole("button", { name: "Lock organization", exact: true }).click(); await reopenPending();
+  await expect(page.getByRole("heading", { name: "Resolve the saved operation first.", exact: true })).toHaveCount(0);
+  await expect(page.getByText("1 finalized transactions", { exact: true })).toBeVisible();
+});
 async function disconnect(page: Page) {
   await page.locator("header").getByRole("button", { name: "Manage connected wallet" }).click();
   await page.getByRole("button", { name: "Disconnect from Line" }).click();

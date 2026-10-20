@@ -1,6 +1,6 @@
 # Wave progress
 
-Updated 20 October 2026. Line's current release is a Midnight Preprod prototype
+Updated 21 October 2026. Line's current release is a Midnight Preprod prototype
 for organization-funded agent purchases. Production credit, complete historical
 privacy and independent commercial custody are not yet established.
 
@@ -44,7 +44,7 @@ milestone established a local protocol prototype, not customer-funded settlement
 | Canonical accounting | Facility `8990864c6f80c517c7458fa9b2526d3500f3a9814399fc836097ee409da9bed0`; retained checkpoint has 29 receipts, with no token-payout claim |
 | Test-token settlement | Facility `a159597495b52ea7a703a29562b17fcb042bf7eaa984ec1e05e7e8935208304b`; complete 21-transaction two-merchant checkpoint |
 | Organization wallet | Actual 1AM facility and twelve verifier keys; funding, allowance, quote, draw, redemption, replenishment, withdrawal, pause, resume and zero-outstanding closure confirmed. Twenty-two receipts in the workspace. Selected finalized receipts, fixed recipients and actual contract custody were checked through the configured indexer/RPC; fee-bearing acceptance and independent merchant fulfillment remain open |
-| Regression checks | Full CI for read-serialization release `e37616b` and fee-control release `d521b7f`: all four jobs passed, including verification, native worker ownership on Windows/Linux and Windows checkpoint ACLs. Local checks include all 26 account browser cases, the production build, key/secret scans and zero managed-binding drift. The fee-control core suite passed 660 tests with one skipped |
+| Regression checks | Full CI for read-serialization release `e37616b` and fee-control release `d521b7f`: all four jobs passed. Current original-submission recovery checks passed 664 core tests with one skipped, all 27 account browser cases, the further mobile retry/persistence case, the production build, key/secret scans and zero managed-binding drift. Full CI for these newer changes is not yet established |
 | Public host | Free wallet-only server, source-matched proving files, signed reader sessions and actual historical Preprod reads verified |
 
 [Finalized test-token evidence](https://github.com/ShrikarT/line/blob/bbb2fdf/docs/TEST_TOKEN_PAYOUT_2026-10-16.md)
@@ -188,6 +188,46 @@ encrypted backup download. Saving it remains owner-confirmed work. Further
 funded acceptance is blocked on reconciling the retained transaction and the
 owner reporting the wallet's pending/error state; no replacement is authorized
 by an absent indexer record alone.
+
+The recovery UI previously offered only observation after a signed submission
+timeout. It now also offers an explicit, confirmed retry through the connected
+wallet using the same signed bytes. The existing candidate, identifier and
+recipient are retained; no new proof, balance request or payment candidate is
+prepared. Fresh wallet/account locking remains required. Stale confirmations,
+changed release/action metadata, noncanonical bytes and expired transactions are
+rejected before submission. Rejection or another timeout keeps the original
+operation for reconciliation. This is manual resubmission, not automatic retry
+or permission to discard an unobserved transaction.
+
+The controlled browser regression first reached the pending operation and failed
+because no retry action existed. It now verifies that opening the confirmation
+does not submit; rejection preserves the exact operation across vault reopening;
+a stale review cannot submit; and a matching controlled receipt completes the
+original durable operation without another proof or balance approval. Public
+serialization checks cover deployment, maintenance and call bytes plus expiry
+and metadata rejection. These checks do not establish a new Preprod receipt or
+resolve the owner's pending allowance by themselves.
+
+The initial full local run reported 662 passes, one skipped case and one
+checkpoint-write failure in the existing SDK-merge journal test. The same case
+then passed in isolation, and all nineteen tests in that file passed without a
+storage change. Its underlying filesystem failure was not established; it is not
+reported as fixed. The complete organization browser suite passed all twenty-seven
+cases. A further 390px check reproduced pending-identifier overflow; allowing the
+recovery panel to shrink and wrap fixed it, and the full retry/persistence case
+then passed on mobile as well.
+
+The subsequent complete core run passed 664 of 665 tests, with one skipped and
+no failures. Temporary, local-only I/O tracing recorded the expected lease
+conflict and the deliberately injected publication failure; it did not reproduce
+the earlier unexpected failure. The trace was removed. The final production
+build, key/secret scans and zero managed-binding drift checks passed. No Compact
+source, verifier key, financial authorization or automatic retry policy changed.
+
+A fresh configured-provider read at 19:17 UTC on 20 October still returned no
+indexed transaction for the retained identifier, with status CLOSED, generation
+1, fees 0/0 and 900,000 units held. This is neither a new finalized receipt nor
+permission to clear the original candidate.
 
 Fresh organization receipts cover eight distinct call names: `fundReserve`,
 `withdrawUnencumberedReserve`, `openLine`, `postQuote`, `draw`, `redeemDraw`,

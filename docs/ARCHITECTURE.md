@@ -32,6 +32,16 @@ failed or uncertain operation retains the evidence needed for reconciliation.
 Partial failure does not trigger a replacement payment. Backup restoration checks
 wallet scope, private openings and observed contract state before replacing data.
 
+After checking an unresolved signed transaction and clearing active wallet
+requests, the owner can explicitly retry its original submission. A confirmation
+dialog identifies the saved transaction. The account lock reloads the durable
+operation and rejects a stale confirmation. The SDK checks the pinned release,
+canonical signed bytes, identifier, action kind, call entry point, target and expiry before
+forwarding the same bytes to the connected wallet. It does not prepare, balance
+or prove another transaction. A rejected or timed-out retry retains the operation;
+only the exact finalized receipt can publish its candidate state. Expired bytes
+cannot be resent, and expiry or an absent receipt alone never clears the journal.
+
 Encrypted backup export holds the same account lock and reloads the latest durable
 record, including any pending operation. It requires the unlocked vault session
 but remains available when the wallet's remote read API fails. Export rechecks

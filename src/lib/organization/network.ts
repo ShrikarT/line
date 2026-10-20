@@ -14,7 +14,7 @@ import type { LinePrivateWitnessContext } from "../runtime/network";
 import { agentId, canonicalInvoiceIdBytes, drawNoteCommit, issuerPublicKey, merchantPublicKey, quoteCommit, randomBytes32, requiredDrawFee, toHex } from "../line/encoding";
 import { decodeMerchant, decodeQuote, encodeNote } from "./transfers";
 import { OrganizationAccount, bytes32, copyAccount, receivingAddressBytes, type MerchantBinding, type OrganizationFacility, type OrganizationNote, type OrganizationQuote, type OrganizationReceipt, type OrganizationSnapshot } from "./account";
-import { OrganizationTransactions } from "./transactions";
+import { OrganizationTransactions, originalOrganizationTransaction } from "./transactions";
 import { withinDeadline } from "./finality";
 import { activeServiceOrder, requireReplaceableOrder, retireServiceAttempt, serviceOrderNote, supplierRequestId } from "./orders";
 import { matchesRestoredFacility, matchesRestoredNotes } from "./recovery";
@@ -473,6 +473,21 @@ export class OrganizationNetwork {
       delete order.noteCommitment; delete order.quoteCommitment; delete order.quoteExpiry;
     });
     await this.continueService(orderId);
+  }
+  async resubmitOriginal(expected: { operationId: string; txId: string }) {
+    return this.account.exclusive(async () => {
+      const pending = this.account.pending();
+      if (!pending) throw new Error("No signed organization transaction is saved for resubmission.");
+      if (pending.id !== expected.operationId || pending.txId !== expected.txId) throw new Error("The saved operation changed. Check its current transaction before retrying.");
+      originalOrganizationTransaction(pending, this.release.sourceFingerprint);
+      this.report("Resubmitting the original signed transaction through your wallet");
+      // This explicit action bypasses preparation, proving and balancing. Never
+      // use the normal submit wrapper: it would attempt to save a new candidate.
+      await withinDeadline(this.account.wallet.submitTransaction(pending.transaction!), 30_000,
+        "The original transaction submission acknowledgement timed out. Its signed bytes are still saved; check its status before trying again.");
+      await this.account.assertWallet();
+      await this.finish(await this.tx().finality.wait(pending.txId!));
+    });
   }
   async reconcile() {
     return this.account.exclusive(async () => {
