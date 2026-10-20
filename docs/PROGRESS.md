@@ -176,11 +176,18 @@ acknowledgement timed out; the signed identifier
 `006c23221e7a0ebe76a1975d827166437f010f611e6a95bd38d6b0c5b55ab524e2`
 remains retained in the encrypted pending operation. Checking that exact
 transaction did not establish finality, and the separate configured indexer/RPC
-lookup did not return a unique receipt. The last observed workspace remained
-CLOSED with twenty-two receipts. Do not create a replacement allowance or discard
+lookup did not return a unique receipt. A subsequent read at 13:20 UTC returned
+HTTP 200 without GraphQL errors and zero indexed records for that identifier.
+Current contract state was still CLOSED, generation 1, fees 0/0 and 900,000 units
+held; the workspace retained twenty-two receipts. Do not create a replacement allowance or discard
 this candidate without reconciling its original transaction. Browser control
 detached during the subsequent encrypted-backup download check; that download
 is not confirmed saved.
+Browser control subsequently recovered, and the app confirmed requesting the
+encrypted backup download. Saving it remains owner-confirmed work. Further
+funded acceptance is blocked on reconciling the retained transaction and the
+owner reporting the wallet's pending/error state; no replacement is authorized
+by an absent indexer record alone.
 
 Fresh organization receipts cover eight distinct call names: `fundReserve`,
 `withdrawUnencumberedReserve`, `openLine`, `postQuote`, `draw`, `redeemDraw`,
