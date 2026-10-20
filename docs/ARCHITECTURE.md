@@ -49,6 +49,13 @@ The treasury refresh control retries facility state as well as wallet balances
 and supplier discovery. A failed facility read keeps spending controls disabled
 until a successful read restores the required setup and status checks.
 
+The treasury sequences its wallet-dependent facility summary and balance read.
+Refreshes queue behind a still-running read and skip superseded work. Balance
+maps are cached for local asset selection; typing does not issue wallet RPCs.
+Balance waits are bounded, and stale work cannot update the current view.
+Mutation controls wait for reads to settle and required facility data to load;
+refresh remains available. No fresh identity check or transaction guard is removed.
+
 Merchant invoice references preserve the protocol's existing 32-byte encoding:
 UTF-8 text of at most 32 bytes, or a 64-digit hexadecimal ID with optional `0x`.
 The form shares validation with the encoder and reports invalid input inline.

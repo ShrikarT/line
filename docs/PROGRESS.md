@@ -44,7 +44,7 @@ milestone established a local protocol prototype, not customer-funded settlement
 | Canonical accounting | Facility `8990864c6f80c517c7458fa9b2526d3500f3a9814399fc836097ee409da9bed0`; retained checkpoint has 29 receipts, with no token-payout claim |
 | Test-token settlement | Facility `a159597495b52ea7a703a29562b17fcb042bf7eaa984ec1e05e7e8935208304b`; complete 21-transaction two-merchant checkpoint |
 | Organization wallet | Actual 1AM facility and twelve verifier keys; funding, allowance, quote, draw, redemption, replenishment, withdrawal, pause and resume confirmed. Twenty-one receipts in the workspace. Selected finalized receipts, fixed recipients and actual contract custody were checked through the configured indexer/RPC; independent merchant fulfillment remains open |
-| Regression checks | Full CI for backup-status release `7937fe5`: all four jobs passed, including verification, native worker ownership on Windows/Linux and Windows checkpoint ACLs. Current fee-control checks include 660 core tests passed with one skipped, all 25 account browser cases, production builds, key/secret scans and zero managed-binding drift |
+| Regression checks | Full CI for backup-status release `7937fe5`: all four jobs passed, including verification, native worker ownership on Windows/Linux and Windows checkpoint ACLs. Current fee-control checks include 660 core tests passed with one skipped, all 26 account browser cases, production builds, key/secret scans and zero managed-binding drift |
 | Public host | Free wallet-only server, source-matched proving files, signed reader sessions and actual historical Preprod reads verified |
 
 [Finalized test-token evidence](https://github.com/ShrikarT/line/blob/bbb2fdf/docs/TEST_TOKEN_PAYOUT_2026-10-16.md)
@@ -258,6 +258,20 @@ vault opening or a contract read. The owner must restore the local wallet
 connection before further funded acceptance; the extension cannot be operated
 through the available browser control. The existing 21-transaction backup is
 retained, and no replacement facility or payment was created.
+
+After the owner restored the connection and reopened the organization, entering
+the treasury still returned "Request failed". A controlled concurrency-sensitive
+wallet reproduced that symptom: the treasury started its wallet-balance request
+alongside the facility summary's identity probes. The treasury now sequences
+those reads, including refreshes arriving before an earlier read settles. It
+caches the balance map so editing an asset does not issue another wallet RPC.
+Stale reads cannot publish results or start the next balance request; the balance
+wait is bounded. Treasury mutations wait for reads to settle and for required
+facility data, while explicit refresh remains available. Fresh wallet checks for
+mutations are retained. This fixes the reproduced overlap; whether it resolves
+the owner's live 1AM failure remains unverified until the updated app is tested.
+All twenty-six organization browser cases, typecheck, the production build,
+key/secret scans and zero managed-binding drift checks pass for this change.
 
 Encrypted backup export now uses the unlocked vault session and account lock
 without depending on the wallet's remote API. It reloads the current durable
