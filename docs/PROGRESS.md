@@ -43,8 +43,8 @@ milestone established a local protocol prototype, not customer-funded settlement
 | --- | --- |
 | Canonical accounting | Facility `8990864c6f80c517c7458fa9b2526d3500f3a9814399fc836097ee409da9bed0`; retained checkpoint has 29 receipts, with no token-payout claim |
 | Test-token settlement | Facility `a159597495b52ea7a703a29562b17fcb042bf7eaa984ec1e05e7e8935208304b`; complete 21-transaction two-merchant checkpoint |
-| Organization wallet | Actual 1AM facility, twelve verifier keys, one tNIGHT deposit, allowance, quote, draw and 0.1 tNIGHT redemption confirmed; seventeen receipts in the workspace. Separate indexer/RPC checks matched the checkout calls, registered payout recipient and remaining 0.9 tNIGHT in contract custody. Independent merchant fulfillment and remaining lifecycle checks are open |
-| Regression checks | Full CI for deployed code `2fcdba2`: all four jobs passed, including verification, native worker ownership on Windows/Linux and Windows checkpoint ACLs. Local checks include 658 core tests passed with one skipped, all 19 account browser cases, 75 organization tests, 13 vault tests, production builds and key/secret scans |
+| Organization wallet | Actual 1AM facility and twelve verifier keys; funding, allowance, quote, draw, redemption, replenishment, withdrawal and pause confirmed. Twenty receipts in the workspace. Selected finalized receipts, fixed recipients and actual contract custody were checked through the configured indexer/RPC; independent merchant fulfillment remains open |
+| Regression checks | Full CI for deployed code `2fcdba2`: all four jobs passed, including verification, native worker ownership on Windows/Linux and Windows checkpoint ACLs. Local checks include 658 core tests passed with one skipped, all 20 account browser cases for the subsequent custody fix, 75 organization tests, 13 vault tests, production builds and key/secret scans |
 | Public host | Free wallet-only server, source-matched proving files, signed reader sessions and actual historical Preprod reads verified |
 
 [Finalized test-token evidence](https://github.com/ShrikarT/line/blob/bbb2fdf/docs/TEST_TOKEN_PAYOUT_2026-10-16.md)
@@ -61,9 +61,9 @@ submitted. The accepted complete checkpoint remains the earlier 21-transaction r
 
 Fresh organization deployment, twelve-key setup, funding, allowance opening,
 merchant quote, agent draw and merchant redemption are verified through 1AM.
-Continue with replenishment, withdrawals, status controls and independent merchant
-fulfillment, checking original transactions and actual asset movements against
-finalized receipts. A closed wallet-extension channel now produces
+Replenishment, unencumbered withdrawal and pause are also verified. Finish the
+resume check and independent merchant fulfillment, checking original transactions
+and actual asset movements against finalized receipts. A closed wallet-extension channel now produces
 refresh/reconnect guidance without publishing an unverified connected account.
 1AM is the current working connection path. Its retired Preprod read URLs now
 select Line's authenticated same-origin reader; the wallet retains proving,
@@ -139,6 +139,34 @@ the owner confirmed no pending wallet request before reconciliation and retry.
 This checkout used the owner's registered merchant wallet. It establishes the
 protocol payout path, not an independent commercial merchant or service fulfillment.
 
+The owner then deposited 100,000 base units through `acknowledgeRepayment`,
+restoring the private spending balance to zero and the full 1,000,000-unit
+allowance. The finalized transaction contains the actual native-asset deposit;
+contract custody rose to 1,000,000 while reserve accounting rose to 1,100,000.
+A subsequent unencumbered withdrawal paid 100,000 units to the fixed issuer
+recipient, leaving 900,000 in custody and 1,000,000 in reserve accounting.
+Pause was finalized through `setStatus` (the protocol's `DEFAULTED` status),
+without moving assets. Resume acceptance is still pending.
+
+| Operation | Finalized transaction | Block |
+| --- | --- | --- |
+| Replenishment | `6df1b8453e811030e65a8bca568882814a0ffcb4dcf0dd995634f5fe83d70aef` | 3,059,534 |
+| Withdrawal | `92c149ea2a636a51dfa6afaebe5cc17d8f8902750e4e75576e8f83b574307cb0` | 3,059,575 |
+| Pause | `cf4d26a71bef83e78217af23f3e88e54866a4331f31c56406f9e6d4322942ae1` | 3,059,617 |
+
+These read-only checks match finalized receipts and contract snapshots through
+configured TLS indexer/RPC services; they are not independent full-node or local
+proof verification. All twelve installed verifier keys still match the pinned
+organization release. The owner is also the receiving merchant in this run.
+
+The treasury now reads custody from `ContractState.balance`, avoiding a redundant
+wallet-style output lookup that could report an empty or unrelated balance. It
+shows assets held separately from reserve accounting, and failed reads remain
+unavailable. The regression first reproduced the incorrect source, then checked
+the actual SDK summary, empty custody, shielded-asset exclusion and zero extra
+wallet-balance reads. All twenty account browser tests, 658 core tests (one
+skipped), typecheck and the deployment build passed for this fix.
+
 An oversized merchant reference exposed the encoder's `pad32 overflow` message.
 The form now uses the same validation as invoice encoding: at most 32 UTF-8
 bytes of text, or a complete 64-digit hexadecimal ID (optional `0x` prefix).
@@ -204,8 +232,9 @@ it does not establish the cause of the earlier owner-tab timeout.
 ## Wave 3 — pilots and hardening
 
 1. Extend organization acceptance beyond the verified same-owner checkout through
-   independent merchant checkout, replenishment, withdrawal, status controls and
-   interrupted-operation recovery.
+   independent merchant checkout, remaining status/recovery cases and
+   interrupted-operation recovery. Replenishment, withdrawal and pause have
+   finalized same-owner acceptance evidence above.
    Confirm every step against finalized receipts and actual asset movements.
 2. Operate independently funded merchants and durable automated suppliers. The
    current free host does not provide hosted supplier automation.

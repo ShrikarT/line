@@ -41,7 +41,7 @@ flowchart LR
     N --> R[Merchant redeems once]
 ```
 
-The canonical contract records accounting. A separate test-settlement profile has confirmed two-merchant Preprod test-token payouts. The organization-funded profile has now completed fresh 1AM funding, allowance opening, quote, draw and a 0.1 tNIGHT redemption to its registered recipient, leaving 0.9 tNIGHT in contract custody. This used the owner's merchant wallet; independent merchant fulfillment and the remaining reserve lifecycle are still open. These profiles are not interchangeable.
+The canonical contract records accounting. A separate test-settlement profile has confirmed two-merchant Preprod test-token payouts. The organization-funded profile has now completed fresh 1AM funding, allowance opening, quote, draw and a 0.1 tNIGHT redemption to its registered recipient, leaving 0.9 tNIGHT in contract custody. A subsequent 0.1 tNIGHT replenishment and 0.1 tNIGHT withdrawal are also verified, leaving custody at 0.9 tNIGHT and restoring the full agent allowance. This used the owner's merchant wallet; independent merchant fulfillment remains open. These profiles are not interchangeable.
 
 ## Midnight contracts
 
