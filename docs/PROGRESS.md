@@ -43,7 +43,7 @@ milestone established a local protocol prototype, not customer-funded settlement
 | --- | --- |
 | Canonical accounting | Facility `8990864c6f80c517c7458fa9b2526d3500f3a9814399fc836097ee409da9bed0`; retained checkpoint has 29 receipts, with no token-payout claim |
 | Test-token settlement | Facility `a159597495b52ea7a703a29562b17fcb042bf7eaa984ec1e05e7e8935208304b`; complete 21-transaction two-merchant checkpoint |
-| Organization wallet | Actual 1AM facility and twelve verifier keys; funding, allowance, quote, draw, redemption, replenishment, withdrawal and pause confirmed. Twenty receipts in the workspace. Selected finalized receipts, fixed recipients and actual contract custody were checked through the configured indexer/RPC; independent merchant fulfillment remains open |
+| Organization wallet | Actual 1AM facility and twelve verifier keys; funding, allowance, quote, draw, redemption, replenishment, withdrawal, pause and resume confirmed. Twenty-one receipts in the workspace. Selected finalized receipts, fixed recipients and actual contract custody were checked through the configured indexer/RPC; independent merchant fulfillment remains open |
 | Regression checks | Full CI for deployed code `2fcdba2`: all four jobs passed, including verification, native worker ownership on Windows/Linux and Windows checkpoint ACLs. Local checks include 658 core tests passed with one skipped, all 20 account browser cases for the subsequent custody fix, 75 organization tests, 13 vault tests, production builds and key/secret scans |
 | Public host | Free wallet-only server, source-matched proving files, signed reader sessions and actual historical Preprod reads verified |
 
@@ -61,9 +61,10 @@ submitted. The accepted complete checkpoint remains the earlier 21-transaction r
 
 Fresh organization deployment, twelve-key setup, funding, allowance opening,
 merchant quote, agent draw and merchant redemption are verified through 1AM.
-Replenishment, unencumbered withdrawal and pause are also verified. Finish the
-resume check and independent merchant fulfillment, checking original transactions
-and actual asset movements against finalized receipts. A closed wallet-extension channel now produces
+Replenishment, unencumbered withdrawal, pause and resume are also verified. Continue
+with independent merchant fulfillment and remaining recovery cases, checking
+original transactions and asset movements against finalized receipts.
+A closed wallet-extension channel now produces
 refresh/reconnect guidance without publishing an unverified connected account.
 1AM is the current working connection path. Its retired Preprod read URLs now
 select Line's authenticated same-origin reader; the wallet retains proving,
@@ -146,13 +147,15 @@ contract custody rose to 1,000,000 while reserve accounting rose to 1,100,000.
 A subsequent unencumbered withdrawal paid 100,000 units to the fixed issuer
 recipient, leaving 900,000 in custody and 1,000,000 in reserve accounting.
 Pause was finalized through `setStatus` (the protocol's `DEFAULTED` status),
-without moving assets. Resume acceptance is still pending.
+without moving assets. Resume then finalized with status `OPEN`, custody unchanged
+at 900,000 units, zero private spending balance and the full allowance restored.
 
 | Operation | Finalized transaction | Block |
 | --- | --- | --- |
 | Replenishment | `6df1b8453e811030e65a8bca568882814a0ffcb4dcf0dd995634f5fe83d70aef` | 3,059,534 |
 | Withdrawal | `92c149ea2a636a51dfa6afaebe5cc17d8f8902750e4e75576e8f83b574307cb0` | 3,059,575 |
 | Pause | `cf4d26a71bef83e78217af23f3e88e54866a4331f31c56406f9e6d4322942ae1` | 3,059,617 |
+| Resume | `08435fb970a6856c5d15270dfb299005924eef050040476a781279b3d48fad42` | 3,059,694 |
 
 These read-only checks match finalized receipts and contract snapshots through
 configured TLS indexer/RPC services; they are not independent full-node or local
@@ -233,7 +236,7 @@ it does not establish the cause of the earlier owner-tab timeout.
 
 1. Extend organization acceptance beyond the verified same-owner checkout through
    independent merchant checkout, remaining status/recovery cases and
-   interrupted-operation recovery. Replenishment, withdrawal and pause have
+   interrupted-operation recovery. Replenishment, withdrawal, pause and resume have
    finalized same-owner acceptance evidence above.
    Confirm every step against finalized receipts and actual asset movements.
 2. Operate independently funded merchants and durable automated suppliers. The
