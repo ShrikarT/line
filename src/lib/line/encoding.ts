@@ -340,12 +340,17 @@ export function shortHex(hex: string, n = 8): string {
   return `${hex.slice(0, n)}…${hex.slice(-n)}`;
 }
 
-/**
- * Deterministic canonical invoice ID encoding:
- * If a 64-character (32-byte) hex string, decodes directly to bytes.
- * Otherwise, encodes ASCII/UTF-8 string padded to 32 bytes with zeros.
- */
+/** Shared UI/encoding validation; never truncate or rehash an invoice ID. */
+export function invoiceReferenceError(invoiceId: string): string {
+  const clean = invoiceId.startsWith("0x") ? invoiceId.slice(2) : invoiceId;
+  if (/^[0-9a-fA-F]{64}$/.test(clean) || new TextEncoder().encode(invoiceId).length <= 32) return "";
+  return "Use a reference of at most 32 UTF-8 bytes, or a 64-digit hexadecimal invoice ID.";
+}
+
+/** Decode a 32-byte hex ID, or zero-pad a UTF-8 reference to 32 bytes. */
 export function canonicalInvoiceIdBytes(invoiceId: string): Uint8Array {
+  const error = invoiceReferenceError(invoiceId);
+  if (error) throw new Error(error);
   const clean = invoiceId.startsWith("0x") ? invoiceId.slice(2) : invoiceId;
   if (/^[0-9a-fA-F]{64}$/.test(clean)) {
     return fromHex(clean);

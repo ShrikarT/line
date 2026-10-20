@@ -41,7 +41,7 @@ flowchart LR
     N --> R[Merchant redeems once]
 ```
 
-The canonical contract records accounting. A separate test-settlement profile has confirmed two-merchant Preprod test-token payouts. The newer organization-funded profile receives existing assets and pays registered recipients; its fresh, wallet-approved end-to-end acceptance remains in progress. These profiles are not interchangeable.
+The canonical contract records accounting. A separate test-settlement profile has confirmed two-merchant Preprod test-token payouts. The organization-funded profile has now completed fresh 1AM funding, allowance opening, quote, draw and a 0.1 tNIGHT redemption to its registered recipient, leaving 0.9 tNIGHT in contract custody. This used the owner's merchant wallet; independent merchant fulfillment and the remaining reserve lifecycle are still open. These profiles are not interchangeable.
 
 ## Midnight contracts
 
@@ -61,7 +61,7 @@ Compact is the source of truth. Commitments use Midnight's `persistentCommit` an
 | Wave | Delivered / planned |
 | --- | --- |
 | **Wave 1 — foundation** | Five-circuit spending prototype, compiled Compact, issuer/agent/merchant consoles, reference execution and MCP integration |
-| **Wave 2 — checkout** | Twelve circuits, two merchants, reserve controls, redemption, expiry and recovery, confirmed Preprod test-token settlement, wallet-first organization workspace and public app; fresh organization funding verified through 1AM, with checkout acceptance continuing |
+| **Wave 2 — checkout** | Twelve circuits, two merchants, reserve controls, redemption, expiry and recovery, confirmed Preprod test-token settlement, wallet-first organization workspace and public app; fresh 1AM organization funding and checkout payout verified |
 | **Wave 3 — pilots and hardening** | Independent supplier operation, complete purchasing/recovery acceptance, stronger historical privacy and a real API/compute purchasing pilot |
 
 See [progress](docs/PROGRESS.md) for what is verified and what remains open.

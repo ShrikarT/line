@@ -67,6 +67,30 @@ async function profile(page: Page) {
   return JSON.parse(await page.getByLabel("Your public merchant profile", { exact: true }).inputValue());
 }
 
+test("merchant invoice references reject oversized UTF-8 before requesting a proof", async ({ page }) => {
+  test.setTimeout(120_000);
+  await wallets(page, true); await page.goto("/app");
+  await connect(page, "a"); await unlock(page);
+  await page.getByRole("tab", { name: "Merchant", exact: true }).click();
+  await page.getByLabel("Organization facility address", { exact: true }).fill("ab".repeat(32));
+  await page.getByLabel("Price in this facility’s asset base units", { exact: true }).fill("100000");
+  const reference = page.getByRole("textbox", { name: "Invoice / service reference", exact: true });
+  const submit = page.getByRole("button", { name: "Post quote in wallet", exact: true });
+  for (const value of ["Line protocol checkout acceptance 2026-10-20", "é".repeat(17)]) {
+    await reference.fill(value);
+    await expect(reference).toHaveAttribute("aria-invalid", "true");
+    await expect(submit).toBeDisabled();
+    await expect(page.getByRole("alert")).toContainText("32 UTF-8 bytes");
+    await reference.press("Enter");
+  }
+  for (const value of ["x".repeat(32), "é".repeat(16), "ab".repeat(32), "0x" + "AB".repeat(32)]) {
+    await reference.fill(value);
+    await expect(reference).toHaveAttribute("aria-invalid", "false");
+    await expect(submit).toBeEnabled();
+  }
+  expect(await page.evaluate(() => ({ proof: (window as any).organizationProofRequests, signatures: (window as any).organizationSignatures }))).toEqual({ proof: 0, signatures: 0 });
+});
+
 test("real product routes require a wallet and expose no operator or simulator shortcuts", async ({ page }) => {
   test.setTimeout(120_000);
   const posts: string[] = [], errors: string[] = [];

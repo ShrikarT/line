@@ -43,7 +43,7 @@ milestone established a local protocol prototype, not customer-funded settlement
 | --- | --- |
 | Canonical accounting | Facility `8990864c6f80c517c7458fa9b2526d3500f3a9814399fc836097ee409da9bed0`; retained checkpoint has 29 receipts, with no token-payout claim |
 | Test-token settlement | Facility `a159597495b52ea7a703a29562b17fcb042bf7eaa984ec1e05e7e8935208304b`; complete 21-transaction two-merchant checkpoint |
-| Organization wallet | Actual 1AM facility deployed; all twelve verifier keys installed; one tNIGHT deposit finalized at block 3,049,290. Independent indexer/RPC checks matched receipts, native asset input and contract balance; checkout and the remaining lifecycle are not yet accepted |
+| Organization wallet | Actual 1AM facility, twelve verifier keys, one tNIGHT deposit, allowance, quote, draw and 0.1 tNIGHT redemption confirmed; seventeen receipts in the workspace. Separate indexer/RPC checks matched the checkout calls, registered payout recipient and remaining 0.9 tNIGHT in contract custody. Independent merchant fulfillment and remaining lifecycle checks are open |
 | Regression checks | Full CI for deployed code `1ee3c06`: all four jobs passed, including verification, native worker ownership on Windows/Linux and Windows checkpoint ACLs. The recovery release passed the full local core suite (656 passed, one skipped); the treasury refresh change also passed all 16 account browser cases, deployment build and key/secret checks |
 | Public host | Free wallet-only server, source-matched proving files, signed reader sessions and actual historical Preprod reads verified |
 
@@ -59,10 +59,11 @@ submitted. The accepted complete checkpoint remains the earlier 21-transaction r
 
 ### Current priority — organization checkout
 
-Fresh organization deployment, twelve-key setup and funding are verified. Continue
-through allowance, merchant quote, agent claim and redemption, checking original
-transactions and actual asset movements against finalized receipts. Complete
-checkout acceptance remains open after Wave 2 submission. A closed wallet-extension channel now produces
+Fresh organization deployment, twelve-key setup, funding, allowance opening,
+merchant quote, agent draw and merchant redemption are verified through 1AM.
+Continue with replenishment, withdrawals, status controls and independent merchant
+fulfillment, checking original transactions and actual asset movements against
+finalized receipts. A closed wallet-extension channel now produces
 refresh/reconnect guidance without publishing an unverified connected account.
 1AM is the current working connection path. Its retired Preprod read URLs now
 select Line's authenticated same-origin reader; the wallet retains proving,
@@ -107,13 +108,50 @@ reserve accounting. Thirteen organization transactions are confirmed. These
 checks use configured TLS indexer/RPC data, not independent full-node or local
 proof verification; they do not establish merchant payout or cash settlement.
 
-The subsequent allowance attempt reached the wallet's balancing/signature step
-but exceeded its 180-second wait. No Line submission was recorded. The owner
-reported approving the request; the wallet's current pending-task state still
-needs confirmation before another request is prepared. A fresh read at
-14:17 UTC on 19 October found status `NONE` and the full 1,000,000 native-asset
-base units still held by the contract. Allowance and merchant checkout are not
-yet accepted; the timed-out request is not reported as a successful transaction.
+The first allowance attempt reached the wallet's balancing/signature step but
+exceeded its 180-second wait. No Line submission was recorded. On 20 October,
+the owner confirmed the old wallet request was cleared. Reopening the vault
+revealed an unsubmitted candidate, which was reconciled through the existing
+recovery control before preparing a replacement. After owner approvals, the
+replacement `openLine` transaction
+`48a13cca323df8a4d719a19c1e0963e7c322c549bde4ce75782b3438b517049c`
+finalized at block 3,058,632. A separate raw-receipt/indexer/RPC check matched
+the contract action and finalized block; current state is `OPEN`, all twelve
+keys still match, and the contract retains 1,000,000 native-asset base units.
+The encrypted workspace initially showed a 1,000,000-unit allowance, zero spending
+balance and a seven-day expiry. The subsequent 100,000-unit quote, draw and
+redemption finalized in order:
+
+| Action | Transaction | Finalized block |
+| --- | --- | --- |
+| `postQuote` | `6ce7e7d3704c6abdc2cb9a74cb698e8f0a467a35ba75490752aeae7f47f4a2c2` | 3,058,680 |
+| `draw` | `0e70cdc79ba75a9dace592736648d3e7a1ad9b270c7b3990e4422fb0a33a8246` | 3,058,719 |
+| `redeemDraw` | `285f48f366885382b84d45cd071a056e005de0d17929b6d2b66b1e56347dbf97` | 3,058,809 |
+
+Seventeen workspace transactions are confirmed. Separate raw-receipt/indexer/RPC
+checks matched each checkout call and the redemption output: exactly 100,000
+native-asset base units to the registered receiving wallet, with 900,000 still
+held by the contract. Encumbered principal is zero and redeemed principal is
+100,000; `totalReserve` remains the 1,000,000-unit accounting inflow, not the
+remaining asset balance. The wallet balance also rose by 100,000. The first
+redemption preparation was retained as unsubmitted after the workspace reopened;
+the owner confirmed no pending wallet request before reconciliation and retry.
+This checkout used the owner's registered merchant wallet. It establishes the
+protocol payout path, not an independent commercial merchant or service fulfillment.
+
+An oversized merchant reference exposed the encoder's `pad32 overflow` message.
+The form now uses the same validation as invoice encoding: at most 32 UTF-8
+bytes of text, or a complete 64-digit hexadecimal ID (optional `0x` prefix).
+Invalid input gets an inline explanation and cannot start wallet preparation;
+the SDK also rejects it before acquiring the account lock or reading the network.
+Valid references retain their existing encoding; nothing is truncated or rehashed.
+The regression first failed on the original form, then passed after the fix,
+including Unicode boundaries, full hex IDs and zero proof/signature requests.
+The full core suite passed with 658 tests and one skipped; the production build,
+typecheck, key/secret scans, sixteen existing account browser cases and the new
+invoice regression passed. One combined browser run hit its old 30-second cold
+startup budget before connecting; the new case passed separately with the same
+120-second startup budget used by the route checks.
 
 Encrypted backup export now uses the unlocked vault session and account lock
 without depending on the wallet's remote API. It reloads the current durable
@@ -148,8 +186,9 @@ it does not establish the cause of the earlier owner-tab timeout.
 
 ## Wave 3 — pilots and hardening
 
-1. Extend organization acceptance through allowance, independent merchant
-   checkout, replenishment, withdrawal and interrupted-operation recovery.
+1. Extend organization acceptance beyond the verified same-owner checkout through
+   independent merchant checkout, replenishment, withdrawal, status controls and
+   interrupted-operation recovery.
    Confirm every step against finalized receipts and actual asset movements.
 2. Operate independently funded merchants and durable automated suppliers. The
    current free host does not provide hosted supplier automation.

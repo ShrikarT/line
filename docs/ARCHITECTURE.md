@@ -44,6 +44,12 @@ The treasury refresh control retries facility state as well as wallet balances
 and supplier discovery. A failed facility read keeps spending controls disabled
 until a successful read restores the required setup and status checks.
 
+Merchant invoice references preserve the protocol's existing 32-byte encoding:
+UTF-8 text of at most 32 bytes, or a 64-digit hexadecimal ID with optional `0x`.
+The form shares validation with the encoder and reports invalid input inline.
+The SDK rejects oversized references before wallet identity or network reads;
+it never truncates or substitutes a different invoice commitment.
+
 ## Contract rules
 
 Exactly twelve public circuit names are shared across the profiles:
