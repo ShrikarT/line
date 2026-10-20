@@ -44,11 +44,11 @@ milestone established a local protocol prototype, not customer-funded settlement
 | Canonical accounting | Facility `8990864c6f80c517c7458fa9b2526d3500f3a9814399fc836097ee409da9bed0`; retained checkpoint has 29 receipts, with no token-payout claim |
 | Test-token settlement | Facility `a159597495b52ea7a703a29562b17fcb042bf7eaa984ec1e05e7e8935208304b`; complete 21-transaction two-merchant checkpoint |
 | Organization wallet | Actual 1AM facility and twelve verifier keys; funding, allowance, quote, draw, redemption, replenishment, withdrawal, pause and resume confirmed. Twenty-one receipts in the workspace. Selected finalized receipts, fixed recipients and actual contract custody were checked through the configured indexer/RPC; independent merchant fulfillment remains open |
-| Regression checks | Full CI for deployed code `2fcdba2`: all four jobs passed, including verification, native worker ownership on Windows/Linux and Windows checkpoint ACLs. Local checks include 658 core tests passed with one skipped, all 20 account browser cases for the subsequent custody fix, 75 organization tests, 13 vault tests, production builds and key/secret scans |
+| Regression checks | Full CI for deployed custody code `394293b`: all four jobs passed, including verification, native worker ownership on Windows/Linux and Windows checkpoint ACLs. Local checks include 658 core tests passed with one skipped, all 20 account browser cases for the subsequent custody fix, 75 organization tests, 13 vault tests, production builds and key/secret scans |
 | Public host | Free wallet-only server, source-matched proving files, signed reader sessions and actual historical Preprod reads verified |
 
 [Finalized test-token evidence](https://github.com/ShrikarT/line/blob/bbb2fdf/docs/TEST_TOKEN_PAYOUT_2026-10-16.md)
-and [CI run](https://github.com/ShrikarT/line/actions/runs/39386809669) retain the
+and [CI run](https://github.com/ShrikarT/line/actions/runs/39396311139) retain the
 underlying checks. Historical reports and presentation assets remain in Git
 history or release downloads rather than the product source tree.
 
@@ -200,6 +200,23 @@ The subsequent complete account browser suite passed all nineteen cases. Full CI
 for the deployed `2fcdba2` release also completed successfully across all four jobs;
 the prior invoice-validation release `84487b4` passed its full CI as well. The
 published account and workspace modules matched the locally verified build.
+
+Backup export also now replaces the generic working status with "Encrypted
+backup download requested" after handing the encrypted file to the browser.
+The message does not claim the owner saved it or that a transaction finalized.
+The existing real-download/restore regression reproduced the stale status before
+the fix; download, wallet-outage export and lock-during-encryption checks pass.
+The complete twenty-case organization browser suite also passes.
+The owner confirmed saving a fresh backup after the twenty-first transaction.
+
+The subsequent live treasury check reached the owner's unlocked organization,
+but 1AM rate limited its network-configuration probe; an explicit refresh then
+returned "Request failed". The UI retained unavailable balances rather than
+publishing zero custody. The final owner-tab display check remains unaccepted;
+it requires a working wallet read channel. A separate read-only check at
+2026-10-20 11:59 UTC still matched all selected receipts and twelve installed
+keys, with status OPEN, 900,000 units held and 1,000,000 reserve accounting.
+No financial request was retried.
 
 Encrypted backup export now uses the unlocked vault session and account lock
 without depending on the wallet's remote API. It reloads the current durable
