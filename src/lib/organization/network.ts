@@ -11,7 +11,7 @@ import generatedJavascript from "../../../contracts/managed/organization/contrac
 import { createWalletProviders } from "../runtime/wallet";
 import { VaultPrivateStateProvider } from "../runtime/vault-provider";
 import type { LinePrivateWitnessContext } from "../runtime/network";
-import { agentId, canonicalInvoiceIdBytes, drawNoteCommit, issuerPublicKey, merchantPublicKey, quoteCommit, randomBytes32, toHex } from "../line/encoding";
+import { agentId, canonicalInvoiceIdBytes, drawNoteCommit, issuerPublicKey, merchantPublicKey, quoteCommit, randomBytes32, requiredDrawFee, toHex } from "../line/encoding";
 import { decodeMerchant, decodeQuote, encodeNote } from "./transfers";
 import { OrganizationAccount, bytes32, copyAccount, receivingAddressBytes, type MerchantBinding, type OrganizationFacility, type OrganizationNote, type OrganizationQuote, type OrganizationReceipt, type OrganizationSnapshot } from "./account";
 import { OrganizationTransactions } from "./transactions";
@@ -144,7 +144,7 @@ export class OrganizationNetwork {
   async facilitySummary(id: string) {
     const facility = this.facility(id), { state, book } = await this.inspect(facility.address!, false);
     const balances = [...state.balance].flatMap(([type, balance]) => type.tag === "unshielded" ? [{ color: type.raw, units: balance.toString() }] : []);
-    return { status: Status[book.status], registeredCircuits: state.operations().length, assetColor: toHex(book.settlementTokenColor), reserve: book.totalReserve.toString(), encumbered: book.encumberedReserve.toString(), paid: book.redeemedReserve.toString(), domain: toHex(book.contractDomain), balances };
+    return { status: Status[book.status], registeredCircuits: state.operations().length, assetColor: toHex(book.settlementTokenColor), reserve: book.totalReserve.toString(), encumbered: book.encumberedReserve.toString(), paid: book.redeemedReserve.toString(), feeFlat: book.feeFlat.toString(), feeBps: book.feeBps.toString(), fees: book.feeReserve.toString(), pendingFees: book.pendingFeeReserve.toString(), domain: toHex(book.contractDomain), balances };
   }
   private async finish(receipt: FinalizedTxData) {
     const pending = this.account.pending();
@@ -208,14 +208,15 @@ export class OrganizationNetwork {
       finally { this.input = null; }
     });
   }
-  async openAllowance(id: string, limit: bigint, expiry: bigint) {
+  async openAllowance(id: string, limit: bigint, expiry: bigint, flatFee = 0n, basisPoints = 0n) {
+    requiredDrawFee(0n, flatFee, basisPoints);
     return this.account.exclusive(async () => {
       const facility = this.facility(id); const { book } = await this.inspect(facility.address!);
       if (limit <= 0n || expiry <= BigInt(Math.floor(Date.now() / 1000))) throw new Error("Use a positive allowance and a future expiry.");
       const after = this.account.snapshot(), next = after.facilities.find(f => f.id === id)!;
       next.limit = limit; next.outstanding = 0n; next.epoch = 0n; next.generation = book.lineGeneration + 1n; next.salt = toHex(randomBytes32());
       this.input = { callerSecret: bytes32(after.issuerSecret), agentSecret: bytes32(next.agentSecret), salt: bytes32(next.salt), lineLimit: limit };
-      try { await this.operation("call", "openLine", id, facility.address, after, () => this.tx().call(facility.address!, "openLine", [expiry, 0n, 0n])); }
+      try { await this.operation("call", "openLine", id, facility.address, after, () => this.tx().call(facility.address!, "openLine", [expiry, flatFee, basisPoints])); }
       finally { this.input = null; }
     });
   }
@@ -277,10 +278,10 @@ export class OrganizationNetwork {
         if (quote.contractAddress !== facility.address || quote.domain !== toHex(book.contractDomain) || quote.generation !== book.lineGeneration || quote.feeFlat !== book.feeFlat || quote.feeBps !== book.feeBps || quote.amount <= 0n) throw new Error("Quote terms differ.");
         const quoteBytes = quoteCommit({ merchantPk: bytes32(quote.merchantPk), invoiceId: bytes32(quote.invoiceId), nonce: bytes32(quote.quoteNonce), amount: quote.amount, expiry: quote.expiry, generation: quote.generation, domain: bytes32(quote.domain), feeFlat: quote.feeFlat, feeBps: quote.feeBps });
         if (toHex(quoteBytes) !== quote.quoteCommitment) throw new Error("Quote opening differs.");
-        const fee = quote.feeFlat + (quote.amount * quote.feeBps + 9999n) / 10000n;
+        const fee = requiredDrawFee(quote.amount, quote.feeFlat, quote.feeBps);
         const after = this.account.snapshot(), next = after.facilities.find(f => f.id === id)!;
         const service = binding ? activeServiceOrder(after, binding.orderId, binding.requestId) : null;
-        if (service && (service.facilityId !== id || service.quoteCommitment !== quote.quoteCommitment)) throw new Error("The saved API purchase changed.");
+        if (service && (service.facilityId !== id || service.quoteCommitment !== quote.quoteCommitment || fee > BigInt(service.maxFee ?? "0"))) throw new Error("The saved API purchase changed.");
         const retained = after.notes.find(note => note.contractAddress === facility.address && note.quoteCommitment === quote.quoteCommitment);
         if (retained) return retained;
         next.outstanding += quote.amount + fee; next.epoch++; next.salt = toHex(randomBytes32());
@@ -368,18 +369,21 @@ export class OrganizationNetwork {
     }
     throw new Error("The supplier is still confirming its transaction. Resume this saved purchase; do not create a replacement payment.");
   }
-  async purchaseService(id: string, serviceId: string, document: string) {
+  async purchaseService(id: string, serviceId: string, document: string, maxFee = 0n) {
+    requiredDrawFee(0n, maxFee, 0n);
     if (!document.trim() || document.length > 5000) throw new Error("Enter a document of up to 5000 characters.");
     const facility = this.facility(id), catalog = await this.catalog(), service = catalog.services.find(service => service.id === serviceId);
     if (!service || catalog.assetColor !== facility.assetColor) throw new Error("Choose a supplier that accepts this facility’s settlement asset.");
     const observed = await this.inspect(facility.address!);
     if (observed.book.status !== Status.OPEN || observed.book.lineGeneration !== facility.generation) throw new Error("Open this agent’s allowance before requesting a paid API quote.");
     if (!facility.merchants.some(merchant => merchant.publicKey === service.profile.publicKey && merchant.address === service.profile.address && !merchant.disabled)) throw new Error("Authorize this supplier before requesting a quote.");
-    if (facility.outstanding + BigInt(service.price) > facility.limit) throw new Error("Clearance could not be proven.");
+    const serviceFee = requiredDrawFee(BigInt(service.price), observed.book.feeFlat, observed.book.feeBps);
+    if (serviceFee > maxFee) throw new Error("The organization fee changed. Review the current total before buying.");
+    if (facility.outstanding + BigInt(service.price) + serviceFee > facility.limit) throw new Error("Clearance could not be proven.");
     let order = this.account.snapshot().serviceOrders?.find(order => order.facilityId === id && order.service === serviceId && !order.delivered && !order.cancelled);
     if (order && order.document !== document) throw new Error("Resume the saved document purchase before starting a different task.");
     if (!order) {
-      const proposed = { id: crypto.randomUUID(), facilityId: id, service: serviceId, document, price: service.price, assetColor: catalog.assetColor, merchantPk: service.profile.publicKey, merchantAddress: service.profile.address, delivered: false };
+      const proposed = { id: crypto.randomUUID(), facilityId: id, service: serviceId, document, price: service.price, maxFee: maxFee.toString(), assetColor: catalog.assetColor, merchantPk: service.profile.publicKey, merchantAddress: service.profile.address, delivered: false };
       await this.account.edit(snapshot => {
         snapshot.serviceOrders ??= [];
         const existing = snapshot.serviceOrders.find(item => item.facilityId === id && item.service === serviceId && !item.delivered && !item.cancelled);
@@ -407,6 +411,7 @@ export class OrganizationNetwork {
     await this.account.edit(snapshot => { const current = activeServiceOrder(snapshot, orderId, requestId); current.quoteCommitment = quote.quoteCommitment; current.quoteExpiry = quote.expiry; });
     let note = this.account.snapshot().notes.find(note => note.contractAddress === facility.address && note.quoteCommitment === quote.quoteCommitment);
     if (!note) {
+      if (requiredDrawFee(quote.amount, quote.feeFlat, quote.feeBps) > BigInt(order.maxFee ?? "0")) throw new Error("The supplier quote exceeds the saved organization fee limit. Cancel the uncharged request and review a new purchase.");
       if (quote.expiry <= BigInt(Math.floor(Date.now() / 1000)) || quote.generation !== book.lineGeneration) throw new Error("This uncharged quote expired or belongs to an earlier allowance. Request a fresh quote for the saved purchase.");
       note = await this.purchase(order.facilityId, quote, { orderId, requestId });
     }
