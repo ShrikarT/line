@@ -44,11 +44,11 @@ milestone established a local protocol prototype, not customer-funded settlement
 | Canonical accounting | Facility `8990864c6f80c517c7458fa9b2526d3500f3a9814399fc836097ee409da9bed0`; retained checkpoint has 29 receipts, with no token-payout claim |
 | Test-token settlement | Facility `a159597495b52ea7a703a29562b17fcb042bf7eaa984ec1e05e7e8935208304b`; complete 21-transaction two-merchant checkpoint |
 | Organization wallet | Actual 1AM facility and twelve verifier keys; funding, allowance, quote, draw, redemption, replenishment, withdrawal, pause and resume confirmed. Twenty-one receipts in the workspace. Selected finalized receipts, fixed recipients and actual contract custody were checked through the configured indexer/RPC; independent merchant fulfillment remains open |
-| Regression checks | Full CI for backup-status release `7937fe5`: all four jobs passed, including verification, native worker ownership on Windows/Linux and Windows checkpoint ACLs. Current fee-control checks include 660 core tests passed with one skipped, all 26 account browser cases, production builds, key/secret scans and zero managed-binding drift |
+| Regression checks | Full CI for fee-control release `d521b7f`: all four jobs passed, including verification, native worker ownership on Windows/Linux and Windows checkpoint ACLs. Current read-serialization checks include all 26 account browser cases, the production build, key/secret scans and zero managed-binding drift; its full CI is still running. The fee-control core suite passed 660 tests with one skipped |
 | Public host | Free wallet-only server, source-matched proving files, signed reader sessions and actual historical Preprod reads verified |
 
 [Finalized test-token evidence](https://github.com/ShrikarT/line/blob/bbb2fdf/docs/TEST_TOKEN_PAYOUT_2026-10-16.md)
-and [CI run](https://github.com/ShrikarT/line/actions/runs/39419035758) retain the
+and [CI run](https://github.com/ShrikarT/line/actions/runs/39423284534) retain the
 underlying checks. Historical reports and presentation assets remain in Git
 history or release downloads rather than the product source tree.
 
@@ -268,10 +268,20 @@ caches the balance map so editing an asset does not issue another wallet RPC.
 Stale reads cannot publish results or start the next balance request; the balance
 wait is bounded. Treasury mutations wait for reads to settle and for required
 facility data, while explicit refresh remains available. Fresh wallet checks for
-mutations are retained. This fixes the reproduced overlap; whether it resolves
-the owner's live 1AM failure remains unverified until the updated app is tested.
+mutations are retained. This fixes the reproduced overlap.
 All twenty-six organization browser cases, typecheck, the production build,
 key/secret scans and zero managed-binding drift checks pass for this change.
+
+The read-serialization release `e37616b` is deployed, and its published treasury
+module matches the verified local build. After the owner reopened the existing
+organization, the first read still hit an explicit 1AM configuration rate limit.
+One later explicit refresh, without reconnecting or reopening the vault, recovered
+both wallet balances and the facility summary. The actual owner tab displayed
+900,000 native-asset base units held, status OPEN, twelve installed circuit keys,
+1,000,000 reserve accounting and 100,000 principal paid. Its 21 finalized receipts
+were unchanged; this check requested no proof, signature or transaction. The final
+owner-tab custody display check is accepted. Intermittent wallet rate limiting
+remains a limitation; this recovery does not establish that it is eliminated.
 
 Encrypted backup export now uses the unlocked vault session and account lock
 without depending on the wallet's remote API. It reloads the current durable
