@@ -374,6 +374,8 @@ test("the downloaded encrypted backup restores the same organization in a fresh 
   const backup = Buffer.concat(chunks);
   expect(JSON.parse(backup.toString()).version).toBe(2);
   expect(backup.toString()).not.toContain("issuerSecret");
+  await expect(page.getByRole("status")).toContainText("Encrypted backup download requested");
+  await expect(page.getByRole("button", { name: "Encrypted backup", exact: true })).toBeEnabled();
   const recoveryContext = await browser.newContext();
   try {
     const recovered = await recoveryContext.newPage(); await wallets(recovered);
@@ -415,6 +417,7 @@ test("an unlocked organization can export its encrypted backup during a wallet o
   for await (const chunk of stream) chunks.push(Buffer.from(chunk));
   const backup = Buffer.concat(chunks).toString();
   expect(JSON.parse(backup).version).toBe(2); expect(backup).not.toContain("issuerSecret");
+  await expect(page.getByRole("status")).toContainText("Encrypted backup download requested");
   expect(await page.evaluate(() => (window as unknown as { failedWalletReads: number }).failedWalletReads)).toBe(0);
   await page.getByRole("button", { name: "Create facility", exact: true }).click();
   await expect(page.getByRole("alert")).toContainText("Request failed");

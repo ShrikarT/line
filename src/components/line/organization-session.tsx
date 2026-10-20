@@ -5,7 +5,7 @@ import type { OrganizationNetwork } from "@/lib/organization/network";
 import { onVaultSessionLock } from "@/lib/security/vault";
 import { sanitizeServiceError } from "@/lib/runtime/endpoints";
 
-type Session = { account: OrganizationAccount | null; network: OrganizationNetwork | null; snapshot: OrganizationSnapshot | null; pending: OrganizationPending | null; busy: boolean; progress: string; error: string; unlock: (password: string) => Promise<void>; lock: () => void; run: (action: (network: OrganizationNetwork, account: OrganizationAccount) => Promise<unknown>) => Promise<void> };
+type Session = { account: OrganizationAccount | null; network: OrganizationNetwork | null; snapshot: OrganizationSnapshot | null; pending: OrganizationPending | null; busy: boolean; progress: string; error: string; unlock: (password: string) => Promise<void>; lock: () => void; run: (action: (network: OrganizationNetwork, account: OrganizationAccount) => Promise<unknown>, completedMessage?: string) => Promise<void> };
 const OrganizationContext = createContext<Session | null>(null);
 export function useOrganization() { const session = useContext(OrganizationContext); if (!session) throw new Error("OrganizationSessionProvider is required."); return session; }
 export function OrganizationSessionProvider({ children }: { children: ReactNode }) {
@@ -34,10 +34,16 @@ export function OrganizationSessionProvider({ children }: { children: ReactNode 
     } catch (failure) { if (currentWallet.current === wallet) { setProgress(""); setError(sanitizeServiceError(failure instanceof Error ? failure.message : "Could not open the organization vault.")); } }
     finally { working.current = false; setBusy(false); }
   }
-  async function run(action: (client: OrganizationNetwork, account: OrganizationAccount) => Promise<unknown>) {
+  async function run(action: (client: OrganizationNetwork, account: OrganizationAccount) => Promise<unknown>, completedMessage?: string) {
     if (working.current || !network || !account) return;
     working.current = true; setBusy(true); setError(""); setProgress("Working in your organization workspace");
-    try { await action(network, account); }
+    try {
+      await action(network, account);
+      if (completedMessage) {
+        account.assertSession();
+        if (currentWallet.current === account.wallet) setProgress(completedMessage);
+      }
+    }
     catch (failure) { if (currentWallet.current === account.wallet) { setProgress(""); setError(sanitizeServiceError(failure instanceof Error ? failure.message : "The operation needs reconciliation.")); } }
     finally {
       try { account.assertSession(); setSnapshot(account.snapshot()); setPending(account.pending()); } catch { /* Revoked account records stay hidden. */ }
