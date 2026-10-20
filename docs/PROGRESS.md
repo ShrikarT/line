@@ -44,11 +44,11 @@ milestone established a local protocol prototype, not customer-funded settlement
 | Canonical accounting | Facility `8990864c6f80c517c7458fa9b2526d3500f3a9814399fc836097ee409da9bed0`; retained checkpoint has 29 receipts, with no token-payout claim |
 | Test-token settlement | Facility `a159597495b52ea7a703a29562b17fcb042bf7eaa984ec1e05e7e8935208304b`; complete 21-transaction two-merchant checkpoint |
 | Organization wallet | Actual 1AM facility, twelve verifier keys, one tNIGHT deposit, allowance, quote, draw and 0.1 tNIGHT redemption confirmed; seventeen receipts in the workspace. Separate indexer/RPC checks matched the checkout calls, registered payout recipient and remaining 0.9 tNIGHT in contract custody. Independent merchant fulfillment and remaining lifecycle checks are open |
-| Regression checks | Full CI for deployed code `1ee3c06`: all four jobs passed, including verification, native worker ownership on Windows/Linux and Windows checkpoint ACLs. The recovery release passed the full local core suite (656 passed, one skipped); the treasury refresh change also passed all 16 account browser cases, deployment build and key/secret checks |
+| Regression checks | Full CI for deployed code `2fcdba2`: all four jobs passed, including verification, native worker ownership on Windows/Linux and Windows checkpoint ACLs. Local checks include 658 core tests passed with one skipped, all 19 account browser cases, 75 organization tests, 13 vault tests, production builds and key/secret scans |
 | Public host | Free wallet-only server, source-matched proving files, signed reader sessions and actual historical Preprod reads verified |
 
 [Finalized test-token evidence](https://github.com/ShrikarT/line/blob/bbb2fdf/docs/TEST_TOKEN_PAYOUT_2026-10-16.md)
-and [CI run](https://github.com/ShrikarT/line/actions/runs/39266037162) retain the
+and [CI run](https://github.com/ShrikarT/line/actions/runs/39386809669) retain the
 underlying checks. Historical reports and presentation assets remain in Git
 history or release downloads rather than the product source tree.
 
@@ -165,6 +165,10 @@ in tab memory. A browser clock regression failed at minute 31 before the change,
 then verified an unlocked session through hour 11:59, expiration after hour 12,
 manual locking and disconnect locking. Account isolation and backup-lock guards
 also passed. The default timeout for other consoles is unchanged.
+The subsequent complete account browser suite passed all nineteen cases. Full CI
+for the deployed `2fcdba2` release also completed successfully across all four jobs;
+the prior invoice-validation release `84487b4` passed its full CI as well. The
+published account and workspace modules matched the locally verified build.
 
 Encrypted backup export now uses the unlocked vault session and account lock
 without depending on the wallet's remote API. It reloads the current durable
