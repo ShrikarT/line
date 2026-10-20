@@ -28,7 +28,7 @@ test('organization bindings require their explicit release profile', () => {
   assert.throws(() => validateContractArtifacts({ ...options, profile: 'unknown' }), /Unknown contract release profile/);
 });
 
-function fixture(fee = 0n) {
+function fixture(fee = 0n, basisPoints = 0n) {
   const contract = new Contract(WITNESSES);
   let privateState = blankPrivate({ callerSecret: issuer, agentSecret: agent, salt: pad32('salt-zero'), lineLimit: 100n });
   let state = contract.initialState(R.createConstructorContext(privateState, '0'.repeat(64)), issuerPublicKey(issuer), merchantPublicKey(merchantA), pad32('test-settlement-instance'), issuerAddress, addressA, pad32('organization-asset')).currentContractState;
@@ -55,18 +55,19 @@ function fixture(fee = 0n) {
   };
   call('fundReserve', [200n]);
   call('registerMerchant', [merchantPublicKey(merchantB), addressB]);
-  call('openLine', [expiry, fee, 0n]);
+  call('openLine', [expiry, fee, basisPoints]);
   const draw = (merchant, amount) => {
     const id = ++serial;
     const merchantPk = merchantPublicKey(merchant);
     const invoiceId = pad32(`invoice-${id}`), quoteNonce = pad32(`quote-${id}`);
     const noteNonce = pad32(`note-${id}`), noteSalt = pad32(`note-salt-${id}`);
-    const Q = quoteCommit({ merchantPk, invoiceId, nonce: quoteNonce, amount, expiry, generation: 1n, domain: read().contractDomain, feeFlat: fee, feeBps: 0n });
+    const Q = quoteCommit({ merchantPk, invoiceId, nonce: quoteNonce, amount, expiry, generation: 1n, domain: read().contractDomain, feeFlat: fee, feeBps: basisPoints });
+    const drawFee = fee + (amount * basisPoints + 9999n) / 10000n;
     const previous = new Set([...read().notes].map(([D]) => toHex(D)));
     call('postQuote', [expiry], { callerSecret: merchant, invoiceId, quoteNonce, quoteAmount: amount });
     const newSalt = pad32(`book-${id}`);
-    call('draw', [Q, expiry, fee], { callerSecret: agent, invoiceId, quoteNonce, quoteAmount: amount, drawAmount: amount, quoteMerchantPk: merchantPk, noteNonce, noteSalt, newSalt });
-    privateState = { ...privateState, salt: newSalt, lineOutstanding: privateState.lineOutstanding + amount + fee, lineEpoch: privateState.lineEpoch + 1n };
+    call('draw', [Q, expiry, drawFee], { callerSecret: agent, invoiceId, quoteNonce, quoteAmount: amount, drawAmount: amount, quoteMerchantPk: merchantPk, noteNonce, noteSalt, newSalt });
+    privateState = { ...privateState, salt: newSalt, lineOutstanding: privateState.lineOutstanding + amount + drawFee, lineEpoch: privateState.lineEpoch + 1n };
     const D = [...read().notes].find(([D]) => !previous.has(toHex(D)))[0];
     return { args: [D, expiry], ps: { callerSecret: merchant, noteIdentity: agentId(agent), noteQuoteCommit: Q, noteNonce, noteSalt, redeemAmount: amount } };
   };
@@ -139,6 +140,22 @@ test('fees are separate actual payouts and cannot be taken before redemption', (
   assert.equal(f.read().feeReserve, 0n);
 });
 
+
+test('flat and proportional organization fees round upward and pay only finalized fees to the issuer', () => {
+  const f = fixture(2n, 250n);
+  const claim = f.draw(merchantA, 25n);
+  assert.equal(f.read().feeFlat, 2n); assert.equal(f.read().feeBps, 250n);
+  assert.equal(f.private().lineOutstanding, 28n);
+  assert.equal(f.read().pendingFeeReserve, 3n); assert.equal(f.read().feeReserve, 0n);
+  assert.throws(() => f.execute('withdrawFees'), /no fees/);
+  payout(f.call('redeemDraw', claim.args, claim.ps), addressA, 25n);
+  assert.equal(f.read().pendingFeeReserve, 0n); assert.equal(f.read().feeReserve, 3n);
+  assert.throws(() => f.execute('withdrawFees', [], { callerSecret: agent }), /not issuer/);
+  payout(f.call('withdrawFees'), issuerAddress, 3n);
+  assert.equal(f.balance(), 172n); assert.equal(f.read().totalReserve, 197n);
+  assert.equal(f.read().feeReserve, 0n);
+  assert.throws(() => f.execute('withdrawFees'), /no fees/);
+});
 
 test('reserve funding consumes the selected existing asset and never mints funds', () => {
   const f = fixture();

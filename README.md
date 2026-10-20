@@ -84,7 +84,7 @@ npm run build:deploy
 npm run start:organization
 ```
 
-Open **http://127.0.0.1:3000/app**, connect your wallet and open your organization. Facility creation, verifier registration and funding each need wallet approval. Preprod assets have no monetary value.
+Open **http://127.0.0.1:3000/app**, connect your wallet and open your organization. Facility creation, verifier registration and funding each need wallet approval. Optional allowance fees default to zero; the purchase view shows the fee and total allowance charge before approval. Preprod assets have no monetary value.
 
 For UI development, run `npm run dev`. For the complete wallet-only server, use the build/start commands above. The public free host can sleep between visits and does not run automated API suppliers.
 

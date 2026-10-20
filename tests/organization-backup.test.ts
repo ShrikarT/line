@@ -45,3 +45,18 @@ test("decrypted malformed books cannot cross restore validation", () => {
     const invalid = structuredClone(record); change(invalid); assert.throws(() => validateOrganizationRecord(invalid, accountId));
   }
 });
+
+test("backup preserves reviewed service fee ceilings and rejects invalid limits while accepting legacy orders", async () => {
+  const record = initial();
+  record.snapshot.facilities = withPending().pending!.after.facilities;
+  const order = { id: "11111111-1111-4111-8111-111111111111", facilityId: "restored-facility", service: "text-metrics", document: "Content", price: "25", maxFee: "3", assetColor: "0".repeat(64), merchantPk: "11".repeat(32), merchantAddress: address, delivered: false };
+  record.snapshot.serviceOrders = [order];
+  const envelope = await encryptSecret(key, encodeVaultJson(record), "BackupControl123!");
+  assert.equal((await decodeOrganizationBackup(JSON.stringify(envelope), "BackupControl123!", key, accountId)).snapshot.serviceOrders![0].maxFee, "3");
+  for (const value of ["-1", "3.5", "0x3", "18446744073709551616"]) {
+    const invalid = structuredClone(record); invalid.snapshot.serviceOrders![0].maxFee = value;
+    assert.throws(() => validateOrganizationRecord(invalid, accountId));
+  }
+  delete record.snapshot.serviceOrders![0].maxFee;
+  assert.doesNotThrow(() => validateOrganizationRecord(record, accountId));
+});

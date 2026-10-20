@@ -55,6 +55,18 @@ The form shares validation with the encoder and reports invalid input inline.
 The SDK rejects oversized references before wallet identity or network reads;
 it never truncates or substitutes a different invoice commitment.
 
+Optional organization fees use a Uint64 flat amount and 0-10,000 basis points,
+with zero defaults and whole-base-unit upward rounding. The policy is fixed by
+`openLine`. Purchase previews show price, fee and total allowance consumption;
+wallet network fees are separate. Pending fees become withdrawable only after
+redemption. Withdrawals use the contract's fixed issuer recipient.
+
+Hosted service orders persist the reviewed maximum fee in encrypted records and
+backups. The SDK includes the fee in its capacity check and rejects a new quote
+above that ceiling before drawing. Missing legacy ceilings mean zero. A retained,
+already authorized claim can still recover; the ceiling does not cause another
+draw or replace its original transaction identity.
+
 ## Contract rules
 
 Exactly twelve public circuit names are shared across the profiles:

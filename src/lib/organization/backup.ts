@@ -53,6 +53,7 @@ function snapshot(value: unknown, accountId: string): OrganizationSnapshot {
     const request = (id: unknown) => { need(typeof id === "string" && /^[a-f0-9-]{36}$/.test(id)); };
     request(o.id); if (o.requestId !== undefined) request(o.requestId);
     need(typeof o.price === "string" && /^[0-9]{1,20}$/.test(o.price) && BigInt(o.price) > 0n && BigInt(o.price) <= UINT64);
+    if (o.maxFee !== undefined) need(typeof o.maxFee === "string" && /^[0-9]{1,20}$/.test(o.maxFee) && BigInt(o.maxFee) <= UINT64);
     hex(o.assetColor); hex(o.merchantPk); recipient(o.merchantAddress); bool(o.delivered);
     if (o.noteCommitment !== undefined) need(notes.some(item => object(item).noteCommitment === hex(o.noteCommitment)));
     if (o.result !== undefined) object(o.result);

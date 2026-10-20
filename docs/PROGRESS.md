@@ -44,11 +44,11 @@ milestone established a local protocol prototype, not customer-funded settlement
 | Canonical accounting | Facility `8990864c6f80c517c7458fa9b2526d3500f3a9814399fc836097ee409da9bed0`; retained checkpoint has 29 receipts, with no token-payout claim |
 | Test-token settlement | Facility `a159597495b52ea7a703a29562b17fcb042bf7eaa984ec1e05e7e8935208304b`; complete 21-transaction two-merchant checkpoint |
 | Organization wallet | Actual 1AM facility and twelve verifier keys; funding, allowance, quote, draw, redemption, replenishment, withdrawal, pause and resume confirmed. Twenty-one receipts in the workspace. Selected finalized receipts, fixed recipients and actual contract custody were checked through the configured indexer/RPC; independent merchant fulfillment remains open |
-| Regression checks | Full CI for deployed custody code `394293b`: all four jobs passed, including verification, native worker ownership on Windows/Linux and Windows checkpoint ACLs. Local checks include 658 core tests passed with one skipped, all 20 account browser cases for the subsequent custody fix, 75 organization tests, 13 vault tests, production builds and key/secret scans |
+| Regression checks | Full CI for backup-status release `7937fe5`: all four jobs passed, including verification, native worker ownership on Windows/Linux and Windows checkpoint ACLs. Current fee-control checks include 660 core tests passed with one skipped, all 25 account browser cases, production builds, key/secret scans and zero managed-binding drift |
 | Public host | Free wallet-only server, source-matched proving files, signed reader sessions and actual historical Preprod reads verified |
 
 [Finalized test-token evidence](https://github.com/ShrikarT/line/blob/bbb2fdf/docs/TEST_TOKEN_PAYOUT_2026-10-16.md)
-and [CI run](https://github.com/ShrikarT/line/actions/runs/39396311139) retain the
+and [CI run](https://github.com/ShrikarT/line/actions/runs/39419035758) retain the
 underlying checks. Historical reports and presentation assets remain in Git
 history or release downloads rather than the product source tree.
 
@@ -170,8 +170,9 @@ additional `registerMerchant` call, `disableMerchant`, `withdrawFees`, or the
 `cancelOrExpireNote` cancellation/refund modes. Closing/reopening an allowance
 also remains outside this run. Those paths have automated protocol/recovery
 coverage, which does not replace fresh wallet-approved receipt checks. The
-organization UI currently opens zero-fee allowances; fee-bearing organization
-policy and its fee withdrawal flow need product work before that acceptance.
+network checkpoint used a zero-fee allowance. Optional fee controls and fee
+withdrawal are now implemented locally; fee-bearing Preprod acceptance remains
+separate from the verified zero-fee lifecycle.
 
 The treasury now reads custody from `ContractState.balance`, avoiding a redundant
 wallet-style output lookup that could report an empty or unrelated balance. It
@@ -180,6 +181,30 @@ unavailable. The regression first reproduced the incorrect source, then checked
 the actual SDK summary, empty custody, shielded-asset exclusion and zero extra
 wallet-balance reads. All twenty account browser tests, 658 core tests (one
 skipped), typecheck and the deployment build passed for this fix.
+
+Organization allowance setup now supports an optional flat fee and a rate from
+0 to 10,000 basis points, retaining zero-fee defaults. The SDK validates the
+policy before account or wallet checks and forwards the selected terms to
+`openLine`; it previously always supplied zeroes. The treasury reads pending and
+finalized fees from the contract and offers issuer withdrawal only for finalized
+fees, to the contract's fixed organization recipient. Failed reads and zero
+finalized fees disable the control. No Compact source or proving key changed.
+
+Direct quotes and hosted-service cards show merchant price, organization fee and
+total allowance charge before purchase. Hosted orders retain the reviewed maximum
+fee in encrypted records and backups. Fresh or resumed uncharged requests cannot
+exceed that limit; legacy orders keep a zero ceiling. Existing authorized claims
+can continue recovery without creating a replacement draw. These checks do not
+establish independent supplier operation or a new fee-bearing network payout.
+Generated Compact execution confirms upward rounding, pending-fee locking and
+issuer-only, single fee withdrawal; controlled browser checks cover policy
+forwarding, validation, previews and the saved fee ceiling. The ceiling is
+rechecked inside the locked purchase boundary before a draw candidate can be
+prepared. A regression reproduced the direct SDK bypass before that guard;
+mobile layout checking also caught and corrected recipient-address overflow.
+The full core suite passed 660 tests with one skipped; all twenty-five
+organization browser cases, typecheck and the production build passed. Key/secret
+scans passed and managed bindings have zero drift.
 
 An oversized merchant reference exposed the encoder's `pad32 overflow` message.
 The form now uses the same validation as invoice encoding: at most 32 UTF-8
