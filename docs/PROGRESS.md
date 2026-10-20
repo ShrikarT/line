@@ -43,7 +43,7 @@ milestone established a local protocol prototype, not customer-funded settlement
 | --- | --- |
 | Canonical accounting | Facility `8990864c6f80c517c7458fa9b2526d3500f3a9814399fc836097ee409da9bed0`; retained checkpoint has 29 receipts, with no token-payout claim |
 | Test-token settlement | Facility `a159597495b52ea7a703a29562b17fcb042bf7eaa984ec1e05e7e8935208304b`; complete 21-transaction two-merchant checkpoint |
-| Organization wallet | Actual 1AM facility and twelve verifier keys; funding, allowance, quote, draw, redemption, replenishment, withdrawal, pause and resume confirmed. Twenty-one receipts in the workspace. Selected finalized receipts, fixed recipients and actual contract custody were checked through the configured indexer/RPC; independent merchant fulfillment remains open |
+| Organization wallet | Actual 1AM facility and twelve verifier keys; funding, allowance, quote, draw, redemption, replenishment, withdrawal, pause, resume and zero-outstanding closure confirmed. Twenty-two receipts in the workspace. Selected finalized receipts, fixed recipients and actual contract custody were checked through the configured indexer/RPC; fee-bearing acceptance and independent merchant fulfillment remain open |
 | Regression checks | Full CI for fee-control release `d521b7f`: all four jobs passed, including verification, native worker ownership on Windows/Linux and Windows checkpoint ACLs. Current read-serialization checks include all 26 account browser cases, the production build, key/secret scans and zero managed-binding drift; its full CI is still running. The fee-control core suite passed 660 tests with one skipped |
 | Public host | Free wallet-only server, source-matched proving files, signed reader sessions and actual historical Preprod reads verified |
 
@@ -156,22 +156,30 @@ at 900,000 units, zero private spending balance and the full allowance restored.
 | Withdrawal | `92c149ea2a636a51dfa6afaebe5cc17d8f8902750e4e75576e8f83b574307cb0` | 3,059,575 |
 | Pause | `cf4d26a71bef83e78217af23f3e88e54866a4331f31c56406f9e6d4322942ae1` | 3,059,617 |
 | Resume | `08435fb970a6856c5d15270dfb299005924eef050040476a781279b3d48fad42` | 3,059,694 |
+| Close zero-outstanding allowance | `19b6095be3bb7a3eb03865a514c87386e5c340b593529ecdc3d120c9b30a54fc` | 3,062,090 |
 
 These read-only checks match finalized receipts and contract snapshots through
 configured TLS indexer/RPC services; they are not independent full-node or local
 proof verification. All twelve installed verifier keys still match the pinned
 organization release. The owner is also the receiving merchant in this run.
 
+The subsequent zero-outstanding closure finalized through `setStatus`. The
+configured indexer/RPC receipt check matched the successful call and finalized
+block, status CLOSED, unchanged 900,000-unit custody and 1,000,000 reserve
+accounting. The live workspace showed the same status and twenty-two finalized
+transactions. Reopening with a fee policy has been prepared but is not yet
+accepted; no fee-bearing draw or fee withdrawal is claimed.
+
 Fresh organization receipts cover eight distinct call names: `fundReserve`,
 `withdrawUnencumberedReserve`, `openLine`, `postQuote`, `draw`, `redeemDraw`,
 `acknowledgeRepayment` and `setStatus`. Installed verifier keys are not call
 acceptance. This facility has not yet established live acceptance for an
 additional `registerMerchant` call, `disableMerchant`, `withdrawFees`, or the
-`cancelOrExpireNote` cancellation/refund modes. Closing/reopening an allowance
+`cancelOrExpireNote` cancellation/refund modes. Reopening a closed allowance
 also remains outside this run. Those paths have automated protocol/recovery
 coverage, which does not replace fresh wallet-approved receipt checks. The
 network checkpoint used a zero-fee allowance. Optional fee controls and fee
-withdrawal are now implemented locally; fee-bearing Preprod acceptance remains
+withdrawal are now deployed; fee-bearing Preprod acceptance remains
 separate from the verified zero-fee lifecycle.
 
 The treasury now reads custody from `ContractState.balance`, avoiding a redundant
