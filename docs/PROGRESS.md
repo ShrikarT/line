@@ -44,11 +44,11 @@ milestone established a local protocol prototype, not customer-funded settlement
 | Canonical accounting | Facility `8990864c6f80c517c7458fa9b2526d3500f3a9814399fc836097ee409da9bed0`; retained checkpoint has 29 receipts, with no token-payout claim |
 | Test-token settlement | Facility `a159597495b52ea7a703a29562b17fcb042bf7eaa984ec1e05e7e8935208304b`; complete 21-transaction two-merchant checkpoint |
 | Organization wallet | Actual 1AM facility and twelve verifier keys; funding, allowance, quote, draw, redemption, replenishment, withdrawal, pause, resume and zero-outstanding closure confirmed. Twenty-two receipts in the workspace. Selected finalized receipts, fixed recipients and actual contract custody were checked through the configured indexer/RPC; fee-bearing acceptance and independent merchant fulfillment remain open |
-| Regression checks | Full CI for fee-control release `d521b7f`: all four jobs passed, including verification, native worker ownership on Windows/Linux and Windows checkpoint ACLs. Current read-serialization checks include all 26 account browser cases, the production build, key/secret scans and zero managed-binding drift; its full CI is still running. The fee-control core suite passed 660 tests with one skipped |
+| Regression checks | Full CI for read-serialization release `e37616b` and fee-control release `d521b7f`: all four jobs passed, including verification, native worker ownership on Windows/Linux and Windows checkpoint ACLs. Local checks include all 26 account browser cases, the production build, key/secret scans and zero managed-binding drift. The fee-control core suite passed 660 tests with one skipped |
 | Public host | Free wallet-only server, source-matched proving files, signed reader sessions and actual historical Preprod reads verified |
 
 [Finalized test-token evidence](https://github.com/ShrikarT/line/blob/bbb2fdf/docs/TEST_TOKEN_PAYOUT_2026-10-16.md)
-and [CI run](https://github.com/ShrikarT/line/actions/runs/39423284534) retain the
+and [CI run](https://github.com/ShrikarT/line/actions/runs/39426585810) retain the
 underlying checks. Historical reports and presentation assets remain in Git
 history or release downloads rather than the product source tree.
 
@@ -169,6 +169,18 @@ block, status CLOSED, unchanged 900,000-unit custody and 1,000,000 reserve
 accounting. The live workspace showed the same status and twenty-two finalized
 transactions. Reopening with a fee policy has been prepared but is not yet
 accepted; no fee-bearing draw or fee withdrawal is claimed.
+
+The owner approved a new `openLine` with a 1,000,000-unit allowance, seven-day
+expiry, 1,000-unit flat fee and 100 basis points. The wallet submission
+acknowledgement timed out; the signed identifier
+`006c23221e7a0ebe76a1975d827166437f010f611e6a95bd38d6b0c5b55ab524e2`
+remains retained in the encrypted pending operation. Checking that exact
+transaction did not establish finality, and the separate configured indexer/RPC
+lookup did not return a unique receipt. The last observed workspace remained
+CLOSED with twenty-two receipts. Do not create a replacement allowance or discard
+this candidate without reconciling its original transaction. Browser control
+detached during the subsequent encrypted-backup download check; that download
+is not confirmed saved.
 
 Fresh organization receipts cover eight distinct call names: `fundReserve`,
 `withdrawUnencumberedReserve`, `openLine`, `postQuote`, `draw`, `redeemDraw`,
