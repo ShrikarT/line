@@ -4,6 +4,7 @@ import { describe, it } from "node:test";
 import {
   agentId,
   canonicalPaymentReferenceBytes,
+  canonicalInvoiceIdBytes,
   contractDomain,
   drawNoteCommit,
   drawNullifier,
@@ -46,6 +47,20 @@ describe("browser-safe hex", () => {
   it("rejects malformed hex", () => {
     assert.throws(() => fromHex("aa"));
     assert.throws(() => fromHex("z".repeat(64)));
+  });
+});
+
+describe("canonical invoice references", () => {
+  it("retains padded text and full hexadecimal IDs at the byte boundary", () => {
+    assert.deepEqual(canonicalInvoiceIdBytes("x".repeat(32)), new TextEncoder().encode("x".repeat(32)));
+    assert.deepEqual(canonicalInvoiceIdBytes("é".repeat(16)), new TextEncoder().encode("é".repeat(16)));
+    assert.deepEqual(canonicalInvoiceIdBytes("ab".repeat(32)), fromHex("ab".repeat(32)));
+    assert.deepEqual(canonicalInvoiceIdBytes("0x" + "AB".repeat(32)), fromHex("ab".repeat(32)));
+  });
+  it("explains oversized references without echoing invoice contents", () => {
+    for (const value of ["Line protocol checkout acceptance 2026-10-20", "é".repeat(17)]) {
+      assert.throws(() => canonicalInvoiceIdBytes(value), error => error instanceof Error && /32 UTF-8 bytes/.test(error.message) && !error.message.includes(value));
+    }
   });
 });
 

@@ -256,9 +256,10 @@ export class OrganizationNetwork {
     });
   }
   async postQuote(address: string, invoice: string, amount: bigint, expiry: bigint): Promise<OrganizationQuote> {
+    const invoiceId = canonicalInvoiceIdBytes(invoice);
     return this.account.exclusive(async () => {
       const { book } = await this.inspect(address), after = this.account.snapshot();
-      const merchantPk = merchantPublicKey(bytes32(after.merchantSecret)), invoiceId = canonicalInvoiceIdBytes(invoice), nonce = randomBytes32();
+      const merchantPk = merchantPublicKey(bytes32(after.merchantSecret)), nonce = randomBytes32();
       if (!same(book.merchantPayoutRecipients.lookup(merchantPk).bytes, receivingAddressBytes(this.account.receivingAddress))) throw new Error("The facility’s merchant recipient is not this wallet. Do not quote for it.");
       if (amount <= 0n || !invoice.trim() || invoice.length > 500 || expiry <= BigInt(Math.floor(Date.now() / 1000))) throw new Error("Supply an invoice, positive amount and future quote expiry.");
       const Q = quoteCommit({ merchantPk, invoiceId, nonce, amount, expiry, generation: book.lineGeneration, domain: book.contractDomain, feeFlat: book.feeFlat, feeBps: book.feeBps });
