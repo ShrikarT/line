@@ -119,6 +119,31 @@ test("wallet lock and permission failures are not retried as rate limits", async
   }
 });
 
+test("generic wallet failures identify the failed identity read without retrying or advancing", async () => {
+  const probes = ["getConfiguration", "getShieldedAddresses", "getUnshieldedAddress"] as const;
+  const labels = ["network configuration", "shielded identity", "receiving address"];
+  for (const [index, failed] of probes.entries()) {
+    for (const failure of [new Error("Request failed"), { reason: "Request failed" }, "Request failed"]) {
+      const calls: string[] = [];
+      const probe = async (method: typeof probes[number], value: object) => {
+        calls.push(method);
+        if (method === failed) throw failure;
+        return value;
+      };
+      const wallet = {
+        getConfiguration: () => probe("getConfiguration", { networkId: "preprod" }),
+        getShieldedAddresses: () => probe("getShieldedAddresses", {}),
+        getUnshieldedAddress: () => probe("getUnshieldedAddress", {}),
+        signData() { calls.push("signData"); throw Error("Unexpected signature request"); },
+        balanceUnsealedTransaction() { calls.push("balance"); throw Error("Unexpected balance request"); },
+        submitTransaction() { calls.push("submit"); throw Error("Unexpected submission"); },
+      } as unknown as ConnectedAPI;
+      await assert.rejects(readOrganizationWallet(wallet), new RegExp(`wallet could not complete the ${labels[index]} check`));
+      assert.deepEqual(calls, probes.slice(0, index + 1));
+    }
+  }
+});
+
 test("a revoked session during read backoff prevents another wallet request", async () => {
   let current = true, calls = 0;
   const wallet = { getConfiguration: async () => { calls++; throw Error("Rate limited"); },

@@ -757,7 +757,8 @@ test("an unlocked organization can export its encrypted backup during a wallet o
   await expect(page.getByRole("status")).toContainText("Encrypted backup download requested");
   expect(await page.evaluate(() => (window as unknown as { failedWalletReads: number }).failedWalletReads)).toBe(0);
   await page.getByRole("button", { name: "Create facility", exact: true }).click();
-  await expect(page.getByRole("alert")).toContainText("Request failed");
+  await expect(page.getByRole("alert")).toContainText("Your wallet could not complete the network configuration check.");
+  await expect(page.getByRole("alert")).toContainText("No signature or payment was requested by this check.");
   const requests = await page.evaluate(() => {
     const state = window as unknown as { failedWalletReads: number; organizationSignatures: number; organizationProofRequests: number };
     return { reads: state.failedWalletReads, signatures: state.organizationSignatures, proofs: state.organizationProofRequests };

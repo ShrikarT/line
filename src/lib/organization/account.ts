@@ -36,7 +36,11 @@ export async function readOrganizationWallet(wallet: ConnectedAPI, timeoutMs = 2
       try { const value = await request(); current(); return value; }
       catch (failure) {
         current();
-        if (!rateLimited(failure)) throw failure;
+        if (!rateLimited(failure)) {
+          const detail = typeof failure === "string" ? failure : failure && typeof failure === "object" ? (failure as { message?: unknown; reason?: unknown }).message ?? (failure as { reason?: unknown }).reason : undefined;
+          if (typeof detail === "string" && /^request failed[.!]?$/i.test(detail.trim())) throw new Error(`Your wallet could not complete the ${label} check. Reopen your wallet and reconnect before trying again. No signature or payment was requested by this check.`);
+          throw failure;
+        }
         if (attempt === 2) throw new Error(`Your wallet rate limited the ${label} check. Wait before reopening the organization. No signature or payment was retried.`);
         await pause(attempt === 0 ? 500 : 1500);
       }
