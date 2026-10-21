@@ -12,7 +12,7 @@ privacy and independent commercial custody are not established.
 | Product release | `4bf0d1e`, live Render deployment `dep-dbcelkmi0phs73a3r1rg` at 16:41 UTC on 21 October. Entry, account, network, organization session/workspace/recovery JavaScript and proving manifest match the tested local build byte for byte; readiness returns HTTP 200 in wallet-only mode |
 | Local verification | Expired-opening recovery: 676 of 677 core tests passed, one skipped, zero failures; typecheck, production build, 37 proving-file export, key/secret scans and zero managed-binding drift passed |
 | Browser verification | All 31 organization cases passed, plus a focused canonical-opening replay case. Coverage includes stale recovery reviews, wallet-network changes, IndexedDB aborts, encrypted history across every commit and backup/restore. These use synthetic candidates and controlled provider/receipt seams, not new network acceptance |
-| Full CI | [Expired-opening recovery `4bf0d1e`](https://github.com/ShrikarT/line/actions/runs/39636734538): three platform jobs passed; complete verification job still running at the deployment check. Prior [recovery-regression main `e74da33`](https://github.com/ShrikarT/line/actions/runs/39544746247) passed all four jobs |
+| Full CI | Both [deployed recovery `4bf0d1e`](https://github.com/ShrikarT/line/actions/runs/39636734538) and [documentation revision `69f480b`](https://github.com/ShrikarT/line/actions/runs/39638007972) passed all four jobs, including the complete browser suite |
 | Actual organization | Twelve verifier keys and 22 finalized workspace receipts. Last independently checked state: CLOSED, generation 1, 900,000 native-asset base units held, 1,000,000 reserve accounting, zero encumbrance and fees |
 | Active blocker | The original signed fee-bearing `openLine` remains saved and unresolved. The scoped recovery is live; the owner must unlock the existing vault, pass its local candidate check and confirm archival before another mutation. No replacement opening has been created |
 | Wallet / backup | Latest encrypted backup confirmed saved. The owner reopened the existing organization on `ad9aafd`. An initial session-status rate limit recovered after a single cooldown refresh: the live treasury shows CLOSED, all twelve keys and 900,000 units held. Intermittent wallet rate limits remain |
@@ -138,6 +138,11 @@ identity also passed through the production recovery endpoint at finalized block
 3,077,645. Its state matched the pinned closure and all twelve local release keys.
 This checked hosted authentication and provider reads without accessing the
 owner's encrypted record or submitting a transaction.
+A later production check at block 3,078,006 (21 October, 17:17:30 UTC) again
+matched the pinned state and release keys. Readiness remained healthy in
+wallet-only mode, and deployed application assets still matched the tested build.
+The browser-control tools had no connected browser; the owner's local archive
+status therefore remains unverified.
 
 The recovery checks all saved intent TTLs against pinned finalized block time,
 retains a 30-second uncertainty margin, verifies the exact signed action and
