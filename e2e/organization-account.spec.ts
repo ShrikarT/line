@@ -382,6 +382,122 @@ test("merchant invoice references reject oversized UTF-8 before requesting a pro
   expect(await page.evaluate(() => ({ proof: (window as any).organizationProofRequests, signatures: (window as any).organizationSignatures }))).toEqual({ proof: 0, signatures: 0 });
 });
 
+for (const outcome of ["SucceedEntirely", "FailEntirely"] as const) test(`saved merchant quotes recover a timed-out posting only after exact ${outcome} finality`, async ({ page }) => {
+  test.setTimeout(120_000);
+  await wallets(page, true); await page.goto("/app"); await connect(page, "a"); await unlock(page);
+  // Replace only public-state/transaction boundaries. Account preparation,
+  // encryption, receipt validation, reconciliation and UI are the real code.
+  // No proof, wallet signature or network submission is performed.
+  await page.evaluate(async () => {
+    const { browserModuleUrl } = await import("/e2e/browser-module.ts" as any);
+    const { OrganizationNetwork } = await import(browserModuleUrl("/src/lib/organization/network.ts"));
+    const { receivingAddressBytes } = await import(browserModuleUrl("/src/lib/organization/account.ts"));
+    const { encodeQuote } = await import(browserModuleUrl("/src/lib/organization/transfers.ts"));
+    const target = window as any;
+    target.quoteCalls = 0; target.quoteReceipt = "missing";
+    (OrganizationNetwork.prototype as any).inspect = async function () {
+      return { book: { lineGeneration: 1n, contractDomain: new Uint8Array(32).fill(18), feeFlat: 1000n, feeBps: 100n,
+        merchantPayoutRecipients: { lookup: () => ({ bytes: receivingAddressBytes(this.account.receivingAddress) }) } } };
+    };
+    (OrganizationNetwork.prototype as any).tx = function () {
+      return {
+        call: async (address: string) => {
+          target.quoteCalls++;
+          target.retainedQuote = encodeQuote(this.account.pending().after.quotes[0]);
+          await this.account.submitted("cd".repeat(32), "ff", address);
+          throw Error("Synthetic quote submission acknowledgement timed out");
+        },
+        finality: { forget: () => {}, wait: async () => {
+          if (target.quoteReceipt === "missing") throw Error("Synthetic receipt not observed");
+          return { identifiers: [target.quoteReceipt === "unrelated" ? "ee".repeat(32) : "cd".repeat(32)], status: target.quoteReceipt === "unrelated" ? "SucceedEntirely" : target.quoteReceipt, txHash: "ef".repeat(32), blockHeight: 7 };
+        } },
+      };
+    };
+  });
+  await page.getByRole("tab", { name: "Merchant", exact: true }).click();
+  await page.getByLabel("Organization facility address", { exact: true }).fill("ab".repeat(32));
+  await page.getByRole("textbox", { name: "Invoice / service reference", exact: true }).fill("remote-supplier-001");
+  await page.getByLabel(/^Price in this facility/).fill("100000");
+  await page.getByRole("button", { name: "Post quote in wallet", exact: true }).click();
+  await expect(page.getByRole("alert")).toContainText("Synthetic quote submission acknowledgement timed out");
+  const library = page.getByRole("region", { name: "Saved merchant quotes", exact: true });
+  await expect(library.getByRole("button", { name: "Share saved quote", exact: true })).toHaveCount(0);
+  await expect(page.getByLabel("Confirmed supplier quote", { exact: true })).toHaveCount(0);
+  const expected = await page.evaluate(() => JSON.parse((window as any).retainedQuote));
+  for (const receipt of ["missing", "unrelated", "PartiallySucceeded"]) {
+    await page.evaluate(value => { (window as any).quoteReceipt = value; }, receipt);
+    await page.getByRole("button", { name: "Check original transaction", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "Resolve the saved operation first.", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Check original transaction", exact: true })).toBeEnabled();
+    await expect(library.getByRole("button", { name: "Share saved quote", exact: true })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Post quote in wallet", exact: true })).toBeDisabled();
+  }
+  await page.evaluate(value => { (window as any).quoteReceipt = value; }, outcome);
+  await page.getByRole("button", { name: "Check original transaction", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Resolve the saved operation first.", exact: true })).toHaveCount(0);
+  if (outcome === "SucceedEntirely") {
+    await expect(library).toContainText("Organization fee: 2000 base units · Total allowance charge: 102000 base units");
+    await library.getByRole("button", { name: "Share saved quote", exact: true }).click();
+    expect(JSON.parse(await page.getByLabel("Saved merchant quote package", { exact: true }).inputValue())).toEqual(expected);
+  } else {
+    await expect(page.getByRole("alert")).toContainText("failed in a finalized block");
+    await expect(library.getByRole("button", { name: "Share saved quote", exact: true })).toHaveCount(0);
+  }
+  await page.getByRole("button", { name: "Lock organization", exact: true }).click(); await unlock(page);
+  await page.getByRole("tab", { name: "Merchant", exact: true }).click();
+  await expect(library.getByRole("button", { name: "Share saved quote", exact: true })).toHaveCount(outcome === "SucceedEntirely" ? 1 : 0);
+  if (outcome === "SucceedEntirely") {
+    await page.getByLabel("Find saved quotes", { exact: true }).fill("unrelated-invoice");
+    await expect(library).toContainText("No saved quotes match this search.");
+    await page.getByLabel("Find saved quotes", { exact: true }).fill(expected.invoiceId.toUpperCase());
+    await library.getByRole("button", { name: "Share saved quote", exact: true }).click();
+    expect(JSON.parse(await page.getByLabel("Saved merchant quote package", { exact: true }).inputValue())).toEqual(expected);
+  }
+  expect(await page.evaluate(() => ({ calls: (window as any).quoteCalls, proof: (window as any).organizationProofRequests, signatures: (window as any).organizationSignatures }))).toEqual({ calls: 1, proof: 0, signatures: 0 });
+});
+
+test("saved merchant quotes paginate, survive encrypted backup and export historical terms on mobile", async ({ page }) => {
+  test.setTimeout(120_000);
+  await wallets(page, true); await page.goto("/app"); await connect(page, "a"); await unlock(page);
+  const expected = await page.evaluate(async () => {
+    const { browserModuleUrl } = await import("/e2e/browser-module.ts" as any);
+    const { OrganizationAccount, organizationAccountKey } = await import(browserModuleUrl("/src/lib/organization/account.ts"));
+    const { getConnectedWallet } = await import(browserModuleUrl("/src/lib/runtime/wallet.ts"));
+    const { decodeOrganizationBackup } = await import(browserModuleUrl("/src/lib/organization/backup.ts"));
+    const { encodeQuote } = await import(browserModuleUrl("/src/lib/organization/transfers.ts"));
+    const account = await OrganizationAccount.unlock(getConnectedWallet()!, "Organization123!");
+    // Synthetic history includes expired and extreme Uint64 terms accepted by
+    // older backups. Neither their rendering nor export should require proving.
+    await account.edit(snapshot => {
+      for (let index = 1; index <= 11; index++) snapshot.quotes.push({
+        contractAddress: "ab".repeat(32), domain: "12".repeat(32), merchantPk: "13".repeat(32), invoiceId: index.toString(16).padStart(64, "0"), quoteNonce: "14".repeat(32),
+        amount: 100000n, expiry: index === 1 ? (1n << 64n) - 1n : 1n, generation: 1n, feeFlat: index === 1 ? (1n << 64n) - 1n : 1000n, feeBps: 100n, quoteCommitment: index.toString(16).padStart(64, "0"),
+      });
+    });
+    const record = await decodeOrganizationBackup(JSON.stringify(await account.encryptedBackup()), "Organization123!", organizationAccountKey("preprod", account.accountId), account.accountId);
+    return { count: record.snapshot.quotes.length, original: JSON.parse(encodeQuote(record.snapshot.quotes[0])) };
+  });
+  expect(expected.count).toBe(11);
+  await unlock(page); await page.getByRole("tab", { name: "Merchant", exact: true }).click();
+  await page.setViewportSize({ width: 390, height: 844 });
+  const library = page.getByRole("region", { name: "Saved merchant quotes", exact: true });
+  await expect(library.getByRole("article")).toHaveCount(10);
+  await expect(library).toContainText("Page 1 of 2");
+  await expect(library.getByRole("button", { name: "Previous quotes", exact: true })).toBeDisabled();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+  await library.getByRole("button", { name: "Next quotes", exact: true }).click();
+  await expect(library.getByRole("article")).toHaveCount(1);
+  await expect(library).toContainText("Page 2 of 2");
+  await expect(library).toContainText("The saved fee terms exceed the supported fee range.");
+  await expect(library).toContainText(`Unix second ${expected.original.expiry}`);
+  await library.getByRole("button", { name: "Share saved quote", exact: true }).click();
+  expect(JSON.parse(await page.getByLabel("Saved merchant quote package", { exact: true }).inputValue())).toEqual(expected.original);
+  await library.getByLabel("Find saved quotes", { exact: true }).fill("AB".repeat(32));
+  await expect(library).toContainText("Page 1 of 2");
+  await expect(library.getByRole("article")).toHaveCount(10);
+  expect(await page.evaluate(() => ({ proof: (window as any).organizationProofRequests, signatures: (window as any).organizationSignatures }))).toEqual({ proof: 0, signatures: 0 });
+});
+
 test("real product routes require a wallet and expose no operator or simulator shortcuts", async ({ page }) => {
   test.setTimeout(120_000);
   const posts: string[] = [], errors: string[] = [];
