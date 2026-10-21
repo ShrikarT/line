@@ -15,7 +15,7 @@ privacy and independent commercial custody are not established.
 | Full CI | [Diagnostic release `6406886`](https://github.com/ShrikarT/line/actions/runs/39536239295) and [recovery release `82f3d90`](https://github.com/ShrikarT/line/actions/runs/39483250056): all four jobs passed for each release, including verification, Windows/Ubuntu native-worker ownership and Windows checkpoint ACL checks |
 | Actual organization | Twelve verifier keys and 22 finalized workspace receipts. Last independently checked state: CLOSED, generation 1, 900,000 native-asset base units held, 1,000,000 reserve accounting, zero encumbrance and fees |
 | Active blocker | A signed fee-bearing `openLine` remains unresolved. Original-transaction checks did not establish finality, and the owner-triggered retry returned `Request failed` |
-| Wallet / backup | A separate fresh tab also failed to connect to 1AM. Its current unlocked/synced Preprod state needs owner confirmation. The latest encrypted backup download was requested but not confirmed saved; the older backup after transaction 21 was confirmed saved |
+| Wallet / backup | The owner confirmed saving the latest encrypted backup while the allowance remained retained after transaction 22. After refreshing the existing tab, 1AM connection still returned `Request failed`; its current unlocked/synced Preprod state needs verification |
 
 ## Wave 1 — foundation
 
@@ -127,8 +127,9 @@ receive bounded read retries; generic failures, signatures, proofs and submissio
 are not automatically retried. The current diagnostic release names the failed
 configuration, shielded-identity or receiving-address read instead of returning
 only `Request failed`. This improves diagnosis and does not establish a repair of
-1AM's underlying forwarding failure. The original owner tab has not loaded this
-new release because its latest backup download is still unconfirmed.
+1AM's underlying forwarding failure. After the owner confirmed saving the latest
+encrypted backup, the existing tab reloaded the diagnostic release. Its read-only
+1AM connection still failed before vault opening; no transaction was requested.
 
 Backup export reloads the latest durable record under the account lock without
 wallet RPCs, rechecks session validity after encryption and retains pending
@@ -158,7 +159,7 @@ compiled-contract tests do not replace fresh network receipts.
 
 ## Wave 3 — pilots and hardening
 
-1. Restore the owner's 1AM connection, confirm the latest backup and reconcile the
+1. Restore the owner's 1AM connection and reconcile the
    original allowance before starting another mutation. If its bytes are expired,
    establish a sound nonapplication/recovery path; do not discard them blindly.
 2. Complete fee-bearing and remaining twelve-action/compensation acceptance with
