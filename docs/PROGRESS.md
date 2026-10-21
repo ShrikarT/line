@@ -14,8 +14,8 @@ privacy and independent commercial custody are not established.
 | Browser verification | Session-check fix: all 28 organization browser cases passed, including original-byte recovery, real encrypted account guards, backup/restore and mobile layout. These use controlled wallet/receipt seams, not new network acceptance |
 | Full CI | [Session-check release `ad9aafd`](https://github.com/ShrikarT/line/actions/runs/39542507712) is running. Last completed runs: [diagnostic release `6406886`](https://github.com/ShrikarT/line/actions/runs/39536239295) and [recovery release `82f3d90`](https://github.com/ShrikarT/line/actions/runs/39483250056), all four jobs passed for each |
 | Actual organization | Twelve verifier keys and 22 finalized workspace receipts. Last independently checked state: CLOSED, generation 1, 900,000 native-asset base units held, 1,000,000 reserve accounting, zero encumbrance and fees |
-| Active blocker | A signed fee-bearing `openLine` remains unresolved. Original-transaction checks did not establish finality, and the owner-triggered retry returned `Request failed` |
-| Wallet / backup | Latest encrypted backup confirmed saved. The owner reconnected 1AM and reopened the existing organization; subsequent configuration reads failed. The session-check fix awaits fresh live acceptance |
+| Active blocker | A signed fee-bearing `openLine` remains unresolved. The latest check through the recovered wallet session did not observe finality. Exact-byte retry review is open for the owner's final local action |
+| Wallet / backup | Latest encrypted backup confirmed saved. The owner reopened the existing organization on `ad9aafd`. An initial session-status rate limit recovered after a single cooldown refresh: the live treasury shows CLOSED, all twelve keys and 900,000 units held. Intermittent wallet rate limits remain |
 
 ## Wave 1 — foundation
 
@@ -108,11 +108,11 @@ and zero records; current state remained CLOSED, generation 1, fees 0/0 and
 900,000 held. Neither a missing receipt nor a latest-state snapshot proves that
 an uncertain transaction never applied.
 
-The live finality check ended with `Finality has not been observed yet`. The
-owner's subsequent original-byte retry returned `Request failed`; successful
-resubmission is not established. A fresh tab also returned
-`Failed to connect to 1AM: Request failed`, so the failure is not limited to the
-older tab. The owner's vault was preserved and no replacement was created.
+The latest finality check through the recovered live session ended with
+`Finality has not been observed yet`. Exact-byte retry review is open for the
+owner's final local action; successful resubmission remains unestablished and
+the workspace retains 22 receipts. Earlier retries and a separate fresh-tab
+connection returned `Request failed`. No replacement was created.
 
 Explicit resubmission keeps the original bytes and identifier, validates the
 release, canonical encoding, action, target and expiry, and requires fresh wallet
@@ -129,7 +129,12 @@ service configuration at unlock and keeps a frozen in-memory copy. Later guards
 check the live connector session and Preprod network, then reread both identities.
 A failed live check cannot fall back to saved settings. Changed accounts still
 lock the vault; reconnect/reopen adopts changed service URLs. This reduces
-repeated configuration reads; fresh live 1AM acceptance is not yet established.
+repeated configuration reads. On the deployed fix, the owner reopened the existing
+organization. 1AM initially rate limited the live session-status check; one later
+refresh after cooldown recovered the actual treasury without reconnecting or
+reopening again. It displayed CLOSED, twelve keys and 900,000 units held, with
+the same 22 receipts. This accepts the live read path, not a new financial call;
+intermittent wallet rate limiting remains unresolved.
 
 Identity reads remain sequential and bounded. Only explicit rate limits receive
 bounded read retries; generic failures, signatures, proofs and submission are not
