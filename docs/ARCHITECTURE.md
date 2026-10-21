@@ -67,7 +67,8 @@ cannot make those bound bytes valid again.
 
 The relevant implementations are [ledger-8.1.2 replay and application rules](https://github.com/midnightntwrk/midnight-ledger/blob/ledger-8.1.2/ledger/src/semantics.rs),
 [maintenance validation](https://github.com/midnightntwrk/midnight-ledger/blob/ledger-8.1.2/ledger/src/verify.rs),
-and the [observed node-1.0.300 block context](https://github.com/midnightntwrk/midnight-node/blob/node-1.0.300/pallets/midnight/src/lib.rs).
+the [observed node-1.0.300 block context](https://github.com/midnightntwrk/midnight-node/blob/node-1.0.300/pallets/midnight/src/lib.rs),
+and its Cargo.lock-pinned [timestamp monotonicity check](https://github.com/paritytech/polkadot-sdk/blob/2e4dd0bc22366a5af820492528869a493b5a5208/substrate/frame/timestamp/src/lib.rs#L259).
 These are configured TLS provider assertions and audited implementation assumptions,
 not a light-client proof or independent full-node verification.
 
