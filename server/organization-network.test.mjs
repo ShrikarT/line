@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
-import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve, sep } from 'node:path';
 import { once } from 'node:events';
@@ -9,15 +9,16 @@ import { WebSocket, WebSocketServer } from 'ws';
 import { bech32m } from '@scure/base';
 import * as L from '@midnight-ntwrk/ledger-v8';
 import { startOrganizationServer } from './organization-server.mjs';
+import { EXPIRED_OPENING as expiryPolicy } from '../src/lib/organization/expired-opening-policy.ts';
 
 async function fixture(t) {
   const directory = mkdtempSync(join(tmpdir(), 'line-network-test-'));
   writeFileSync(join(directory, 'index.html'), '<title>Network transport control</title>');
-  const requests = [], connections = [], settings = { reply: null };
+  const requests = [], connections = [], settings = { reply: null, rpc: null };
   const upstream = createServer(async (req, res) => {
     let body = ''; for await (const chunk of req) body += chunk;
-    requests.push({ url: req.url, headers: req.headers, body: JSON.parse(body) });
-    res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(settings.reply ?? { data: { contractAction: null } }));
+    const input = JSON.parse(body); requests.push({ url: req.url, headers: req.headers, body: input });
+    res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(input.method && settings.rpc ? { jsonrpc: '2.0', id: input.id, result: settings.rpc(input.method, input.params) } : settings.reply ?? { data: { contractAction: null } }));
   });
   const sockets = new WebSocketServer({ server: upstream });
   sockets.on('connection', (socket, req) => {
@@ -34,7 +35,7 @@ async function fixture(t) {
   const token = 'synthetic-provider-credential-control';
   const origin = 'https://line.example';
   const app = await startOrganizationServer({ env: { LINE_PUBLIC_ORIGIN: origin }, port: 0, host: '127.0.0.1', publicDirectory: directory, createService: async () => ({
-    endpoints: { indexerUri: `${upstreamOrigin}/graphql?project_id=${token}`, indexerWsUri: `${upstreamOrigin.replace('http:', 'ws:')}/ws?project_id=${token}` },
+    endpoints: { nodeUri: `${upstreamOrigin}/rpc?project_id=${token}`, indexerUri: `${upstreamOrigin}/graphql?project_id=${token}`, indexerWsUri: `${upstreamOrigin.replace('http:', 'ws:')}/ws?project_id=${token}` },
     catalog: () => ({ services: [] }), close: async () => {},
   }) });
   t.after(async () => {
@@ -63,6 +64,34 @@ test('the production entry provides authenticated public read URLs without retur
   assert(!JSON.stringify(metadata).includes(f.token)); assert.equal(f.requests.length, 0);
   assert.equal((await fetch(f.base + '/api/organization/network', { headers: { Origin: f.origin } })).status, 401);
   assert.equal((await fetch(f.base + '/api/organization/network', { headers: { ...f.headers, Origin: 'https://other.example' } })).status, 403);
+});
+
+test('expired-opening endpoint pins finalized state reads, requires authentication and rejects provider disagreement', async t => {
+  const f = await fixture(t), path = f.base + '/api/organization/network/expired-opening';
+  const state = readFileSync(new URL('../tests/fixtures/organization-closed-state.hex', import.meta.url), 'utf8');
+  const head = 'aa'.repeat(32), height = 3077281, timestamp = 1792598700000;
+  const storage = Buffer.alloc(8); storage.writeBigUInt64LE(BigInt(timestamp));
+  f.settings.rpc = (method, params) => {
+    if (method === 'chain_getFinalizedHead') return '0x' + head;
+    if (method === 'chain_getHeader') { assert.deepEqual(params, ['0x' + head]); return { number: '0x' + height.toString(16) }; }
+    if (method === 'chain_getBlockHash') return '0x' + (params[0] === 0 ? expiryPolicy.genesisHash : expiryPolicy.baselineHash);
+    if (method === 'state_getRuntimeVersion') return { specName: 'midnight', specVersion: expiryPolicy.runtimeSpecVersion };
+    if (method === 'midnight_contractState') { assert.equal(params[0], expiryPolicy.address); assert(['0x' + head, '0x' + expiryPolicy.baselineHash].includes(params[1])); return '0x' + state; }
+    if (method === 'state_getStorage') { assert.deepEqual(params, [expiryPolicy.timestampKey, '0x' + head]); return '0x' + storage.toString('hex'); }
+    throw Error('Arbitrary RPC forwarding is prohibited');
+  };
+  f.settings.reply = { data: { block: { hash: head, height, timestamp } } };
+  assert.equal((await fetch(path, { headers: { Origin: f.origin } })).status, 401);
+  assert.equal(f.requests.length, 0);
+  const response = await fetch(path, { headers: f.headers }); assert.equal(response.status, 200);
+  const evidence = await response.json();
+  assert.equal(evidence.finalized.state, state); assert.equal(evidence.baseline.state, state); assert.equal(evidence.finalized.timestamp, timestamp);
+  assert(!JSON.stringify(evidence).includes(f.token));
+  assert.equal((await fetch(path + '?method=author_submitExtrinsic', { headers: f.headers })).status, 400);
+  assert.equal((await fetch(path, { method: 'POST', headers: f.headers, body: JSON.stringify({ method: 'author_submitExtrinsic' }) })).status, 404);
+  f.settings.reply.data.block.timestamp--;
+  const failed = await fetch(path, { headers: f.headers }); assert.equal(failed.status, 503);
+  assert(!JSON.stringify(await failed.json()).includes(f.token));
 });
 
 test('read-only HTTP forwards only a fixed credentialed query and redacts provider diagnostics', async t => {

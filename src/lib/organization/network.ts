@@ -22,6 +22,7 @@ import { organizationProofProvider } from "./proving";
 import { OrganizationSupplierClient } from "./supplier-client";
 import { organizationReadEndpoints } from "./read-endpoints";
 import { authenticatedOrganizationReads } from "./authenticated-reads";
+import { recoveryDigest, verifyExpiredOpening, type ExpiredOpeningReview } from "./expired-opening";
 
 type Circuit = keyof Contract<LinePrivateWitnessContext>["provableCircuits"];
 type Providers = ContractProviders<Contract<LinePrivateWitnessContext>>;
@@ -121,6 +122,10 @@ export class OrganizationNetwork {
   async restoreBackup(file: string, password: string) {
     this.report("Authenticating the backup and checking its facilities on Midnight");
     await this.account.restoreBackup(file, password, async record => {
+      for (const recovery of record.recoveries ?? []) {
+        const verified = await verifyExpiredOpening(recovery.before, recovery.original, recovery.evidence, this.release.sourceFingerprint, name => this.providers.zkConfigProvider.getVerifierKey(name as Circuit));
+        if (verified.ttl !== recovery.ttl) throw new Error("The recovery history differs from the original signed expiry.");
+      }
       if (record.pending && record.pending.sourceFingerprint !== this.release.sourceFingerprint) throw new Error("Restore the pending operation with its original contract release.");
       const snapshots = [record.snapshot, ...(record.pending ? [record.pending.after] : [])];
       const facilities = snapshots.flatMap(snapshot => snapshot.facilities);
@@ -502,5 +507,32 @@ export class OrganizationNetwork {
       this.report("Checking the original signed transaction. No replacement will be created");
       await this.finish(await this.tx().finality.wait(pending.txId));
     });
+  }
+  async reviewExpiredOpening(): Promise<ExpiredOpeningReview> {
+    return this.account.exclusive(async () => {
+      const pending = this.account.pending(), before = this.account.snapshot();
+      if (!pending?.txId) throw new Error("No original signed opening is saved.");
+      this.report("Checking the pinned finalized state and original opening candidate");
+      const verified = await this.verifyExpiredOpening(before, pending, await this.supplier.request("network/expired-opening"));
+      await this.account.assertWallet();
+      return { operationId: pending.id, txId: pending.txId, operationDigest: await recoveryDigest(pending), snapshotDigest: await recoveryDigest(before), checkedAt: Date.now(), ...verified };
+    });
+  }
+  async recoverExpiredOpening(review: ExpiredOpeningReview) {
+    return this.account.exclusive(async () => {
+      const pending = this.account.pending(), before = this.account.snapshot();
+      if (!pending?.txId || pending.id !== review.operationId || pending.txId !== review.txId || await recoveryDigest(pending) !== review.operationDigest || await recoveryDigest(before) !== review.snapshotDigest || !Number.isSafeInteger(review.checkedAt) || review.checkedAt > Date.now() || Date.now() - review.checkedAt > 300_000) throw new Error("The saved operation or recovery review changed. Check it again.");
+      // Re-read after confirmation under the durable account lock. A failed read,
+      // wallet change or storage write retains the original pending operation.
+      const verified = await this.verifyExpiredOpening(before, pending, await this.supplier.request("network/expired-opening"));
+      if (verified.evidence.finalized.height < review.evidence.finalized.height || verified.evidence.finalized.timestamp < review.evidence.finalized.timestamp) throw new Error("The recovery provider checkpoint moved backwards. Keep the original operation saved.");
+      await this.account.assertWallet();
+      await this.account.archiveExpiredOpening(pending, verified.evidence, verified.ttl);
+      this.tx().finality.forget(pending.txId);
+      this.report("Expired opening archived with provider-backed nonapplication evidence. No transaction was submitted. Review new allowance terms separately.");
+    });
+  }
+  private verifyExpiredOpening(before: OrganizationSnapshot, pending: NonNullable<ReturnType<OrganizationAccount["pending"]>>, evidence: unknown) {
+    return verifyExpiredOpening(before, pending, evidence, this.release.sourceFingerprint, name => this.providers.zkConfigProvider.getVerifierKey(name as Circuit));
   }
 }
