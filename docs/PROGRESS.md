@@ -9,10 +9,10 @@ privacy and independent commercial custody are not established.
 | Area | Verified state / limitation |
 | --- | --- |
 | Public application | [line-midnight.onrender.com](https://line-midnight.onrender.com/app), free wallet-only hosting; no hosted supplier signing wallet or automated supplier |
-| Product release | `6406886`, live Render deployment `dep-dbc2lvon74is73f5ek10` at 03:02 UTC on 21 October. Account JavaScript and public proving manifest match the tested local build byte for byte; readiness returns HTTP 200 |
+| Product release | `ad9aafd`, live Render deployment `dep-dbc3m5e1egvs739d2100` at 04:11 UTC on 21 October. Account JavaScript and public proving manifest match the tested local build byte for byte; readiness returns HTTP 200 |
 | Local verification | Session-check fix: 668 of 669 core tests passed, one skipped, zero failures; typecheck, production build, 37 proving-file export, key/secret scans and zero managed-binding drift passed |
 | Browser verification | Session-check fix: all 28 organization browser cases passed, including original-byte recovery, real encrypted account guards, backup/restore and mobile layout. These use controlled wallet/receipt seams, not new network acceptance |
-| Full CI | Last completed runs: [diagnostic release `6406886`](https://github.com/ShrikarT/line/actions/runs/39536239295) and [recovery release `82f3d90`](https://github.com/ShrikarT/line/actions/runs/39483250056), all four jobs passed for each. Full CI for the newer session-check fix is not yet established |
+| Full CI | [Session-check release `ad9aafd`](https://github.com/ShrikarT/line/actions/runs/39542507712) is running. Last completed runs: [diagnostic release `6406886`](https://github.com/ShrikarT/line/actions/runs/39536239295) and [recovery release `82f3d90`](https://github.com/ShrikarT/line/actions/runs/39483250056), all four jobs passed for each |
 | Actual organization | Twelve verifier keys and 22 finalized workspace receipts. Last independently checked state: CLOSED, generation 1, 900,000 native-asset base units held, 1,000,000 reserve accounting, zero encumbrance and fees |
 | Active blocker | A signed fee-bearing `openLine` remains unresolved. Original-transaction checks did not establish finality, and the owner-triggered retry returned `Request failed` |
 | Wallet / backup | Latest encrypted backup confirmed saved. The owner reconnected 1AM and reopened the existing organization; subsequent configuration reads failed. The session-check fix awaits fresh live acceptance |
