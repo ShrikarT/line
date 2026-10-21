@@ -242,7 +242,23 @@ browser fixtures do not establish its finality.
 
 That live check subsequently ended with `Finality has not been observed yet` and
 retained the signed operation. The exact-byte retry review was reopened for the
-owner's final local action; no new candidate was created.
+owner's final local action; the owner then reported `Request failed`. No new
+candidate was created and successful resubmission remains unestablished.
+
+Generic `Request failed` responses from wallet identity reads previously omitted
+the failing stage. They now name the network-configuration, shielded-identity or
+receiving-address check and explain that this read requested no signature or
+payment. The failing regression reproduced the old generic message; all twelve
+finality/wallet-read cases now pass, including each stage with Error, reason-only
+and string failures. Generic errors are not retried, later probes do not run, and
+lock, permission, revocation and rate-limit handling are retained. The focused
+browser checks passed for exact-byte recovery and encrypted backup export during
+a wallet outage. This improves diagnosis; it does not claim to repair 1AM's
+underlying forwarding failure or resolve the pending allowance.
+The complete core run for this diagnostic change passed 665 of 666 tests with
+one skipped and zero failures. Typecheck and the production build passed, as did
+key/secret scans and zero managed-binding drift. Its new full CI result is not
+yet established; the passing four-job run above belongs to release `82f3d90`.
 
 A fresh configured-provider read at 19:17 UTC on 20 October still returned no
 indexed transaction for the retained identifier, with status CLOSED, generation
