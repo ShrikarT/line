@@ -141,6 +141,88 @@ test("explicit resubmission retains the original signed bytes without another pr
   await expect(page.getByRole("heading", { name: "Resolve the saved operation first.", exact: true })).toHaveCount(0);
   await expect(page.getByText("1 finalized transactions", { exact: true })).toBeVisible();
 });
+for (const outcome of ["SucceedEntirely", "FailEntirely"]) test(`expired signed operations survive retry, backup and reopen until exact ${outcome} reconciliation`, async ({ page }) => {
+  test.setTimeout(120_000);
+  const L = await import("@midnight-ntwrk/ledger-v8");
+  // Expired serialization fixture, not a network-valid maintenance approval.
+  // Controlled finality below tests reconciliation, not live network acceptance.
+  const address = "ab".repeat(32), intent = L.Intent.new(new Date(Date.now() - 60_000));
+  const unproven = L.Transaction.fromParts("preprod", undefined, undefined, intent.addMaintenanceUpdate(new L.MaintenanceUpdate(address, [], 0n)));
+  const unexpected = async () => { throw Error("No circuit proof is needed for this serialization fixture"); };
+  const signed = (await unproven.prove({ check: unexpected, prove: unexpected }, L.CostModel.initialCostModel())).bind();
+  const transaction = Buffer.from(signed.serialize()).toString("hex"), txId = signed.identifiers().at(-1)!;
+  const sourceFingerprint = createHash("sha256").update(readFileSync(new URL("../contracts/organization/line.compact", import.meta.url))).digest("hex");
+  await wallets(page, true, true); await page.goto("/app"); await connect(page, "a"); await unlock(page);
+  await page.evaluate(async ({ address, transaction, txId, sourceFingerprint }) => {
+    const { browserModuleUrl } = await import("/e2e/browser-module.ts" as any);
+    const { OrganizationAccount } = await import(browserModuleUrl("/src/lib/organization/account.ts"));
+    const { OrganizationNetwork } = await import(browserModuleUrl("/src/lib/organization/network.ts"));
+    const { getConnectedWallet } = await import(browserModuleUrl("/src/lib/runtime/wallet.ts"));
+    const wallet = getConnectedWallet()!;
+    (window as any).expiredSubmissions = 0;
+    wallet.submitTransaction = async () => { (window as any).expiredSubmissions++; throw Error("Expired bytes must not reach the wallet"); };
+    const account = await OrganizationAccount.unlock(wallet, "Organization123!");
+    await account.exclusive(async () => {
+      await account.prepare({ id: "expired-maintenance", kind: "key", circuit: "draw", facilityId: null, contractAddress: address, sourceFingerprint, after: account.snapshot(), txId: null, transaction: null });
+      await account.submitted(txId, transaction, address);
+    });
+    (window as any).expiredReceipt = "missing";
+    (OrganizationNetwork.prototype as any).tx = () => ({ finality: {
+      wait: async (id: string) => {
+        if (id !== txId) throw Error("A replacement transaction was observed");
+        const mode = (window as any).expiredReceipt;
+        if (mode === "missing") throw Error("Finality has not been observed yet");
+        return { identifiers: [mode === "foreign" ? "00" + "ef".repeat(32) : txId], blockHeight: 321, txHash: "ee".repeat(32), status: mode === "foreign" ? "SucceedEntirely" : mode };
+      }, forget: () => {},
+    } });
+  }, { address, transaction, txId, sourceFingerprint });
+  const reopen = async () => {
+    await page.getByLabel("Organization vault password", { exact: true }).fill("Organization123!");
+    await page.getByRole("button", { name: "Open organization", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "Resolve the saved operation first.", exact: true })).toBeVisible();
+  };
+  await reopen();
+  await page.getByRole("button", { name: "Retry original submission", exact: true }).click();
+  await page.getByRole("button", { name: "Resubmit same signed transaction", exact: true }).click();
+  await expect(page.getByRole("alert")).toContainText("The original signed transaction has expired. Keep it for reconciliation; expiry alone does not prove it was never applied.");
+  for (const mode of ["missing", "foreign"]) {
+    await page.evaluate(mode => { (window as any).expiredReceipt = mode; }, mode);
+    await page.getByRole("button", { name: "Check original transaction", exact: true }).click();
+    await expect(page.getByRole("alert")).toContainText(mode === "missing" ? "Finality has not been observed yet" : "exact organization transaction has not been observed");
+    await expect(page.getByRole("heading", { name: "Resolve the saved operation first.", exact: true })).toBeVisible();
+  }
+  const retained = await page.evaluate(async () => {
+    const { browserModuleUrl } = await import("/e2e/browser-module.ts" as any);
+    const { OrganizationAccount, organizationAccountKey } = await import(browserModuleUrl("/src/lib/organization/account.ts"));
+    const { decodeOrganizationBackup } = await import(browserModuleUrl("/src/lib/organization/backup.ts"));
+    const { getConnectedWallet } = await import(browserModuleUrl("/src/lib/runtime/wallet.ts"));
+    const account = await OrganizationAccount.unlock(getConnectedWallet()!, "Organization123!");
+    const backup = await decodeOrganizationBackup(JSON.stringify(await account.encryptedBackup()), "Organization123!", organizationAccountKey("preprod", account.accountId), account.accountId);
+    return { pending: backup.pending, snapshot: backup.snapshot, receipts: backup.snapshot.receipts.length, failures: backup.snapshot.failures?.length ?? 0, submissions: (window as any).expiredSubmissions, proofs: (window as any).organizationProofRequests, signatures: (window as any).organizationSignatures };
+  });
+  expect(retained.pending).toMatchObject({ id: "expired-maintenance", txId, transaction, sourceFingerprint, contractAddress: address });
+  expect(retained.pending!.after).toEqual(retained.snapshot);
+  expect(retained).toMatchObject({ receipts: 0, failures: 0, submissions: 0, proofs: 0, signatures: 0 });
+  // The independent account unlock used to decode the backup revokes the UI's
+  // prior vault session. Reopen it normally rather than reusing stale controls.
+  await expect(page.getByRole("heading", { name: "Open your organization.", exact: true })).toBeVisible();
+  await reopen();
+  await expect(page.getByText(new RegExp(txId))).toBeVisible();
+  await page.evaluate(outcome => { (window as any).expiredReceipt = outcome; }, outcome);
+  await page.getByRole("button", { name: "Check original transaction", exact: true }).click();
+  if (outcome === "SucceedEntirely") await expect(page.getByRole("status")).toContainText("Confirmed on Midnight Preprod");
+  else await expect(page.getByRole("alert")).toContainText("failed in a finalized block");
+  await expect(page.getByRole("heading", { name: "Resolve the saved operation first.", exact: true })).toHaveCount(0);
+  const reconciled = await page.evaluate(async () => {
+    const { browserModuleUrl } = await import("/e2e/browser-module.ts" as any);
+    const { OrganizationAccount } = await import(browserModuleUrl("/src/lib/organization/account.ts"));
+    const { getConnectedWallet } = await import(browserModuleUrl("/src/lib/runtime/wallet.ts"));
+    const account = await OrganizationAccount.unlock(getConnectedWallet()!, "Organization123!");
+    return { pending: account.pending(), receipts: account.snapshot().receipts.map(receipt => receipt.txId), failures: account.snapshot().failures?.map(receipt => receipt.txId) ?? [], submissions: (window as any).expiredSubmissions, proofs: (window as any).organizationProofRequests, signatures: (window as any).organizationSignatures };
+  });
+  expect(reconciled).toEqual({ pending: null, receipts: outcome === "SucceedEntirely" ? [txId] : [], failures: outcome === "FailEntirely" ? [txId] : [], submissions: 0, proofs: 0, signatures: 0 });
+});
+
 async function disconnect(page: Page) {
   await page.locator("header").getByRole("button", { name: "Manage connected wallet" }).click();
   await page.getByRole("button", { name: "Disconnect from Line" }).click();

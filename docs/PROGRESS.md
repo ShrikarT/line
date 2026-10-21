@@ -12,9 +12,9 @@ privacy and independent commercial custody are not established.
 | Product release | `ad9aafd`, live Render deployment `dep-dbc3m5e1egvs739d2100` at 04:11 UTC on 21 October. Account JavaScript and public proving manifest match the tested local build byte for byte; readiness returns HTTP 200 |
 | Local verification | Session-check fix: 668 of 669 core tests passed, one skipped, zero failures; typecheck, production build, 37 proving-file export, key/secret scans and zero managed-binding drift passed |
 | Browser verification | Session-check fix: all 28 organization browser cases passed, including original-byte recovery, real encrypted account guards, backup/restore and mobile layout. These use controlled wallet/receipt seams, not new network acceptance |
-| Full CI | [Session-check release `ad9aafd`](https://github.com/ShrikarT/line/actions/runs/39542507712) is running. Last completed runs: [diagnostic release `6406886`](https://github.com/ShrikarT/line/actions/runs/39536239295) and [recovery release `82f3d90`](https://github.com/ShrikarT/line/actions/runs/39483250056), all four jobs passed for each |
+| Full CI | [Session-check release `ad9aafd`](https://github.com/ShrikarT/line/actions/runs/39542507712): all four jobs passed, including the complete browser suite |
 | Actual organization | Twelve verifier keys and 22 finalized workspace receipts. Last independently checked state: CLOSED, generation 1, 900,000 native-asset base units held, 1,000,000 reserve accounting, zero encumbrance and fees |
-| Active blocker | A signed fee-bearing `openLine` remains unresolved. The latest check through the recovered wallet session did not observe finality. Exact-byte retry review is open for the owner's final local action |
+| Active blocker | The original signed fee-bearing `openLine` is expired and remains unresolved. Retry validation rejected it before wallet submission. Its bytes and private candidate remain saved for reconciliation; new mutations stay blocked |
 | Wallet / backup | Latest encrypted backup confirmed saved. The owner reopened the existing organization on `ad9aafd`. An initial session-status rate limit recovered after a single cooldown refresh: the live treasury shows CLOSED, all twelve keys and 900,000 units held. Intermittent wallet rate limits remain |
 
 ## Wave 1 — foundation
@@ -109,9 +109,11 @@ and zero records; current state remained CLOSED, generation 1, fees 0/0 and
 an uncertain transaction never applied.
 
 The latest finality check through the recovered live session ended with
-`Finality has not been observed yet`. Exact-byte retry review is open for the
-owner's final local action; successful resubmission remains unestablished and
-the workspace retains 22 receipts. Earlier retries and a separate fresh-tab
+`Finality has not been observed yet`. The owner's subsequent original-byte retry
+was rejected by expiry validation before wallet submission. The live workspace
+still shows the exact original identifier, CLOSED status, 900,000 units held and
+22 receipts. Signed bytes and the private candidate remain retained; expiry is
+not recorded as finalized failure. Earlier retries and a separate fresh-tab
 connection returned `Request failed`. No replacement was created.
 
 Explicit resubmission keeps the original bytes and identifier, validates the
@@ -121,6 +123,14 @@ are rejected. It requests no new proof or balancing. Rejection or timeout retain
 the pending operation. Expiry alone never clears the journal. A generic expiry
 recovery procedure is not established; in this CLOSED facility `setStatus` is
 rejected, so it cannot be assumed to provide a cancellation fence.
+
+Two focused browser regressions passed for expired signed operations: no wallet
+submission, proof or balance request; exact bytes and candidate retained through
+encrypted backup and reopening; missing and unrelated receipts keep the journal
+blocked; exact finalized success or total failure can still reconcile it. These
+use serialization fixtures and controlled receipts, not fresh network evidence.
+All five transaction-validation tests and typecheck also passed. No production
+transaction behavior or contract changed in this verification update.
 
 After the owner restored 1AM and reopened the organization, the diagnostic release
 identified `getConfiguration` as the failed check. A later cooldown refresh failed
@@ -173,9 +183,10 @@ compiled-contract tests do not replace fresh network receipts.
 
 ## Wave 3 — pilots and hardening
 
-1. Restore the owner's 1AM connection and reconcile the
-   original allowance before starting another mutation. If its bytes are expired,
-   establish a sound nonapplication/recovery path; do not discard them blindly.
+1. Reconcile the expired original allowance before starting another mutation.
+   The 1AM read path has recovered. Exact finality or a separately validated
+   nonapplication/recovery procedure is still required; do not discard the saved
+   bytes based on expiry, a missing receipt or the latest CLOSED snapshot.
 2. Complete fee-bearing and remaining twelve-action/compensation acceptance with
    finalized receipts and actual asset movements. The next 100,000-unit purchase
    under the proposed policy would charge a 2,000-unit fee, totaling 102,000.
