@@ -11,8 +11,8 @@ privacy and independent commercial custody are not established.
 | Public application | [line-midnight.onrender.com](https://line-midnight.onrender.com/app), free wallet-only hosting; no hosted supplier signing wallet or automated supplier |
 | Product release | `6406886`, live Render deployment `dep-dbc2lvon74is73f5ek10` at 03:02 UTC on 21 October. Account JavaScript and public proving manifest match the tested local build byte for byte; readiness returns HTTP 200 |
 | Local verification | 665 of 666 core tests passed, one skipped, zero failures; typecheck, production build, 37 proving-file export, key/secret scans and zero managed-binding drift passed |
-| Browser verification | Recovery release `82f3d90`: all 27 organization cases and the additional mobile retry/persistence check passed. Diagnostic release `6406886`: both affected browser checks passed; these use controlled wallet/receipt seams, not new network acceptance |
-| Full CI | [Recovery release `82f3d90`](https://github.com/ShrikarT/line/actions/runs/39483250056): all four jobs passed. [Diagnostic release `6406886`](https://github.com/ShrikarT/line/actions/runs/39536239295): still running; Windows/Ubuntu native-worker ownership and Windows checkpoint ACL jobs passed |
+| Browser verification | Recovery release `82f3d90`: all 27 organization cases and the additional mobile retry/persistence check passed. Diagnostic release `6406886`: both affected local browser checks and the full CI browser stage passed; these use controlled wallet/receipt seams, not new network acceptance |
+| Full CI | [Diagnostic release `6406886`](https://github.com/ShrikarT/line/actions/runs/39536239295) and [recovery release `82f3d90`](https://github.com/ShrikarT/line/actions/runs/39483250056): all four jobs passed for each release, including verification, Windows/Ubuntu native-worker ownership and Windows checkpoint ACL checks |
 | Actual organization | Twelve verifier keys and 22 finalized workspace receipts. Last independently checked state: CLOSED, generation 1, 900,000 native-asset base units held, 1,000,000 reserve accounting, zero encumbrance and fees |
 | Active blocker | A signed fee-bearing `openLine` remains unresolved. Original-transaction checks did not establish finality, and the owner-triggered retry returned `Request failed` |
 | Wallet / backup | A separate fresh tab also failed to connect to 1AM. Its current unlocked/synced Preprod state needs owner confirmation. The latest encrypted backup download was requested but not confirmed saved; the older backup after transaction 21 was confirmed saved |
@@ -84,7 +84,8 @@ Redemption paid exactly 100,000 to the registered merchant recipient. Replenishm
 contained an actual 100,000 deposit; withdrawal paid the fixed issuer recipient.
 Closure retained 900,000 in custody and 1,000,000 in reserve accounting. These are
 configured TLS indexer/RPC checks, not independent full-node or local proof
-verification. The latest successful check was 02:51 UTC on 21 October.
+verification. The latest successful check was 03:18 UTC on 21 October; it
+explicitly read generation 1, zero encumbrance, zero fee terms and zero fees.
 
 Fresh receipts cover eight distinct call names: `fundReserve`,
 `withdrawUnencumberedReserve`, `openLine`, `postQuote`, `draw`, `redeemDraw`,
