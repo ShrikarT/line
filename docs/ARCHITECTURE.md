@@ -41,6 +41,9 @@ forwarding the same bytes to the connected wallet. It does not prepare, balance
 or prove another transaction. A rejected or timed-out retry retains the operation;
 only the exact finalized receipt can publish its candidate state. Expired bytes
 cannot be resent, and expiry or an absent receipt alone never clears the journal.
+Expiry is a submission restriction, not a reconciliation restriction: an exact
+finalized success can still publish the candidate, and an exact finalized total
+failure can record the failure. Missing, unrelated or partial receipts retain it.
 
 Encrypted backup export holds the same account lock and reloads the latest durable
 record, including any pending operation. It requires the unlocked vault session
