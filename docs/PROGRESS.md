@@ -11,7 +11,8 @@ privacy and independent commercial custody are not established.
 | Public application | [line-midnight.onrender.com](https://line-midnight.onrender.com/app), free wallet-only hosting; no hosted supplier signing wallet or automated supplier |
 | Product release | `4bf0d1e`, live Render deployment `dep-dbcelkmi0phs73a3r1rg` at 16:41 UTC on 21 October. Entry, account, network, organization session/workspace/recovery JavaScript and proving manifest match the tested local build byte for byte; readiness returns HTTP 200 in wallet-only mode |
 | Local verification | Expired-opening recovery: 676 of 677 core tests passed, one skipped, zero failures; typecheck, production build, 37 proving-file export, key/secret scans and zero managed-binding drift passed |
-| Browser verification | All 31 organization cases passed, plus a focused canonical-opening replay case. Coverage includes stale recovery reviews, wallet-network changes, IndexedDB aborts, encrypted history across every commit and backup/restore. These use synthetic candidates and controlled provider/receipt seams, not new network acceptance |
+| Browser verification | All 35 organization cases passed, including three saved-quote regressions covering lost acknowledgements, exact success/failure reconciliation, vault reopening, encrypted backup, pagination and mobile export. Existing stale-review, wallet-change, IndexedDB-abort and recovery-history cases also pass. These use synthetic candidates and controlled provider/receipt seams, not new network acceptance |
+| Saved quote verification | Typecheck, production build, 37-file public proving export, key/secret scans, 17 relevant unit tests and zero managed-binding drift passed. Live owner-wallet testing is deferred at the owner's request; the retained opening was not accessed or changed |
 | Full CI | Both [deployed recovery `4bf0d1e`](https://github.com/ShrikarT/line/actions/runs/39636734538) and [documentation revision `69f480b`](https://github.com/ShrikarT/line/actions/runs/39638007972) passed all four jobs, including the complete browser suite |
 | Actual organization | Twelve verifier keys and 22 finalized workspace receipts. Last independently checked state: CLOSED, generation 1, 900,000 native-asset base units held, 1,000,000 reserve accounting, zero encumbrance and fees |
 | Active blocker | The original signed fee-bearing `openLine` remains saved and unresolved. The scoped recovery is live; the owner must unlock the existing vault, pass its local candidate check and confirm archival before another mutation. No replacement opening has been created |
@@ -49,6 +50,11 @@ not customer-funded settlement.
   saved service fee ceilings and issuer withdrawal of finalized fees only.
 - Invoice references validate 32 UTF-8 bytes or a full 64-digit hexadecimal ID
   before wallet preparation; valid encoding is unchanged.
+- Merchants can search and re-export saved quote packages after confirmation,
+  exact-success reconciliation or reopening their vault. Only committed quotes
+  appear; uncertain and failed candidates remain unavailable. The original
+  package, fee preview and deadline survive without reposting a quote. Saved
+  packages do not establish current availability or independent fulfillment.
 - Contract engines load after vault opening. Local production initial resource
   bodies fell from 12.30 MB to 0.34–0.36 MB, with no earlier WASM request. This is
   downloaded-byte evidence, not a rendering-speed guarantee.
