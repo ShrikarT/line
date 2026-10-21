@@ -260,6 +260,16 @@ one skipped and zero failures. Typecheck and the production build passed, as did
 key/secret scans and zero managed-binding drift. Its new full CI result is not
 yet established; the passing four-job run above belongs to release `82f3d90`.
 
+Diagnostic release `6406886` is pushed to `main` and live on the free public
+host (Render deployment `dep-dbc2lvon74is73f5ek10`, completed 03:02 UTC on
+21 October). Its account JavaScript and public proving manifest match the
+verified local build byte for byte; readiness returns HTTP 200 in wallet-only
+mode. Its [full CI run](https://github.com/ShrikarT/line/actions/runs/39536239295)
+is still running. The app confirmed requesting another encrypted backup download;
+the owner has not confirmed that latest file saved. The live owner tab has not
+been refreshed into this diagnostic release, and no new allowance finality or
+successful original-byte resubmission is claimed.
+
 A fresh configured-provider read at 19:17 UTC on 20 October still returned no
 indexed transaction for the retained identifier, with status CLOSED, generation
 1, fees 0/0 and 900,000 units held. This is neither a new finalized receipt nor
