@@ -9,12 +9,12 @@ privacy and independent commercial custody are not established.
 | Area | Verified state / limitation |
 | --- | --- |
 | Public application | [line-midnight.onrender.com](https://line-midnight.onrender.com/app), free wallet-only hosting; no hosted supplier signing wallet or automated supplier |
-| Product release | `ad9aafd`, live Render deployment `dep-dbc3m5e1egvs739d2100` at 04:11 UTC on 21 October. Account JavaScript and public proving manifest match the tested local build byte for byte; readiness returns HTTP 200 |
+| Product release | `4bf0d1e`, live Render deployment `dep-dbcelkmi0phs73a3r1rg` at 16:41 UTC on 21 October. Entry, account, network, organization session/workspace/recovery JavaScript and proving manifest match the tested local build byte for byte; readiness returns HTTP 200 in wallet-only mode |
 | Local verification | Expired-opening recovery: 676 of 677 core tests passed, one skipped, zero failures; typecheck, production build, 37 proving-file export, key/secret scans and zero managed-binding drift passed |
 | Browser verification | All 31 organization cases passed, plus a focused canonical-opening replay case. Coverage includes stale recovery reviews, wallet-network changes, IndexedDB aborts, encrypted history across every commit and backup/restore. These use synthetic candidates and controlled provider/receipt seams, not new network acceptance |
-| Full CI | [Session-check release `ad9aafd`](https://github.com/ShrikarT/line/actions/runs/39542507712): all four jobs passed, including the complete browser suite |
+| Full CI | [Expired-opening recovery `4bf0d1e`](https://github.com/ShrikarT/line/actions/runs/39636734538): three platform jobs passed; complete verification job still running at the deployment check. Prior [recovery-regression main `e74da33`](https://github.com/ShrikarT/line/actions/runs/39544746247) passed all four jobs |
 | Actual organization | Twelve verifier keys and 22 finalized workspace receipts. Last independently checked state: CLOSED, generation 1, 900,000 native-asset base units held, 1,000,000 reserve accounting, zero encumbrance and fees |
-| Active blocker | The original signed fee-bearing `openLine` is expired and remains unresolved. Retry validation rejected it before wallet submission. Its bytes and private candidate remain saved for reconciliation; new mutations stay blocked |
+| Active blocker | The original signed fee-bearing `openLine` remains saved and unresolved. The scoped recovery is live; the owner must unlock the existing vault, pass its local candidate check and confirm archival before another mutation. No replacement opening has been created |
 | Wallet / backup | Latest encrypted backup confirmed saved. The owner reopened the existing organization on `ad9aafd`. An initial session-status rate limit recovered after a single cooldown refresh: the live treasury shows CLOSED, all twelve keys and 900,000 units held. Intermittent wallet rate limits remain |
 
 ## Wave 1 — foundation
@@ -126,13 +126,18 @@ rejected, so it cannot be assumed to provide a cancellation fence.
 
 A narrowly scoped recovery implementation now targets only this original opening.
 Fresh node/indexer reads agreed at finalized block 3,077,413 (21 October,
-16:18:12 UTC). Its complete contract state still equals the independently
+16:18:12 UTC). Its complete contract state still equals the separately
 rechecked closure checkpoint: generation 1, CLOSED and maintenance counter 11.
 Closure block hash is
 `07e0ca54c514da92538ec7d29b3c1aa9db4f315d6a61bd0142379a20dafc9306`;
 serialized state SHA-256 is
 `b7ff374bea501e82b6fb2210b1e1fed115f1b3688402cb49b6e1ba2211066cdd`.
 The observed runtime is `midnight` spec 1,000,300, using ledger 8.1.2.
+After deployment, an authenticated public read with an ephemeral, unfunded test
+identity also passed through the production recovery endpoint at finalized block
+3,077,645. Its state matched the pinned closure and all twelve local release keys.
+This checked hosted authentication and provider reads without accessing the
+owner's encrypted record or submitting a transaction.
 
 The recovery checks all saved intent TTLs against pinned finalized block time,
 retains a 30-second uncertainty margin, verifies the exact signed action and
