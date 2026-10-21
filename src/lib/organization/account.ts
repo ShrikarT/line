@@ -1,4 +1,4 @@
-import type { ConnectedAPI } from "@midnight-ntwrk/dapp-connector-api";
+import type { Configuration, ConnectedAPI } from "@midnight-ntwrk/dapp-connector-api";
 import { bech32m } from "@scure/base";
 import { decodeWalletPublicKey, getConnectedWallet, getWalletConfiguration } from "../runtime/wallet.ts";
 import { encodeVaultJson, encryptSecret, getVaultSessionPassphrase, getVaultSessionRevision, isVaultSessionUnlocked, loadEncryptedJson, lockVaultSession, saveEncryptedJson, unlockVaultSession } from "../security/vault.ts";
@@ -16,7 +16,7 @@ function rateLimited(failure: unknown): boolean {
 /** Only these three read-only probes may retry. No proof, signature, balance or
  * submission request is admitted here. Every retry rechecks the caller's session.
  */
-export async function readOrganizationWallet(wallet: ConnectedAPI, timeoutMs = 25_000, assertCurrent: () => void = () => {}) {
+export async function readOrganizationWallet(wallet: ConnectedAPI, timeoutMs = 25_000, assertCurrent: () => void = () => {}, verifiedConfiguration?: Configuration) {
   const controller = new AbortController(), signal = controller.signal;
   const timeoutMessage = "The wallet is not responding. Reopen your wallet and try again; no transaction was submitted by this wallet check.";
   const expired = () => new OrganizationTimeoutError(timeoutMessage);
@@ -47,7 +47,16 @@ export async function readOrganizationWallet(wallet: ConnectedAPI, timeoutMs = 2
     }
   }
   const task = async () => {
-    const configuration = await read("network configuration", () => getWalletConfiguration(wallet, "preprod", signal));
+    let configuration: Configuration;
+    if (verifiedConfiguration) {
+      if (verifiedConfiguration.networkId !== "preprod") throw new Error("Organization service settings belong to a different network.");
+      if (typeof wallet.getConnectionStatus !== "function") throw new Error("Wallet does not implement connector v4 capability: getConnectionStatus.");
+      const session = await read("network session", () => wallet.getConnectionStatus());
+      if (session?.status !== "connected" || session.networkId !== "preprod") throw new Error("Your wallet has not established a preprod session. Reconnect your wallet before continuing.");
+      configuration = structuredClone(verifiedConfiguration);
+    } else {
+      configuration = await read("network configuration", () => getWalletConfiguration(wallet, "preprod", signal));
+    }
     const shielded = await read("shielded identity", () => wallet.getShieldedAddresses());
     const receiving = await read("receiving address", () => wallet.getUnshieldedAddress());
     return { configuration, shielded, receiving };
@@ -98,14 +107,16 @@ export class OrganizationAccount {
   readonly accountId: string;
   readonly receivingAddress: string;
   readonly revision: number;
+  private readonly configuration: Configuration;
   private record: OrganizationRecord;
-  private constructor(wallet: ConnectedAPI, accountId: string, receivingAddress: string, revision: number, record: OrganizationRecord) {
+  private constructor(wallet: ConnectedAPI, accountId: string, receivingAddress: string, revision: number, record: OrganizationRecord, configuration: Configuration) {
     this.wallet = wallet; this.accountId = accountId; this.receivingAddress = receivingAddress; this.revision = revision; this.record = record;
+    this.configuration = Object.freeze(structuredClone(configuration));
   }
   static async unlock(wallet: ConnectedAPI, passphrase: string): Promise<OrganizationAccount> {
     if (wallet !== getConnectedWallet()) throw new Error("Connect your wallet before opening an organization.");
     if (passphrase.length < 8) throw new Error("Use at least eight characters for the organization vault password.");
-    const { shielded, receiving: unshielded } = await readOrganizationWallet(wallet, 25_000, () => {
+    const { configuration, shielded, receiving: unshielded } = await readOrganizationWallet(wallet, 25_000, () => {
       if (wallet !== getConnectedWallet()) throw new Error("Wallet changed while opening the organization.");
     });
     const accountId = decodeWalletPublicKey(shielded.shieldedCoinPublicKey, "shield-cpk", "preprod");
@@ -121,7 +132,7 @@ export class OrganizationAccount {
     unlockVaultSession(passphrase, ORGANIZATION_SESSION_MINUTES);
     const account = new OrganizationAccount(wallet, accountId, unshielded.unshieldedAddress, getVaultSessionRevision(), retained ?? {
       snapshot: { schema: ORGANIZATION_SCHEMA, networkId: "preprod", accountId, issuerSecret: toHex(randomBytes32()), merchantSecret: toHex(randomBytes32()), facilities: [], quotes: [], notes: [], receipts: [] }, pending: null,
-    });
+    }, configuration);
     if (!retained) await account.save();
     return account;
     });
@@ -131,7 +142,10 @@ export class OrganizationAccount {
   };
   async assertWallet() {
     this.assertSession();
-    const identity = await readOrganizationWallet(this.wallet, 25_000, this.assertSession);
+    // Service settings were verified at unlock and remain in memory for this
+    // account only. Recheck the live network session and both identities on every
+    // boundary; never use the settings as a fallback for a failed live check.
+    const identity = await readOrganizationWallet(this.wallet, 25_000, this.assertSession, this.configuration);
     const { shielded, receiving } = identity;
     this.assertSession();
     if (decodeWalletPublicKey(shielded.shieldedCoinPublicKey, "shield-cpk", "preprod") !== this.accountId) { this.close(); throw new Error("Wallet account changed. Unlock the selected account’s own vault."); }

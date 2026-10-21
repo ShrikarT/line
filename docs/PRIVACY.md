@@ -44,6 +44,9 @@ Encrypted backup export requires the unlocked organization session and account
 lock, while remaining available during a wallet API outage. It does not reveal
 the backup plaintext or authorize a transaction. Restore and financial operations
 still require fresh wallet identity verification.
+Verified wallet service settings remain in session memory and are excluded from
+backups. Transaction boundaries check the live connection, Preprod network and
+both wallet identities; a failed live check cannot use cached settings to proceed.
 Keep a recoverable encrypted backup: browser-local storage is not institutional
 custody or a guarantee against device compromise.
 

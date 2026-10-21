@@ -10,12 +10,12 @@ privacy and independent commercial custody are not established.
 | --- | --- |
 | Public application | [line-midnight.onrender.com](https://line-midnight.onrender.com/app), free wallet-only hosting; no hosted supplier signing wallet or automated supplier |
 | Product release | `6406886`, live Render deployment `dep-dbc2lvon74is73f5ek10` at 03:02 UTC on 21 October. Account JavaScript and public proving manifest match the tested local build byte for byte; readiness returns HTTP 200 |
-| Local verification | 665 of 666 core tests passed, one skipped, zero failures; typecheck, production build, 37 proving-file export, key/secret scans and zero managed-binding drift passed |
-| Browser verification | Recovery release `82f3d90`: all 27 organization cases and the additional mobile retry/persistence check passed. Diagnostic release `6406886`: both affected local browser checks and the full CI browser stage passed; these use controlled wallet/receipt seams, not new network acceptance |
-| Full CI | [Diagnostic release `6406886`](https://github.com/ShrikarT/line/actions/runs/39536239295) and [recovery release `82f3d90`](https://github.com/ShrikarT/line/actions/runs/39483250056): all four jobs passed for each release, including verification, Windows/Ubuntu native-worker ownership and Windows checkpoint ACL checks |
+| Local verification | Session-check fix: 668 of 669 core tests passed, one skipped, zero failures; typecheck, production build, 37 proving-file export, key/secret scans and zero managed-binding drift passed |
+| Browser verification | Session-check fix: all 28 organization browser cases passed, including original-byte recovery, real encrypted account guards, backup/restore and mobile layout. These use controlled wallet/receipt seams, not new network acceptance |
+| Full CI | Last completed runs: [diagnostic release `6406886`](https://github.com/ShrikarT/line/actions/runs/39536239295) and [recovery release `82f3d90`](https://github.com/ShrikarT/line/actions/runs/39483250056), all four jobs passed for each. Full CI for the newer session-check fix is not yet established |
 | Actual organization | Twelve verifier keys and 22 finalized workspace receipts. Last independently checked state: CLOSED, generation 1, 900,000 native-asset base units held, 1,000,000 reserve accounting, zero encumbrance and fees |
 | Active blocker | A signed fee-bearing `openLine` remains unresolved. Original-transaction checks did not establish finality, and the owner-triggered retry returned `Request failed` |
-| Wallet / backup | The owner confirmed saving the latest encrypted backup while the allowance remained retained after transaction 22. After refreshing the existing tab, 1AM connection still returned `Request failed`; its current unlocked/synced Preprod state needs verification |
+| Wallet / backup | Latest encrypted backup confirmed saved. The owner reconnected 1AM and reopened the existing organization; subsequent configuration reads failed. The session-check fix awaits fresh live acceptance |
 
 ## Wave 1 — foundation
 
@@ -122,14 +122,20 @@ the pending operation. Expiry alone never clears the journal. A generic expiry
 recovery procedure is not established; in this CLOSED facility `setStatus` is
 rejected, so it cannot be assumed to provide a cancellation fence.
 
-Wallet identity reads are sequential and bounded. Only explicit rate limits
-receive bounded read retries; generic failures, signatures, proofs and submission
-are not automatically retried. The current diagnostic release names the failed
-configuration, shielded-identity or receiving-address read instead of returning
-only `Request failed`. This improves diagnosis and does not establish a repair of
-1AM's underlying forwarding failure. After the owner confirmed saving the latest
-encrypted backup, the existing tab reloaded the diagnostic release. Its read-only
-1AM connection still failed before vault opening; no transaction was requested.
+After the owner restored 1AM and reopened the organization, the diagnostic release
+identified `getConfiguration` as the failed check. A later cooldown refresh failed
+at the same stage, before proof or submission. The session-check fix verifies
+service configuration at unlock and keeps a frozen in-memory copy. Later guards
+check the live connector session and Preprod network, then reread both identities.
+A failed live check cannot fall back to saved settings. Changed accounts still
+lock the vault; reconnect/reopen adopts changed service URLs. This reduces
+repeated configuration reads; fresh live 1AM acceptance is not yet established.
+
+Identity reads remain sequential and bounded. Only explicit rate limits receive
+bounded read retries; generic failures, signatures, proofs and submission are not
+automatically retried. Fifteen focused finality/read cases and the real encrypted
+account regression cover configuration failure, wrong/disconnected networks,
+changed accounts, settings isolation, deadlines and no unauthorized mutation.
 
 Backup export reloads the latest durable record under the account lock without
 wallet RPCs, rechecks session validity after encryption and retains pending
@@ -151,10 +157,13 @@ Merchant A redeemed, while Merchant B's original draw returned node error 170 an
 remains retained. It is not another complete acceptance run and no replacement
 was submitted.
 
-One earlier local core run hit an unexpected checkpoint-write failure in the
-SDK-merge journal test. Its isolated test, entire file and subsequent full runs
-passed without a storage change; the underlying filesystem cause is unknown and
-is not claimed fixed. Temporary I/O tracing was removed. Browser fixtures and
+An earlier core run hit an unexpected checkpoint-write failure in the SDK-merge
+journal test; later runs passed without a storage change. During the session-check
+work, a core run alongside build/browser jobs hit a fixture-compilation timeout
+and an `EPERM` rename in the unchanged approval signer. A fresh core run alone
+passed all 668 cases with one skipped, including both previously failing tests.
+No timeout or persistence rule was weakened; the underlying intermittent causes
+are not claimed fixed. Temporary I/O tracing was removed. Browser fixtures and
 compiled-contract tests do not replace fresh network receipts.
 
 ## Wave 3 — pilots and hardening
