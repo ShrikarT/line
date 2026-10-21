@@ -270,6 +270,13 @@ the owner has not confirmed that latest file saved. The live owner tab has not
 been refreshed into this diagnostic release, and no new allowance finality or
 successful original-byte resubmission is claimed.
 
+A separate fresh Line tab then failed its read-only connection attempt with
+`Failed to connect to 1AM: Request failed`. The original vault was left open and
+no transaction was requested. This rules out a failure limited to the older
+tab's saved connection, but does not establish whether 1AM is locked, syncing,
+offline or failing internally. The owner must report the extension's current
+Preprod state before further live acceptance. No extension UI was automated.
+
 A fresh configured-provider read at 19:17 UTC on 20 October still returned no
 indexed transaction for the retained identifier, with status CLOSED, generation
 1, fees 0/0 and 900,000 units held. This is neither a new finalized receipt nor
