@@ -240,6 +240,10 @@ shows twenty-two receipts. A successful resubmission or new finalized receipt
 has not been established. The old signed allowance remains unresolved. CI and
 browser fixtures do not establish its finality.
 
+That live check subsequently ended with `Finality has not been observed yet` and
+retained the signed operation. The exact-byte retry review was reopened for the
+owner's final local action; no new candidate was created.
+
 A fresh configured-provider read at 19:17 UTC on 20 October still returned no
 indexed transaction for the retained identifier, with status CLOSED, generation
 1, fees 0/0 and 900,000 units held. This is neither a new finalized receipt nor
