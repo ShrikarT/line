@@ -52,9 +52,15 @@ wallet workflows to finish without the previous fifteen-minute cutoff. The
 passphrase stays in tab memory; manual locking, wallet disconnect/account changes
 and tab reload still end the session. Other consoles retain their existing timeout.
 
-Wallet identity probes are sequential. Only explicit rate-limit responses on
-configuration/address reads may retry within a bounded deadline; each retry checks
-session validity. Signing, proving and submission are outside that retry path.
+Wallet identity probes are sequential. Unlock reads and validates service
+configuration once, keeping a frozen copy only in the account's memory. Later
+boundaries use the standard [`getConnectionStatus`](https://github.com/midnightntwrk/midnight-dapp-connector-api/blob/main/docs/api/_media/SPECIFICATION.md)
+to check the live session and Preprod network, then reread both wallet identities.
+A failed or disconnected session never falls back to the saved
+settings. Reconnect and reopen the organization to adopt changed service URLs.
+Only explicit rate-limit responses on these reads may retry within a bounded
+deadline; each retry checks session validity. Signing, proving and submission
+are outside that retry path.
 The treasury refresh control retries facility state as well as wallet balances
 and supplier discovery. A failed facility read keeps spending controls disabled
 until a successful read restores the required setup and status checks.

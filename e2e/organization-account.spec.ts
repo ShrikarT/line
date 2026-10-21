@@ -272,6 +272,51 @@ test("wallet-only onboarding uses the account's actual receiving profile without
   expect(await page.evaluate(() => (window as unknown as { organizationSignatures: number }).organizationSignatures)).toBe(0);
 });
 
+test("an actual encrypted account uses fresh session and identity checks after configuration becomes unavailable", async ({ page }) => {
+  test.setTimeout(120_000);
+  await wallets(page, true, true); await page.goto("/app"); await connect(page, "a"); await unlock(page);
+  const result = await page.evaluate(async ({ foreignCoin, foreignRecipient }) => {
+    const { browserModuleUrl } = await import("/e2e/browser-module.ts" as any);
+    const { OrganizationAccount } = await import(browserModuleUrl("/src/lib/organization/account.ts"));
+    const { getConnectedWallet } = await import(browserModuleUrl("/src/lib/runtime/wallet.ts"));
+    const { isVaultSessionUnlocked } = await import(browserModuleUrl("/src/lib/security/vault.ts"));
+    const wallet = getConnectedWallet()!, original = {
+      configuration: wallet.getConfiguration.bind(wallet), session: wallet.getConnectionStatus.bind(wallet),
+      shielded: wallet.getShieldedAddresses.bind(wallet), receiving: wallet.getUnshieldedAddress.bind(wallet),
+    };
+    let configurationReads = 0, mutations = 0;
+    const unavailable = async () => { configurationReads++; throw Error("Request failed"); };
+    let account = await OrganizationAccount.unlock(wallet, "Organization123!");
+    wallet.getConfiguration = unavailable;
+    const first = await account.assertWallet(); first.configuration.indexerUri = "https://changed.example.test";
+    const second = await account.assertWallet();
+    const settingsUnchanged = second.configuration.indexerUri !== first.configuration.indexerUri;
+    const rejectedSessions = [];
+    for (const status of [{ status: "disconnected" }, { status: "connected", networkId: "mainnet" }]) {
+      wallet.getConnectionStatus = async () => status as any;
+      try { await account.exclusive(async () => { mutations++; }); rejectedSessions.push(false); }
+      catch (failure) { rejectedSessions.push(/preprod session/i.test((failure as Error).message)); }
+    }
+    const rejectedIdentities = [];
+    for (const changed of ["shielded", "receiving"]) {
+      wallet.getConfiguration = original.configuration; wallet.getConnectionStatus = original.session;
+      wallet.getShieldedAddresses = original.shielded; wallet.getUnshieldedAddress = original.receiving;
+      account = await OrganizationAccount.unlock(wallet, "Organization123!");
+      wallet.getConfiguration = unavailable;
+      if (changed === "shielded") wallet.getShieldedAddresses = async () => ({ ...await original.shielded(), shieldedCoinPublicKey: foreignCoin });
+      else wallet.getUnshieldedAddress = async () => ({ unshieldedAddress: foreignRecipient });
+      try { await account.exclusive(async () => { mutations++; }); rejectedIdentities.push(false); }
+      catch (failure) { rejectedIdentities.push(/wallet.*account changed/i.test((failure as Error).message) && !isVaultSessionUnlocked()); }
+    }
+    return { configurationReads, mutations, settingsUnchanged, rejectedSessions, rejectedIdentities };
+  }, {
+    foreignCoin: bech32m.encodeFromBytes("mn_shield-cpk_preprod", new Uint8Array(32).fill(12)),
+    foreignRecipient: bech32m.encodeFromBytes("mn_addr_preprod", new Uint8Array(32).fill(52)),
+  });
+  expect(result).toEqual({ configurationReads: 0, mutations: 0, settingsUnchanged: true, rejectedSessions: [true, true], rejectedIdentities: [true, true] });
+  expect(await page.evaluate(() => ({ signatures: (window as any).organizationSignatures, proofs: (window as any).organizationProofRequests }))).toEqual({ signatures: 0, proofs: 0 });
+});
+
 test("treasury serializes wallet reads across refreshes and does not refetch balances while typing an asset", async ({ page }) => {
   test.setTimeout(120_000);
   await wallets(page, true, true); await page.goto("/app"); await connect(page, "a"); await unlock(page);
@@ -291,7 +336,7 @@ test("treasury serializes wallet reads across refreshes and does not refetch bal
         return await request();
       } finally { state.walletReadActive--; }
     };
-    for (const name of ["getConfiguration", "getShieldedAddresses", "getUnshieldedAddress"] as const) {
+    for (const name of ["getConfiguration", "getConnectionStatus", "getShieldedAddresses", "getUnshieldedAddress"] as const) {
       const original = wallet[name].bind(wallet); (wallet as any)[name] = () => probe(original);
     }
     wallet.getUnshieldedBalances = () => probe(async () => { state.walletBalanceReads++; return { ["0".repeat(64)]: 5000000n }; }) as ReturnType<typeof wallet.getUnshieldedBalances>;
@@ -743,7 +788,7 @@ test("an unlocked organization can export its encrypted backup during a wallet o
     const { getConnectedWallet } = await import(browserModuleUrl("/src/lib/runtime/wallet.ts"));
     const wallet = getConnectedWallet()!;
     const state = window as unknown as { failedWalletReads: number }; state.failedWalletReads = 0;
-    for (const method of ["getConfiguration", "getShieldedAddresses", "getUnshieldedAddress"] as const) {
+    for (const method of ["getConfiguration", "getConnectionStatus", "getShieldedAddresses", "getUnshieldedAddress"] as const) {
       wallet[method] = async () => { state.failedWalletReads++; throw Error("Request failed"); };
     }
   });
@@ -757,7 +802,7 @@ test("an unlocked organization can export its encrypted backup during a wallet o
   await expect(page.getByRole("status")).toContainText("Encrypted backup download requested");
   expect(await page.evaluate(() => (window as unknown as { failedWalletReads: number }).failedWalletReads)).toBe(0);
   await page.getByRole("button", { name: "Create facility", exact: true }).click();
-  await expect(page.getByRole("alert")).toContainText("Your wallet could not complete the network configuration check.");
+  await expect(page.getByRole("alert")).toContainText("Your wallet could not complete the network session check.");
   await expect(page.getByRole("alert")).toContainText("No signature or payment was requested by this check.");
   const requests = await page.evaluate(() => {
     const state = window as unknown as { failedWalletReads: number; organizationSignatures: number; organizationProofRequests: number };

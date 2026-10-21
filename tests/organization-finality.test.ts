@@ -4,6 +4,58 @@ import { OrganizationFinality, OrganizationTimeoutError, withinDeadline } from "
 import { readOrganizationWallet } from "../src/lib/organization/account.ts";
 import type { ConnectedAPI } from "@midnight-ntwrk/dapp-connector-api";
 
+const verifiedConfiguration = { networkId: "preprod", indexerUri: "https://indexer.example.test/graphql", indexerWsUri: "wss://indexer.example.test/graphql", substrateNodeUri: "https://node.example.test" };
+
+test("an open organization checks its live network session without refetching service configuration", async () => {
+  const calls: string[] = [];
+  const wallet = {
+    getConfiguration: async () => { calls.push("configuration"); throw Error("Request failed"); },
+    getConnectionStatus: async () => { calls.push("session"); return { status: "connected", networkId: "preprod" }; },
+    getShieldedAddresses: async () => { calls.push("shielded"); return { shieldedCoinPublicKey: "identity" }; },
+    getUnshieldedAddress: async () => { calls.push("receiving"); return { unshieldedAddress: "recipient" }; },
+    balanceUnsealedTransaction() { throw Error("No balance approval allowed"); },
+    submitTransaction() { throw Error("No submission allowed"); },
+  } as unknown as ConnectedAPI;
+  const identity = await readOrganizationWallet(wallet, 25_000, () => {}, verifiedConfiguration);
+  assert.deepEqual(calls, ["session", "shielded", "receiving"]);
+  assert.deepEqual(identity.configuration, verifiedConfiguration);
+  identity.configuration.indexerUri = "https://changed.example.test";
+  assert.equal(verifiedConfiguration.indexerUri, "https://indexer.example.test/graphql");
+});
+
+test("saved service settings cannot hide a disconnected or different-network wallet", async () => {
+  for (const status of [{ status: "disconnected" }, { status: "connected", networkId: "mainnet" }]) {
+    let addresses = 0, configurationReads = 0;
+    const wallet = {
+      getConnectionStatus: async () => status,
+      getConfiguration: async () => { configurationReads++; return verifiedConfiguration; },
+      getShieldedAddresses: async () => { addresses++; return {}; },
+      getUnshieldedAddress: async () => { addresses++; return {}; },
+      balanceUnsealedTransaction() {}, submitTransaction() {},
+    } as unknown as ConnectedAPI;
+    await assert.rejects(readOrganizationWallet(wallet, 25_000, () => {}, verifiedConfiguration), /wallet.*preprod session/i);
+    assert.equal(addresses, 0); assert.equal(configurationReads, 0);
+  }
+});
+
+test("a failed live session read cannot fall back to saved configuration or continue after timeout", async () => {
+  let finish!: (value: unknown) => void, addresses = 0;
+  const wallet = {
+    getConnectionStatus: () => new Promise(resolve => { finish = resolve; }),
+    getConfiguration: async () => verifiedConfiguration,
+    getShieldedAddresses: async () => { addresses++; return {}; },
+    getUnshieldedAddress: async () => { addresses++; return {}; },
+    balanceUnsealedTransaction() {}, submitTransaction() {},
+  } as unknown as ConnectedAPI;
+  await assert.rejects(readOrganizationWallet(wallet, 5, () => {}, verifiedConfiguration), OrganizationTimeoutError);
+  finish({ status: "connected", networkId: "preprod" });
+  await Promise.resolve(); await Promise.resolve();
+  assert.equal(addresses, 0);
+  wallet.getConnectionStatus = async () => { throw Error("Request failed"); };
+  await assert.rejects(readOrganizationWallet(wallet, 25_000, () => {}, verifiedConfiguration), /wallet could not complete the network session check/);
+  assert.equal(addresses, 0);
+});
+
 test("observation timeout reuses the original live task and never treats absence as failure", async () => {
   let reads = 0, resolve!: (value: string) => void;
   const original = new Promise<string>(yes => { resolve = yes; });
