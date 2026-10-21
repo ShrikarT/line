@@ -44,7 +44,7 @@ milestone established a local protocol prototype, not customer-funded settlement
 | Canonical accounting | Facility `8990864c6f80c517c7458fa9b2526d3500f3a9814399fc836097ee409da9bed0`; retained checkpoint has 29 receipts, with no token-payout claim |
 | Test-token settlement | Facility `a159597495b52ea7a703a29562b17fcb042bf7eaa984ec1e05e7e8935208304b`; complete 21-transaction two-merchant checkpoint |
 | Organization wallet | Actual 1AM facility and twelve verifier keys; funding, allowance, quote, draw, redemption, replenishment, withdrawal, pause, resume and zero-outstanding closure confirmed. Twenty-two receipts in the workspace. Selected finalized receipts, fixed recipients and actual contract custody were checked through the configured indexer/RPC; fee-bearing acceptance and independent merchant fulfillment remain open |
-| Regression checks | Full CI for read-serialization release `e37616b` and fee-control release `d521b7f`: all four jobs passed. Current original-submission recovery checks passed 664 core tests with one skipped, all 27 account browser cases, the further mobile retry/persistence case, the production build, key/secret scans and zero managed-binding drift. Full CI for these newer changes is not yet established |
+| Regression checks | Full CI for recovery release `82f3d90`, read-serialization release `e37616b` and fee-control release `d521b7f`: all four jobs passed for each release. Original-submission recovery checks passed 664 core tests with one skipped, all 27 account browser cases, the further mobile retry/persistence case, the production build, key/secret scans and zero managed-binding drift |
 | Public host | Free wallet-only server, source-matched proving files, signed reader sessions and actual historical Preprod reads verified |
 
 [Finalized test-token evidence](https://github.com/ShrikarT/line/blob/bbb2fdf/docs/TEST_TOKEN_PAYOUT_2026-10-16.md)
@@ -228,16 +228,30 @@ Recovery release `82f3d90` is pushed to `main` and deployed on the free public
 host. Its published network, workspace and recovery JavaScript match the tested
 local build byte for byte; the public proving manifest is unchanged and
 `/readyz` returns HTTP 200 in wallet-only mode. Its
-[full CI run](https://github.com/ShrikarT/line/actions/runs/39483250056) is still
-running. The owner's final live recovery check requires reconnecting Chrome
-browser control and reopening the existing vault locally: the browser tool
-currently reports zero connected browsers. No production resubmission was
-performed, and the old signed allowance remains unresolved.
+[full CI run](https://github.com/ShrikarT/line/actions/runs/39483250056) passed all
+four jobs: verification, native-worker ownership on Ubuntu and Windows, and the
+Windows checkpoint ACL check. Chrome control subsequently recovered and the owner
+reopened the existing organization. The recovery controls are present in the live
+workspace, but its initial treasury read hit a wallet network-configuration rate
+limit. A single cooldown refresh and original-transaction check then returned
+`Request failed`. The owner subsequently reported submitting from the recovery
+review; the observed workspace is checking the original transaction and still
+shows twenty-two receipts. A successful resubmission or new finalized receipt
+has not been established. The old signed allowance remains unresolved. CI and
+browser fixtures do not establish its finality.
 
 A fresh configured-provider read at 19:17 UTC on 20 October still returned no
 indexed transaction for the retained identifier, with status CLOSED, generation
 1, fees 0/0 and 900,000 units held. This is neither a new finalized receipt nor
 permission to clear the original candidate.
+
+The separate read-only verifier succeeded again at 02:51 UTC on 21 October. It
+rechecked selected finalized receipts, their fixed payout recipients, all twelve
+release-matched verifier keys and current CLOSED state with 900,000 base units
+held. A direct lookup of the retained allowance identifier returned HTTP 200,
+no GraphQL errors and zero records. These configured TLS provider checks do not
+repair the wallet's failed API requests or establish that the allowance never
+applied. They submitted no transaction and started no wallet.
 
 Fresh organization receipts cover eight distinct call names: `fundReserve`,
 `withdrawUnencumberedReserve`, `openLine`, `postQuote`, `draw`, `redeemDraw`,
