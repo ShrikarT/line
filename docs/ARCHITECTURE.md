@@ -45,6 +45,41 @@ Expiry is a submission restriction, not a reconciliation restriction: an exact
 finalized success can still publish the candidate, and an exact finalized total
 failure can record the failure. Missing, unrelated or partial receipts retain it.
 
+The expired fee-bearing reopening listed in [progress](PROGRESS.md) has a separate,
+owner-reviewed recovery path scoped to that identifier, facility and release.
+An authenticated fixed-purpose API pins node reads to a finalized hash, checks
+Preprod genesis/runtime identity, reads `Timestamp.Now` and checks the indexer
+agrees on the block. The complete serialized contract must equal the trusted
+closure checkpoint at block 3,062,090, including all twelve release-matched keys
+and maintenance counter 11. The checkpoint hash and state SHA-256 are pinned.
+
+The argument depends on ordinary validated ledger-8 history: an existing contract
+cannot be redeployed; only `openLine` changes generation after construction; its
+Uint64 cast rejects overflow. Maintenance counter 11 is below saturation and
+cannot return after a verifier or authority update, including authority
+replacement. Thus this unchanged predecessor generation excludes a successful
+opening in the intervening history. The exact canonical signed action is replayed
+against the predecessor and must produce the retained generation-2 private book
+and approved amount/fee terms. Every saved intent TTL is read separately from
+the seven-day allowance expiry. Finalized block seconds must be strictly past
+the latest TTL plus the node's 30-second time uncertainty; later block timestamps
+cannot make those bound bytes valid again.
+
+The relevant implementations are [ledger-8.1.2 replay and application rules](https://github.com/midnightntwrk/midnight-ledger/blob/ledger-8.1.2/ledger/src/semantics.rs),
+[maintenance validation](https://github.com/midnightntwrk/midnight-ledger/blob/ledger-8.1.2/ledger/src/verify.rs),
+and the [observed node-1.0.300 block context](https://github.com/midnightntwrk/midnight-node/blob/node-1.0.300/pallets/midnight/src/lib.rs).
+These are configured TLS provider assertions and audited implementation assumptions,
+not a light-client proof or independent full-node verification.
+
+Confirmation reloads the encrypted record under the account lock, rejects a stale
+review, rereads provider evidence and rechecks wallet identity. One encrypted
+commit archives the original bytes, predecessor, candidate and evidence before
+unblocking. The candidate is never promoted and no receipt is invented. Recovery
+history is bounded, outside candidate snapshots, retained by every commit and
+validated during backup restore. Missing evidence, changed state/runtime/keys,
+wallet changes or failed storage writes retain the pending operation. Recovery
+does not prove that no network fees were charged or authorize another opening.
+
 Encrypted backup export holds the same account lock and reloads the latest durable
 record, including any pending operation. It requires the unlocked vault session
 but remains available when the wallet's remote read API fails. Export rechecks

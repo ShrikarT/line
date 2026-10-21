@@ -10,8 +10,8 @@ privacy and independent commercial custody are not established.
 | --- | --- |
 | Public application | [line-midnight.onrender.com](https://line-midnight.onrender.com/app), free wallet-only hosting; no hosted supplier signing wallet or automated supplier |
 | Product release | `ad9aafd`, live Render deployment `dep-dbc3m5e1egvs739d2100` at 04:11 UTC on 21 October. Account JavaScript and public proving manifest match the tested local build byte for byte; readiness returns HTTP 200 |
-| Local verification | Session-check fix: 668 of 669 core tests passed, one skipped, zero failures; typecheck, production build, 37 proving-file export, key/secret scans and zero managed-binding drift passed |
-| Browser verification | Session-check fix: all 28 organization browser cases passed, including original-byte recovery, real encrypted account guards, backup/restore and mobile layout. These use controlled wallet/receipt seams, not new network acceptance |
+| Local verification | Expired-opening recovery: 676 of 677 core tests passed, one skipped, zero failures; typecheck, production build, 37 proving-file export, key/secret scans and zero managed-binding drift passed |
+| Browser verification | All 31 organization cases passed, plus a focused canonical-opening replay case. Coverage includes stale recovery reviews, wallet-network changes, IndexedDB aborts, encrypted history across every commit and backup/restore. These use synthetic candidates and controlled provider/receipt seams, not new network acceptance |
 | Full CI | [Session-check release `ad9aafd`](https://github.com/ShrikarT/line/actions/runs/39542507712): all four jobs passed, including the complete browser suite |
 | Actual organization | Twelve verifier keys and 22 finalized workspace receipts. Last independently checked state: CLOSED, generation 1, 900,000 native-asset base units held, 1,000,000 reserve accounting, zero encumbrance and fees |
 | Active blocker | The original signed fee-bearing `openLine` is expired and remains unresolved. Retry validation rejected it before wallet submission. Its bytes and private candidate remain saved for reconciliation; new mutations stay blocked |
@@ -124,6 +124,34 @@ the pending operation. Expiry alone never clears the journal. A generic expiry
 recovery procedure is not established; in this CLOSED facility `setStatus` is
 rejected, so it cannot be assumed to provide a cancellation fence.
 
+A narrowly scoped recovery implementation now targets only this original opening.
+Fresh node/indexer reads agreed at finalized block 3,077,413 (21 October,
+16:18:12 UTC). Its complete contract state still equals the independently
+rechecked closure checkpoint: generation 1, CLOSED and maintenance counter 11.
+Closure block hash is
+`07e0ca54c514da92538ec7d29b3c1aa9db4f315d6a61bd0142379a20dafc9306`;
+serialized state SHA-256 is
+`b7ff374bea501e82b6fb2210b1e1fed115f1b3688402cb49b6e1ba2211066cdd`.
+The observed runtime is `midnight` spec 1,000,300, using ledger 8.1.2.
+
+The recovery checks all saved intent TTLs against pinned finalized block time,
+retains a 30-second uncertainty margin, verifies the exact signed action and
+replays its transcript against the predecessor to bind the generation-2 private
+candidate and approved fee terms. The unchanged, nonsaturated maintenance counter
+excludes intervening verifier/authority updates; generation cannot reset or wrap
+under this release. Details and source references are in
+[architecture](ARCHITECTURE.md). These rely on configured TLS providers and normal
+validated ledger history, not an independent full node or light-client proof.
+
+Owner confirmation triggers another provider read and wallet check under the
+account lock. A single encrypted commit preserves the original operation,
+predecessor, candidate and evidence in recovery history before unblocking.
+Ordinary expiry rejection and exact-receipt reconciliation remain unchanged.
+Recovery neither promotes the candidate nor creates a failure receipt. The real
+owner's encrypted operation has not yet passed this new local candidate check or
+been archived; that requires the existing vault to be opened locally after the
+verified product update. No replacement opening has been created.
+
 Two focused browser regressions passed for expired signed operations: no wallet
 submission, proof or balance request; exact bytes and candidate retained through
 encrypted backup and reopening; missing and unrelated receipts keep the journal
@@ -184,9 +212,9 @@ compiled-contract tests do not replace fresh network receipts.
 ## Wave 3 — pilots and hardening
 
 1. Reconcile the expired original allowance before starting another mutation.
-   The 1AM read path has recovered. Exact finality or a separately validated
-   nonapplication/recovery procedure is still required; do not discard the saved
-   bytes based on expiry, a missing receipt or the latest CLOSED snapshot.
+   The 1AM read path has recovered. Use exact finality or the narrowly scoped,
+   owner-reviewed recovery after its local candidate check succeeds. Do not
+   discard bytes based on expiry, a missing receipt or a latest CLOSED snapshot.
 2. Complete fee-bearing and remaining twelve-action/compensation acceptance with
    finalized receipts and actual asset movements. The next 100,000-unit purchase
    under the proposed policy would charge a 2,000-unit fee, totaling 102,000.

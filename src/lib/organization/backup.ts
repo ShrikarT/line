@@ -1,6 +1,7 @@
 import { decodeVaultJson, decryptSecret, type EncryptedEnvelope } from "../security/vault.ts";
 import type { OrganizationRecord, OrganizationSnapshot } from "./account.ts";
 import { receivingAddressBytes } from "./account.ts";
+import { EXPIRED_OPENING } from "./expired-opening-policy.ts";
 
 export const MAX_ORGANIZATION_BACKUP_BYTES = 64 * 1024 * 1024;
 const UINT64 = 18_446_744_073_709_551_615n;
@@ -22,6 +23,7 @@ function receipt(value: unknown) {
 }
 function snapshot(value: unknown, accountId: string): OrganizationSnapshot {
   const row = object(value);
+  need(row.recoveries === undefined && row.pending === undefined);
   need(row.schema === "line:organization-account/v1" && row.networkId === "preprod" && row.accountId === accountId);
   hex(row.issuerSecret); hex(row.merchantSecret);
   const facilities = array(row.facilities, 50), quotes = array(row.quotes, 10_000), notes = array(row.notes, 10_000);
@@ -73,6 +75,7 @@ export function validateOrganizationRecord(value: unknown, accountId: string): O
   hex(accountId); const record = object(value), current = snapshot(record.snapshot, accountId);
   if (record.pending !== null) {
     const p = object(record.pending); text(p.id); need(["deploy", "key", "call"].includes(text(p.kind)));
+    need(p.recoveries === undefined && p.pending === undefined);
     need(p.circuit === "deploy" && p.kind === "deploy" || circuits.has(text(p.circuit)));
     need(p.facilityId === null || typeof p.facilityId === "string"); need(p.contractAddress === null || hex(p.contractAddress)); hex(p.sourceFingerprint);
     const candidate = snapshot(p.after, accountId);
@@ -81,12 +84,32 @@ export function validateOrganizationRecord(value: unknown, accountId: string): O
     need((p.txId === null) === (p.transaction === null));
     if (p.txId !== null) { text(p.txId, 132); need(typeof p.transaction === "string" && /^(?:[0-9a-f]{2})+$/.test(p.transaction)); hex(p.contractAddress); }
   }
+  if (record.recoveries !== undefined) {
+    const recoveries = array(record.recoveries, 10);
+    unique(recoveries.map(item => object(object(item).original).txId));
+    for (const item of recoveries) {
+      const r = object(item), original = object(r.original), evidence = object(r.evidence);
+      need(r.disposition === "expired-opening-not-applied" && r.recoveries === undefined);
+      need(Number.isFinite(Date.parse(text(r.recordedAt))) && Number.isSafeInteger(r.ttl) && (r.ttl as number) > 0);
+      const previous = validateOrganizationRecord({ snapshot: r.before, pending: r.original }, accountId);
+      need(previous.snapshot.issuerSecret === current.issuerSecret && previous.snapshot.merchantSecret === current.merchantSecret);
+      need(original.kind === "call" && original.circuit === "openLine" && original.txId === EXPIRED_OPENING.txId && original.contractAddress === EXPIRED_OPENING.address && original.sourceFingerprint === EXPIRED_OPENING.sourceFingerprint);
+      need(evidence.schema === "line:expired-opening-evidence/v1" && evidence.address === EXPIRED_OPENING.address && evidence.genesisHash === EXPIRED_OPENING.genesisHash && evidence.runtimeSpecVersion === EXPIRED_OPENING.runtimeSpecVersion);
+      const baseline = object(evidence.baseline), finalized = object(evidence.finalized);
+      need(baseline.hash === EXPIRED_OPENING.baselineHash && baseline.height === EXPIRED_OPENING.baselineHeight);
+      hex(finalized.hash); need(Number.isSafeInteger(finalized.height) && (finalized.height as number) > EXPIRED_OPENING.baselineHeight);
+      need(Number.isSafeInteger(finalized.timestamp) && Math.floor((finalized.timestamp as number) / 1000) > Math.floor((r.ttl as number) / 1000) + 30);
+      for (const state of [baseline.state, finalized.state]) need(typeof state === "string" && state.length <= 256000 && /^(?:[0-9a-f]{2})+$/.test(state));
+      need(baseline.state === finalized.state);
+      need(record.pending === null || object(record.pending).txId !== original.txId);
+    }
+  }
   return structuredClone(value as OrganizationRecord);
 }
 
 export function isOrganizationEmpty(record: OrganizationRecord): boolean {
   const s = record.snapshot;
-  return !record.pending && !s.facilities.length && !s.quotes.length && !s.notes.length && !s.receipts.length && !s.failures?.length && !s.serviceOrders?.length;
+  return !record.pending && !record.recoveries?.length && !s.facilities.length && !s.quotes.length && !s.notes.length && !s.receipts.length && !s.failures?.length && !s.serviceOrders?.length;
 }
 
 /** Authenticate the entire original envelope before accepting its wallet scope. */

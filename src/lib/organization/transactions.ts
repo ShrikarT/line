@@ -16,7 +16,7 @@ type Circuit = keyof LineContract["provableCircuits"];
 type Compiled = CompiledContract.CompiledContract<LineContract, LinePrivateWitnessContext>;
 
 /** Decode only the immutable transaction already retained at the submission boundary. */
-export function originalOrganizationTransaction(pending: OrganizationPending, sourceFingerprint: string, now = Date.now()) {
+export function decodeOriginalOrganizationTransaction(pending: OrganizationPending, sourceFingerprint: string) {
   if (pending.sourceFingerprint !== sourceFingerprint) throw new Error("Recover with the original organization contract release.");
   if (!pending.txId || !pending.transaction || !pending.contractAddress) throw new Error("No signed organization transaction is saved for resubmission.");
   const transaction = Transaction.deserialize("signature", "proof", "binding", hexToBytes(pending.transaction));
@@ -25,7 +25,13 @@ export function originalOrganizationTransaction(pending: OrganizationPending, so
   if (actions.length !== 1 || actions[0].address !== pending.contractAddress) throw new Error("Saved transaction differs from the prepared organization action.");
   const action = actions[0];
   if (pending.kind === "deploy" ? !(action instanceof ContractDeploy) : pending.kind === "key" ? !(action instanceof MaintenanceUpdate) : pending.kind !== "call" || !(action instanceof ContractCall) || (typeof action.entryPoint === "string" ? action.entryPoint : new TextDecoder().decode(action.entryPoint)) !== pending.circuit) throw new Error("Saved transaction differs from the prepared organization action.");
-  if (intents.some(intent => !Number.isFinite(intent.ttl.getTime()) || intent.ttl.getTime() <= now)) throw new Error("The original signed transaction has expired. Keep it for reconciliation; expiry alone does not prove it was never applied.");
+  if (!intents.length || intents.some(intent => !Number.isFinite(intent.ttl.getTime()))) throw new Error("Saved transaction has invalid intent expiry.");
+  return transaction;
+}
+
+export function originalOrganizationTransaction(pending: OrganizationPending, sourceFingerprint: string, now = Date.now()) {
+  const transaction = decodeOriginalOrganizationTransaction(pending, sourceFingerprint);
+  if ([...transaction.intents!.values()].some(intent => intent.ttl.getTime() <= now)) throw new Error("The original signed transaction has expired. Keep it for reconciliation; expiry alone does not prove it was never applied.");
   return transaction;
 }
 

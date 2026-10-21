@@ -6,6 +6,7 @@ import { hexToBytes, randomBytes32, toHex } from "../line/encoding.ts";
 import { decodeOrganizationBackup, isOrganizationEmpty } from "./backup.ts";
 import { OrganizationTimeoutError, withinDeadline } from "./finality.ts";
 import { ORGANIZATION_SESSION_MINUTES } from "./session-policy.ts";
+import { EXPIRED_OPENING, type ExpiredOpeningEvidence } from "./expired-opening-policy.ts";
 
 function rateLimited(failure: unknown): boolean {
   if (!failure || typeof failure !== "object") return typeof failure === "string" && /rate[\s_-]*limit|too many requests/i.test(failure);
@@ -77,7 +78,8 @@ export type OrganizationNote = { contractAddress: string; domain: string; identi
 export type OrganizationServiceOrder = { id: string; facilityId: string; service: string; document: string; price: string; maxFee?: string; assetColor: string; merchantPk: string; merchantAddress: string; noteCommitment?: string; result?: Record<string, unknown>; delivered: boolean; cancelled?: boolean; requestId?: string; quoteCommitment?: string; quoteExpiry?: bigint; history?: { requestId: string; quoteCommitment?: string; noteCommitment?: string; retiredAt: string }[] };
 export type OrganizationSnapshot = { schema: "line:organization-account/v1"; networkId: "preprod"; accountId: string; issuerSecret: string; merchantSecret: string; facilities: OrganizationFacility[]; quotes: OrganizationQuote[]; notes: OrganizationNote[]; receipts: OrganizationReceipt[]; serviceOrders?: OrganizationServiceOrder[]; failures?: OrganizationReceipt[] };
 export type OrganizationPending = { id: string; kind: OrganizationReceipt["kind"]; circuit: string; facilityId: string | null; contractAddress: string | null; sourceFingerprint: string; after: OrganizationSnapshot; txId: string | null; transaction: string | null };
-export type OrganizationRecord = { snapshot: OrganizationSnapshot; pending: OrganizationPending | null };
+export type OrganizationExpiredRecovery = { disposition: "expired-opening-not-applied"; before: OrganizationSnapshot; original: OrganizationPending; evidence: ExpiredOpeningEvidence; ttl: number; recordedAt: string };
+export type OrganizationRecord = { snapshot: OrganizationSnapshot; pending: OrganizationPending | null; recoveries?: OrganizationExpiredRecovery[] };
 export const ORGANIZATION_SCHEMA = "line:organization-account/v1";
 
 export function organizationAccountKey(network: string, publicKey: string): string {
@@ -156,6 +158,7 @@ export class OrganizationAccount {
   private key() { return organizationAccountKey("preprod", this.accountId); }
   snapshot(): OrganizationSnapshot { this.assertSession(); return copyAccount(this.record.snapshot); }
   pending(): OrganizationPending | null { this.assertSession(); return copyAccount(this.record.pending); }
+  recoveryHistory() { this.assertSession(); return (this.record.recoveries ?? []).map(entry => ({ txId: entry.original.txId, blockHeight: entry.evidence.finalized.height, recordedAt: entry.recordedAt })); }
   async save() {
     await this.commit(this.record);
   }
@@ -164,6 +167,9 @@ export class OrganizationAccount {
     const password = getVaultSessionPassphrase();
     if (!password) throw new Error("Organization vault is locked.");
     const next = copyAccount(record);
+    // History lives outside candidate snapshots and survives every commit path.
+    next.recoveries ??= copyAccount(this.record.recoveries);
+    if ((next.recoveries?.length ?? 0) > 10 || this.record.recoveries?.some((entry, index) => encodeVaultJson(entry) !== encodeVaultJson(next.recoveries?.[index]))) throw new Error("Retained recovery history cannot be removed or replaced.");
     await saveEncryptedJson(this.key(), next, password, { beforeWrite: this.assertSession });
     this.assertSession();
     this.record = next;
@@ -218,6 +224,15 @@ export class OrganizationAccount {
     const snapshot = copyAccount(this.record.snapshot);
     snapshot.failures ??= []; snapshot.failures.push(receipt);
     await this.commit({ snapshot, pending: null });
+  }
+  async archiveExpiredOpening(expected: OrganizationPending, evidence: ExpiredOpeningEvidence, ttl: number) {
+    this.assertSession();
+    if (expected.kind !== "call" || expected.circuit !== "openLine" || expected.txId !== EXPIRED_OPENING.txId || expected.contractAddress !== EXPIRED_OPENING.address || expected.sourceFingerprint !== EXPIRED_OPENING.sourceFingerprint) throw new Error("Only the audited original opening can use this recovery path.");
+    if (!this.record.pending?.txId || encodeVaultJson(this.record.pending) !== encodeVaultJson(expected)) throw new Error("The saved operation changed. Review its recovery again.");
+    const recoveries = copyAccount(this.record.recoveries ?? []);
+    if (recoveries.some(entry => entry.original.txId === expected.txId)) throw new Error("This original operation already has recovery history.");
+    recoveries.push({ disposition: "expired-opening-not-applied", before: copyAccount(this.record.snapshot), original: copyAccount(expected), evidence: copyAccount(evidence), ttl, recordedAt: new Date().toISOString() });
+    await this.commit({ snapshot: this.record.snapshot, pending: null, recoveries });
   }
   async discardUnsubmitted() {
     this.assertSession();

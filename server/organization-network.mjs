@@ -1,6 +1,7 @@
 import { WebSocket, WebSocketServer } from 'ws';
 import { parse, getOperationAST, visit } from 'graphql';
 import { OrganizationAuthError } from './organization-auth.mjs';
+import { expiredOpeningReader } from './organization-expiry.mjs';
 
 const BASE = '/api/organization/network';
 const MAX_REQUEST = 65536;
@@ -30,6 +31,7 @@ async function readBounded(stream, limit) {
  * fixed server URLs, never in metadata, client frames or forwarded headers.
  */
 export function organizationNetwork({ server, auth, origin, endpoints }) {
+  const readExpiredOpening = expiredOpeningReader({ endpoints });
   const queryUrl = new URL(endpoints.indexerUri), wsUrl = new URL(endpoints.indexerWsUri);
   for (const [url, schemes] of [[queryUrl, ['https:', 'http:']], [wsUrl, ['wss:', 'ws:']]]) {
     if (!schemes.includes(url.protocol) || url.username || url.password || url.hash) throw Error('Invalid supplier indexer configuration.');
@@ -67,6 +69,17 @@ export function organizationNetwork({ server, auth, origin, endpoints }) {
       const session = authorized(req); admit(session);
       if (req.url !== path) throw new OrganizationAuthError('Indexer URL parameters are not supported.', 400);
       if (path === BASE && req.method === 'GET') return send(res, 200, metadata);
+      if (path === BASE + '/expired-opening' && req.method === 'GET') {
+        if (requests.size >= 8) throw new OrganizationAuthError('Recovery reads are busy.', 429);
+        controller = new AbortController(); requests.add(controller);
+        const abort = () => controller.abort(); res.once('close', abort);
+        try {
+          const evidence = await readExpiredOpening(controller.signal);
+          auth.require(req.headers.cookie);
+          if (!res.destroyed) return send(res, 200, evidence);
+          return;
+        } finally { res.off('close', abort); }
+      }
       if (path !== BASE + '/indexer' || req.method !== 'POST') throw new OrganizationAuthError('Unknown indexer read.', 404);
       if (!(req.headers['content-type'] ?? '').toLowerCase().startsWith('application/json')) throw new OrganizationAuthError('Use a JSON indexer query.', 415);
       let input; try { input = JSON.parse(await readBounded(req, MAX_REQUEST)); } catch (error) { if (error instanceof OrganizationAuthError) throw error; throw new OrganizationAuthError('Invalid indexer query.', 400); }
