@@ -54,6 +54,29 @@ async function connect(page: Page, id: "a" | "b") {
   await page.getByRole("link", { name: "Continue to workspace" }).click();
 }
 
+for (const method of ["connect(preprod)", "getConfiguration"] as const) test(`connection diagnostics identify early ${method} failure without publishing an account`, async ({ page }) => {
+  await wallets(page, true); await page.goto("/app");
+  await page.evaluate(method => {
+    const target = (window as any).midnight.a, original = target.connect;
+    target.connect = async (...args: any[]) => {
+      if (method === "connect(preprod)") throw Error("Request failed");
+      const api = await original(...args); api.getConfiguration = async () => { throw Error("Request failed"); }; return api;
+    };
+  }, method);
+  await page.getByRole("banner").getByRole("button", { name: "Connect wallet", exact: true }).click();
+  await page.getByRole("button", { name: "Organization wallet a", exact: true }).click();
+  await expect(page.getByRole("alert")).toContainText("Request failed");
+  await page.getByText("Connection diagnostics", { exact: true }).click();
+  await expect(page.getByRole("dialog")).toContainText(`Connection stopped at ${method}.`);
+  if (method === "getConfiguration") {
+    await page.getByRole("button", { name: "Check connector reads", exact: true }).click();
+    await expect(page.getByRole("dialog")).toContainText("getConfiguration: failed", { timeout: 10_000 });
+    await expect(page.getByRole("dialog")).toContainText("getConnectionStatus: passed", { timeout: 10_000 });
+    await expect(page.getByRole("dialog")).toContainText("no verified connection to compare");
+  } else await expect(page.getByRole("button", { name: "Check connector reads", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Your wallet is connected.", exact: true })).toHaveCount(0);
+});
+
 test("browser replays the canonical opening action against its exact retained private candidate", async ({ page }) => {
   const f = await candidateFixture();
   await page.goto("/app");

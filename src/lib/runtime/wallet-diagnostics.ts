@@ -21,7 +21,7 @@ function failureDetail(error: unknown) {
  * connection/vault state. In particular a successful configuration read cannot
  * stand in for a failed live session check. No automatic retry is performed.
  */
-export async function diagnoseWalletReads(wallet: Reader, expectedAddress: string, isCurrent: () => boolean, report: (result: WalletReadDiagnostic) => void, options: { timeoutMs?: number; pauseMs?: number } = {}) {
+export async function diagnoseWalletReads(wallet: Reader, expectedAddress: string | null, isCurrent: () => boolean, report: (result: WalletReadDiagnostic) => void, options: { timeoutMs?: number; pauseMs?: number } = {}) {
   const timeoutMs = options.timeoutMs ?? 10000, pauseMs = options.pauseMs ?? 1000;
   if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 30000 || !Number.isSafeInteger(pauseMs) || pauseMs < 0 || pauseMs > 5000) throw Error("Invalid diagnostic deadline.");
   const current = () => { if (!isCurrent()) throw Error("Wallet connection changed. Diagnostic results were discarded."); };
@@ -30,7 +30,7 @@ export async function diagnoseWalletReads(wallet: Reader, expectedAddress: strin
     { method: "getShieldedAddresses", read: () => wallet.getShieldedAddresses(), describe: (value: Awaited<ReturnType<Reader["getShieldedAddresses"]>>) => {
       decodeWalletPublicKey(value.shieldedCoinPublicKey, "shield-cpk", "preprod"); decodeWalletPublicKey(value.shieldedEncryptionPublicKey, "shield-epk", "preprod"); return "Preprod public identities returned";
     } },
-    { method: "getUnshieldedAddress", read: () => wallet.getUnshieldedAddress(), describe: (value: Awaited<ReturnType<Reader["getUnshieldedAddress"]>>) => { if (value.unshieldedAddress !== expectedAddress) throw new DiagnosticMismatch("Receiving address differs from this connection"); return "Receiving address matches this connection"; } },
+    { method: "getUnshieldedAddress", read: () => wallet.getUnshieldedAddress(), describe: (value: Awaited<ReturnType<Reader["getUnshieldedAddress"]>>) => { if (!value.unshieldedAddress) throw new DiagnosticMismatch("No receiving address returned"); if (expectedAddress === null) return "Receiving address returned; no verified connection to compare"; if (value.unshieldedAddress !== expectedAddress) throw new DiagnosticMismatch("Receiving address differs from this connection"); return "Receiving address matches this connection"; } },
     { method: "getConnectionStatus", read: () => wallet.getConnectionStatus(), describe: (value: Awaited<ReturnType<Reader["getConnectionStatus"]>>) => { if (value.status !== "connected" || value.networkId !== "preprod") throw new DiagnosticMismatch("Live session is disconnected or on a different network"); return "Live Preprod session confirmed"; } },
   ];
   const results: WalletReadDiagnostic[] = [];

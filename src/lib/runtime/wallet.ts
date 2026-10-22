@@ -22,7 +22,7 @@ export interface WalletInfo {
 
 export type WalletConnectionStatus = "disconnected" | "connecting" | "connected" | "error";
 export type WalletConnectionPhase = "requesting-access" | "verifying-network" | "reading-address" | "checking-session";
-export type WalletDiagnosticTarget = { reads: Pick<ConnectedAPI, "getConfiguration" | "getShieldedAddresses" | "getUnshieldedAddress" | "getConnectionStatus">; address: string };
+export type WalletDiagnosticTarget = { reads: Pick<ConnectedAPI, "getConfiguration" | "getShieldedAddresses" | "getUnshieldedAddress" | "getConnectionStatus">; address: string | null };
 type WalletAccount = { address: string; network: string };
 
 export interface WalletState {
@@ -239,20 +239,23 @@ export async function connectWallet(
       throw new WalletNotConnectedError("Wallet connect resolved with empty API instance.");
     }
 
+    if (attempt.signal.aborted || pendingConnection !== attempt) throw cancelledConnection();
+    // A verification failure must not publish a connected wallet. The UI may
+    // retain only these four read capabilities for an explicit diagnostic.
+    const reads = {
+      getConfiguration: () => connectedApi.getConfiguration(),
+      getShieldedAddresses: () => connectedApi.getShieldedAddresses(),
+      getUnshieldedAddress: () => connectedApi.getUnshieldedAddress(),
+      getConnectionStatus: () => connectedApi.getConnectionStatus(),
+    };
+    diagnostic?.({ address: null, reads });
     report("verifying-network");
     await getWalletConfiguration(connectedApi, networkId, attempt.signal);
     report("reading-address");
     const address = await readWalletAddress(connectedApi, attempt.signal);
     if (typeof connectedApi.getConnectionStatus !== "function") throw new WalletNotConnectedError("Wallet does not implement connector v4 capability: getConnectionStatus.");
     if (attempt.signal.aborted || pendingConnection !== attempt) throw cancelledConnection();
-    // A session-check failure must not publish a connected wallet. The UI may
-    // retain only these four read capabilities for an explicit diagnostic.
-    diagnostic?.({ address, reads: {
-      getConfiguration: () => connectedApi.getConfiguration(),
-      getShieldedAddresses: () => connectedApi.getShieldedAddresses(),
-      getUnshieldedAddress: () => connectedApi.getUnshieldedAddress(),
-      getConnectionStatus: () => connectedApi.getConnectionStatus(),
-    } });
+    diagnostic?.({ address, reads });
     report("checking-session");
     const status = await walletResponse(() => connectedApi.getConnectionStatus(), 20_000,
       "Wallet session check timed out. Unlock your wallet and reconnect.", attempt.signal);
