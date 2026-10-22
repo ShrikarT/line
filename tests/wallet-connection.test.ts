@@ -192,6 +192,26 @@ test("locked errors identify the selected alternative wallet", async () => {
   await assert.rejects(connectWallet("1am-uuid"), /1AM is locked/);
 });
 
+test("connection failures preserve standard connector codes without exposing their private reason", async () => {
+  const secret = "redaction-control-sensitive";
+  for (const code of ["InternalError", "InvalidRequest", "PermissionRejected", "Disconnected", -32603, 429, secret]) {
+    inject(async () => { throw { type: "DAppConnectorAPIError", code, message: "Request failed", reason: `https://private.invalid/?token=${secret}` }; });
+    await assert.rejects(connectWallet("lace"), error => {
+      assert.match(error.message, code === secret ? /connector code unavailable/ : new RegExp(`connector code ${code}`));
+      assert(!error.message.includes(secret)); assert(!error.message.includes("private.invalid"));
+      return true;
+    });
+    assert.equal(getConnectedWallet(), null); assert.equal(getConnectedWalletAccount(), null);
+  }
+});
+
+test("connector diagnostics retain standard string codes without echoing a private reason", async () => {
+  const wallet = diagnosticWallet({ getConnectionStatus: async () => { throw { code: "PermissionRejected", message: "Request failed", reason: "https://private.invalid/?token=redaction-control" }; } });
+  const results = await diagnoseWalletReads(wallet, "test-receiving-address", () => true, () => {}, { pauseMs: 0 });
+  assert.equal(results[3].code, "PermissionRejected");
+  assert(!JSON.stringify(results).includes("private.invalid"));
+});
+
 test("connector diagnostics distinguish a failing live session read from healthy configuration and identities without retrying", async () => {
   let sessions = 0, payments = 0;
   const wallet = diagnosticWallet({ getConnectionStatus: async () => { sessions++; throw { code: 429, message: "Rate limited" }; }, balanceUnsealedTransaction: () => { payments++; }, submitTransaction: () => { payments++; }, signData: () => { payments++; } });

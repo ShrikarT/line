@@ -2,6 +2,17 @@
  * Structured errors for Line runtime operations.
  */
 
+/** Connector codes are public protocol labels, but arbitrary strings may carry
+ * private provider data. Retain only the v4 enumeration or bounded RPC codes. */
+export function walletConnectorCode(error: unknown): string | undefined {
+  if (!error || typeof error !== "object" || !("code" in error)) return undefined;
+  const code = error.code;
+  if (typeof code === "string" && ["InternalError", "Rejected", "InvalidRequest", "PermissionRejected", "Disconnected"].includes(code)) return code;
+  if (typeof code === "number" && Number.isSafeInteger(code) && Math.abs(code) <= 100000) return String(code);
+  if (typeof code === "string" && /^-?[0-9]{1,5}$/.test(code)) return code;
+  return undefined;
+}
+
 export class LineRuntimeError extends Error {
   readonly code: string;
   readonly details?: Record<string, unknown>;
