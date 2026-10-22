@@ -37,6 +37,13 @@ test('production HTTP authenticates wallet ownership, serializes streamed reques
     assert.equal((await request('orders', input)).status, 401); assert.equal(quotes, 0);
     const wrong = await signIn(other), cookie = await signIn(owner);
     const wrongWallet = bech32m.encodeFromBytes('mn_addr_preprod', Buffer.from(L.addressFromKey(L.signatureVerifyingKey(other)), 'hex'));
+    const ownerWallet = bech32m.encodeFromBytes('mn_addr_preprod', Buffer.from(L.addressFromKey(L.signatureVerifyingKey(owner)), 'hex'));
+    const sessionState = await fetch(origin + '/api/organization/auth/session', { headers: { ...headers, Cookie: cookie, 'X-Line-Wallet': ownerWallet } });
+    assert.equal(sessionState.status, 200);
+    assert.deepEqual(await sessionState.json(), { authenticated: true, expiresAt: api.auth.require(cookie).expiresAt });
+    assert.equal(sessionState.headers.get('set-cookie'), null);
+    assert.equal((await request('auth/session', undefined, cookie)).status, 401);
+    assert.equal((await fetch(origin + '/api/organization/auth/session', { headers: { ...headers, Cookie: cookie, 'X-Line-Wallet': wrongWallet } })).status, 401);
     const changedAccount = await fetch(origin + '/api/organization/orders/' + id, { headers: { ...headers, Cookie: cookie, 'X-Line-Wallet': wrongWallet } });
     assert.equal(changedAccount.status, 401); assert.equal((await changedAccount.json()).code, 'WALLET_AUTH_REQUIRED');
     assert.equal((await request('orders', input, wrong)).status, 404); assert.equal(quotes, 0);

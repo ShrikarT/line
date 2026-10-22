@@ -64,8 +64,7 @@ export class OrganizationNetwork {
     if (release.profile !== "organization" || !/^[0-9a-f]{64}$/.test(release.inputs?.source?.sha256 ?? "") || release.files?.["contract/index.js"]?.sha256 !== await fingerprint(new TextEncoder().encode(generatedJavascript))) throw new Error("Organization contract bindings do not match the published proving release.");
     const zkConfigProvider = new FetchZkConfigProvider<Circuit>(new URL("/organization-zk", location.origin).href, (url, init) => globalThis.fetch(url, { ...init, signal: init?.signal ? AbortSignal.any([init.signal, AbortSignal.timeout(60_000)]) : AbortSignal.timeout(60_000) }));
     const privateStateProvider = new VaultPrivateStateProvider<LinePrivateWitnessContext>({ networkId: "preprod", accountId: account.accountId });
-    const wallet = await withinDeadline(createWalletProviders(account.wallet, "preprod"), 25_000, "The wallet is not responding. Reopen your wallet and try again.");
-    await account.assertWallet();
+    const wallet = await withinDeadline(createWalletProviders(account.wallet, "preprod", () => account.assertWallet()), 25_000, "The wallet is not responding. Reopen your wallet and try again.");
     const publicData = authenticatedOrganizationReads(indexerPublicDataProvider(endpoints.indexerUri, endpoints.indexerWsUri, globalThis.WebSocket), endpoints.authorize);
     const client = new OrganizationNetwork(account, {
       ...wallet, zkConfigProvider, privateStateProvider,

@@ -160,9 +160,19 @@ export function getConnectedWalletAccount(): WalletAccount | null {
 }
 
 /** Adapts the standard connector to Midnight.js without obtaining secret keys. */
-export async function createWalletProviders(api: ConnectedAPI, networkId: string): Promise<{ walletProvider: WalletProvider; midnightProvider: MidnightProvider }> {
-  await getWalletConfiguration(api, networkId);
-  const addresses = await api.getShieldedAddresses();
+export async function createWalletProviders(api: ConnectedAPI, networkId: string, readIdentity?: () => Promise<{
+  configuration: { networkId: string };
+  shielded: { shieldedCoinPublicKey: string; shieldedEncryptionPublicKey: string };
+}>): Promise<{ walletProvider: WalletProvider; midnightProvider: MidnightProvider }> {
+  for (const method of ["balanceUnsealedTransaction", "submitTransaction"] as const) {
+    if (typeof api[method] !== "function") throw new WalletNotConnectedError(`Wallet does not implement connector v4 capability: ${method}.`);
+  }
+  // Organization accounts supply their live session/identity guard, which also
+  // checks the original account binding. Never fall back if that guard fails.
+  const { configuration, shielded: addresses } = readIdentity ? await readIdentity() : {
+    configuration: await getWalletConfiguration(api, networkId), shielded: await api.getShieldedAddresses(),
+  };
+  if (configuration.networkId !== networkId) throw new WalletNotConnectedError("Wallet network does not match the selected contract network.");
   const coinPublicKey = decodeWalletPublicKey(addresses.shieldedCoinPublicKey, "shield-cpk", networkId);
   const encryptionPublicKey = decodeWalletPublicKey(addresses.shieldedEncryptionPublicKey, "shield-epk", networkId);
   return {

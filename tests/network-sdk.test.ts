@@ -281,6 +281,17 @@ describe("connector v4 wallet adapter", () => {
     await assert.rejects(() => getWalletConfiguration(api as any, "preprod"), /does not match/);
     await assert.rejects(() => getWalletConfiguration({ getConfiguration: api.getConfiguration } as any, "preview"), /capability/);
   });
+  it("uses the account's fresh identity guard without duplicate reads or fallback after rejection", async () => {
+    let guarded = 0, unexpectedReads = 0;
+    const noReads = { ...api, getConfiguration: async () => { unexpectedReads++; throw Error("Duplicate configuration read"); }, getShieldedAddresses: async () => { unexpectedReads++; throw Error("Duplicate identity read"); } };
+    const identity = { configuration: { networkId: "preview" } as any, shielded: await api.getShieldedAddresses() };
+    const providers = await createWalletProviders(noReads as any, "preview", async () => { guarded++; return identity; });
+    assert.equal(providers.walletProvider.getCoinPublicKey(), "0b".repeat(32));
+    await assert.rejects(createWalletProviders(noReads as any, "preview", async () => { guarded++; throw Error("Disconnected live session"); }), /Disconnected live session/);
+    await assert.rejects(createWalletProviders(noReads as any, "preprod", async () => identity), /does not match/);
+    await assert.rejects(createWalletProviders({ ...noReads, balanceUnsealedTransaction: undefined } as any, "preview", async () => identity), /capability: balanceUnsealedTransaction/);
+    assert.equal(guarded, 2); assert.equal(unexpectedReads, 0);
+  });
   it("rejects malformed balancing output and submits only the finalized encoding", async () => {
     let serialized: string | undefined;
     const providers = await createWalletProviders({ ...api, submitTransaction: async (value: string) => { serialized = value; } } as any, "preview");
