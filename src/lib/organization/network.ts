@@ -23,6 +23,7 @@ import { OrganizationSupplierClient } from "./supplier-client";
 import { organizationReadEndpoints } from "./read-endpoints";
 import { authenticatedOrganizationReads } from "./authenticated-reads";
 import { recoveryDigest, verifyExpiredOpening, type ExpiredOpeningReview } from "./expired-opening";
+import { inspectMerchantClaim } from "./claims";
 
 type Circuit = keyof Contract<LinePrivateWitnessContext>["provableCircuits"];
 type Providers = ContractProviders<Contract<LinePrivateWitnessContext>>;
@@ -302,13 +303,20 @@ export class OrganizationNetwork {
       finally { this.input = null; }
     });
   }
+  async checkMerchantClaim(note: OrganizationNote) {
+    note = copyAccount(note);
+    return this.account.exclusive(async () => {
+      const { book } = await this.inspect(note.contractAddress);
+      return inspectMerchantClaim(book, note, toHex(merchantPublicKey(bytes32(this.account.snapshot().merchantSecret))), this.account.receivingAddress);
+    });
+  }
   async redeem(note: OrganizationNote) {
+    note = copyAccount(note);
     return this.account.exclusive(async () => {
       const { book } = await this.inspect(note.contractAddress), after = this.account.snapshot();
-      if (toHex(merchantPublicKey(bytes32(after.merchantSecret))) !== note.merchantPk || toHex(book.contractDomain) !== note.domain) throw new Error("This claim belongs to another merchant or facility.");
-      if (!same(book.merchantPayoutRecipients.lookup(bytes32(note.merchantPk)).bytes, receivingAddressBytes(this.account.receivingAddress))) throw new Error("This facility would pay another receiving address. Redemption is blocked.");
-      const commitment = drawNoteCommit({ domain: bytes32(note.domain), lineGeneration: note.generation, identity: bytes32(note.identity), quoteCommit: bytes32(note.quoteCommitment), merchantPk: bytes32(note.merchantPk), amount: note.amount, fee: note.fee, noteNonce: bytes32(note.noteNonce), expiry: note.expiry }, bytes32(note.noteSalt));
-      if (toHex(commitment) !== note.noteCommitment) throw new Error("Claim opening does not match its commitment.");
+      const review = inspectMerchantClaim(book, note, toHex(merchantPublicKey(bytes32(after.merchantSecret))), this.account.receivingAddress);
+      if (review.status !== "unspent") throw new Error(review.status === "redeemed" ? "This claim was already redeemed. No new redemption was prepared." : "This claim was cancelled. No redemption was prepared.");
+      const commitment = bytes32(note.noteCommitment);
       const existing = after.notes.find(n => n.noteCommitment === note.noteCommitment);
       if (existing) existing.redeemed = true; else after.notes.push({ ...copyAccount(note), redeemed: true });
       this.input = { callerSecret: bytes32(after.merchantSecret), noteIdentity: bytes32(note.identity), noteQuoteCommit: bytes32(note.quoteCommitment), noteNonce: bytes32(note.noteNonce), noteSalt: bytes32(note.noteSalt), redeemAmount: note.amount };

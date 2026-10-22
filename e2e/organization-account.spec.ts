@@ -498,6 +498,83 @@ test("saved merchant quotes paginate, survive encrypted backup and export histor
   expect(await page.evaluate(() => ({ proof: (window as any).organizationProofRequests, signatures: (window as any).organizationSignatures }))).toEqual({ proof: 0, signatures: 0 });
 });
 
+test("merchant claim review binds payout terms and rechecks spent state before transaction preparation", async ({ page }) => {
+  test.setTimeout(120_000);
+  await wallets(page, true); await page.goto("/app"); await connect(page, "a"); await unlock(page);
+  const packageText = await page.evaluate(async () => {
+    const { browserModuleUrl } = await import("/e2e/browser-module.ts" as any);
+    const { OrganizationAccount, receivingAddressBytes } = await import(browserModuleUrl("/src/lib/organization/account.ts"));
+    const { OrganizationNetwork } = await import(browserModuleUrl("/src/lib/organization/network.ts"));
+    const { getConnectedWallet } = await import(browserModuleUrl("/src/lib/runtime/wallet.ts"));
+    const { drawNoteCommit, merchantPublicKey, toHex, hexToBytes } = await import(browserModuleUrl("/src/lib/line/encoding.ts"));
+    const { encodeNote } = await import(browserModuleUrl("/src/lib/organization/transfers.ts"));
+    const account = await OrganizationAccount.unlock(getConnectedWallet()!, "Organization123!");
+    const pk = merchantPublicKey(hexToBytes(account.snapshot().merchantSecret));
+    const note = { contractAddress: "ab".repeat(32), domain: "12".repeat(32), identity: "13".repeat(32), merchantPk: toHex(pk), quoteCommitment: "14".repeat(32), amount: 100000n, fee: 2000n, expiry: BigInt(Math.floor(Date.now() / 1000) + 3600), generation: 1n, noteNonce: "15".repeat(32), noteSalt: "16".repeat(32), noteCommitment: "", redeemed: false };
+    note.noteCommitment = toHex(drawNoteCommit({ domain: hexToBytes(note.domain), lineGeneration: note.generation, identity: hexToBytes(note.identity), quoteCommit: hexToBytes(note.quoteCommitment), merchantPk: pk, amount: note.amount, fee: note.fee, noteNonce: hexToBytes(note.noteNonce), expiry: note.expiry }, hexToBytes(note.noteSalt)));
+    const target = window as any;
+    target.claimState = "unspent"; target.claimCalls = 0; target.claimMissing = false; target.claimReadFailure = false;
+    (OrganizationNetwork.prototype as any).inspect = async function (address: string) {
+      if (target.claimReadFailure) throw Error("Synthetic claim state unavailable");
+      if (address !== note.contractAddress) throw Error("Unexpected facility");
+      return { book: {
+        contractDomain: hexToBytes(note.domain), settlementTokenColor: new Uint8Array(32).fill(23),
+        // A previous-generation claim must not depend on current line status
+        // or merchant registration. Compact deliberately preserves its payout.
+        lineGeneration: 2n, status: 3, registeredMerchants: { lookup: () => false },
+        merchantPayoutRecipients: { member: (key: Uint8Array) => toHex(key) === note.merchantPk, lookup: () => ({ bytes: receivingAddressBytes(this.account.receivingAddress) }) },
+        notes: { member: (key: Uint8Array) => !target.claimMissing && toHex(key) === note.noteCommitment, lookup: () => ({ amount: note.amount, fee: note.fee, expiry: note.expiry, lineGeneration: note.generation, redeemed: target.claimState === "redeemed", cancelled: target.claimState === "cancelled" }) },
+      } };
+    };
+    // The real SDK reaches its prepared transaction boundary only for the
+    // current unspent state; this seam rejects without any wallet request.
+    (OrganizationNetwork.prototype as any).tx = function () {
+      return { call: async () => { target.claimCalls++; throw Error("Synthetic redemption declined"); } };
+    };
+    return encodeNote(note);
+  });
+  await unlock(page); await page.getByRole("tab", { name: "Merchant", exact: true }).click();
+  const input = page.getByRole("textbox", { name: "Merchant claim package", exact: true });
+  const check = page.getByRole("button", { name: "Check claim and payout", exact: true });
+  const redeem = page.getByRole("button", { name: "Redeem and receive assets", exact: true });
+  await input.fill("invalid"); await expect(check).toBeDisabled(); await expect(redeem).toBeDisabled();
+  await input.fill(packageText); await expect(redeem).toBeDisabled(); await check.click();
+  const review = page.getByRole("article", { name: "Checked merchant claim", exact: true });
+  await expect(review).toContainText("Merchant payout: 100000 asset base units");
+  await expect(review).toContainText("Organization fee: 2000 base units, retained by the organization.");
+  await expect(review).toContainText("17".repeat(32));
+  await expect(review).toContainText("Allowance generation: 1");
+  await expect(redeem).toBeEnabled();
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+  // Another transaction spends the claim after review. Rechecking in redeem()
+  // must reject before prepare(), even though the UI held an unspent snapshot.
+  await page.evaluate(() => { (window as any).claimState = "redeemed"; });
+  await redeem.click(); await expect(page.getByRole("alert")).toContainText("already redeemed");
+  await expect(redeem).toBeDisabled();
+  for (const state of ["redeemed", "cancelled"]) {
+    await page.evaluate(value => { (window as any).claimState = value; }, state); await check.click();
+    await expect(review).toContainText(state === "redeemed" ? "Already redeemed" : "Cancelled");
+    await expect(redeem).toBeDisabled();
+  }
+  await page.evaluate(() => { (window as any).claimState = "unspent"; }); await check.click();
+  await expect(redeem).toBeEnabled();
+  const tampered = JSON.parse(packageText); tampered.amount = "99999";
+  await input.fill(JSON.stringify(tampered)); await expect(redeem).toBeDisabled();
+  await expect(review).toHaveCount(0); await check.click();
+  await expect(page.getByRole("alert")).toContainText("opening does not match");
+  await input.fill(packageText);
+  await page.evaluate(() => { (window as any).claimMissing = true; }); await check.click();
+  await expect(page.getByRole("alert")).toContainText("not found"); await expect(redeem).toBeDisabled();
+  await page.evaluate(() => { (window as any).claimMissing = false; (window as any).claimReadFailure = true; }); await check.click();
+  await expect(page.getByRole("alert")).toContainText("Synthetic claim state unavailable"); await expect(redeem).toBeDisabled();
+  await page.evaluate(() => { (window as any).claimReadFailure = false; }); await check.click();
+  await expect(redeem).toBeEnabled(); await redeem.click();
+  await expect(page.getByRole("alert")).toContainText("Synthetic redemption declined");
+  await expect(page.getByRole("heading", { name: "Resolve the saved operation first.", exact: true })).toHaveCount(0);
+  expect(await page.evaluate(() => ({ calls: (window as any).claimCalls, proof: (window as any).organizationProofRequests, signatures: (window as any).organizationSignatures }))).toEqual({ calls: 1, proof: 0, signatures: 0 });
+});
+
 test("real product routes require a wallet and expose no operator or simulator shortcuts", async ({ page }) => {
   test.setTimeout(120_000);
   const posts: string[] = [], errors: string[] = [];

@@ -5,6 +5,7 @@ import { OrganizationField as Field, organizationField as field } from "./organi
 import { decodeNote, encodeMerchant, encodeQuote } from "@/lib/organization/transfers";
 import { units } from "@/lib/organization/account";
 import { invoiceReferenceError, requiredDrawFee } from "@/lib/line/encoding";
+import type { MerchantClaimReview } from "@/lib/organization/claims";
 
 const QUOTES_PER_PAGE = 10;
 function quoteDeadline(expiry: bigint) {
@@ -17,8 +18,11 @@ export function OrganizationMerchant({ output }: { output: (title: string, value
   const [name, setName] = useState(""), [address, setAddress] = useState(""), [invoice, setInvoice] = useState(""), [price, setPrice] = useState(""), [minutes, setMinutes] = useState("60"), [claim, setClaim] = useState("");
   const [balances, setBalances] = useState<Record<string, string>>({}), [error, setError] = useState("");
   const [quoteSearch, setQuoteSearch] = useState(""), [quotePage, setQuotePage] = useState(0);
+  const [claimReview, setClaimReview] = useState<{ package: string; review: MerchantClaimReview } | null>(null);
   const disabled = busy || !!pending || !network;
   const invoiceError = invoiceReferenceError(invoice);
+  const decodedClaim = (() => { try { return decodeNote(claim); } catch { return null; } })();
+  const checkedClaim = claimReview?.package === claim ? claimReview.review : null;
   // Only the committed snapshot is shareable. A pending postQuote candidate
   // becomes visible here after exact successful finality promotes it.
   const search = quoteSearch.trim().toLowerCase();
@@ -33,7 +37,33 @@ export function OrganizationMerchant({ output }: { output: (title: string, value
   }, [account, snapshot?.receipts.length]);
   return <div className="organization-tab"><div className="workspace-section-heading"><div><p className="line-eyebrow">Merchant / Your receiving wallet</p><h2>Quote, redeem and receive assets.</h2></div></div><div className="workspace-start-grid"><section className="workspace-welcome"><h2>Share your public profile.</h2><p>An organization registers your public role key and this wallet’s receiving address. Your secret remains in your encrypted account.</p><Field label="Merchant name"><input className={field} value={name} onChange={event => setName(event.target.value)} maxLength={80} disabled={busy} /></Field><Button variant="outline" disabled={!network} onClick={() => { if (network) output("Your public merchant profile", encodeMerchant(network.merchantProfile(name))); }}>Show merchant profile</Button><code className="wallet-address w-full">{account?.receivingAddress}</code></section><section className="workspace-launch"><p className="line-eyebrow">Existing assets / Read from your wallet</p><h2>Your receiving wallet.</h2>{Object.entries(balances).length ? Object.entries(balances).map(([color, amount]) => <div key={color} className="organization-asset"><strong>{amount} base units</strong><code>{color}</code></div>) : <p>No unshielded asset balance was returned by your wallet.</p>}<small>A claim pays only the receiving address your organization registered. A recipient mismatch blocks quotes and redemption.</small></section></div>
     <section className="workspace-welcome"><h2>Post a quote to an organization.</h2><form className="organization-form-grid w-full" onSubmit={event => { event.preventDefault(); if (invoiceError) return; void run(async client => { const validity = Number(minutes); if (!Number.isInteger(validity) || validity < 1 || validity > 10080) throw new Error("Choose validity between one minute and seven days."); output("Confirmed supplier quote", encodeQuote(await client.postQuote(address, invoice, units(price), BigInt(Math.floor(Date.now() / 1000) + validity * 60)))); }); }}><Field label="Organization facility address"><input className={field} value={address} onChange={event => setAddress(event.target.value)} pattern="[0-9a-f]{64}" disabled={disabled} required /></Field><Field label="Invoice / service reference"><input className={field} value={invoice} onChange={event => setInvoice(event.target.value)} maxLength={500} aria-label="Invoice / service reference" aria-invalid={!!invoiceError} aria-describedby="invoice-reference-help" disabled={disabled} required /><small id="invoice-reference-help" role={invoiceError ? "alert" : undefined}>{invoiceError || "Up to 32 UTF-8 bytes, or a 64-digit hexadecimal invoice ID."}</small></Field><Field label="Price in this facility’s asset base units"><input className={field} value={price} onChange={event => setPrice(event.target.value)} inputMode="numeric" pattern="[0-9]+" disabled={disabled} required /></Field><Field label="Quote valid for (minutes)"><input className={field} value={minutes} onChange={event => setMinutes(event.target.value)} type="number" min="1" max="10080" disabled={disabled} required /></Field><Button type="submit" disabled={disabled || !!invoiceError}>Post quote in wallet</Button></form><small>You must be registered by this organization and hold DUST for network fees. Service fulfillment remains your responsibility.</small></section>
-    <section className="workspace-welcome"><h2>Redeem your merchant claim.</h2><p>Import the agent’s package. Redemption proves your merchant authority, pays your registered wallet and consumes the claim once.</p><Field label="Merchant claim package"><textarea className={field} rows={7} maxLength={16384} value={claim} onChange={event => setClaim(event.target.value)} disabled={disabled} /></Field><Button disabled={disabled || !claim} onClick={() => void run(client => client.redeem(decodeNote(claim)))}>Redeem and receive assets</Button></section>
+    <section className="workspace-welcome"><h2>Redeem your merchant claim.</h2>
+      <p>Import the agent’s package, then check its terms and registered payout against the facility before requesting redemption.</p>
+      <Field label="Merchant claim package"><textarea className={field} rows={7} maxLength={16384} value={claim} onChange={event => { setClaim(event.target.value); setClaimReview(null); }} aria-invalid={!!claim && !decodedClaim} aria-describedby="merchant-claim-help" disabled={disabled} /></Field>
+      <small id="merchant-claim-help">{claim && !decodedClaim ? "Paste a complete merchant claim package with valid amounts and commitment bytes." : "Checking reads public contract state and prepares no payment. Wallet sign-in may be required for hosted reads."}</small>
+      <Button variant="outline" disabled={disabled || !decodedClaim} onClick={() => {
+        const original = claim; setClaimReview(null);
+        void run(async client => {
+          const review = await client.checkMerchantClaim(decodeNote(original));
+          account?.assertSession(); setClaimReview({ package: original, review });
+        });
+      }}>Check claim and payout</Button>
+      {checkedClaim && <article className="organization-claim min-w-0 [overflow-wrap:anywhere]" aria-label="Checked merchant claim">
+        <strong>Merchant payout: {checkedClaim.amount.toString()} asset base units</strong>
+        <p>Organization fee: {checkedClaim.fee.toString()} base units, retained by the organization.</p>
+        <p>Settlement asset: <code>{checkedClaim.assetColor}</code></p>
+        <p>Receiving wallet: <code>{checkedClaim.receivingAddress}</code></p>
+        <p>Facility: <code>{checkedClaim.contractAddress}</code></p>
+        <p>Claim: <code>{checkedClaim.noteCommitment}</code></p>
+        <p>Allowance generation: {checkedClaim.generation.toString()} · Claim deadline: {quoteDeadline(checkedClaim.expiry)}</p>
+        <p>Observed state: {checkedClaim.status === "unspent" ? "Unspent" : checkedClaim.status === "redeemed" ? "Already redeemed" : "Cancelled"}.</p>
+        <small>This is a read from the configured Preprod provider. State can change; redemption rechecks it. Compact still checks the deadline, available assets and single use. Wallet network fees are separate.</small>
+      </article>}
+      <Button disabled={disabled || checkedClaim?.status !== "unspent"} onClick={() => {
+        const original = claim; setClaimReview(null);
+        void run(client => client.redeem(decodeNote(original)));
+      }}>Redeem and receive assets</Button>
+    </section>
     <section className="workspace-welcome" aria-labelledby="saved-quotes-heading">
       <h2 id="saved-quotes-heading">Saved merchant quotes</h2>
       <p>Share the original package again after confirmation, reconciliation or reopening this vault. Sharing prepares no transaction. Saved quotes may have expired, been used or belong to a previous allowance; the facility checks their current validity at purchase.</p>

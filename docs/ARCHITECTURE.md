@@ -123,6 +123,16 @@ with zero defaults and whole-base-unit upward rounding. The policy is fixed by
 wallet network fees are separate. Pending fees become withdrawable only after
 redemption. Withdrawals use the contract's fixed issuer recipient.
 
+Merchant claim review reads the release-checked facility and binds the imported
+opening to its public note metadata, merchant key and registered receiving
+wallet. It shows the settlement asset, merchant payout, separately retained fee,
+deadline and observed unspent/redeemed/cancelled status. Editing the package
+invalidates the review. Redemption repeats the check under the account lock
+before preparing a transaction, so a claim spent since review is rejected early.
+Current allowance status/generation and merchant disabling do not invalidate an
+older claim. Provider-observed state is not a finalized payout receipt or a
+guarantee of payment; Compact still checks ledger time, custody and single use.
+
 Hosted service orders persist the reviewed maximum fee in encrypted records and
 backups. The SDK includes the fee in its capacity check and rejects a new quote
 above that ceiling before drawing. Missing legacy ceilings mean zero. A retained,
