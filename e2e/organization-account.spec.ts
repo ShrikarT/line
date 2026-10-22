@@ -575,6 +575,58 @@ test("merchant claim review binds payout terms and rechecks spent state before t
   expect(await page.evaluate(() => ({ calls: (window as any).claimCalls, proof: (window as any).organizationProofRequests, signatures: (window as any).organizationSignatures }))).toEqual({ calls: 1, proof: 0, signatures: 0 });
 });
 
+test("connection diagnostics isolate connector reads without opening a vault or preparing a transaction", async ({ page }) => {
+  await wallets(page, true); await page.goto("/app"); await connect(page, "a");
+  await page.evaluate(async () => {
+    const { browserModuleUrl } = await import("/e2e/browser-module.ts" as any);
+    const { getConnectedWallet } = await import(browserModuleUrl("/src/lib/runtime/wallet.ts"));
+    const wallet = getConnectedWallet()!;
+    const read = wallet.getConfiguration.bind(wallet);
+    wallet.getConfiguration = async () => ({ ...await read(), substrateNodeUri: "https://provider.invalid/?token=private-diagnostic-control" });
+    wallet.getConnectionStatus = async () => { throw { code: -32603, message: "Request failed" }; };
+  });
+  await page.locator("header").getByRole("button", { name: "Manage connected wallet", exact: true }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByText("Connection diagnostics", { exact: true }).click();
+  await dialog.getByRole("button", { name: "Check connector reads", exact: true }).click();
+  await expect(dialog.getByText(/getConfiguration: passed/)).toBeVisible();
+  await expect(dialog.getByText(/getShieldedAddresses: passed/)).toBeVisible();
+  await expect(dialog.getByText(/getUnshieldedAddress: passed/)).toBeVisible();
+  await expect(dialog.getByText(/getConnectionStatus: failed/)).toContainText("Connector returned Request failed (code -32603)");
+  await expect(dialog.getByRole("button", { name: "Check connector reads", exact: true })).toBeEnabled();
+  await expect(dialog).not.toContainText("private-diagnostic-control");
+  await expect(dialog).not.toContainText("provider.invalid");
+  await dialog.getByRole("button", { name: "Close", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Open your organization.", exact: true })).toBeVisible();
+  await expect(page.getByText("Organization vault unlocked", { exact: true })).toHaveCount(0);
+  expect(await page.evaluate(() => ({ proof: (window as any).organizationProofRequests, signatures: (window as any).organizationSignatures }))).toEqual({ proof: 0, signatures: 0 });
+});
+
+test("failed session verification remains diagnosable without publishing a wallet connection", async ({ page }) => {
+  await wallets(page, true);
+  await page.addInitScript(() => {
+    for (const wallet of Object.values((window as any).midnight) as any[]) {
+      const connect = wallet.connect;
+      wallet.connect = async () => {
+        const api = await connect(); api.getConnectionStatus = async () => { throw { code: -32603, message: "Request failed" }; }; return api;
+      };
+    }
+  });
+  await page.goto("/app");
+  await page.locator("header").getByRole("button", { name: "Connect wallet", exact: true }).click();
+  await page.getByRole("button", { name: "Organization wallet a", exact: true }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.getByRole("alert")).toContainText("Request failed");
+  await dialog.getByText("Connection diagnostics", { exact: true }).click();
+  await dialog.getByRole("button", { name: "Check connector reads", exact: true }).click();
+  await expect(dialog.getByText(/getConnectionStatus: failed/)).toContainText("code -32603");
+  await expect(dialog.getByText(/getConfiguration: passed/)).toBeVisible();
+  await expect(dialog.getByRole("heading", { name: "Connect your wallet.", exact: true })).toBeVisible();
+  await dialog.getByRole("button", { name: "Close", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Start with your wallet.", exact: true })).toBeVisible();
+  expect(await page.evaluate(() => ({ proof: (window as any).organizationProofRequests, signatures: (window as any).organizationSignatures }))).toEqual({ proof: 0, signatures: 0 });
+});
+
 test("real product routes require a wallet and expose no operator or simulator shortcuts", async ({ page }) => {
   test.setTimeout(120_000);
   const posts: string[] = [], errors: string[] = [];

@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, mock, test } from "node:test";
 import assert from "node:assert/strict";
 import { cancelWalletConnection, connectWallet, disconnectWallet, getAvailableWallets, getConnectedWallet, getConnectedWalletAccount, getWalletAccount } from "../src/lib/runtime/wallet.ts";
+import { diagnoseWalletReads } from "../src/lib/runtime/wallet-diagnostics.ts";
+import { bech32m } from "@scure/base";
 
 const originalWindow = Object.getOwnPropertyDescriptor(globalThis, "window");
 const flush = async () => { for (let i = 0; i < 20; i++) await Promise.resolve(); };
@@ -20,6 +22,12 @@ function inject(connect) {
   Object.defineProperty(globalThis, "window", { configurable: true, value: {
     midnight: { lace: { name: "Lace", rdns: "lace", apiVersion: "4.0.1", connect } },
   } });
+}
+function diagnosticWallet(patch = {}) {
+  return { ...connected(), getShieldedAddresses: async () => ({
+    shieldedCoinPublicKey: bech32m.encodeFromBytes("mn_shield-cpk_preprod", new Uint8Array(32).fill(11)),
+    shieldedEncryptionPublicKey: bech32m.encodeFromBytes("mn_shield-epk_preprod", new Uint8Array(32).fill(12)),
+  }), ...patch };
 }
 beforeEach(async () => { await disconnectWallet(); mock.timers.enable({ apis: ["setTimeout"] }); });
 afterEach(async () => {
@@ -182,4 +190,61 @@ test("locked errors identify the selected alternative wallet", async () => {
     "1am-uuid": { name: "1AM", rdns: "xyz.1am", apiVersion: "4.0.1", connect: async () => { throw { reason: "Wallet is locked" }; } },
   } } });
   await assert.rejects(connectWallet("1am-uuid"), /1AM is locked/);
+});
+
+test("connector diagnostics distinguish a failing live session read from healthy configuration and identities without retrying", async () => {
+  let sessions = 0, payments = 0;
+  const wallet = diagnosticWallet({ getConnectionStatus: async () => { sessions++; throw { code: 429, message: "Rate limited" }; }, balanceUnsealedTransaction: () => { payments++; }, submitTransaction: () => { payments++; }, signData: () => { payments++; } });
+  const reported = [];
+  const results = await diagnoseWalletReads(wallet, "test-receiving-address", () => true, result => reported.push(result), { pauseMs: 0 });
+  assert.deepEqual(results.map(row => row.outcome), ["passed", "passed", "passed", "failed"]);
+  assert.deepEqual(results.map(row => row.method), ["getConfiguration", "getShieldedAddresses", "getUnshieldedAddress", "getConnectionStatus"]);
+  assert.deepEqual(results, reported); assert.equal(sessions, 1); assert.equal(payments, 0);
+  assert.equal(results[3].detail, "Connector rate limit"); assert.equal(results[3].code, "429");
+  assert(!JSON.stringify(results).includes("test-receiving-address"));
+});
+
+test("a failed connection exposes only explicit read-only diagnostics and never publishes a connected API", async () => {
+  const wallet = diagnosticWallet({ getConnectionStatus: async () => { throw { code: -32603, message: "Request failed" }; } });
+  inject(async () => wallet);
+  let target;
+  await assert.rejects(connectWallet("lace", "preprod", () => {}, value => { target = value; }), /Request failed/);
+  assert.equal(getConnectedWallet(), null); assert.equal(getConnectedWalletAccount(), null);
+  assert.deepEqual(Object.keys(target.reads).sort(), ["getConfiguration", "getConnectionStatus", "getShieldedAddresses", "getUnshieldedAddress"].sort());
+  const results = await diagnoseWalletReads(target.reads, target.address, () => true, () => {}, { pauseMs: 0 });
+  assert.deepEqual(results.map(row => row.outcome), ["passed", "passed", "passed", "failed"]);
+  assert.equal(getConnectedWallet(), null);
+});
+
+test("connector diagnostics redact service credentials, arbitrary wallet messages and public identity bytes", async () => {
+  const secretControl = "redaction-control-sensitive";
+  const wallet = diagnosticWallet({ getConfiguration: async () => { throw { code: secretControl, message: `https://provider.invalid/?token=${secretControl}` }; } });
+  const results = await diagnoseWalletReads(wallet, "test-receiving-address", () => true, () => {}, { pauseMs: 0 });
+  assert.equal(results[0].outcome, "failed"); assert.equal(results[0].detail, "Connector read failed");
+  const rendered = JSON.stringify(results);
+  for (const value of [secretControl, "provider.invalid", "mn_shield", "test-receiving-address"]) assert(!rendered.includes(value));
+});
+
+test("a timed-out diagnostic stops and a late reply cannot start another probe", async () => {
+  const request = deferred(); let identities = 0;
+  const wallet = diagnosticWallet({ getConfiguration: () => request.promise, getShieldedAddresses: async () => { identities++; } });
+  const reported = [], work = diagnoseWalletReads(wallet, "test-receiving-address", () => true, row => reported.push(row), { timeoutMs: 10, pauseMs: 0 });
+  await flush(); mock.timers.tick(11); await flush();
+  const results = await work; assert.equal(results.length, 1); assert.equal(results[0].outcome, "timed out");
+  request.resolve({ networkId: "preprod" }); await flush();
+  assert.equal(identities, 0); assert.equal(reported.length, 1);
+});
+
+test("a wallet change discards diagnostic replies before publication or subsequent reads", async () => {
+  const request = deferred(); let current = true, published = 0, identities = 0;
+  const wallet = diagnosticWallet({ getConfiguration: () => request.promise, getShieldedAddresses: async () => { identities++; } });
+  const work = diagnoseWalletReads(wallet, "test-receiving-address", () => current, () => { published++; }, { pauseMs: 0 });
+  await flush(); current = false; request.resolve({ networkId: "preprod" });
+  await assert.rejects(work, /connection changed/); assert.equal(published, 0); assert.equal(identities, 0);
+});
+
+test("diagnostics report network, recipient and disconnected-session mismatches as failures", async () => {
+  const wallet = diagnosticWallet({ getConfiguration: async () => ({ networkId: "mainnet" }), getUnshieldedAddress: async () => ({ unshieldedAddress: "different" }), getConnectionStatus: async () => ({ status: "disconnected", networkId: "preprod" }) });
+  const results = await diagnoseWalletReads(wallet, "test-receiving-address", () => true, () => {}, { pauseMs: 0 });
+  assert.deepEqual(results.map(row => row.outcome), ["failed", "passed", "failed", "failed"]);
 });
