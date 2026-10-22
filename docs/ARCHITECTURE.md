@@ -86,10 +86,24 @@ record, including any pending operation. It requires the unlocked vault session
 but remains available when the wallet's remote read API fails. Export rechecks
 session validity after encryption; restore and mutations still verify the wallet.
 
-Organization vault sessions last twelve hours per unlock, allowing multi-step
-wallet workflows to finish without the previous fifteen-minute cutoff. The
-passphrase stays in tab memory; manual locking, wallet disconnect/account changes
-and tab reload still end the session. Other consoles retain their existing timeout.
+Organization vault sessions last twelve hours per unlock. The selected wallet's
+public provider/account identifiers are remembered in sessionStorage; refresh
+reconnects that provider, verifies Preprod and rejects a changed receiving account.
+One explicit transient connector failure may retry once during connection or
+configuration reads. Permission rejection, cancellation and signing/submission
+never enter this retry path.
+
+A same-origin SharedWorker holds the organization passphrase and previously
+verified configuration in memory across same-tab refreshes. Only a random resume
+ticket is stored in sessionStorage. A document-lifetime browser lock excludes
+duplicated tabs. Resume rereads the live Preprod session and both identities,
+checks their original bindings and reloads the encrypted journal under its account
+lock. It retains the original absolute expiry instead of starting another twelve
+hours, and never recreates a missing record. Manual lock, disconnect or account
+change revokes restoration. Browser restart or loss of the memory holder requires
+the password again; unsupported browsers keep the vault locked after refresh.
+No passphrase or private key is written to browser storage. Other consoles retain
+their existing timeout.
 
 Wallet identity probes are sequential. Unlock reads and validates service
 configuration once, keeping a frozen copy only in the account's memory. Later

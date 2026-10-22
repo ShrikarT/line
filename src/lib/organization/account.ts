@@ -7,6 +7,7 @@ import { decodeOrganizationBackup, isOrganizationEmpty } from "./backup.ts";
 import { OrganizationTimeoutError, withinDeadline } from "./finality.ts";
 import { ORGANIZATION_SESSION_MINUTES } from "./session-policy.ts";
 import { EXPIRED_OPENING, type ExpiredOpeningEvidence } from "./expired-opening-policy.ts";
+import { rememberOrganizationTabSession, forgetOrganizationTabSession, type OrganizationTabSession } from "./tab-session.ts";
 
 function rateLimited(failure: unknown): boolean {
   if (!failure || typeof failure !== "object") return typeof failure === "string" && /rate[\s_-]*limit|too many requests/i.test(failure);
@@ -115,29 +116,38 @@ export class OrganizationAccount {
     this.wallet = wallet; this.accountId = accountId; this.receivingAddress = receivingAddress; this.revision = revision; this.record = record;
     this.configuration = Object.freeze(structuredClone(configuration));
   }
-  static async unlock(wallet: ConnectedAPI, passphrase: string): Promise<OrganizationAccount> {
+  static async unlock(wallet: ConnectedAPI, passphrase: string, restored?: OrganizationTabSession): Promise<OrganizationAccount> {
     if (wallet !== getConnectedWallet()) throw new Error("Connect your wallet before opening an organization.");
     if (passphrase.length < 8) throw new Error("Use at least eight characters for the organization vault password.");
     const { configuration, shielded, receiving: unshielded } = await readOrganizationWallet(wallet, 25_000, () => {
       if (wallet !== getConnectedWallet()) throw new Error("Wallet changed while opening the organization.");
-    });
+    }, restored?.configuration);
     const accountId = decodeWalletPublicKey(shielded.shieldedCoinPublicKey, "shield-cpk", "preprod");
     receivingAddressBytes(unshielded.unshieldedAddress);
+    if (restored && (restored.accountId !== accountId || restored.receivingAddress !== unshielded.unshieldedAddress || restored.expiresAt <= Date.now())) { forgetOrganizationTabSession(); throw new Error("The saved tab session no longer matches this wallet. Open the selected account’s own vault."); }
     // Authenticate existing ciphertext before replacing any open vault session.
     const key = organizationAccountKey("preprod", accountId);
     if (!navigator.locks) throw new Error("Use a browser with account-lock support to protect organization transactions.");
     return navigator.locks.request(key, { mode: "exclusive", ifAvailable: true }, async lock => {
     if (!lock) throw new Error("This organization is busy in another tab.");
     const retained = await loadEncryptedJson<OrganizationRecord>(key, passphrase);
+    if (restored && !retained) { forgetOrganizationTabSession(); throw new Error("The saved organization record is unavailable. Open the vault explicitly before creating any records."); }
     if (wallet !== getConnectedWallet()) throw new Error("Wallet changed while opening the organization.");
     if (retained && (retained.snapshot?.schema !== ORGANIZATION_SCHEMA || retained.snapshot.accountId !== accountId || retained.snapshot.networkId !== "preprod")) throw new Error("Organization record belongs to another wallet or schema.");
-    unlockVaultSession(passphrase, ORGANIZATION_SESSION_MINUTES);
+    if (restored && restored.expiresAt <= Date.now()) throw new Error("The organization session expired. Enter its password again.");
+    unlockVaultSession(passphrase, ORGANIZATION_SESSION_MINUTES, restored?.expiresAt);
     const account = new OrganizationAccount(wallet, accountId, unshielded.unshieldedAddress, getVaultSessionRevision(), retained ?? {
       snapshot: { schema: ORGANIZATION_SCHEMA, networkId: "preprod", accountId, issuerSecret: toHex(randomBytes32()), merchantSecret: toHex(randomBytes32()), facilities: [], quotes: [], notes: [], receipts: [] }, pending: null,
     }, configuration);
     if (!retained) await account.save();
+    await account.retainSessionForReload();
     return account;
     });
+  }
+  async retainSessionForReload() {
+    this.assertSession();
+    await rememberOrganizationTabSession(this.accountId, this.receivingAddress, this.configuration);
+    this.assertSession();
   }
   assertSession = () => {
     if (this.wallet !== getConnectedWallet() || !isVaultSessionUnlocked() || getVaultSessionRevision() !== this.revision) throw new Error("Organization session changed. Reconnect and unlock your wallet’s organization vault.");

@@ -2,7 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { mkdir } from "node:fs/promises";
 
 const address = "mn_addr_preprod1vflat69hjj5n2m8ftfwwspp2vssf7ckjay22qcp8p9lxedv4hgjszhshk3";
-async function injectWallet(page: Page, behavior: "success" | "reject-once" | "wrong-network" | "closed-channel" = "success") {
+async function injectWallet(page: Page, behavior: "success" | "reject-once" | "transient-once" | "wrong-network" | "closed-channel" = "success") {
   await page.addInitScript(({ address, behavior }) => {
     let attempts = 0;
     const testWindow = window as unknown as { midnight: unknown; walletCalls: string[] };
@@ -15,9 +15,10 @@ async function injectWallet(page: Page, behavior: "success" | "reject-once" | "w
           testWindow.walletCalls.push(`connect:${network}`);
           if (behavior === "closed-channel") throw new Error("Remote API with channel 'feature-flags' was shutdown: object can no longer be used.");
           if (behavior === "reject-once" && ++attempts === 1) throw new Error("User rejected connection");
+          if (behavior === "transient-once" && ++attempts === 1) throw { code: "InternalError", message: "Request failed" };
           return {
             getConfiguration: async () => ({ networkId: behavior === "wrong-network" ? "preview" : network }),
-            getUnshieldedAddress: async () => ({ unshieldedAddress: address }),
+            getUnshieldedAddress: async () => ({ unshieldedAddress: sessionStorage.getItem("test-receiving-account") ?? address }),
             getConnectionStatus: async () => ({ status: "connected", networkId: network }),
             getShieldedAddresses: async () => ({}),
             balanceUnsealedTransaction: async () => { testWindow.walletCalls.push("balance"); throw new Error("Must never balance during onboarding"); },
@@ -91,6 +92,43 @@ test("rejected connection can be retried", async ({ page }) => {
   await page.getByRole("button", { name: "Midnight Lace", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Your wallet is connected." })).toBeVisible();
   await expect(page.getByRole("alert")).toHaveCount(0);
+});
+
+test("one click connects after a transient failure without a second click or payment request", async ({ page }) => {
+  await injectWallet(page, "transient-once"); await page.goto("/app");
+  await page.getByRole("banner").getByRole("button", { name: "Connect wallet", exact: true }).click();
+  await page.getByRole("button", { name: "Midnight Lace", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Your wallet is connected.", exact: true })).toBeVisible();
+  expect(await page.evaluate(() => (window as any).walletCalls)).toEqual(["connect:preprod", "connect:preprod"]);
+});
+
+test("refresh restores the selected wallet without another click and disconnect prevents restoration", async ({ page }) => {
+  await injectWallet(page); await page.goto("/app");
+  await page.getByRole("banner").getByRole("button", { name: "Connect wallet", exact: true }).click();
+  await page.getByRole("button", { name: "Midnight Lace", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Your wallet is connected.", exact: true })).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole("banner").getByRole("button", { name: "Manage connected wallet", exact: true })).toBeVisible();
+  expect(await page.evaluate(() => (window as any).walletCalls)).toEqual(["connect:preprod"]);
+  await page.getByRole("banner").getByRole("button", { name: "Manage connected wallet", exact: true }).click();
+  await page.getByRole("button", { name: "Disconnect from Line", exact: true }).click();
+  await page.reload();
+  await expect(page.getByRole("banner").getByRole("button", { name: "Connect wallet", exact: true })).toBeVisible();
+  expect(await page.evaluate(() => (window as any).walletCalls)).toEqual([]);
+});
+
+test("wallet restoration waits for delayed extension injection and refuses a changed receiving account", async ({ page }) => {
+  await injectWallet(page); await page.goto("/app");
+  await page.getByRole("banner").getByRole("button", { name: "Connect wallet", exact: true }).click();
+  await page.getByRole("button", { name: "Midnight Lace", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Your wallet is connected.", exact: true })).toBeVisible();
+  await page.addInitScript(() => { const wallet = (window as any).midnight; delete (window as any).midnight; setTimeout(() => { (window as any).midnight = wallet; }, 1000); });
+  await page.reload();
+  await expect(page.getByRole("banner").getByRole("button", { name: "Manage connected wallet", exact: true })).toBeVisible();
+  await page.evaluate(() => sessionStorage.setItem("test-receiving-account", "different-receiving-account"));
+  await page.reload();
+  await expect(page.getByRole("banner").getByRole("button", { name: "Connect wallet", exact: true })).toBeVisible();
+  expect(await page.evaluate(() => sessionStorage.getItem("line:wallet-connection:v1"))).toBeNull();
 });
 
 test("wrong network never displays a connected account", async ({ page }) => {

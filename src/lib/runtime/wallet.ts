@@ -10,6 +10,8 @@ import { bech32m } from "@scure/base";
 import { hexToBytes, toHex } from "../bytes.ts";
 import { WalletNotConnectedError, WalletApprovalRejectedError, walletConnectorCode } from "./errors.ts";
 import { lockVaultSession } from "../security/vault.ts";
+import { forgetOrganizationTabSession } from "../organization/tab-session.ts";
+import { rememberedWallet, rememberWallet, forgetWallet, type RememberedWallet } from "./wallet-session.ts";
 
 export interface WalletInfo {
   id: string;
@@ -36,6 +38,8 @@ let activeConnectedApi: ConnectedAPI | null = null;
 let activeWalletInfo: WalletInfo | null = null;
 let activeWalletAccount: WalletAccount | null = null;
 let pendingConnection: AbortController | null = null;
+let restoreAttempt: AbortController | null = null;
+let restoring: Promise<ConnectedAPI | null> | null = null;
 const walletListeners = new Set<() => void>();
 
 /** A cancelled extension prompt may still answer later; it must never own a session. */
@@ -63,10 +67,46 @@ function walletResponse<T>(request: () => Promise<T>, milliseconds: number, mess
 }
 
 export function cancelWalletConnection(): void {
+  restoreAttempt?.abort();
+  forgetWallet();
   const pending = pendingConnection;
   pendingConnection = null;
   pending?.abort();
 }
+
+function transientConnectionFailure(error: unknown): boolean {
+  const code = walletConnectorCode(error);
+  const message = error && typeof error === "object" && "message" in error ? String(error.message) : typeof error === "string" ? error : "";
+  return code === "429" || (code === undefined || code === "InternalError" || code === "-32603") && /^request failed[.!]?$/i.test(message.trim());
+}
+async function connectionRead<T>(request: () => Promise<T>, signal: AbortSignal): Promise<T> {
+  try { return await request(); }
+  catch (failure) {
+    if (signal.aborted || !transientConnectionFailure(failure)) throw failure;
+    await walletResponse(() => new Promise<void>(resolve => setTimeout(resolve, 750)), 2000, "Wallet connection retry timed out.", signal);
+    if (signal.aborted) throw cancelledConnection();
+    return request(); // One retry, only for connection/configuration reads.
+  }
+}
+
+export function restoreWalletConnection(report: (phase: WalletConnectionPhase) => void = () => {}): Promise<ConnectedAPI | null> {
+  if (restoring) return restoring;
+  const saved = rememberedWallet();
+  if (!saved) return Promise.resolve(null);
+  const attempt = new AbortController(); restoreAttempt = attempt;
+  restoring = (async () => {
+    for (let i = 0; i < 80; i++) {
+      if (attempt.signal.aborted) return null;
+      const matches = getAvailableWallets().filter(wallet => wallet.isAvailable && wallet.rdns === saved.rdns);
+      const selected = matches.find(wallet => wallet.id === saved.id) ?? (matches.length === 1 ? matches[0] : undefined);
+      if (selected) return connectWallet(selected.id, "preprod", report, undefined, saved);
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    return null;
+  })().finally(() => { if (restoreAttempt === attempt) restoreAttempt = null; restoring = null; });
+  return restoring;
+}
+export { rememberedWallet } from "./wallet-session.ts";
 
 /** Keep the shared account control in sync with advanced network setup. */
 export function subscribeWallet(listener: () => void): () => void {
@@ -178,6 +218,7 @@ export function getActiveWalletInfo(): WalletInfo | null {
 
 export async function disconnectWallet(): Promise<void> {
   cancelWalletConnection();
+  forgetWallet(); forgetOrganizationTabSession();
   lockVaultSession();
   activeConnectedApi = null;
   activeWalletInfo = null;
@@ -190,6 +231,7 @@ export async function connectWallet(
   networkId: string = "preprod",
   report: (phase: WalletConnectionPhase) => void = () => {},
   diagnostic?: (target: WalletDiagnosticTarget) => void,
+  restore?: RememberedWallet,
 ): Promise<ConnectedAPI> {
   if (typeof window === "undefined") {
     throw new WalletNotConnectedError("Browser window environment is required for wallet connection.");
@@ -221,7 +263,8 @@ export async function connectWallet(
     throw new WalletNotConnectedError("Wallet must implement Midnight DApp Connector API v4.");
   }
 
-  cancelWalletConnection();
+  if (restore) { const pending = pendingConnection; pendingConnection = null; pending?.abort(); }
+  else { cancelWalletConnection(); forgetWallet(); forgetOrganizationTabSession(); }
   const attempt = new AbortController();
   pendingConnection = attempt;
   try {
@@ -233,8 +276,8 @@ export async function connectWallet(
     activeWalletAccount = null;
     notifyWalletChanged();
     report("requesting-access");
-    const connectedApi = await walletResponse(() => targetWallet.connect(networkId), 90_000,
-      "Wallet connection timed out. Unlock your wallet, select the requested network, close any old connection prompt and try again.", attempt.signal);
+    const connectedApi = await connectionRead(() => walletResponse(() => targetWallet.connect(networkId), 90_000,
+      "Wallet connection timed out. Unlock your wallet, select the requested network, close any old connection prompt and try again.", attempt.signal), attempt.signal);
     if (!connectedApi) {
       throw new WalletNotConnectedError("Wallet connect resolved with empty API instance.");
     }
@@ -250,7 +293,7 @@ export async function connectWallet(
     };
     diagnostic?.({ address: null, reads });
     report("verifying-network");
-    await getWalletConfiguration(connectedApi, networkId, attempt.signal);
+    await connectionRead(() => getWalletConfiguration(connectedApi, networkId, attempt.signal), attempt.signal);
     report("reading-address");
     const address = await readWalletAddress(connectedApi, attempt.signal);
     if (typeof connectedApi.getConnectionStatus !== "function") throw new WalletNotConnectedError("Wallet does not implement connector v4 capability: getConnectionStatus.");
@@ -264,6 +307,11 @@ export async function connectWallet(
     }
     if (attempt.signal.aborted || pendingConnection !== attempt) throw cancelledConnection();
 
+    if (restore && (address !== restore.address || (targetWallet.rdns ?? walletKey) !== restore.rdns || networkId !== restore.network)) {
+      forgetWallet(); forgetOrganizationTabSession();
+      throw new WalletNotConnectedError("The wallet account changed. Connect the selected account and open its own organization vault.");
+    }
+
     activeConnectedApi = connectedApi;
     activeWalletAccount = { address, network: networkId };
     activeWalletInfo = {
@@ -274,6 +322,7 @@ export async function connectWallet(
       apiVersion: targetWallet.apiVersion,
       isAvailable: true,
     };
+    rememberWallet({ id: walletKey, rdns: activeWalletInfo.rdns, address, network: "preprod" });
     pendingConnection = null;
     notifyWalletChanged();
 

@@ -38,8 +38,16 @@ They are scoped to the connected Preprod wallet. Pending candidates remain
 encrypted until finalized receipts authorize publication. An uncertain transaction
 is reconciled by its original identity before another mutation is admitted.
 The organization vault stays unlocked for up to twelve hours in the current tab,
-as shown in the workspace. Its passphrase is held only in memory; manual locking,
-wallet disconnect/account changes and reloading the tab end that session.
+including normal refreshes. Its passphrase stays in a same-origin SharedWorker's
+memory, with only a random resume ticket and public wallet selection in
+sessionStorage. Restoration verifies the live Preprod network and both wallet
+identities before loading encrypted records; it does not renew the expiry.
+Duplicated tabs cannot claim the original tab's browser lock. Manual locking,
+disconnect and account changes revoke restoration. Browser restart, unavailable
+worker support or loss of that memory require another password entry. Neither
+the password nor private keys are written to localStorage, sessionStorage or
+IndexedDB by the session holder. Same-origin script compromise remains a threat
+while an organization is unlocked, including during its refresh grace period.
 Encrypted backup export requires the unlocked organization session and account
 lock, while remaining available during a wallet API outage. It does not reveal
 the backup plaintext or authorize a transaction. Restore and financial operations
