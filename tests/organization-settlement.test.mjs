@@ -8,6 +8,8 @@ import { blankPrivate, WITNESSES } from '../src/lib/line/compact-harness.ts';
 import { issuerPublicKey, merchantPublicKey, agentId, quoteCommit, pad32, toHex } from '../src/lib/line/encoding.ts';
 import { validateContractArtifacts } from '../scripts/contract-artifacts.mjs';
 import { matchesRestoredNotes } from '../src/lib/organization/recovery.ts';
+import { inspectMerchantClaim } from '../src/lib/organization/claims.ts';
+import { bech32m } from '@scure/base';
 
 const issuer = pad32('settlement-test-issuer');
 const agent = pad32('settlement-test-agent');
@@ -88,6 +90,55 @@ function payout(effects, recipient, amount) {
   assert.deepEqual(spends[0][0][1], { tag: 'user', address: R.decodeUserAddress(recipient.bytes) });
   assert.equal(spends[0][1], amount);
 }
+
+function claimPackage(f, claim) {
+  const meta = f.read().notes.lookup(claim.args[0]);
+  return { contractAddress: address, domain: toHex(f.read().contractDomain), identity: toHex(claim.ps.noteIdentity), merchantPk: toHex(merchantPublicKey(claim.ps.callerSecret)), quoteCommitment: toHex(claim.ps.noteQuoteCommit), amount: meta.amount, fee: meta.fee, expiry: meta.expiry, generation: meta.lineGeneration, noteNonce: toHex(claim.ps.noteNonce), noteSalt: toHex(claim.ps.noteSalt), noteCommitment: toHex(claim.args[0]), redeemed: false };
+}
+const receiving = recipient => bech32m.encodeFromBytes('mn_addr_preprod', recipient.bytes);
+
+test('merchant review binds generated claim amounts, fees, settlement asset and exact receiving wallet', () => {
+  const f = fixture(2n, 250n), claim = f.draw(merchantA, 25n), note = claimPackage(f, claim);
+  const review = inspectMerchantClaim(f.read(), note, note.merchantPk, receiving(addressA));
+  assert.deepEqual(review, { contractAddress: address, noteCommitment: note.noteCommitment, assetColor: toHex(f.read().settlementTokenColor), receivingAddress: receiving(addressA), amount: 25n, fee: 3n, expiry, generation: 1n, status: 'unspent' });
+  assert.throws(() => inspectMerchantClaim(f.read(), note, note.merchantPk, receiving(addressB)), /another receiving address/);
+  assert.throws(() => inspectMerchantClaim(f.read(), note, toHex(merchantPublicKey(merchantB)), receiving(addressA)), /another merchant/);
+  assert.throws(() => inspectMerchantClaim(f.read(), { ...note, domain: 'ab'.repeat(32) }, note.merchantPk, receiving(addressA)), /another merchant or facility/);
+  for (const patch of [{ amount: 24n }, { fee: 0n }, { generation: 2n }, { expiry: expiry + 1n }, { noteSalt: 'ab'.repeat(32) }, { identity: 'ab'.repeat(32) }, { quoteCommitment: 'ab'.repeat(32) }]) {
+    assert.throws(() => inspectMerchantClaim(f.read(), { ...note, ...patch }, note.merchantPk, receiving(addressA)), /opening does not match/);
+  }
+  assert.equal(f.balance(), 200n);
+});
+
+test('merchant review rejects missing claims and disagreement with public note metadata', () => {
+  const f = fixture(), claim = f.draw(merchantA, 25n), note = claimPackage(f, claim), book = f.read();
+  assert.throws(() => inspectMerchantClaim({ ...book, notes: { member: () => false } }, note, note.merchantPk, receiving(addressA)), /not found/);
+  const meta = book.notes.lookup(claim.args[0]);
+  for (const patch of [{ amount: 24n }, { fee: 1n }, { expiry: expiry + 1n }, { lineGeneration: 2n }]) {
+    assert.throws(() => inspectMerchantClaim({ ...book, notes: { member: () => true, lookup: () => ({ ...meta, ...patch }) } }, note, note.merchantPk, receiving(addressA)), /terms differ/);
+  }
+  assert.throws(() => inspectMerchantClaim({ ...book, merchantPayoutRecipients: { member: () => false } }, note, note.merchantPk, receiving(addressA)), /another receiving address/);
+});
+
+test('merchant review observes redemption and permissionless expiry without trusting package status flags', () => {
+  const f = fixture(), a = f.draw(merchantA, 25n), b = f.draw(merchantB, 20n);
+  const first = claimPackage(f, a), second = claimPackage(f, b);
+  f.call('redeemDraw', a.args, a.ps);
+  assert.equal(inspectMerchantClaim(f.read(), first, first.merchantPk, receiving(addressA)).status, 'redeemed');
+  f.time(10001); f.call('cancelOrExpireNote', [b.args[0], 0n, 20000n]);
+  assert.equal(inspectMerchantClaim(f.read(), second, second.merchantPk, receiving(addressB)).status, 'cancelled');
+});
+
+test('merchant review preserves an older valid claim after disabling, closing and reopening the allowance', () => {
+  const f = fixture(), claim = f.draw(merchantA, 25n), note = claimPackage(f, claim);
+  f.call('disableMerchant', [merchantPublicKey(merchantA)]);
+  f.replenish(25n); f.call('setStatus', [3]);
+  assert.equal(inspectMerchantClaim(f.read(), note, note.merchantPk, receiving(addressA)).status, 'unspent');
+  f.call('openLine', [20000n, 0n, 0n], { salt: pad32('replacement-book') });
+  assert.equal(f.read().lineGeneration, 2n);
+  assert.equal(inspectMerchantClaim(f.read(), note, note.merchantPk, receiving(addressA)).generation, 1n);
+  payout(f.call('redeemDraw', claim.args, claim.ps), addressA, 25n);
+});
 
 test('organization spending retains exactly twelve circuit names', () => {
   const f = fixture();

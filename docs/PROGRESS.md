@@ -1,6 +1,6 @@
 # Wave progress
 
-Updated 21 October 2026. Line is a Midnight Preprod prototype for
+Updated 22 October 2026. Line is a Midnight Preprod prototype for
 organization-funded agent purchases. Production credit, complete historical
 privacy and independent commercial custody are not established.
 
@@ -10,12 +10,12 @@ privacy and independent commercial custody are not established.
 | --- | --- |
 | Public application | [line-midnight.onrender.com](https://line-midnight.onrender.com/app), free wallet-only hosting; no hosted supplier signing wallet or automated supplier |
 | Product release | `0e2c112`, live Render deployment `dep-dbcfgmmktt5c73f9psg0` at 17:38 UTC on 21 October. Entry, merchant/workspace JavaScript, stylesheet and proving manifest match the tested local build byte for byte; readiness returns HTTP 200 in wallet-only mode. Public deployment checks connected no wallet and submitted no transactions |
-| Local verification | Expired-opening recovery: 676 of 677 core tests passed, one skipped, zero failures; typecheck, production build, 37 proving-file export, key/secret scans and zero managed-binding drift passed |
-| Browser verification | All 35 organization cases passed, including three saved-quote regressions covering lost acknowledgements, exact success/failure reconciliation, vault reopening, encrypted backup, pagination and mobile export. Existing stale-review, wallet-change, IndexedDB-abort and recovery-history cases also pass. These use synthetic candidates and controlled provider/receipt seams, not new network acceptance |
-| Saved quote verification | Typecheck, production build, 37-file public proving export, key/secret scans, 17 relevant unit tests and zero managed-binding drift passed. Live owner-wallet testing is deferred at the owner's request; the retained opening was not accessed or changed |
-| Full CI | Both [recovery `4bf0d1e`](https://github.com/ShrikarT/line/actions/runs/39636734538) and [documentation revision `69f480b`](https://github.com/ShrikarT/line/actions/runs/39638007972) passed all four jobs. The [saved-quote revision `0e2c112`](https://github.com/ShrikarT/line/actions/runs/39645433621) is in progress at publication; its local checks passed as listed above |
+| Local verification | Claim review: all 97 organization tests passed, including generated Compact settlement, recipient binding, tampering, spent/cancelled state and older-claim preservation. Typecheck, production build, 37 proving-file export, key/secret scans and zero managed-binding drift passed |
+| Browser verification | All 36 organization cases passed. Claim review covers package edits, changed state before redemption, missing claims, provider outages and mobile layout. Saved-quote, wallet isolation, IndexedDB-abort, encrypted backup/restore and expired-opening recovery regressions still pass. These use synthetic candidates and controlled provider/receipt seams, not new network acceptance |
+| Full CI | [Saved-quote revision `0e2c112`](https://github.com/ShrikarT/line/actions/runs/39645433621) passed all four jobs, including the complete browser suite |
 | Actual organization | Twelve verifier keys and 22 finalized workspace receipts. Last independently checked state: CLOSED, generation 1, 900,000 native-asset base units held, 1,000,000 reserve accounting, zero encumbrance and fees |
 | Active blocker | The original signed fee-bearing `openLine` remains saved and unresolved. The scoped recovery is live; the owner must unlock the existing vault, pass its local candidate check and confirm archival before another mutation. No replacement opening has been created |
+| Live testing | Owner-wallet connection and transaction testing remain deferred at the owner's request. The retained opening was not accessed or changed by the quote or claim-review work |
 | Wallet / backup | Latest encrypted backup confirmed saved. The owner reopened the existing organization on `ad9aafd`. An initial session-status rate limit recovered after a single cooldown refresh: the live treasury shows CLOSED, all twelve keys and 900,000 units held. Intermittent wallet rate limits remain |
 
 ## Wave 1 — foundation
@@ -55,6 +55,11 @@ not customer-funded settlement.
   appear; uncertain and failed candidates remain unavailable. The original
   package, fee preview and deadline survive without reposting a quote. Saved
   packages do not establish current availability or independent fulfillment.
+- Merchant claim review binds the imported opening, public note terms, asset
+  and registered receiving wallet before redemption. The SDK rereads state
+  before preparation, rejects spent/cancelled claims and preserves older valid
+  claims after disabling, closure and reopening. Observed unspent status does
+  not guarantee a payout; Compact checks expiry and custody at execution.
 - Contract engines load after vault opening. Local production initial resource
   bodies fell from 12.30 MB to 0.34–0.36 MB, with no earlier WASM request. This is
   downloaded-byte evidence, not a rendering-speed guarantee.
