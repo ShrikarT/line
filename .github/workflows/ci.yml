@@ -188,4 +188,4 @@ jobs:
       - name: Built application organization refresh and wallet outages
         env:
           PLAYWRIGHT_PREVIEW: "1"
-        run: npx playwright test e2e/organization-account.spec.ts --grep "built-page refresh|refresh keeps" --project chromium
+        run: npx playwright test e2e/organization-account.spec.ts --grep "built-page refresh|refresh keeps|do not reread configuration|retains its HTTP sign-in" --project chromium

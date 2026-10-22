@@ -10,8 +10,8 @@ privacy and independent commercial custody are not established.
 | --- | --- |
 | Public application | [line-midnight.onrender.com](https://line-midnight.onrender.com/app), free wallet-only hosting; no hosted supplier signing wallet or automated supplier |
 | Product release | `1efc8b4`, live Render deployment `dep-dbcvsegn74is73fnt050` at 12:16 UTC on 22 October. Entry asset and memory-holder script match the tested build; `/readyz` reports ready in wallet-only mode. No transaction was submitted by this release check |
-| Local verification | This correction: 44 wallet/vault tests and two built wallet-only host tests passed. Typecheck, production build, 37-file proving export, production key/secret scans and zero managed-contract drift passed. The prior release had 692 core passes and one skipped; a new full core run is delegated to CI |
-| Browser verification | 65 distinct organization, startup and wallet scenarios passed across broad/focused runs. The broad run caught two missing backup-completion messages; those were corrected and their reruns passed. Three production-preview checks also passed: normal refresh and wallet outages before/after vault decryption. CI now repeats these against built assets. Fixtures are controlled tests, not new network acceptance |
+| Local verification | This follow-up: 695 core tests passed, one skipped. After adding the clock-skew and missing-capability checks, all 14 affected auth/adapter tests passed again. Two built wallet-only host tests, typecheck, production build, 37-file proving export, production key/secret scans and zero managed-contract drift passed |
+| Browser verification | 67 distinct organization, startup and wallet scenarios passed across the broad/focused runs, including the two new duplicate-read and retained-cookie cases. The broad run caught two missing backup-completion messages; those were corrected and their reruns passed. All five current production-preview session checks passed, plus ten fresh browser checks covering exact pending bytes, recovery/backup preservation, rejected approvals, expiry and changed identities. CI now repeats these against built assets. Fixtures are controlled tests, not new network acceptance |
 | Full CI | Previous [connector release `78ca9e3`](https://github.com/ShrikarT/line/actions/runs/39725974958) passed. The [refresh/session release](https://github.com/ShrikarT/line/actions/runs/39756065676) failed two startup checks waiting for browser-wide network idle. Those now await the actual deferred unlock completing; both passed locally. The [new correction CI](https://github.com/ShrikarT/line/actions/runs/39776737263) is running; it is not yet confirmed |
 | Actual organization | Twelve verifier keys and 22 finalized workspace receipts. Last independently checked state: CLOSED, generation 1, 900,000 native-asset base units held, 1,000,000 reserve accounting, zero encumbrance and fees |
 | Active blocker | The original signed fee-bearing `openLine` remains pending. Its live owner-vault recovery review passed, but archival stopped on a fresh wallet-session failure before committing. The original bytes and candidate remain saved; no archive, failure receipt or replacement opening was created |
@@ -21,7 +21,12 @@ privacy and independent commercial custody are not established.
 Wallet-read failure during restoration now offers a retry using the retained
 absolute session deadline. Failure after decryption keeps the vault and encrypted
 backup available while transaction tools wait for fresh verification. A missing
-memory record is handled as locked, never as a successful restore.
+memory record is handled as locked, never as a successful restore. SDK setup now
+uses the fresh account identity guard instead of repeating configuration RPCs.
+A refreshed client can reuse its existing thirty-minute HttpOnly sign-in cookie
+after a server check for the selected wallet, without another signature or any
+extension of the cookie deadline. Service errors and stale locks cannot bypass
+that check.
 
 Wallet/organization refresh uses public wallet selection and a random tab ticket
 in sessionStorage. Passwords, verified configuration and the original absolute

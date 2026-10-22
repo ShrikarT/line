@@ -55,6 +55,10 @@ still require fresh wallet identity verification.
 Verified wallet service settings remain in session memory and are excluded from
 backups. Transaction boundaries check the live connection, Preprod network and
 both wallet identities; a failed live check cannot use cached settings to proceed.
+Server access uses a separate thirty-minute HttpOnly sign-in cookie. Refresh can
+reuse an unexpired cookie only after the server matches it to the selected
+receiving wallet; the check does not extend its deadline or send the vault
+password to the server.
 Keep a recoverable encrypted backup: browser-local storage is not institutional
 custody or a guarantee against device compromise.
 

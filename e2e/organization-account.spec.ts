@@ -94,6 +94,56 @@ test("built-page refresh restores the organization without development module im
   expect(await profile(page)).toEqual(before);
 });
 
+test("organization startup and refresh do not reread configuration after verifying the account", async ({ page }) => {
+  await wallets(page, true, true);
+  await page.addInitScript(() => {
+    const target = (window as any).midnight.a, original = target.connect;
+    target.connect = async (...args: any[]) => {
+      const api = await original(...args), configuration = api.getConfiguration;
+      (window as any).configurationReads = 0;
+      api.getConfiguration = async () => {
+        const allowed = sessionStorage.getItem("test-configuration-restoring") ? 1 : 2;
+        if (++(window as any).configurationReads > allowed) throw Error("Request failed");
+        return configuration();
+      };
+      return api;
+    };
+  });
+  await page.goto("/app"); await connect(page, "a");
+  await page.getByLabel("Organization vault password", { exact: true }).fill("Organization123!");
+  await page.getByRole("button", { name: "Open organization", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Create facility", exact: true })).toBeEnabled({ timeout: 8_000 });
+  expect(await page.evaluate(() => (window as any).configurationReads)).toBe(2);
+  await page.evaluate(() => sessionStorage.setItem("test-configuration-restoring", "yes"));
+  await page.reload();
+  await expect(page.getByRole("button", { name: "Create facility", exact: true })).toBeEnabled();
+  expect(await page.evaluate(() => (window as any).configurationReads)).toBe(1);
+  expect(await page.evaluate(() => ({ proofs: (window as any).organizationProofRequests, signatures: (window as any).organizationSignatures }))).toEqual({ proofs: 0, signatures: 0 });
+});
+
+test("organization refresh retains its HTTP sign-in without asking the wallet to sign again", async ({ page }) => {
+  await wallets(page, true, true);
+  await page.route("**/api/organization/catalog", route => route.fulfill({ json: { network: "preprod", services: [], walletAuthentication: "required", hostedSupplierAutomation: false } }));
+  const origin = test.info().project.use.baseURL as string;
+  await page.context().addCookies([{ name: "line_session", value: "fixture-http-only-session", url: origin, httpOnly: true, sameSite: "Strict" }]);
+  let resumed = 0;
+  await page.route("**/api/organization/auth/session", route => {
+    expect(route.request().headers().cookie).toContain("line_session=fixture-http-only-session");
+    expect(route.request().headers()["x-line-wallet"]).toBeTruthy();
+    resumed++;
+    return route.fulfill({ json: { authenticated: true, expiresAt: Date.now() + 25 * 60_000 } });
+  });
+  // This fixture implements no signData method. A redundant sign-in therefore
+  // prevents the actual network setup from completing instead of passing silently.
+  await page.goto("/app"); await connect(page, "a"); await unlock(page);
+  const before = await profile(page);
+  await page.reload();
+  await expect(page.getByRole("button", { name: "Create facility", exact: true })).toBeEnabled();
+  expect(await profile(page)).toEqual(before);
+  expect(resumed).toBe(2);
+  expect(await page.evaluate(() => ({ proofs: (window as any).organizationProofRequests, signatures: (window as any).organizationSignatures }))).toEqual({ proofs: 0, signatures: 0 });
+});
+
 for (const failedRead of [2, 3]) test(`refresh keeps the organization session when wallet status read ${failedRead} is rate limited`, async ({ page }) => {
   await wallets(page, true, true); await page.goto("/app"); await connect(page, "a"); await unlock(page);
   const before = await profile(page);

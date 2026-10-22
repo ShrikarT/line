@@ -50,6 +50,11 @@ export function organizationApi({ service, origin, auth = new OrganizationAuth(o
       if (req.method === 'POST' && path === '/api/organization/auth/logout') return send(200, { authenticated: false }, { 'Set-Cookie': auth.revoke(req.headers.cookie) });
       const session = auth.require(req.headers.cookie);
       if(req.headers['x-line-wallet'] && organizationRecipient(req.headers['x-line-wallet'])!==session.recipient)throw new OrganizationAuthError('Sign in with the selected organization wallet.');
+      if (req.method === 'GET' && path === '/api/organization/auth/session') {
+        if (typeof req.headers['x-line-wallet'] !== 'string') throw new OrganizationAuthError('Select the organization wallet before restoring its sign-in.');
+        // This read neither renews the cookie nor extends its server deadline.
+        return send(200, { authenticated: true, expiresAt: session.expiresAt });
+      }
       if ((path === '/api/organization/orders' || path.startsWith('/api/organization/orders/')) && service.capabilities?.hostedSupplierAutomation === false) throw new OrganizationAuthError('Hosted API checkout is unavailable here. Exchange quotes and claims directly with your merchant.', 503);
       const match = /^\/api\/organization\/orders\/([0-9a-f-]{36})(\/redeem)?$/.exec(path);
       if (req.method === 'GET' && match && !match[2]) {

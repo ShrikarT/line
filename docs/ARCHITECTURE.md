@@ -123,6 +123,20 @@ Only explicit rate-limit responses on these reads may retry within a bounded
 deadline; each retry checks session validity. Signing, proving and submission
 are outside that retry path.
 
+The SDK wallet adapter is constructed through that same live account guard, using
+its checked public keys and in-memory settings. It does not issue another
+configuration RPC after a successful account check or fall back after a rejected
+guard. Proof, balancing and submission boundaries retain their fresh checks.
+
+HTTP wallet sign-in has a separate thirty-minute server deadline. After refresh,
+the client first checks its existing HttpOnly cookie through the same-origin
+`GET /api/organization/auth/session`, with the selected receiving wallet header.
+The server requires an unexpired session for that exact wallet and returns only
+its original expiry. This read does not renew the cookie. Missing or rejected
+sessions use the existing nonce/signature flow; service failure or an invalid
+resume response cannot initiate a signature or supplier action. A wallet lock
+during that read prevents restoration from completing.
+
 The wallet dialog also provides explicit read-only connection diagnostics. It
 records the connection stage and probes configuration, shielded identities,
 receiving address and live session separately, without opening a vault. Failed
