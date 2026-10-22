@@ -9,14 +9,24 @@ privacy and independent commercial custody are not established.
 | Area | Verified state / limitation |
 | --- | --- |
 | Public application | [line-midnight.onrender.com](https://line-midnight.onrender.com/app), free wallet-only hosting; no hosted supplier signing wallet or automated supplier |
-| Product release | `c6dbe4a`, live Render deployment `dep-dbco7cuq1p3s73cotusg` at 03:33 UTC on 22 October. Entry, network/setup and merchant/workspace JavaScript, stylesheet and proving manifest match the tested local build byte for byte; readiness returns HTTP 200 in wallet-only mode. Public deployment checks connected no wallet and submitted no transactions |
+| Product release | `5c94dca`, live Render deployment `dep-dbcp9m5g1s2s73e2qq7g` at 04:46 UTC on 22 October. Entry asset matches the tested local build and wallet-dialog JavaScript matches byte for byte; `/readyz` reports ready in wallet-only mode. This deployment adds read-only connector diagnostics and submitted no transactions |
 | Local verification | Claim review: all 97 organization tests passed, including generated Compact settlement, recipient binding, tampering, spent/cancelled state and older-claim preservation. Typecheck, production build, 37 proving-file export, key/secret scans and zero managed-binding drift passed |
 | Browser verification | All 36 organization cases passed. Claim review covers package edits, changed state before redemption, missing claims, provider outages and mobile layout. Saved-quote, wallet isolation, IndexedDB-abort, encrypted backup/restore and expired-opening recovery regressions still pass. These use synthetic candidates and controlled provider/receipt seams, not new network acceptance |
 | Full CI | Both [saved-quote revision `0e2c112`](https://github.com/ShrikarT/line/actions/runs/39645433621) and [claim-review revision `c6dbe4a`](https://github.com/ShrikarT/line/actions/runs/39717343090) passed all four jobs, including the complete browser suite |
 | Actual organization | Twelve verifier keys and 22 finalized workspace receipts. Last independently checked state: CLOSED, generation 1, 900,000 native-asset base units held, 1,000,000 reserve accounting, zero encumbrance and fees |
 | Active blocker | The original signed fee-bearing `openLine` remains pending. Its live owner-vault recovery review passed, but archival stopped on a fresh wallet-session failure before committing. The original bytes and candidate remain saved; no archive, failure receipt or replacement opening was created |
 | Live testing | After reconnecting 1AM, the actual retained opening passed the scoped candidate/evidence review at finalized block 3,084,505 (22 October, 04:07:24.001 UTC), past its signed TTL of 20 October, 14:13:04 UTC. This is provider-backed nonapplication evidence, not a finalized failure receipt or new transaction acceptance |
-| Wallet / backup | Latest encrypted backup confirmed saved. The owner can connect and unlock, but later 1AM network-session reads intermittently report a rate limit, "Request failed" or no response from the wallet background script. Reconnection, cooldown and a Chrome restart have not yet enabled archival. Live network and both wallet-identity guards remain enforced |
+| Wallet / backup | Latest encrypted backup confirmed saved. Live diagnostics isolate a fresh failure at the standard `1AM.connect("preprod")` call, before configuration, session verification or vault access. The retained unlocked session separately fails `getConnectionStatus`. These observations concern the dApp connector, not the wallet interface or the owner's ability to use it. Live network and both wallet-identity guards remain enforced |
+
+Connector diagnostics passed 26 unit tests and four focused browser cases,
+covering early connection/configuration failure, session failure, timeout,
+wallet changes and redaction. Seven wallet-onboarding cases and the atomic
+expired-opening recovery case also passed. The final production build and
+37-file proving export passed with no managed-contract drift. The complete
+local core run passed 687 tests with one skipped and no failures. The latest
+[full CI run](https://github.com/ShrikarT/line/actions/runs/39724112974) is still
+running; prior claim-review CI remains green. Diagnostics cannot authorize
+recovery, promote a connected account or substitute for its live guards.
 
 ## Wave 1 — foundation
 
@@ -233,7 +243,7 @@ compiled-contract tests do not replace fresh network receipts.
 ## Wave 3 — pilots and hardening
 
 1. Reconcile the expired original allowance before starting another mutation.
-   The 1AM read path has recovered. Use exact finality or the narrowly scoped,
+   The dApp connector currently blocks the live guard. Use exact finality or the narrowly scoped,
    owner-reviewed recovery after its local candidate check succeeds. Do not
    discard bytes based on expiry, a missing receipt or a latest CLOSED snapshot.
 2. Complete fee-bearing and remaining twelve-action/compensation acceptance with
