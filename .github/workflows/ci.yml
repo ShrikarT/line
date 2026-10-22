@@ -184,3 +184,8 @@ jobs:
 
       - name: Browser checkout, custody and recovery tests
         run: npm run test:e2e
+
+      - name: Built application organization refresh and wallet outages
+        env:
+          PLAYWRIGHT_PREVIEW: "1"
+        run: npx playwright test e2e/organization-account.spec.ts --grep "built-page refresh|refresh keeps" --project chromium

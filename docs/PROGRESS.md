@@ -10,13 +10,18 @@ privacy and independent commercial custody are not established.
 | --- | --- |
 | Public application | [line-midnight.onrender.com](https://line-midnight.onrender.com/app), free wallet-only hosting; no hosted supplier signing wallet or automated supplier |
 | Product release | `3ccff2c`, live Render deployment `dep-dbctfrgm7kps73csu6l0` at 09:32 UTC on 22 October. Entry asset and memory-holder script match the tested build; `/readyz` reports ready in wallet-only mode. No transaction was submitted by this release check |
-| Local verification | Refresh/session fixes: 692 core tests passed, one skipped. Typecheck, production build, 37-file proving export, production key/secret scans and zero managed-contract drift passed |
-| Browser verification | 59 organization/wallet scenarios checked across the broad and focused runs. The initial broad run had 56 passes and one quote-test timeout; its separate rerun passed. New cases cover first-click recovery, refresh, unchanged signed candidates, fixed expiry, account changes, unavailable workers, fresh browser contexts, duplicated tabs and delayed revocation. Fixtures are controlled tests, not new network acceptance |
-| Full CI | Previous [connector release `78ca9e3`](https://github.com/ShrikarT/line/actions/runs/39725974958) passed. The [refresh/session release](https://github.com/ShrikarT/line/actions/runs/39756065676) is running; do not treat it as passed yet |
+| Local verification | This correction: 44 wallet/vault tests and two built wallet-only host tests passed. Typecheck, production build, 37-file proving export, production key/secret scans and zero managed-contract drift passed. The prior release had 692 core passes and one skipped; a new full core run is delegated to CI |
+| Browser verification | 65 distinct organization, startup and wallet scenarios passed across broad/focused runs. The broad run caught two missing backup-completion messages; those were corrected and their reruns passed. Three production-preview checks also passed: normal refresh and wallet outages before/after vault decryption. CI now repeats these against built assets. Fixtures are controlled tests, not new network acceptance |
+| Full CI | Previous [connector release `78ca9e3`](https://github.com/ShrikarT/line/actions/runs/39725974958) passed. The [refresh/session release](https://github.com/ShrikarT/line/actions/runs/39756065676) failed two startup checks waiting for browser-wide network idle. Those now await the actual deferred unlock completing; both passed locally. New full CI follows this correction; it is not yet confirmed |
 | Actual organization | Twelve verifier keys and 22 finalized workspace receipts. Last independently checked state: CLOSED, generation 1, 900,000 native-asset base units held, 1,000,000 reserve accounting, zero encumbrance and fees |
 | Active blocker | The original signed fee-bearing `openLine` remains pending. Its live owner-vault recovery review passed, but archival stopped on a fresh wallet-session failure before committing. The original bytes and candidate remain saved; no archive, failure receipt or replacement opening was created |
 | Live testing | After reconnecting 1AM, the actual retained opening passed the scoped candidate/evidence review at finalized block 3,084,505 (22 October, 04:07:24.001 UTC), past its signed TTL of 20 October, 14:13:04 UTC. This is provider-backed nonapplication evidence, not a finalized failure receipt or new transaction acceptance |
-| Wallet / backup | Latest encrypted backup remains saved. On the new live build, the actual 1AM owner wallet connected with one click and restored itself after refresh. The actual organization needs one local unlock in the updated tab before its memory-only refresh session can be checked. Its original signed operation is retained. Prior connector failures included a rate limit, generic configuration failure and InternalError; none justified bypassing live guards |
+| Wallet / backup | Latest encrypted backup remains saved. On the new live build, the actual 1AM owner wallet connected with one click and restored itself after refresh. The owner subsequently reported an organization logout after refresh; a live tab showed a rate limit above the password form. The reproduced boundary was network-read failure being presented as vault logout; the correction retains the memory session for retry. Actual owner-vault refresh still needs live confirmation. Its original signed operation is retained. Prior connector failures included a rate limit, generic configuration failure and InternalError; none justified bypassing live guards |
+
+Wallet-read failure during restoration now offers a retry using the retained
+absolute session deadline. Failure after decryption keeps the vault and encrypted
+backup available while transaction tools wait for fresh verification. A missing
+memory record is handled as locked, never as a successful restore.
 
 Wallet/organization refresh uses public wallet selection and a random tab ticket
 in sessionStorage. Passwords, verified configuration and the original absolute
@@ -50,7 +55,8 @@ not customer-funded settlement.
   two-merchant checkpoint and the fresh 1AM organization lifecycle below.
 - Encrypted wallet-scoped accounts, backup/restore, durable candidates and
   receipt-based recovery. Organization sessions last twelve hours in tab memory;
-  manual locking, disconnect, account changes and reload revoke the session.
+  manual locking, disconnect and account changes revoke the session. Same-tab
+  refresh can restore the original session from memory without renewing expiry.
 - Same-origin authenticated Preprod HTTP/WebSocket readers recover retired wallet
   endpoints while wallets retain proving, signing and submission.
 - Treasury reads actual `ContractState.balance`, separately from reserve

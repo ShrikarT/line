@@ -6,13 +6,13 @@ const KEY = "line:organization-tab:v1";
 let worker: SharedWorker | null = null, token: string | null = null, ownsLease = false, established = false, generation = 0;
 let lease: Promise<boolean> | null = null;
 let releaseLease: (() => void) | null = null;
-const waiting = new Map<string, { resolve: (value: unknown) => void; timer: ReturnType<typeof setTimeout> }>();
+const waiting = new Map<string, { operation: string; resolve: (value: unknown) => void; timer: ReturnType<typeof setTimeout> }>();
 const random = () => Array.from(crypto.getRandomValues(new Uint8Array(32)), byte => byte.toString(16).padStart(2, "0")).join("");
 function initialize() {
   if (worker || typeof window === "undefined" || typeof SharedWorker === "undefined") return;
   try {
     worker = new SharedWorker(new URL("./tab-session.worker.ts", import.meta.url), { type: "module", name: "line-organization-tab-v1", extendedLifetime: true } as WorkerOptions);
-    worker.port.onmessage = event => { const pending = waiting.get(event.data?.id); if (pending) { waiting.delete(event.data.id); clearTimeout(pending.timer); pending.resolve(event.data.ok ? event.data.value ?? true : null); } };
+    worker.port.onmessage = event => { const pending = waiting.get(event.data?.id); if (pending) { waiting.delete(event.data.id); clearTimeout(pending.timer); pending.resolve(event.data.ok ? pending.operation === "resume" ? event.data.value : true : null); } };
     worker.port.start();
   } catch { worker = null; }
 }
@@ -23,7 +23,7 @@ function request(operation: string, record?: OrganizationTabSession, sessionToke
   const id = random();
   return new Promise(resolve => {
     const timer = setTimeout(() => { waiting.delete(id); resolve(null); }, 3000);
-    waiting.set(id, { resolve, timer });
+    waiting.set(id, { operation, resolve, timer });
     try { worker!.port.postMessage({ id, token: sessionToken, operation, record }); }
     catch { waiting.delete(id); clearTimeout(timer); resolve(null); }
   });
@@ -62,7 +62,7 @@ export async function readOrganizationTabSession(): Promise<OrganizationTabSessi
   if (!await claim(false)) return null;
   if (generation !== version) return null;
   const value = await request("resume", undefined, token) as OrganizationTabSession | null;
-  if (generation !== version || !value || value.expiresAt <= Date.now()) return null;
+  if (generation !== version || !value || typeof value !== "object" || typeof value.passphrase !== "string" || !Number.isSafeInteger(value.expiresAt) || value.expiresAt <= Date.now()) return null;
   return value;
 }
 export async function rememberOrganizationTabSession(accountId: string, receivingAddress: string, configuration: Configuration): Promise<void> {
