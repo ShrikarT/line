@@ -46,6 +46,34 @@ test("a silent locked-wallet request settles instead of connecting forever", asy
   assert.equal(getConnectedWallet(), null);
 });
 
+test("one click recovers an explicit transient connector failure without a replacement signing request", async () => {
+  let calls = 0;
+  const next = connected();
+  inject(async () => { if (++calls === 1) throw { code: "InternalError", message: "Request failed" }; return next; });
+  let failure;
+  const work = connectWallet("lace").catch(error => { failure = error; });
+  await flush(); mock.timers.tick(1000); await flush(); await work;
+  assert.equal(failure, undefined); assert.equal(calls, 2); assert.equal(getConnectedWallet(), next);
+});
+
+test("cancelling during the connection retry delay prevents the second request", async () => {
+  let calls = 0;
+  inject(async () => { calls++; throw { code: "InternalError", message: "Request failed" }; });
+  const work = connectWallet("lace").catch(error => error);
+  await flush(); cancelWalletConnection(); mock.timers.tick(1000); await flush();
+  assert.match((await work).message, /cancelled/); assert.equal(calls, 1); assert.equal(getConnectedWallet(), null);
+});
+
+test("a temporary configuration failure retries once while permission rejection never retries", async () => {
+  let reads = 0;
+  const next = connected(async () => { if (++reads === 1) throw { code: "InternalError", message: "Request failed" }; return { networkId: "preprod" }; });
+  inject(async () => next);
+  const work = connectWallet("lace"); await flush(); mock.timers.tick(1000); await flush();
+  assert.equal(await work, next); assert.equal(reads, 2);
+  let calls = 0; inject(async () => { calls++; throw { code: "PermissionRejected", message: "Request failed" }; });
+  await assert.rejects(connectWallet("lace"), /PermissionRejected/); assert.equal(calls, 1); assert.equal(getConnectedWallet(), null);
+});
+
 test("an unresponsive wallet configuration also has a deadline", async () => {
   inject(async () => connected(() => new Promise(() => {})));
   let failure;
@@ -196,11 +224,12 @@ test("connection failures preserve standard connector codes without exposing the
   const secret = "redaction-control-sensitive";
   for (const code of ["InternalError", "InvalidRequest", "PermissionRejected", "Disconnected", -32603, 429, secret]) {
     inject(async () => { throw { type: "DAppConnectorAPIError", code, message: "Request failed", reason: `https://private.invalid/?token=${secret}` }; });
-    await assert.rejects(connectWallet("lace"), error => {
+    const rejected = assert.rejects(connectWallet("lace"), error => {
       assert.match(error.message, code === secret ? /connector code unavailable/ : new RegExp(`connector code ${code}`));
       assert(!error.message.includes(secret)); assert(!error.message.includes("private.invalid"));
       return true;
     });
+    await flush(); mock.timers.tick(1000); await flush(); await rejected;
     assert.equal(getConnectedWallet(), null); assert.equal(getConnectedWalletAccount(), null);
   }
 });
@@ -228,7 +257,8 @@ test("a failed connection exposes only explicit read-only diagnostics and never 
   const wallet = diagnosticWallet({ getConnectionStatus: async () => { throw { code: -32603, message: "Request failed" }; } });
   inject(async () => wallet);
   let target;
-  await assert.rejects(connectWallet("lace", "preprod", () => {}, value => { target = value; }), /Request failed/);
+  const rejected = assert.rejects(connectWallet("lace", "preprod", () => {}, value => { target = value; }), /Request failed/);
+  await flush(); mock.timers.tick(1000); await flush(); await rejected;
   assert.equal(getConnectedWallet(), null); assert.equal(getConnectedWalletAccount(), null);
   assert.deepEqual(Object.keys(target.reads).sort(), ["getConfiguration", "getConnectionStatus", "getShieldedAddresses", "getUnshieldedAddress"].sort());
   const results = await diagnoseWalletReads(target.reads, target.address, () => true, () => {}, { pauseMs: 0 });
@@ -240,7 +270,8 @@ test("configuration failure retains read-only diagnostics before any receiving a
   const wallet = diagnosticWallet({ getConfiguration: async () => { throw Error("Request failed"); } });
   inject(async () => wallet);
   let target;
-  await assert.rejects(connectWallet("lace", "preprod", () => {}, value => { target = value; }), /Request failed/);
+  const rejected = assert.rejects(connectWallet("lace", "preprod", () => {}, value => { target = value; }), /Request failed/);
+  await flush(); mock.timers.tick(1000); await flush(); await rejected;
   assert.equal(target.address, null);
   const results = await diagnoseWalletReads(target.reads, target.address, () => true, () => {}, { pauseMs: 0 });
   assert.deepEqual(results.map(row => row.outcome), ["failed", "passed", "passed", "passed"]);

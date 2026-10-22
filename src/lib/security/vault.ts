@@ -350,23 +350,24 @@ let sessionRevision = 0;
 const lockListeners = new Set<() => void>();
 
 export function getVaultSessionRevision(): number { return sessionRevision; }
+export function getVaultSessionExpiresAt(): number { return isVaultSessionUnlocked() ? sessionExpiresAt : 0; }
 export function onVaultSessionLock(callback: () => void): () => void {
   lockListeners.add(callback);
   return () => { lockListeners.delete(callback); };
 }
 
-export function unlockVaultSession(passphrase: string, timeoutMinutes: number = 15): void {
-  if (!passphrase || !Number.isFinite(timeoutMinutes) || timeoutMinutes <= 0 || timeoutMinutes * 60_000 > 2_147_483_647) {
+export function unlockVaultSession(passphrase: string, timeoutMinutes: number = 15, deadline?: number): void {
+  if (!passphrase || !Number.isFinite(timeoutMinutes) || timeoutMinutes <= 0 || timeoutMinutes * 60_000 > 2_147_483_647 || deadline !== undefined && (!Number.isSafeInteger(deadline) || deadline <= Date.now())) {
     throw new TypeError("A passphrase and a valid positive vault timeout are required.");
   }
   lockVaultSession();
   sessionRevision++;
   sessionPassphrase = passphrase;
-  sessionExpiresAt = Date.now() + timeoutMinutes * 60 * 1000;
+  sessionExpiresAt = Math.min(Date.now() + timeoutMinutes * 60 * 1000, deadline ?? Infinity);
   if (sessionTimer) clearTimeout(sessionTimer);
   sessionTimer = setTimeout(() => {
     lockVaultSession();
-  }, timeoutMinutes * 60 * 1000);
+  }, Math.max(0, sessionExpiresAt - Date.now()));
   if (sessionTimer && typeof (sessionTimer as any).unref === "function") {
     (sessionTimer as any).unref();
   }

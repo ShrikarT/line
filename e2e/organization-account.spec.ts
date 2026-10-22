@@ -48,8 +48,13 @@ async function wallets(page: Page, walletOnly = false, retiredReaders = false, i
   }, { a: identity(11), b: identity(12), retiredReaders, identityRateLimit });
 }
 async function connect(page: Page, id: "a" | "b") {
-  await page.locator("header").getByRole("button", { name: "Connect wallet", exact: true }).click();
-  await page.getByRole("button", { name: `Organization wallet ${id}`, exact: true }).click();
+  await page.locator("header").getByRole("button", { name: /^(Connect wallet|Manage connected wallet)$/ }).click();
+  if (await page.getByRole("heading", { name: "Your wallet is connected.", exact: true }).isVisible()) {
+    if (!(await page.getByRole("dialog").innerText()).includes(`Organization wallet ${id}`)) {
+      await page.getByRole("button", { name: "Disconnect from Line", exact: true }).click();
+      await page.getByRole("button", { name: `Organization wallet ${id}`, exact: true }).click();
+    }
+  } else await page.getByRole("button", { name: `Organization wallet ${id}`, exact: true }).click();
   await expect(page.getByRole("heading", { name: "Your wallet is connected." })).toBeVisible();
   await page.getByRole("link", { name: "Continue to workspace" }).click();
 }
@@ -79,6 +84,158 @@ for (const method of ["connect(preprod)", "getConfiguration"] as const) test(`co
     await expect(page.getByRole("dialog")).toContainText("no verified connection to compare");
   } else await expect(page.getByRole("button", { name: "Check connector reads", exact: true })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Your wallet is connected.", exact: true })).toHaveCount(0);
+});
+
+test("same-tab refresh restores the organization in memory and manual lock survives refresh", async ({ page }) => {
+  await wallets(page, true, true); await page.goto("/app"); await connect(page, "a"); await unlock(page);
+  const before = await profile(page);
+  const deadline = await page.evaluate(async () => { const { browserModuleUrl } = await import("/e2e/browser-module.ts" as any); const vault = await import(browserModuleUrl("/src/lib/security/vault.ts")); return vault.getVaultSessionExpiresAt(); });
+  await page.reload();
+  await expect(page.getByText("Organization vault unlocked", { exact: true })).toBeVisible({ timeout: 30_000 });
+  expect(await profile(page)).toEqual(before);
+  expect(await page.evaluate(async () => { const { browserModuleUrl } = await import("/e2e/browser-module.ts" as any); const vault = await import(browserModuleUrl("/src/lib/security/vault.ts")); return vault.getVaultSessionExpiresAt(); })).toBe(deadline);
+  const storage = await page.evaluate(() => JSON.stringify({ local: { ...localStorage }, session: { ...sessionStorage } }));
+  expect(storage).not.toContain("Organization123!"); expect(storage).not.toContain("issuerSecret");
+  await page.getByRole("button", { name: "Lock organization", exact: true }).click(); await page.reload();
+  await expect(page.getByRole("banner").getByRole("button", { name: "Manage connected wallet", exact: true })).toBeVisible();
+  await expect(page.getByText("Organization vault unlocked", { exact: true })).toHaveCount(0);
+});
+
+test("refresh retains the exact signed pending operation and private candidate without resubmission", async ({ page }) => {
+  await wallets(page, true, true); await page.goto("/app"); await connect(page, "a"); await unlock(page);
+  const retained = await page.evaluate(async () => {
+    const { browserModuleUrl } = await import("/e2e/browser-module.ts" as any);
+    const { OrganizationAccount } = await import(browserModuleUrl("/src/lib/organization/account.ts"));
+    const { getConnectedWallet } = await import(browserModuleUrl("/src/lib/runtime/wallet.ts"));
+    const { encodeVaultJson } = await import(browserModuleUrl("/src/lib/security/vault.ts"));
+    const account = await OrganizationAccount.unlock(getConnectedWallet()!, "Organization123!");
+    const candidate = account.snapshot();
+    await account.prepare({ id: "refresh-synthetic-opening", kind: "call", circuit: "openLine", facilityId: null, contractAddress: "ab".repeat(32), sourceFingerprint: "cd".repeat(32), after: candidate, txId: null, transaction: null });
+    await account.submitted("ef".repeat(32), "a1b2c3d4", "ab".repeat(32));
+    return { accountId: account.accountId, pending: encodeVaultJson(account.pending()) };
+  });
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "Resolve the saved operation first.", exact: true })).toBeVisible();
+  const durable = await page.evaluate(async accountId => {
+    const { browserModuleUrl } = await import("/e2e/browser-module.ts" as any);
+    const { loadEncryptedJson, getVaultSessionPassphrase, encodeVaultJson } = await import(browserModuleUrl("/src/lib/security/vault.ts"));
+    const record = await loadEncryptedJson(`line:organization:preprod:${accountId}`, getVaultSessionPassphrase()!);
+    return { pending: encodeVaultJson(record.pending), signatures: (window as any).organizationSignatures, proofs: (window as any).organizationProofRequests };
+  }, retained.accountId);
+  expect(durable).toEqual({ pending: retained.pending, signatures: 0, proofs: 0 });
+});
+
+test("a changed shielded account cannot restore the original organization after refresh", async ({ page }) => {
+  await wallets(page, true, true); await page.goto("/app"); await connect(page, "a"); await unlock(page);
+  await page.addInitScript(() => {
+    const target = (window as any).midnight.a, original = target.connect;
+    target.connect = async (...args: any[]) => { const api = await original(...args); api.getShieldedAddresses = async () => ((await (window as any).midnight.b.connect("preprod")).getShieldedAddresses()); return api; };
+  });
+  await page.reload();
+  await expect(page.getByRole("alert")).toContainText("saved tab session no longer matches this wallet");
+  await expect(page.getByText("Organization vault unlocked", { exact: true })).toHaveCount(0);
+  expect(await page.evaluate(() => sessionStorage.getItem("line:organization-tab:v1"))).toBeNull();
+});
+
+test("an expired organization session stays locked after refresh", async ({ page }) => {
+  await wallets(page, true, true); await page.goto("/app"); await connect(page, "a"); await unlock(page);
+  await page.addInitScript(() => { const now = Date.now; Date.now = () => now() + 13 * 60 * 60 * 1000; });
+  await page.reload();
+  await expect(page.getByRole("banner").getByRole("button", { name: "Manage connected wallet", exact: true })).toBeVisible();
+  await expect(page.getByText("Organization vault unlocked", { exact: true })).toHaveCount(0);
+});
+
+test("a duplicated tab cannot inherit or revoke the original tab’s organization session", async ({ page }) => {
+  await wallets(page, true, true); await page.goto("/app"); await connect(page, "a"); await unlock(page);
+  const duplicateEvent = page.waitForEvent("popup");
+  await page.evaluate(() => window.open("about:blank", "_blank"));
+  const duplicate = await duplicateEvent;
+  try {
+    await wallets(duplicate, true, true); await duplicate.goto("/app");
+    await expect(duplicate.getByRole("banner").getByRole("button", { name: "Manage connected wallet", exact: true })).toBeVisible();
+    await duplicate.reload();
+    await expect(duplicate.getByRole("banner").getByRole("button", { name: "Manage connected wallet", exact: true })).toBeVisible();
+    await expect(duplicate.getByText("Organization vault unlocked", { exact: true })).toHaveCount(0);
+    await expect(page.getByText("Organization vault unlocked", { exact: true })).toBeVisible();
+    await page.reload();
+    await expect(page.getByText("Organization vault unlocked", { exact: true })).toBeVisible();
+  } finally { await duplicate.close(); }
+});
+
+test("an unavailable memory session holder keeps the organization locked after refresh", async ({ page }) => {
+  await wallets(page, true, true);
+  await page.addInitScript(() => Object.defineProperty(window, "SharedWorker", { configurable: true, value: undefined }));
+  await page.goto("/app"); await connect(page, "a"); await unlock(page);
+  expect(await page.evaluate(() => sessionStorage.getItem("line:organization-tab:v1"))).toBeNull();
+  await page.reload();
+  await expect(page.getByRole("banner").getByRole("button", { name: "Manage connected wallet", exact: true })).toBeVisible();
+  await expect(page.getByText("Organization vault unlocked", { exact: true })).toHaveCount(0);
+});
+
+test("disconnect during a pending refresh lease cannot recreate the saved tab ticket", async ({ page }) => {
+  await wallets(page, true, true); await page.goto("/app"); await connect(page, "a"); await unlock(page);
+  await page.addInitScript(() => {
+    const original = navigator.locks.request.bind(navigator.locks); let delayed = false;
+    navigator.locks.request = ((name: string, ...args: any[]) => {
+      if (name.startsWith("line:organization-tab:") && !delayed) {
+        delayed = true;
+        const callback = args[args.length - 1];
+        args[args.length - 1] = (lock: Lock | null) => { (window as any).tabLeaseDelivered = true; return callback(lock); };
+        return new Promise((resolve, reject) => { (window as any).releaseTabLease = () => { void (original as any)(name, ...args).then(resolve, reject); }; });
+      }
+      return (original as any)(name, ...args);
+    }) as typeof navigator.locks.request;
+  });
+  await page.reload();
+  await expect.poll(() => page.evaluate(() => typeof (window as any).releaseTabLease)).toBe("function");
+  await page.getByRole("banner").getByRole("button", { name: "Manage connected wallet", exact: true }).click();
+  await page.getByRole("button", { name: "Disconnect from Line", exact: true }).click();
+  await page.evaluate(() => (window as any).releaseTabLease());
+  await expect.poll(() => page.evaluate(() => (window as any).tabLeaseDelivered)).toBe(true);
+  await expect.poll(() => page.evaluate(() => sessionStorage.getItem("line:organization-tab:v1"))).toBeNull();
+  await expect(page.getByText("Organization vault unlocked", { exact: true })).toHaveCount(0);
+  await page.reload();
+  await expect(page.getByRole("banner").getByRole("button", { name: "Connect wallet", exact: true })).toBeVisible();
+});
+
+test("manual lock excludes copied tickets until the memory holder acknowledges revocation", async ({ page }) => {
+  await wallets(page, true, true);
+  await page.addInitScript(() => {
+    const Native = SharedWorker;
+    (window as any).SharedWorker = class extends Native {
+      constructor(...args: ConstructorParameters<typeof SharedWorker>) {
+        super(...args); const send = this.port.postMessage.bind(this.port);
+        this.port.postMessage = ((message: any, ...rest: any[]) => {
+          if (message?.operation === "forget") setTimeout(() => { (send as any)(message, ...rest); (window as any).revocationDelivered = true; }, 2000);
+          else (send as any)(message, ...rest);
+        }) as typeof this.port.postMessage;
+      }
+    };
+  });
+  await page.goto("/app"); await connect(page, "a"); await unlock(page);
+  const popup = page.waitForEvent("popup"); await page.evaluate(() => window.open("about:blank", "_blank")); const duplicate = await popup;
+  try {
+    await wallets(duplicate, true, true); await duplicate.goto("/app");
+    await expect(duplicate.getByRole("banner").getByRole("button", { name: "Manage connected wallet", exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "Lock organization", exact: true }).click();
+    await duplicate.reload();
+    await expect.poll(() => page.evaluate(() => (window as any).revocationDelivered)).toBe(true);
+    await expect(duplicate.getByText("Organization vault unlocked", { exact: true })).toHaveCount(0);
+  } finally { await duplicate.close(); }
+});
+
+test("a new browser context cannot restore an organization from saved storage without its password", async ({ page, browser }) => {
+  await wallets(page, true, true); await page.goto("/app"); await connect(page, "a"); await unlock(page);
+  const original = await profile(page), state = await page.context().storageState({ indexedDB: true });
+  const tabStorage = await page.evaluate(() => ({ ...sessionStorage }));
+  const fresh = await browser.newContext({ storageState: state });
+  try {
+    await fresh.addInitScript(values => { for (const [key, value] of Object.entries(values)) sessionStorage.setItem(key, value); }, tabStorage);
+    const restored = await fresh.newPage(); await wallets(restored, true, true); await restored.goto("/app");
+    await expect(restored.getByRole("banner").getByRole("button", { name: "Manage connected wallet", exact: true })).toBeVisible();
+    await expect(restored.getByText("Organization vault unlocked", { exact: true })).toHaveCount(0);
+    await unlock(restored); expect(await profile(restored)).toEqual(original);
+  } finally { await fresh.close(); }
 });
 
 test("browser replays the canonical opening action against its exact retained private candidate", async ({ page }) => {
@@ -374,8 +531,10 @@ async function disconnect(page: Page) {
   await page.getByRole("button", { name: "Close", exact: true }).click();
 }
 async function unlock(page: Page, password = "Organization123!") {
-  await page.getByLabel("Organization vault password", { exact: true }).fill(password);
-  await page.getByRole("button", { name: "Open organization", exact: true }).click();
+  if (!await page.getByText("Organization vault unlocked", { exact: true }).isVisible()) {
+    await page.getByLabel("Organization vault password", { exact: true }).fill(password);
+    await page.getByRole("button", { name: "Open organization", exact: true }).click();
+  }
   await expect(page.getByText("Organization vault unlocked", { exact: true })).toBeVisible({ timeout: 30_000 });
   await expect(page.getByRole("button", { name: "Create facility", exact: true })).toBeEnabled({ timeout: 30_000 });
 }

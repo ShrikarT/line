@@ -4,6 +4,7 @@ import type { OrganizationAccount, OrganizationPending, OrganizationSnapshot } f
 import type { OrganizationNetwork } from "@/lib/organization/network";
 import { onVaultSessionLock } from "@/lib/security/vault";
 import { sanitizeServiceError } from "@/lib/runtime/endpoints";
+import { readOrganizationTabSession, type OrganizationTabSession } from "@/lib/organization/tab-session";
 
 type Session = { account: OrganizationAccount | null; network: OrganizationNetwork | null; snapshot: OrganizationSnapshot | null; pending: OrganizationPending | null; recoveries: ReturnType<OrganizationAccount["recoveryHistory"]>; busy: boolean; progress: string; error: string; unlock: (password: string) => Promise<void>; lock: () => void; run: (action: (network: OrganizationNetwork, account: OrganizationAccount) => Promise<unknown>, completedMessage?: string) => Promise<void> };
 const OrganizationContext = createContext<Session | null>(null);
@@ -15,11 +16,19 @@ export function OrganizationSessionProvider({ children }: { children: ReactNode 
   const [recoveries, setRecoveries] = useState<Session["recoveries"]>([]);
   const [busy, setBusy] = useState(false), [progress, setProgress] = useState(""), [error, setError] = useState("");
   const working = useRef(false), currentWallet = useRef(wallet); currentWallet.current = wallet;
+  const restoreGeneration = useRef(0);
   useEffect(() => {
     const clear = () => { setAccount(null); setNetwork(null); setSnapshot(null); setPending(null); setRecoveries([]); setProgress(""); setError(""); };
     clear(); return onVaultSessionLock(clear);
   }, [wallet]);
-  async function unlock(password: string) {
+  useEffect(() => {
+    const attempt = ++restoreGeneration.current;
+    if (wallet) void readOrganizationTabSession().then(saved => {
+      if (saved && restoreGeneration.current === attempt && currentWallet.current === wallet) return unlock(saved.passphrase, saved);
+    });
+    return () => { restoreGeneration.current++; };
+  }, [wallet]);
+  async function unlock(password: string, restored?: OrganizationTabSession) {
     if (working.current || !wallet) return;
     working.current = true; setBusy(true); setError(""); setProgress("Opening your encrypted organization vault");
     try {
@@ -27,7 +36,7 @@ export function OrganizationSessionProvider({ children }: { children: ReactNode 
         import("@/lib/organization/account"), import("@/lib/organization/network"),
       ]);
       if (getConnectedWallet() !== wallet) return;
-      const opened = await OrganizationAccount.unlock(wallet, password);
+      const opened = await OrganizationAccount.unlock(wallet, password, restored);
       if (currentWallet.current !== wallet) return;
       setAccount(opened); setSnapshot(opened.snapshot()); setPending(opened.pending()); setRecoveries(opened.recoveryHistory());
       const client = await OrganizationNetwork.connect(opened, message => { if (currentWallet.current === wallet) setProgress(message); });

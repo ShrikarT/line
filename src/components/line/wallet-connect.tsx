@@ -2,14 +2,14 @@ import { createContext, useContext, useEffect, useRef, useState, useSyncExternal
 import { ArrowRight, ArrowSquareOut, CheckCircle, CircleNotch, Copy, Plugs, Wallet } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { cancelWalletConnection, connectWallet, disconnectWallet, getActiveWalletInfo, getAvailableWallets, getConnectedWallet, getConnectedWalletAccount, subscribeWallet, type WalletConnectionPhase, type WalletInfo, type WalletDiagnosticTarget } from "@/lib/runtime/wallet";
+import { cancelWalletConnection, connectWallet, disconnectWallet, getActiveWalletInfo, getAvailableWallets, getConnectedWallet, getConnectedWalletAccount, subscribeWallet, restoreWalletConnection, rememberedWallet, type WalletConnectionPhase, type WalletInfo, type WalletDiagnosticTarget } from "@/lib/runtime/wallet";
 import { getActiveRuntime } from "@/lib/runtime/active";
 import { sanitizeServiceError } from "@/lib/runtime/endpoints";
 import { diagnoseWalletReads, type WalletReadDiagnostic } from "@/lib/runtime/wallet-diagnostics";
 
 const WalletContext = createContext<{ connected: boolean; connecting: boolean; name: string; address: string; openWallet: () => void } | null>(null);
 const connectionMessages: Record<WalletConnectionPhase, string> = {
-  "requesting-access": "Waiting for your wallet to open the connection request. Unlock the extension and select your Midnight Preprod account.",
+  "requesting-access": "Requesting your wallet’s Midnight Preprod session…",
   "verifying-network": "Your wallet answered. Checking Midnight Preprod…",
   "reading-address": "Reading your receiving address. Approve address access if the extension asks.",
   "checking-session": "Confirming your wallet session…",
@@ -49,6 +49,16 @@ export function WalletSessionProvider({ children }: { children: ReactNode }) {
   const diagnosticAttempt = useRef(0), diagnosticBusy = useRef(false);
   const [diagnosticTarget, setDiagnosticTarget] = useState<WalletDiagnosticTarget | null>(null);
   const currentDiagnosticTarget = useRef(diagnosticTarget); currentDiagnosticTarget.current = diagnosticTarget;
+  useEffect(() => {
+    let active = true;
+    if (rememberedWallet() && !getConnectedWallet()) {
+      setConnecting(true);
+      void restoreWalletConnection(phase => { if (active) setConnectionPhase(phase); })
+        .catch(failure => { if (active) setError(sanitizeServiceError(failure instanceof Error ? failure.message : "Your wallet connection could not be restored.")); })
+        .finally(() => { if (active) setConnecting(false); });
+    }
+    return () => { active = false; };
+  }, []);
   useEffect(() => {
     if (!open) return;
     const discover = () => setWallets(getAvailableWallets().filter(wallet => wallet.isAvailable));
@@ -126,7 +136,7 @@ export function WalletSessionProvider({ children }: { children: ReactNode }) {
           <p className="text-xs text-muted">Public receiving address</p>
           {account.address ? <><code className="wallet-address">{account.address}</code><Button variant="outline" size="sm" onClick={() => void copyAddress()}><Copy aria-hidden="true" />{copied ? "Address copied" : "Copy address"}</Button></> : <p className="text-sm text-muted">Waiting for the wallet address.</p>}
           <Button variant="ghost" onClick={() => void disconnect()}><Plugs aria-hidden="true" />Disconnect from Line</Button>
-          <p className="text-xs text-muted">To revoke the site permission, remove Line from connected sites in your wallet. After refreshing the page, reconnect to approve a new session.</p>
+          <p className="text-xs text-muted">Line restores this wallet after a refresh in the same tab and verifies the account again. Disconnect here to stop restoration. To revoke site permission, remove Line from connected sites in your wallet.</p>
         </div> : <div className="wallet-options" aria-busy={connecting}>
           {wallets.length ? wallets.map(wallet => <Button key={wallet.id} variant="outline" className="wallet-option" disabled={connecting} onClick={() => void connect(wallet)}><Wallet aria-hidden="true" /><span>{wallet.name}</span>{connecting ? <CircleNotch className="animate-spin" aria-hidden="true" /> : <ArrowRight aria-hidden="true" />}</Button>) : <div className="wallet-empty"><strong>No compatible Midnight wallet detected yet.</strong><p>Install a Midnight wallet below, create or unlock its Preprod account, then refresh Line. Any wallet implementing Midnight DApp Connector v4 can appear here.</p><Button variant="outline" asChild><a href="https://docs.midnight.network/getting-started/installation" target="_blank" rel="noreferrer">Wallet setup guide <ArrowSquareOut aria-hidden="true" /></a></Button></div>}
           {connecting && <><p role="status" className="text-sm text-muted">{connectionMessages[connectionPhase]}</p><Button variant="ghost" onClick={cancelConnection}>Cancel connection</Button></>}
