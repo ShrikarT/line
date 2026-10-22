@@ -3,6 +3,13 @@ import { getVaultSessionPassphrase, getVaultSessionRevision, getVaultSessionExpi
 
 export type OrganizationTabSession = { accountId: string; receivingAddress: string; passphrase: string; expiresAt: number; configuration: Configuration };
 const KEY = "line:organization-tab:v1";
+// sessionStorage is copied into opener-created tabs. Drop that copied capability
+// on their initial navigation, even before a wallet becomes available. Otherwise
+// closing the original tab before the copy reloads would let it take the lease.
+if (typeof window !== "undefined") {
+  try { if (!performance.getEntriesByType("navigation").some(entry => (entry as PerformanceNavigationTiming).type === "reload")) sessionStorage.removeItem(KEY); }
+  catch { /* Restricted storage cannot restore a session. */ }
+}
 let worker: SharedWorker | null = null, token: string | null = null, ownsLease = false, established = false, generation = 0;
 let lease: Promise<boolean> | null = null;
 let releaseLease: (() => void) | null = null;

@@ -6,7 +6,13 @@ import { lockVaultSession, onVaultSessionLock } from "@/lib/security/vault";
 import { sanitizeServiceError } from "@/lib/runtime/endpoints";
 import { forgetOrganizationTabSession, readOrganizationTabSession, type OrganizationTabSession } from "@/lib/organization/tab-session";
 
-type Session = { account: OrganizationAccount | null; network: OrganizationNetwork | null; snapshot: OrganizationSnapshot | null; pending: OrganizationPending | null; recoveries: ReturnType<OrganizationAccount["recoveryHistory"]>; busy: boolean; resumeAvailable: boolean; progress: string; error: string; unlock: (password: string) => Promise<void>; retryConnection: () => Promise<void>; backup: () => Promise<string | null>; lock: () => void; run: (action: (network: OrganizationNetwork, account: OrganizationAccount) => Promise<unknown>, completedMessage?: string) => Promise<void> };
+type Session = { account: OrganizationAccount | null; network: OrganizationNetwork | null; snapshot: OrganizationSnapshot | null; pending: OrganizationPending | null; recoveries: ReturnType<OrganizationAccount["recoveryHistory"]>; busy: boolean; resumeAvailable: boolean; needsReload: boolean; progress: string; error: string; unlock: (password: string) => Promise<void>; retryConnection: () => Promise<void>; backup: () => Promise<string | null>; lock: () => void; run: (action: (network: OrganizationNetwork, account: OrganizationAccount) => Promise<unknown>, completedMessage?: string) => Promise<void> };
+const CODE_LOAD_MESSAGE = "Line could not load the workspace code. Check your connection, then refresh to load the current application. Your encrypted records remain saved.";
+class OrganizationCodeLoadError extends Error { constructor() { super(CODE_LOAD_MESSAGE); } }
+async function organizationModules() {
+  try { return await Promise.all([import("@/lib/organization/account"), import("@/lib/organization/network")]); }
+  catch { throw new OrganizationCodeLoadError(); }
+}
 const OrganizationContext = createContext<Session | null>(null);
 export function useOrganization() { const session = useContext(OrganizationContext); if (!session) throw new Error("OrganizationSessionProvider is required."); return session; }
 export function OrganizationSessionProvider({ children }: { children: ReactNode }) {
@@ -16,6 +22,7 @@ export function OrganizationSessionProvider({ children }: { children: ReactNode 
   const [recoveries, setRecoveries] = useState<Session["recoveries"]>([]);
   const [busy, setBusy] = useState(false), [progress, setProgress] = useState(""), [error, setError] = useState("");
   const [resumeAvailable, setResumeAvailable] = useState(false), [restoring, setRestoring] = useState(false);
+  const [needsReload, setNeedsReload] = useState(false);
   const working = useRef(false), currentWallet = useRef(wallet); currentWallet.current = wallet;
   const restoreGeneration = useRef(0);
   useEffect(() => {
@@ -34,14 +41,18 @@ export function OrganizationSessionProvider({ children }: { children: ReactNode 
     } else setRestoring(false);
     return () => { restoreGeneration.current++; };
   }, [wallet]);
+  function reportFailure(failure: unknown, fallback: string) {
+    const codeFailure = failure instanceof OrganizationCodeLoadError || failure instanceof Error && /Failed to fetch dynamically imported module|error loading dynamically imported module|Importing a module script failed|Unable to preload CSS/i.test(failure.message);
+    setProgress("");
+    if (codeFailure) { setNeedsReload(true); setError(CODE_LOAD_MESSAGE); }
+    else setError(sanitizeServiceError(failure instanceof Error ? failure.message : fallback));
+  }
   async function unlock(password: string, restored?: OrganizationTabSession) {
-    if (working.current || !wallet) return;
+    if (working.current || !wallet || needsReload) return;
     working.current = true; setBusy(true); setError(""); setProgress("Opening your encrypted organization vault");
     let opened: OrganizationAccount | null = null;
     try {
-      const [{ OrganizationAccount }, { OrganizationNetwork }] = await Promise.all([
-        import("@/lib/organization/account"), import("@/lib/organization/network"),
-      ]);
+      const [{ OrganizationAccount }, { OrganizationNetwork }] = await organizationModules();
       if (getConnectedWallet() !== wallet) return;
       opened = await OrganizationAccount.unlock(wallet, password, restored);
       if (currentWallet.current !== wallet) return;
@@ -54,13 +65,13 @@ export function OrganizationSessionProvider({ children }: { children: ReactNode 
       const retained = restored && !opened ? await readOrganizationTabSession() : null;
       if (currentWallet.current === wallet) {
         if (restored && !opened) setResumeAvailable(!!retained);
-        setProgress(""); setError(sanitizeServiceError(failure instanceof Error ? failure.message : "Could not open the organization vault."));
+        reportFailure(failure, "Could not open the organization vault.");
       }
     }
     finally { working.current = false; setBusy(false); }
   }
   async function retryConnection() {
-    if (working.current || !wallet) return;
+    if (working.current || !wallet || needsReload) return;
     if (!account) {
       const attempt = restoreGeneration.current;
       setRestoring(true);
@@ -75,10 +86,10 @@ export function OrganizationSessionProvider({ children }: { children: ReactNode 
     working.current = true; setBusy(true); setError(""); setProgress("Checking your wallet and organization connection");
     try {
       account.assertSession();
-      const { OrganizationNetwork } = await import("@/lib/organization/network");
+      const [, { OrganizationNetwork }] = await organizationModules();
       const client = await OrganizationNetwork.connect(account);
       account.assertSession(); setNetwork(client); setProgress("Your wallet and organization contract release are ready");
-    } catch (failure) { if (currentWallet.current === wallet) { setProgress(""); setError(sanitizeServiceError(failure instanceof Error ? failure.message : "Could not connect the organization.")); } }
+    } catch (failure) { if (currentWallet.current === wallet) reportFailure(failure, "Could not connect the organization."); }
     finally { working.current = false; setBusy(false); }
   }
   async function backup(): Promise<string | null> {
@@ -89,11 +100,11 @@ export function OrganizationSessionProvider({ children }: { children: ReactNode 
       setProgress("Encrypted backup download requested");
       return file;
     }
-    catch (failure) { if (currentWallet.current === account.wallet) setError(sanitizeServiceError(failure instanceof Error ? failure.message : "Could not export the encrypted backup.")); return null; }
+    catch (failure) { if (currentWallet.current === account.wallet) reportFailure(failure, "Could not export the encrypted backup."); return null; }
     finally { working.current = false; setBusy(false); }
   }
   async function run(action: (client: OrganizationNetwork, account: OrganizationAccount) => Promise<unknown>, completedMessage?: string) {
-    if (working.current || !network || !account) return;
+    if (working.current || !network || !account || needsReload) return;
     working.current = true; setBusy(true); setError(""); setProgress("Working in your organization workspace");
     try {
       await action(network, account);
@@ -102,11 +113,11 @@ export function OrganizationSessionProvider({ children }: { children: ReactNode 
         if (currentWallet.current === account.wallet) setProgress(completedMessage);
       }
     }
-    catch (failure) { if (currentWallet.current === account.wallet) { setProgress(""); setError(sanitizeServiceError(failure instanceof Error ? failure.message : "The operation needs reconciliation.")); } }
+    catch (failure) { if (currentWallet.current === account.wallet) reportFailure(failure, "The operation needs reconciliation."); }
     finally {
       try { account.assertSession(); setSnapshot(account.snapshot()); setPending(account.pending()); setRecoveries(account.recoveryHistory()); } catch { /* Revoked account records stay hidden. */ }
       working.current = false; setBusy(false);
     }
   }
-  return <OrganizationContext.Provider value={{ account, network, snapshot, pending, recoveries, busy: busy || restoring, resumeAvailable, progress, error, unlock, retryConnection, backup, lock: () => { forgetOrganizationTabSession(); lockVaultSession(); }, run }}>{children}</OrganizationContext.Provider>;
+  return <OrganizationContext.Provider value={{ account, network, snapshot, pending, recoveries, busy: busy || restoring, resumeAvailable, needsReload, progress, error, unlock, retryConnection, backup, lock: () => { forgetOrganizationTabSession(); lockVaultSession(); }, run }}>{children}</OrganizationContext.Provider>;
 }
