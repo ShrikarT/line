@@ -14,6 +14,7 @@ const connectionMessages: Record<WalletConnectionPhase, string> = {
   "reading-address": "Reading your receiving address. Approve address access if the extension asks.",
   "checking-session": "Confirming your wallet session…",
 };
+const connectionMethods: Record<WalletConnectionPhase, string> = { "requesting-access": "connect(preprod)", "verifying-network": "getConfiguration", "reading-address": "getUnshieldedAddress", "checking-session": "getConnectionStatus" };
 const walletDownloads = [
   { name: "1AM", matches: /1am|1 am|one.?am/i, href: "https://chromewebstore.google.com/detail/1am/bphnkdkcnfhompoegfpgnkidcjfbojjp" },
   { name: "Lace", matches: /lace/i, href: "https://www.lace.io/" },
@@ -39,6 +40,7 @@ export function WalletSessionProvider({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false), [wallets, setWallets] = useState<WalletInfo[]>([]);
   const [connecting, setConnecting] = useState(false), [error, setError] = useState("");
   const [connectionPhase, setConnectionPhase] = useState<WalletConnectionPhase>("requesting-access");
+  const [failedMethod, setFailedMethod] = useState("");
   const [account, setAccount] = useState({ address: "", network: "" }), [copied, setCopied] = useState(false);
   const busy = useRef(false);
   const connectionAttempt = useRef(0);
@@ -76,10 +78,12 @@ export function WalletSessionProvider({ children }: { children: ReactNode }) {
   async function connect(wallet: WalletInfo) {
     if (busy.current) return;
     const attempt = ++connectionAttempt.current;
-    busy.current = true; setConnecting(true); setError(""); diagnosticAttempt.current++; setDiagnostics([]); setDiagnosticTarget(null);
-    try { await connectWallet(wallet.id, "preprod", phase => { if (connectionAttempt.current === attempt) setConnectionPhase(phase); }, target => { if (connectionAttempt.current === attempt) setDiagnosticTarget(target); }); }
+    busy.current = true; setConnecting(true); setError(""); setFailedMethod(""); diagnosticAttempt.current++; setDiagnostics([]); setDiagnosticTarget(null);
+    let phase: WalletConnectionPhase = "requesting-access";
+    try { await connectWallet(wallet.id, "preprod", next => { phase = next; if (connectionAttempt.current === attempt) setConnectionPhase(next); }, target => { if (connectionAttempt.current === attempt) setDiagnosticTarget(target); }); }
     catch (failure) {
       if (connectionAttempt.current !== attempt) return;
+      setFailedMethod(connectionMethods[phase]);
       const code = failure instanceof Error && "code" in failure ? failure.code : "";
       setError(code === "WALLET_APPROVAL_REJECTED" ? "Connection declined. You can try again when you’re ready." : sanitizeServiceError(failure instanceof Error ? failure.message : "Could not connect. Unlock your wallet and select Preprod, then try again."));
     } finally { if (connectionAttempt.current === attempt) { busy.current = false; setConnecting(false); } }
@@ -128,10 +132,11 @@ export function WalletSessionProvider({ children }: { children: ReactNode }) {
           {connecting && <><p role="status" className="text-sm text-muted">{connectionMessages[connectionPhase]}</p><Button variant="ghost" onClick={cancelConnection}>Cancel connection</Button></>}
         </div>}
         {!api && !connecting && <div className="flex flex-col gap-3"><p className="text-xs text-muted">Use another Midnight wallet</p><div className="flex flex-wrap gap-2">{walletDownloads.filter(option => !wallets.some(wallet => option.matches.test(`${wallet.name} ${wallet.rdns}`))).map(option => <Button key={option.name} variant="outline" size="sm" asChild><a href={option.href} target="_blank" rel="noreferrer">Get {option.name}<ArrowSquareOut aria-hidden="true" /></a></Button>)}<Button variant="ghost" size="sm" onClick={() => window.location.reload()}>Refresh wallets</Button></div></div>}
-        {(api || diagnosticTarget) && <details className="w-full">
+        {(api || diagnosticTarget || failedMethod) && <details className="w-full">
           <summary>Connection diagnostics</summary>
+          {failedMethod && <p className="text-xs text-muted">Connection stopped at <code>{failedMethod}</code>.</p>}
           <p className="text-xs text-muted">Check individual connector reads without opening the vault or requesting a proof, signature or transaction. Results stay in this dialog and do not enable payments.</p>
-          <Button variant="outline" size="sm" disabled={checking || connecting} onClick={() => void checkConnection()}>{checking ? "Checking connector reads…" : "Check connector reads"}</Button>
+          {(api || diagnosticTarget) && <Button variant="outline" size="sm" disabled={checking || connecting} onClick={() => void checkConnection()}>{checking ? "Checking connector reads…" : "Check connector reads"}</Button>}
           <ul className="flex flex-col gap-2" aria-live="polite">{diagnostics.map(result => <li key={result.method} className="text-xs [overflow-wrap:anywhere]"><code>{result.method}</code>: {result.outcome} · {result.detail}{result.code && ` (code ${result.code})`} · {result.elapsedMs} ms</li>)}</ul>
         </details>}
         <div className="wallet-scope"><CheckCircle aria-hidden="true" /><p>Connecting shares your wallet address and sends no transaction. Your organization’s records stay encrypted in its wallet-scoped vault. Deposits and purchases require separate wallet approvals.</p></div>

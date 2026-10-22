@@ -216,6 +216,18 @@ test("a failed connection exposes only explicit read-only diagnostics and never 
   assert.equal(getConnectedWallet(), null);
 });
 
+test("configuration failure retains read-only diagnostics before any receiving address is verified", async () => {
+  const wallet = diagnosticWallet({ getConfiguration: async () => { throw Error("Request failed"); } });
+  inject(async () => wallet);
+  let target;
+  await assert.rejects(connectWallet("lace", "preprod", () => {}, value => { target = value; }), /Request failed/);
+  assert.equal(target.address, null);
+  const results = await diagnoseWalletReads(target.reads, target.address, () => true, () => {}, { pauseMs: 0 });
+  assert.deepEqual(results.map(row => row.outcome), ["failed", "passed", "passed", "passed"]);
+  assert.match(results[2].detail, /no verified connection to compare/);
+  assert.equal(getConnectedWallet(), null); assert.equal(getConnectedWalletAccount(), null);
+});
+
 test("connector diagnostics redact service credentials, arbitrary wallet messages and public identity bytes", async () => {
   const secretControl = "redaction-control-sensitive";
   const wallet = diagnosticWallet({ getConfiguration: async () => { throw { code: secretControl, message: `https://provider.invalid/?token=${secretControl}` }; } });
