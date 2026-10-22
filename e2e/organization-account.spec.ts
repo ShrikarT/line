@@ -94,6 +94,32 @@ test("built-page refresh restores the organization without development module im
   expect(await profile(page)).toEqual(before);
 });
 
+test("an unavailable account code download offers reload instead of another password attempt", async ({ page }) => {
+  await wallets(page, true, true);
+  await page.route(/\/(?:src\/lib\/organization\/account\.ts|assets\/account-[^/]+\.js)(?:\?|$)/, route => route.abort());
+  await page.goto("/app"); await connect(page, "a");
+  await page.getByLabel("Organization vault password", { exact: true }).fill("Organization123!");
+  await page.getByRole("button", { name: "Open organization", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Reload the workspace to continue.", exact: true })).toBeVisible({ timeout: 8_000 });
+  await expect(page.getByLabel("Organization vault password", { exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Refresh Line", exact: true })).toBeEnabled();
+  await expect(page.getByRole("alert")).not.toContainText("/assets/");
+  expect(await page.evaluate(() => ({ proofs: (window as any).organizationProofRequests, signatures: (window as any).organizationSignatures }))).toEqual({ proofs: 0, signatures: 0 });
+});
+
+test("a failed account code download preserves the refresh session until the current code loads", async ({ page }) => {
+  await wallets(page, true, true); await page.goto("/app"); await connect(page, "a"); await unlock(page);
+  const before = await profile(page);
+  const accountCode = /\/(?:src\/lib\/organization\/account\.ts|assets\/account-[^/]+\.js)(?:\?|$)/;
+  await page.route(accountCode, route => route.abort()); await page.reload();
+  await expect(page.getByRole("heading", { name: "Reload the workspace to continue.", exact: true })).toBeVisible();
+  await page.unroute(accountCode);
+  await page.getByRole("button", { name: "Refresh Line", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Create facility", exact: true })).toBeEnabled();
+  expect(await profile(page)).toEqual(before);
+  expect(await page.evaluate(() => ({ proofs: (window as any).organizationProofRequests, signatures: (window as any).organizationSignatures }))).toEqual({ proofs: 0, signatures: 0 });
+});
+
 test("organization startup and refresh do not reread configuration after verifying the account", async ({ page }) => {
   await wallets(page, true, true);
   await page.addInitScript(() => {
@@ -258,6 +284,19 @@ test("an unavailable memory session holder keeps the organization locked after r
   await page.reload();
   await expect(page.getByRole("banner").getByRole("button", { name: "Manage connected wallet", exact: true })).toBeVisible();
   await expect(page.getByText("Organization vault unlocked", { exact: true })).toHaveCount(0);
+});
+
+test("a copied tab ticket cannot restore after the original tab closes", async ({ page }) => {
+  await wallets(page, true, true); await page.goto("/app"); await connect(page, "a"); await unlock(page);
+  const popup = page.waitForEvent("popup"); await page.evaluate(() => window.open("about:blank", "_blank"));
+  const duplicate = await popup;
+  try {
+    await wallets(duplicate, true, true); await duplicate.goto("/app");
+    await expect(duplicate.getByRole("banner").getByRole("button", { name: "Manage connected wallet", exact: true })).toBeVisible();
+    await page.close(); await duplicate.reload();
+    await expect(duplicate.getByLabel("Organization vault password", { exact: true })).toBeVisible({ timeout: 8_000 });
+    await expect(duplicate.getByText("Organization vault unlocked", { exact: true })).toHaveCount(0);
+  } finally { await duplicate.close(); }
 });
 
 test("disconnect during a pending refresh lease cannot recreate the saved tab ticket", async ({ page }) => {

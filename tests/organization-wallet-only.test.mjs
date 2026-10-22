@@ -17,6 +17,12 @@ test('wallet-only host starts without signing credentials, authenticates reads a
     const ready = await request('/readyz');
     assert.equal(ready.status, 200);
     assert.deepEqual(await ready.json(), { ready: true, mode: 'wallet-only' });
+    const page = await request('/app');
+    assert.equal(page.headers.get('cache-control'), 'no-store');
+    const entry = (await page.text()).match(/src="([^"]+\.js)"/)[1];
+    assert.equal((await request(entry)).headers.get('cache-control'), 'public, max-age=31536000, immutable');
+    assert.equal((await request('/assets/missing-old-build.js')).status, 404);
+    assert.equal((await request('/assets/missing-old-build.js')).headers.get('cache-control'), 'no-store');
     const catalog = await (await request('/api/organization/catalog')).json();
     assert.equal(catalog.hostedSupplierAutomation, false);
     assert.deepEqual(catalog.services, []);

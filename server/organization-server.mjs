@@ -17,7 +17,8 @@ async function servePublic(req, res, root) {
     const file = await realpath(resolve(root, '.' + path));
     if (!file.startsWith(root + sep)) throw Error('Outside public directory');
     const details = await stat(file); if (!details.isFile()) throw Error('Not a file');
-    res.writeHead(200, { 'Content-Type': TYPES[extname(file)] ?? 'application/octet-stream', 'Content-Length': details.size, 'Cache-Control': 'no-cache', 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'same-origin' });
+    const cache = extname(file) === '.html' ? 'no-store' : /^\/assets\/[^/]+-[\w-]{8,}\.(?:js|css|wasm|woff2|svg|png|webp|jpg)$/.test(path) ? 'public, max-age=31536000, immutable' : 'no-cache';
+    res.writeHead(200, { 'Content-Type': TYPES[extname(file)] ?? 'application/octet-stream', 'Content-Length': details.size, 'Cache-Control': cache, 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'same-origin' });
     if (req.method === 'HEAD') return res.end();
     const stream = createReadStream(file); stream.on('error', () => res.destroy()); stream.pipe(res);
   } catch { res.writeHead(404, { 'Cache-Control': 'no-store' }); res.end('Not found'); }

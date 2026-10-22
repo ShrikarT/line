@@ -105,6 +105,10 @@ the password again; unsupported browsers keep the vault locked after refresh.
 No passphrase or private key is written to browser storage. Other consoles retain
 their existing timeout.
 
+Initial document navigations discard copied resume tickets before wallet
+discovery. A copied tab cannot wait for the original tab to close and then claim
+its released lock. Normal same-tab reloads retain their ticket.
+
 Vault authentication and network readiness are separate UI states. A failed live
 read during restoration retains a valid memory session for an explicit retry;
 it does not ask for the password again or renew the original deadline. A network
@@ -122,6 +126,14 @@ settings. Reconnect and reopen the organization to adopt changed service URLs.
 Only explicit rate-limit responses on these reads may retry within a bounded
 deadline; each retry checks session validity. Signing, proving and submission
 are outside that retry path.
+
+Organization code-download failures are distinct from wallet or password errors.
+They offer a workspace reload and stop further unlock/mutation attempts in the
+stale document, while retaining encrypted records and any memory resume ticket.
+Reload uses the current asset graph; code is never mixed across releases and
+financial operations are never automatically retried. HTML is served with
+`no-store`; content-hashed JS/CSS/WASM assets are immutable browser-cache entries.
+An older open tab can still need a reload for an unfetched chunk after deployment.
 
 The SDK wallet adapter is constructed through that same live account guard, using
 its checked public keys and in-memory settings. It does not issue another
