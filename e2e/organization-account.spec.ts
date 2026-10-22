@@ -86,6 +86,44 @@ for (const method of ["connect(preprod)", "getConfiguration"] as const) test(`co
   await expect(page.getByRole("heading", { name: "Your wallet is connected.", exact: true })).toHaveCount(0);
 });
 
+test("built-page refresh restores the organization without development module imports", async ({ page }) => {
+  await wallets(page, true, true); await page.goto("/app"); await connect(page, "a"); await unlock(page);
+  const before = await profile(page);
+  await page.reload();
+  await expect(page.getByText("Organization vault unlocked", { exact: true })).toBeVisible({ timeout: 30_000 });
+  expect(await profile(page)).toEqual(before);
+});
+
+for (const failedRead of [2, 3]) test(`refresh keeps the organization session when wallet status read ${failedRead} is rate limited`, async ({ page }) => {
+  await wallets(page, true, true); await page.goto("/app"); await connect(page, "a"); await unlock(page);
+  const before = await profile(page);
+  await page.addInitScript(failedRead => {
+    const target = (window as any).midnight.a, original = target.connect;
+    target.connect = async (...args: any[]) => {
+      const api = await original(...args); let reads = 0;
+      api.getConnectionStatus = async () => {
+        if (++reads >= failedRead && !sessionStorage.getItem("test-status-recovered")) throw { code: 429, message: "Rate limited" };
+        return { status: "connected", networkId: "preprod" };
+      };
+      return api;
+    };
+  }, failedRead);
+  await page.reload();
+  await expect(page.getByRole("alert")).toContainText(/rate limited/i);
+  await expect(page.getByLabel("Organization vault password", { exact: true })).toHaveCount(0);
+  if (failedRead === 3) {
+    await expect(page.getByText("Organization vault unlocked", { exact: true })).toBeVisible();
+    const download = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Encrypted backup", exact: true }).click();
+    expect((await download).suggestedFilename()).toBe("line-organization-backup.json");
+  }
+  await page.evaluate(() => sessionStorage.setItem("test-status-recovered", "yes"));
+  await page.getByRole("button", { name: "Retry wallet checks", exact: true }).click();
+  await expect(page.getByText("Organization vault unlocked", { exact: true })).toBeVisible();
+  expect(await profile(page)).toEqual(before);
+  expect(await page.evaluate(() => ({ proofs: (window as any).organizationProofRequests, signatures: (window as any).organizationSignatures }))).toEqual({ proofs: 0, signatures: 0 });
+});
+
 test("same-tab refresh restores the organization in memory and manual lock survives refresh", async ({ page }) => {
   await wallets(page, true, true); await page.goto("/app"); await connect(page, "a"); await unlock(page);
   const before = await profile(page);
@@ -234,6 +272,10 @@ test("a new browser context cannot restore an organization from saved storage wi
     const restored = await fresh.newPage(); await wallets(restored, true, true); await restored.goto("/app");
     await expect(restored.getByRole("banner").getByRole("button", { name: "Manage connected wallet", exact: true })).toBeVisible();
     await expect(restored.getByText("Organization vault unlocked", { exact: true })).toHaveCount(0);
+    await restored.reload();
+    await expect(restored.getByLabel("Organization vault password", { exact: true })).toBeVisible();
+    await expect(restored.locator(".network-status")).toHaveCount(0);
+    await expect(restored.getByRole("alert")).toHaveCount(0);
     await unlock(restored); expect(await profile(restored)).toEqual(original);
   } finally { await fresh.close(); }
 });

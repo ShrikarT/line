@@ -41,7 +41,9 @@ for (const path of ["/", "/app"]) {
       await expect(page.getByRole("heading", { name: "Connect your wallet.", exact: true })).toBeVisible();
       release();
       await page.getByRole("button", { name: "Close", exact: true }).click();
-      await page.waitForLoadState("networkidle");
+      // Wait for the deferred unlock itself to settle. SharedWorker startup can
+      // keep browser network-idle pending after the UI operation is complete.
+      await expect(page.locator(".network-status")).toHaveCount(0);
       await expect(page.getByRole("heading", { name: "Start with your wallet.", exact: true })).toBeVisible();
       await expect(page.getByText("Organization vault unlocked", { exact: true })).toHaveCount(0);
       await expect(page.getByRole("alert")).toHaveCount(0);

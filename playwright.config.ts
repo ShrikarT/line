@@ -24,7 +24,7 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: `node node_modules/vite/bin/vite.js --host 127.0.0.1 --port ${port} --strictPort`,
+    command: `node node_modules/vite/bin/vite.js ${process.env.PLAYWRIGHT_PREVIEW === "1" ? "preview " : ""}--host 127.0.0.1 --port ${port} --strictPort`,
     url: localUrl,
     reuseExistingServer: !process.env.CI,
   },

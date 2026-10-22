@@ -105,6 +105,14 @@ the password again; unsupported browsers keep the vault locked after refresh.
 No passphrase or private key is written to browser storage. Other consoles retain
 their existing timeout.
 
+Vault authentication and network readiness are separate UI states. A failed live
+read during restoration retains a valid memory session for an explicit retry;
+it does not ask for the password again or renew the original deadline. A network
+setup failure after decryption keeps the vault and encrypted backup available,
+while transaction tools remain unavailable until fresh checks pass. Missing or
+expired memory records still require the password. A null resume reply is never
+treated as a successful restored session.
+
 Wallet identity probes are sequential. Unlock reads and validates service
 configuration once, keeping a frozen copy only in the account's memory. Later
 boundaries use the standard [`getConnectionStatus`](https://github.com/midnightntwrk/midnight-dapp-connector-api/blob/main/docs/api/_media/SPECIFICATION.md)
