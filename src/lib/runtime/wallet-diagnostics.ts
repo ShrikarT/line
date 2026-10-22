@@ -1,5 +1,6 @@
 import type { ConnectedAPI } from "@midnight-ntwrk/dapp-connector-api";
 import { decodeWalletPublicKey } from "./wallet.ts";
+import { walletConnectorCode } from "./errors.ts";
 
 export type WalletReadDiagnostic = { method: string; outcome: "passed" | "failed" | "timed out"; elapsedMs: number; detail: string; code?: string };
 type Reader = Pick<ConnectedAPI, "getConfiguration" | "getShieldedAddresses" | "getUnshieldedAddress" | "getConnectionStatus">;
@@ -8,8 +9,7 @@ class DiagnosticMismatch extends Error {}
 
 function failureDetail(error: unknown) {
   const row = error && typeof error === "object" ? error as { code?: unknown; message?: unknown; reason?: unknown } : null;
-  const rawCode = row?.code;
-  const code = typeof rawCode === "number" && Number.isSafeInteger(rawCode) && Math.abs(rawCode) <= 100000 ? String(rawCode) : typeof rawCode === "string" && /^-?[0-9]{1,5}$/.test(rawCode) ? rawCode : undefined;
+  const code = walletConnectorCode(error);
   const message = String(row?.message ?? row?.reason ?? (typeof error === "string" ? error : ""));
   const detail = error instanceof DiagnosticMismatch ? error.message : /rate[\s_-]*limit|too many requests/i.test(message) || code === "429" ? "Connector rate limit" : /background script|extension.*loaded|forwarding message/i.test(message) ? "Wallet message bridge did not respond" : /^request failed[.!]?$/i.test(message.trim()) ? "Connector returned Request failed" : "Connector read failed";
   // Never echo arbitrary wallet diagnostics: they can contain service URLs,

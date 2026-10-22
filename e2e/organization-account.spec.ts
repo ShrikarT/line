@@ -59,13 +59,17 @@ for (const method of ["connect(preprod)", "getConfiguration"] as const) test(`co
   await page.evaluate(method => {
     const target = (window as any).midnight.a, original = target.connect;
     target.connect = async (...args: any[]) => {
-      if (method === "connect(preprod)") throw Error("Request failed");
+      if (method === "connect(preprod)") throw { code: "InternalError", message: "Request failed", reason: "https://private.invalid/?token=redaction-control" };
       const api = await original(...args); api.getConfiguration = async () => { throw Error("Request failed"); }; return api;
     };
   }, method);
   await page.getByRole("banner").getByRole("button", { name: "Connect wallet", exact: true }).click();
   await page.getByRole("button", { name: "Organization wallet a", exact: true }).click();
   await expect(page.getByRole("alert")).toContainText("Request failed");
+  if (method === "connect(preprod)") {
+    await expect(page.getByRole("alert")).toContainText("connector code InternalError");
+    await expect(page.getByRole("dialog")).not.toContainText("private.invalid");
+  }
   await page.getByText("Connection diagnostics", { exact: true }).click();
   await expect(page.getByRole("dialog")).toContainText(`Connection stopped at ${method}.`);
   if (method === "getConfiguration") {

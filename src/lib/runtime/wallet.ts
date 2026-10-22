@@ -8,7 +8,7 @@ import type { InitialAPI, ConnectedAPI, Configuration } from "@midnight-ntwrk/da
 import type { WalletProvider, MidnightProvider } from "@midnight-ntwrk/midnight-js-types";
 import { bech32m } from "@scure/base";
 import { hexToBytes, toHex } from "../bytes.ts";
-import { WalletNotConnectedError, WalletApprovalRejectedError } from "./errors.ts";
+import { WalletNotConnectedError, WalletApprovalRejectedError, walletConnectorCode } from "./errors.ts";
 import { lockVaultSession } from "../security/vault.ts";
 
 export interface WalletInfo {
@@ -307,7 +307,7 @@ export async function connectWallet(
       throw err;
     }
     throw new WalletNotConnectedError(
-      `Failed to connect to ${targetWallet.name ?? walletKey}: ${message}`
+      `Failed to connect to ${targetWallet.name ?? walletKey}: ${message} (connector code ${walletConnectorCode(err) ?? "unavailable"})`
     );
   }
 }
