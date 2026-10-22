@@ -100,6 +100,15 @@ settings. Reconnect and reopen the organization to adopt changed service URLs.
 Only explicit rate-limit responses on these reads may retry within a bounded
 deadline; each retry checks session validity. Signing, proving and submission
 are outside that retry path.
+
+The wallet dialog also provides explicit read-only connection diagnostics. It
+records the connection stage and probes configuration, shielded identities,
+receiving address and live session separately, without opening a vault. Failed
+verification may retain only these four read capabilities for diagnostics;
+it never publishes a connected account. Results stay in memory, redact arbitrary
+provider errors and stop on timeout or connection changes. Diagnostic success
+cannot substitute for the live guards on recovery or transactions.
+
 The treasury refresh control retries facility state as well as wallet balances
 and supplier discovery. A failed facility read keeps spending controls disabled
 until a successful read restores the required setup and status checks.
