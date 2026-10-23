@@ -7,7 +7,7 @@ import { setNetworkId } from "@midnight-ntwrk/midnight-js-network-id";
 import type { ContractProviders } from "@midnight-ntwrk/midnight-js-contracts";
 import { Contract } from "../contracts/managed/organization/contract/index.js";
 import { WITNESSES } from "../src/lib/line/compact-harness.ts";
-import { OrganizationTransactions, originalOrganizationTransaction } from "../src/lib/organization/transactions.ts";
+import { OrganizationTransactions, originalOrganizationTransaction, originalOrganizationSubmissionDetails } from "../src/lib/organization/transactions.ts";
 import type { OrganizationPending } from "../src/lib/organization/account.ts";
 import { organizationProofProvider } from "../src/lib/organization/proving.ts";
 
@@ -39,6 +39,22 @@ test("original submission validation preserves exact public bytes and every acti
   const { pending } = await originalFixture();
   Object.assign(pending, { kind: "call", circuit: "openLine", contractAddress: action.address, transaction: raw.toString("hex"), txId: transaction.identifiers().at(-1) });
   assert.equal(Buffer.from(originalOrganizationTransaction(pending, fingerprint, 0).serialize()).toString("hex"), raw.toString("hex"));
+});
+
+test("submission diagnostics export only canonical public bytes and exact TTLs without private candidates", async () => {
+  const { pending, transaction } = await originalFixture(), before = structuredClone(pending);
+  const details = originalOrganizationSubmissionDetails(pending, fingerprint);
+  assert.deepEqual(Object.keys(details).sort(), ["schema", "operationId", "identifier", "transactionHash", "kind", "circuit", "contractAddress", "sourceFingerprint", "intentTtls", "transaction"].sort());
+  assert.equal(details.identifier, pending.txId); assert.equal(details.transaction, pending.transaction);
+  assert.equal(details.transactionHash, transaction.transactionHash());
+  assert.deepEqual(details.intentTtls, [...transaction.intents!.values()].map(intent => intent.ttl.toISOString()).sort());
+  assert(!JSON.stringify(details).includes(pending.after.issuerSecret)); assert(!JSON.stringify(details).includes(pending.after.merchantSecret));
+  assert.deepEqual(pending, before);
+  for (const change of [{ txId: "00" + "ff".repeat(32) }, { kind: "call" as const }, { sourceFingerprint: "ff".repeat(32) }]) assert.throws(() => originalOrganizationSubmissionDetails({ ...pending, ...change }, fingerprint));
+  const raw = readFileSync(new URL("fixtures/private-offer-public-pairs/3-openLine.proven-public-tx.bin", import.meta.url));
+  const expired = Transaction.deserialize("signature", "proof", "binding", raw), action = [...expired.intents!.values()].flatMap(intent => intent.actions)[0];
+  Object.assign(pending, { kind: "call", circuit: "openLine", contractAddress: action.address, transaction: raw.toString("hex"), txId: expired.identifiers().at(-1) });
+  assert.equal(originalOrganizationSubmissionDetails(pending, fingerprint).transaction, raw.toString("hex"));
 });
 
 test("original submission rejects changed bytes, identity, release and action metadata", async () => {

@@ -259,6 +259,17 @@ export class OrganizationAccount {
     if (this.record.pending?.txId) throw new Error("A signed submission must be reconciled against its exact transaction.");
     await this.commit({ snapshot: this.record.snapshot, pending: null });
   }
+  async savedSubmissionDetails(sourceFingerprint: string) {
+    return this.withAccountLock(async () => {
+      const pending = this.pending();
+      if (!pending?.txId) throw new Error("No original signed transaction is saved.");
+      const { originalOrganizationSubmissionDetails } = await import("./transactions.ts");
+      this.assertSession();
+      const details = originalOrganizationSubmissionDetails(pending, sourceFingerprint);
+      this.assertSession();
+      return details;
+    }, false);
+  }
   async encryptedBackup() {
     // Recovery must remain available when the wallet's remote API is offline.
     // Keep the session guard, durable reload and lock; only omit the RPC check.

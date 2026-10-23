@@ -92,7 +92,7 @@ export class OrganizationNetwork {
         if (!feeActions.some(action => action.spends.length > 0) || feeActions.some(action => action.spends.length === 0 && action.registrations.length === 0)) throw new Error("The wallet returned an empty DUST fee section. Synchronize or update the wallet before retrying.");
         if (!id) throw new Error("Transaction has no identifier.");
         await account.submitted(id, toHex(tx.serialize()), action.address);
-        report("Submitted to Midnight. Waiting for the finalized receipt");
+        report("Sending the signed transaction. Waiting for the finalized receipt");
         return withinDeadline(wallet.midnightProvider.submitTx(tx), 30_000, "The submission acknowledgement timed out. The original signed transaction is saved; check its status before doing anything else.");
       } },
     };
@@ -486,6 +486,9 @@ export class OrganizationNetwork {
       delete order.noteCommitment; delete order.quoteCommitment; delete order.quoteExpiry;
     });
     await this.continueService(orderId);
+  }
+  savedSubmissionDetails() {
+    return this.account.savedSubmissionDetails(this.release.sourceFingerprint);
   }
   async resubmitOriginal(expected: { operationId: string; txId: string }) {
     return this.account.exclusive(async () => {

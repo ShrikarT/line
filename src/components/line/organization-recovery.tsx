@@ -3,15 +3,17 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { MAX_ORGANIZATION_BACKUP_BYTES, isOrganizationEmpty } from "@/lib/organization/backup";
 import { useOrganization } from "./organization-session";
-import { OrganizationField, organizationField } from "./organization-ui";
+import { OrganizationField, organizationField, downloadOrganizationFile } from "./organization-ui";
 import { matchesExpiredOpeningScope } from "@/lib/organization/expired-opening-policy";
 import type { ExpiredOpeningReview } from "@/lib/organization/expired-opening";
 import { matchesExpiredDisableScope } from "@/lib/organization/expired-disable-policy";
 import type { ExpiredDisableReview } from "@/lib/organization/expired-disable";
+import type { OriginalOrganizationSubmissionDetails } from "@/lib/organization/transactions";
 
 export function OrganizationPendingRecovery() {
   const { recoveries, pending, busy, run } = useOrganization();
   const [reviewingId, setReviewingId] = useState<string | null>(null);
+  const [submissionDetails, setSubmissionDetails] = useState<OriginalOrganizationSubmissionDetails | null>(null);
   const [expiryReview, setExpiryReview] = useState<ExpiredOpeningReview | ExpiredDisableReview | null>(null);
   if (!pending) {
     return recoveries.length ? <details className="organization-create"><summary>Expired operation recovery history ({recoveries.length})</summary><p>The original signed operation and private candidate remain in encrypted storage and backups. Recovery evidence comes from the configured TLS Preprod providers; it is separate from finalized transaction receipts.</p>{recoveries.map(entry => <p key={entry.txId} className="[overflow-wrap:anywhere]"><code>{entry.txId}</code> · nonapplication checked at finalized block {entry.blockHeight.toLocaleString()}.</p>)}</details> : null;
@@ -24,6 +26,21 @@ export function OrganizationPendingRecovery() {
     {pending.contractAddress && <p className="[overflow-wrap:anywhere]">Facility: <code>{pending.contractAddress}</code></p>}
     <div className="flex flex-wrap gap-3">
       <Button disabled={busy} onClick={() => void run(client => client.reconcile())}>Check original transaction</Button>
+      {!!pending.txId && !!pending.transaction && <>
+        <Dialog open={submissionDetails?.operationId === pending.id && submissionDetails.identifier === pending.txId && submissionDetails.transaction === pending.transaction} onOpenChange={open => { if (!open) setSubmissionDetails(null); }}>
+          <DialogTrigger asChild><Button variant="outline" disabled={busy} onClick={() => { setSubmissionDetails(null); void run(async client => setSubmissionDetails(await client.savedSubmissionDetails()), "Saved transaction details loaded. No transaction was submitted."); }}>Inspect saved transaction</Button></DialogTrigger>
+          <DialogContent className="max-h-[85dvh] overflow-y-auto">
+            <DialogHeader><DialogTitle>Saved transaction details</DialogTitle><DialogDescription>Read from the original signed bytes. These deadlines are separate from your allowance and merchant claim deadlines. Expiry does not prove nonapplication.</DialogDescription></DialogHeader>
+            {submissionDetails && <>
+              <code className="wallet-address block w-full">{submissionDetails.identifier}</code>
+              {submissionDetails.intentTtls.map((ttl, index) => <p key={index}>Signed intent {index + 1} TTL: {ttl}</p>)}
+              <p>Diagnostics include the original signed transaction and public metadata. They exclude your vault password, role secrets and private candidate. Exporting does not submit or clear the operation.</p>
+              <DialogFooter><Button variant="outline" disabled={busy} onClick={() => downloadOrganizationFile("line-submission-diagnostics.json", JSON.stringify(submissionDetails, null, 2))}>Download submission diagnostics</Button><Button variant="ghost" onClick={() => setSubmissionDetails(null)}>Close details</Button></DialogFooter>
+            </>}
+          </DialogContent>
+        </Dialog>
+      </>}
+
       {(matchesExpiredOpeningScope(pending) || disabling) && <>
         <Button variant="outline" disabled={busy} onClick={() => { setExpiryReview(null); void run(async client => setExpiryReview(await (disabling ? client.reviewExpiredDisable() : client.reviewExpiredOpening()))); }}>{disabling ? "Review expired merchant disable recovery" : "Review expired opening recovery"}</Button>
         <Dialog open={expiryReview?.operationId === pending.id} onOpenChange={open => { if (!open) setExpiryReview(null); }}>
