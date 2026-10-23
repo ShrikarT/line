@@ -13,8 +13,8 @@ privacy and independent commercial custody are not established.
 | Local verification | This follow-up: 695 core tests passed, one skipped. After adding the clock-skew and missing-capability checks, all 14 affected auth/adapter tests passed again. Two built wallet-only host tests, typecheck, production build, 37-file proving export, production key/secret scans and zero managed-contract drift passed |
 | Browser verification | 70 distinct organization, startup and wallet scenarios passed across the broad/focused runs, including duplicate-read, retained-cookie, missing-code and closed-original-tab cases. The broad run caught two missing backup-completion messages; those were corrected and their reruns passed. All eight final production-preview checks passed. Six further browser checks confirmed exact pending bytes, atomic recovery, backup/restore, outage export and lock protection; the startup checks also passed. Final UI/cache changes were verified after the full core run. CI now repeats these against built assets. Fixtures are controlled tests, not new network acceptance |
 | Full CI | The [refresh correction `1efc8b4`](https://github.com/ShrikarT/line/actions/runs/39776737263), [startup follow-up `568c093`](https://github.com/ShrikarT/line/actions/runs/39780636985), [code-download correction `cb754a5`](https://github.com/ShrikarT/line/actions/runs/39784089985) and [second-opening recovery `702194d`](https://github.com/ShrikarT/line/actions/runs/39901700502) all passed. Recovery's 39 focused tests, five browser cases, two built-host tests, typecheck, build, proving export and key/secret checks also passed locally |
-| Actual organization | Twelve verifier keys and 22 finalized workspace receipts. Last independently checked state: CLOSED, generation 1, 900,000 native-asset base units held, 1,000,000 reserve accounting, zero encumbrance and fees |
-| Active blocker | Both expired openings are archived and the owner reports recovery history (2). No new opening was created during recovery. Closed-line reopening and fee-bearing acceptance still require a separately reviewed wallet-approved transaction and finalized receipt |
+| Actual organization | Latest separately checked finalized opening: OPEN, generation 2, twelve release-matched keys, maintenance counter 11, fees 1,000 + 100 bps, zero encumbrance and accrued fees. Its post-state holds 1,900,000 native-asset base units with reserve accounting 2,000,000. The extra reserve increase is observed; its funding receipt has not yet been separately audited. Latest workspace receipt count has not been reread |
+| Active blocker | Both expired openings are archived and the owner reports recovery history (2). The separately reviewed fresh reopening is now finalized. Next acceptance is a fresh generation-2 quote, fee-bearing purchase, redemption and finalized fee withdrawal |
 | Live testing | On 23 October the owner confirmed automatic wallet connection, a ready organization and an unlocked vault after refresh, then successfully reviewed and archived the newer opening. The displayed history records `006c2322...` at finalized block 3,092,740 and `00abb757...` at finalized block 3,099,704. These are encrypted local recovery records with provider-backed evidence, not finalized failure receipts or successful reopening acceptance |
 | Wallet / backup | Latest encrypted backup remains saved. On the new live build, the actual 1AM owner wallet connected with one click and restored itself after refresh. The owner subsequently reported an organization logout after refresh; a live tab showed a rate limit above the password form. The reproduced boundary was network-read failure being presented as vault logout; the correction retains the memory session for retry. On the corrected deployment, the actual owner tab restored the organization after refresh without password entry, displayed all 22 receipts, and completed wallet/contract-release setup. This is session verification, not a new chain transaction. Its original signed operation is retained. Prior connector failures included a rate limit, generic configuration failure and InternalError; none justified bypassing live guards |
 
@@ -116,6 +116,7 @@ units. All amounts below use base units.
 | Pause | `cf4d26a71bef83e78217af23f3e88e54866a4331f31c56406f9e6d4322942ae1` | 3,059,617 |
 | Resume | `08435fb970a6856c5d15270dfb299005924eef050040476a781279b3d48fad42` | 3,059,694 |
 | Close with zero outstanding | `19b6095be3bb7a3eb03865a514c87386e5c340b593529ecdc3d120c9b30a54fc` | 3,062,090 |
+| Reopen with 1,000 flat fee + 100 bps | `5cceda1a3b762fd156a124d412e7b02db263fa4fed172f5f12e4fcf3aae74a65` | 3,099,871 |
 
 Separate read-only checks matched selected raw transactions, contract actions,
 identifiers, canonical finalized blocks and all twelve release-matched keys.
@@ -130,9 +131,12 @@ Fresh receipts cover eight distinct call names: `fundReserve`,
 `withdrawUnencumberedReserve`, `openLine`, `postQuote`, `draw`, `redeemDraw`,
 `acknowledgeRepayment`, `setStatus`. Verifier registration is not circuit-call
 acceptance. Additional `registerMerchant`, `disableMerchant`, `withdrawFees`,
-all `cancelOrExpireNote` modes and closed-line reopening remain unaccepted in
-this facility. Its confirmed allowance used zero fees; fee-bearing checkout and
-fee withdrawal still need fresh wallet-approved receipts.
+all `cancelOrExpireNote` modes remain unaccepted in this facility. Closed-line
+reopening with fees was separately verified on 23 October: exact canonical raw
+transaction, aggregate SUCCESS and RPC-finalized block 3,099,871. Its post-state
+is OPEN, generation 2, flat fee 1,000 and rate 100 bps, expiring
+`2026-10-30T05:40:32Z`. All twelve verifier keys still match the release. Fee-bearing
+checkout, redemption and fee withdrawal still need fresh wallet-approved receipts.
 
 ### Pending allowance and recovery
 
@@ -284,9 +288,9 @@ compiled-contract tests do not replace fresh network receipts.
 
 ## Wave 3 — pilots and hardening
 
-1. Review and submit a fresh fee-bearing opening on the existing CLOSED facility.
-   Both expired originals remain in encrypted recovery history. Do not reuse or
-   replace their bytes; the new terms and wallet approval are a separate action.
+1. Preserve the finalized generation-2 opening and both encrypted recovery records.
+   Use a fresh quote bound to this generation for the next purchase; older
+   generation-1 quotes cannot establish acceptance of the reopened allowance.
 2. Complete fee-bearing and remaining twelve-action/compensation acceptance with
    finalized receipts and actual asset movements. The next 100,000-unit purchase
    under the proposed policy would charge a 2,000-unit fee, totaling 102,000.
