@@ -14,7 +14,7 @@ privacy and independent commercial custody are not established.
 | Browser verification | 70 distinct organization, startup and wallet scenarios passed across the broad/focused runs, including duplicate-read, retained-cookie, missing-code and closed-original-tab cases. The broad run caught two missing backup-completion messages; those were corrected and their reruns passed. All eight final production-preview checks passed. Six further browser checks confirmed exact pending bytes, atomic recovery, backup/restore, outage export and lock protection; the startup checks also passed. Final UI/cache changes were verified after the full core run. CI now repeats these against built assets. Fixtures are controlled tests, not new network acceptance |
 | Full CI | The [claim-list correction `df43535`](https://github.com/ShrikarT/line/actions/runs/39917370912) passed all jobs; local checks above also passed. The [refresh correction `1efc8b4`](https://github.com/ShrikarT/line/actions/runs/39776737263), [startup follow-up `568c093`](https://github.com/ShrikarT/line/actions/runs/39780636985), [code-download correction `cb754a5`](https://github.com/ShrikarT/line/actions/runs/39784089985) and [second-opening recovery `702194d`](https://github.com/ShrikarT/line/actions/runs/39901700502) all passed. Recovery's 39 focused tests, five browser cases, two built-host tests, typecheck, build, proving export and key/secret checks also passed locally |
 | Actual organization | Latest Merchant 2 draw: OPEN, generation 2, policy 1,000 + 100 bps, 100,000 encumbered principal, 2,000 pending fees and zero finalized fees. Custody remains 1,798,000, reserve accounting 1,998,000 and cumulative redeemed principal 200,000; the Merchant 2 payout is pending. The preceding cycle paid 100,000 to the first merchant and 2,000 to the fixed issuer. The additional 1,000,000 funding was separately verified at block 3,099,785. Latest workspace receipt count has not been reread |
-| Active blocker | The two expired openings are archived, and fresh fee-bearing reopening, quote, draw, merchant payout and fee withdrawal are all finalized. The owner confirmed final UI figures and saved a fresh encrypted backup. Merchant 2 registration, quote and draw are finalized; its payout and disabling checks remain, alongside compensation acceptance, independent suppliers/customer validation and full-history privacy |
+| Active blocker | Merchant 2 disabling has an unresolved signed operation: acknowledgement timed out and exact-identifier lookup has no receipt. The encrypted journal blocks new mutations. Registration, quote and draw are finalized; the existing claim remains unredeemed. Preserve the original bytes and candidate. Earlier expired openings remain archived. Compensation acceptance, independent suppliers/customer validation and full-history privacy remain outstanding |
 | Live testing | On 23 October the owner confirmed automatic wallet connection, a ready organization and an unlocked vault after refresh, then successfully reviewed and archived the newer opening. The displayed history records `006c2322...` at finalized block 3,092,740 and `00abb757...` at finalized block 3,099,704. These are encrypted local recovery records with provider-backed evidence, not finalized failure receipts or successful reopening acceptance |
 | Wallet / backup | The owner confirmed automatic wallet connection, organization readiness and an unlocked vault after refresh on 23 October. After the fee-bearing cycle, the owner confirmed allowance 1,000,000, spending balance 102,000, remaining allowance 898,000, zero fees and assets held 1,798,000. A fresh encrypted backup was saved; only its existence was checked, without reading or decrypting it. Intermittent wallet rate limits remain possible; failed reads retain the memory session and never bypass live transaction guards |
 
@@ -211,6 +211,20 @@ native inflow, custody 1,900,000 and reserve accounting 2,000,000 while still CL
 at generation 1, before the fresh opening. This completes the fee-bearing
 reopening/quote/draw/redemption/fee-withdrawal cycle on this facility. It does not
 establish independent fulfillment, a customer pilot or full-history privacy.
+
+### Pending Merchant 2 disabling
+
+The owner's `disableMerchant` submission acknowledgement timed out. Its exact
+retained identifier is
+`0054af76ef4d913f967d607a266633d5fb6c7d6db18b79b4ddb7c6d9158649cce6`.
+At finalized block 3,102,407 (`2026-10-23T09:57:36Z`), an exact identifier query
+returned zero records without indexer errors; pinned node state still showed
+Merchant 2 active and its 100,000 + 2,000 claim unredeemed. These configured
+provider observations do not prove nonapplication or future impossibility.
+The encrypted pending operation remains blocked for exact receipt reconciliation
+or an explicit original-byte retry that still passes canonical/release/TTL checks.
+No replacement transaction or failure receipt has been created. The scoped
+expired-opening recovery does not apply to this different action.
 
 ### Archived expired openings
 
