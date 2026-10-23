@@ -6,7 +6,7 @@ import { hexToBytes, randomBytes32, toHex } from "../line/encoding.ts";
 import { decodeOrganizationBackup, isOrganizationEmpty } from "./backup.ts";
 import { OrganizationTimeoutError, withinDeadline } from "./finality.ts";
 import { ORGANIZATION_SESSION_MINUTES } from "./session-policy.ts";
-import { EXPIRED_OPENING, type ExpiredOpeningEvidence } from "./expired-opening-policy.ts";
+import { matchesExpiredOpeningScope, type ExpiredOpeningEvidence } from "./expired-opening-policy.ts";
 import { rememberOrganizationTabSession, forgetOrganizationTabSession, type OrganizationTabSession } from "./tab-session.ts";
 
 function rateLimited(failure: unknown): boolean {
@@ -237,7 +237,7 @@ export class OrganizationAccount {
   }
   async archiveExpiredOpening(expected: OrganizationPending, evidence: ExpiredOpeningEvidence, ttl: number) {
     this.assertSession();
-    if (expected.kind !== "call" || expected.circuit !== "openLine" || expected.txId !== EXPIRED_OPENING.txId || expected.contractAddress !== EXPIRED_OPENING.address || expected.sourceFingerprint !== EXPIRED_OPENING.sourceFingerprint) throw new Error("Only the audited original opening can use this recovery path.");
+    if (!matchesExpiredOpeningScope(expected)) throw new Error("Only the explicitly scoped openings can use this recovery path.");
     if (!this.record.pending?.txId || encodeVaultJson(this.record.pending) !== encodeVaultJson(expected)) throw new Error("The saved operation changed. Review its recovery again.");
     const recoveries = copyAccount(this.record.recoveries ?? []);
     if (recoveries.some(entry => entry.original.txId === expected.txId)) throw new Error("This original operation already has recovery history.");

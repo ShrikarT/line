@@ -45,8 +45,10 @@ Expiry is a submission restriction, not a reconciliation restriction: an exact
 finalized success can still publish the candidate, and an exact finalized total
 failure can record the failure. Missing, unrelated or partial receipts retain it.
 
-The expired fee-bearing reopening listed in [progress](PROGRESS.md) has a separate,
-owner-reviewed recovery path scoped to that identifier, facility and release.
+The two expired fee-bearing reopenings listed in [progress](PROGRESS.md) have a
+separate, owner-reviewed recovery path scoped to their exact identifiers, facility
+and release. Naming an identifier only admits the checks; it never substitutes
+for canonical signed-byte decoding or replay of the retained private candidate.
 An authenticated fixed-purpose API pins node reads to a finalized hash, checks
 Preprod genesis/runtime identity, reads `Timestamp.Now` and checks the indexer
 agrees on the block. The complete serialized contract must equal the trusted

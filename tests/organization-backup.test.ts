@@ -63,12 +63,16 @@ test("backup preserves reviewed service fee ceilings and rejects invalid limits 
   assert.doesNotThrow(() => validateOrganizationRecord(record, accountId));
 });
 
-test("backup preserves bounded expired-opening history without nesting archives inside candidates", async () => {
+test("backup preserves both scoped expired openings without nesting archives inside candidates", async () => {
   const base = withPending(), original = base.pending!;
   Object.assign(original, { kind: "call", circuit: "openLine", contractAddress: policy.address, txId: policy.txId, sourceFingerprint: policy.sourceFingerprint });
   original.after.facilities[0].address = policy.address;
   const state = readFileSync(new URL("fixtures/organization-closed-state.hex", import.meta.url), "utf8");
   const record: OrganizationRecord = { snapshot: structuredClone(original.after), pending: null, recoveries: [{ disposition: "expired-opening-not-applied", original, before: structuredClone(original.after), ttl: 1792500000000, recordedAt: "2026-10-21T15:00:00.000Z", evidence: { schema: "line:expired-opening-evidence/v1", address: policy.address, genesisHash: policy.genesisHash, runtimeSpecVersion: policy.runtimeSpecVersion, baseline: { hash: policy.baselineHash, height: policy.baselineHeight, state }, finalized: { hash: "aa".repeat(32), height: 3077281, timestamp: 1792598700000, state } } }] };
+  const second = structuredClone(record.recoveries![0]);
+  second.original.id = "second-owner-reviewed-opening";
+  second.original.txId = "00abb757c332b831dd25c7640f417d50323639ede3361893571e361ec8eae44813";
+  record.recoveries!.push(second);
   const backup = await encryptSecret(key, encodeVaultJson(record), "BackupControl123!");
   assert.deepEqual(await decodeOrganizationBackup(JSON.stringify(backup), "BackupControl123!", key, accountId), record);
   assert.equal(isOrganizationEmpty({ ...initial(), recoveries: record.recoveries }), false);

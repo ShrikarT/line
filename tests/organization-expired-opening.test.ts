@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import * as L from "@midnight-ntwrk/ledger-v8";
 import * as R from "@midnight-ntwrk/compact-runtime";
 import { validateExpiredOpeningEvidence, validateOpeningCandidate, validateOpeningExpiry, verifyExpiredOpening } from "../src/lib/organization/expired-opening.ts";
-import { EXPIRED_OPENING as policy, type ExpiredOpeningEvidence } from "../src/lib/organization/expired-opening-policy.ts";
+import { EXPIRED_OPENING as policy, EXPIRED_OPENING_TRANSACTION_IDS, matchesExpiredOpeningScope, type ExpiredOpeningEvidence } from "../src/lib/organization/expired-opening-policy.ts";
 import { ledger } from "../contracts/managed/organization/contract/index.js";
 import type { OrganizationPending } from "../src/lib/organization/account.ts";
 
@@ -15,6 +15,18 @@ export const evidenceFixture = (): ExpiredOpeningEvidence => ({ schema: "line:ex
   baseline: { height: policy.baselineHeight, hash: policy.baselineHash, state: closedState }, finalized: { hash: "aa".repeat(32), height: 3077281, timestamp: 1792598700000, state: closedState } });
 const actual = L.ContractState.deserialize(Buffer.from(closedState, "hex"));
 const key = async (name: string) => actual.operation(name)!.verifierKey;
+
+test("recovery scope admits only the two named openings at the audited facility and release", () => {
+  assert.equal(EXPIRED_OPENING_TRANSACTION_IDS.length, 2);
+  for (const txId of EXPIRED_OPENING_TRANSACTION_IDS) {
+    const pending = { kind: "call", circuit: "openLine", txId, contractAddress: policy.address, sourceFingerprint: policy.sourceFingerprint };
+    assert.equal(matchesExpiredOpeningScope(pending), true);
+    for (const change of [{ txId: "00" + "ff".repeat(32) }, { kind: "deploy" }, { circuit: "draw" }, { contractAddress: "ff".repeat(32) }, { sourceFingerprint: "ff".repeat(32) }]) {
+      assert.equal(matchesExpiredOpeningScope({ ...pending, ...change }), false);
+    }
+  }
+  assert.equal(matchesExpiredOpeningScope(null), false);
+});
 
 test("expired-opening recovery rejects absent, unrelated or unpinned evidence", async () => {
   for (const evidence of [null, {}, { schema: "line:expired-opening-evidence/v1", address: "aa".repeat(32) }]) {
@@ -47,6 +59,7 @@ test("recovery binds the exact serialized opening transcript to predecessor and 
     (p: OrganizationPending) => { p.after.merchantSecret = "cc".repeat(32); },
     (p: OrganizationPending) => { p.after.facilities[0].agentSecret = "cc".repeat(32); },
     (p: OrganizationPending) => { p.txId = policy.txId; },
+    (p: OrganizationPending) => { p.txId = EXPIRED_OPENING_TRANSACTION_IDS[1]; },
     (p: OrganizationPending) => { p.contractAddress = policy.address; },
   ]) { const pending = structuredClone(f.pending); mutate(pending); assert.throws(() => validateOpeningCandidate(f.before, pending, f.predecessor, policy.sourceFingerprint)); }
 });
@@ -54,6 +67,14 @@ test("recovery binds the exact serialized opening transcript to predecessor and 
 test("a different expired opening can never use this facility's recovery authorization", async () => {
   const f = await candidateFixture();
   await assert.rejects(verifyExpiredOpening(f.before, f.pending, evidenceFixture(), policy.sourceFingerprint, key), /recovery/i);
+});
+
+test("a named identifier cannot authorize unrelated canonical bytes", async () => {
+  const f = await candidateFixture();
+  for (const txId of EXPIRED_OPENING_TRANSACTION_IDS) {
+    const pending = { ...f.pending, txId, contractAddress: policy.address };
+    await assert.rejects(verifyExpiredOpening(f.before, pending, evidenceFixture(), policy.sourceFingerprint, key), /Saved transaction bytes differ/);
+  }
 });
 
 test("only pinned block time strictly beyond TTL plus uncertainty admits recovery", () => {

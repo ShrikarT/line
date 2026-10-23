@@ -1,7 +1,7 @@
 import { ContractState, CostModel, QueryContext, ContractCall } from "@midnight-ntwrk/ledger-v8";
 import { ContractState as CompactState } from "@midnight-ntwrk/compact-runtime";
 import { ledger, Status } from "../../../contracts/managed/organization/contract/index.js";
-import { EXPIRED_OPENING as policy, type ExpiredOpeningEvidence } from "./expired-opening-policy.ts";
+import { EXPIRED_OPENING as policy, matchesExpiredOpeningScope, type ExpiredOpeningEvidence } from "./expired-opening-policy.ts";
 import { copyAccount, type OrganizationPending, type OrganizationSnapshot } from "./account.ts";
 import { decodeOriginalOrganizationTransaction } from "./transactions.ts";
 import { matchesRestoredFacility } from "./recovery.ts";
@@ -65,7 +65,7 @@ export function validateOpeningCandidate(before: OrganizationSnapshot, pending: 
 }
 
 export async function verifyExpiredOpening(before: OrganizationSnapshot, pending: OrganizationPending, value: unknown, sourceFingerprint: string, verifierKey: (name: string) => Promise<Uint8Array>) {
-  need(sourceFingerprint === policy.sourceFingerprint && pending.sourceFingerprint === policy.sourceFingerprint && pending.txId === policy.txId && pending.contractAddress === policy.address);
+  need(sourceFingerprint === policy.sourceFingerprint && matchesExpiredOpeningScope(pending));
   const { evidence, state } = await validateExpiredOpeningEvidence(value, verifierKey);
   const ttl = validateOpeningCandidate(before, pending, state, sourceFingerprint);
   // Ledger 8 rejects ttl < tblock, with tblock=floor(Timestamp.Now/1000).

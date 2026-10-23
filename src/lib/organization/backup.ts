@@ -1,7 +1,7 @@
 import { decodeVaultJson, decryptSecret, type EncryptedEnvelope } from "../security/vault.ts";
 import type { OrganizationRecord, OrganizationSnapshot } from "./account.ts";
 import { receivingAddressBytes } from "./account.ts";
-import { EXPIRED_OPENING } from "./expired-opening-policy.ts";
+import { EXPIRED_OPENING, matchesExpiredOpeningScope } from "./expired-opening-policy.ts";
 
 export const MAX_ORGANIZATION_BACKUP_BYTES = 64 * 1024 * 1024;
 const UINT64 = 18_446_744_073_709_551_615n;
@@ -93,7 +93,7 @@ export function validateOrganizationRecord(value: unknown, accountId: string): O
       need(Number.isFinite(Date.parse(text(r.recordedAt))) && Number.isSafeInteger(r.ttl) && (r.ttl as number) > 0);
       const previous = validateOrganizationRecord({ snapshot: r.before, pending: r.original }, accountId);
       need(previous.snapshot.issuerSecret === current.issuerSecret && previous.snapshot.merchantSecret === current.merchantSecret);
-      need(original.kind === "call" && original.circuit === "openLine" && original.txId === EXPIRED_OPENING.txId && original.contractAddress === EXPIRED_OPENING.address && original.sourceFingerprint === EXPIRED_OPENING.sourceFingerprint);
+      need(matchesExpiredOpeningScope(original));
       need(evidence.schema === "line:expired-opening-evidence/v1" && evidence.address === EXPIRED_OPENING.address && evidence.genesisHash === EXPIRED_OPENING.genesisHash && evidence.runtimeSpecVersion === EXPIRED_OPENING.runtimeSpecVersion);
       const baseline = object(evidence.baseline), finalized = object(evidence.finalized);
       need(baseline.hash === EXPIRED_OPENING.baselineHash && baseline.height === EXPIRED_OPENING.baselineHeight);
