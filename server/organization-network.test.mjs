@@ -11,6 +11,7 @@ import * as L from '@midnight-ntwrk/ledger-v8';
 import { startOrganizationServer } from './organization-server.mjs';
 import { EXPIRED_OPENING as openingPolicy } from '../src/lib/organization/expired-opening-policy.ts';
 import { EXPIRED_DISABLE as disablePolicy } from '../src/lib/organization/expired-disable-policy.ts';
+import { EXPIRED_QUOTE as quotePolicy } from '../src/lib/organization/expired-quote-policy.ts';
 
 async function fixture(t) {
   const directory = mkdtempSync(join(tmpdir(), 'line-network-test-'));
@@ -70,6 +71,7 @@ test('the production entry provides authenticated public read URLs without retur
 for (const configuration of [
   { policy: openingPolicy, path: 'expired-opening', fixture: 'organization-closed-state.hex', schema: 'line:expired-opening-evidence/v1', height: 3077281, timestamp: 1792598700000 },
   { policy: disablePolicy, path: 'expired-disable', fixture: 'organization-merchant2-draw-state.hex', schema: 'line:expired-disable-evidence/v1', height: 3102500, timestamp: 1792755000000 },
+  { policy: quotePolicy, path: 'expired-quote', fixture: 'organization-compensated-state.hex', schema: 'line:expired-quote-evidence/v1', height: 3105000, timestamp: 1792764600000 },
   { policy: disablePolicy, path: 'expired-compensation', fixture: 'organization-merchant2-draw-state.hex', schema: 'line:expired-compensation-evidence/v1', height: 3104000, timestamp: 1792760400000 },
 ]) test(`${configuration.path} endpoint pins finalized state reads, requires authentication and rejects provider disagreement`, async t => {
   const expiryPolicy = configuration.policy;

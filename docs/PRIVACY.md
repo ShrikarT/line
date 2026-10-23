@@ -62,7 +62,7 @@ password to the server.
 Keep a recoverable encrypted backup: browser-local storage is not institutional
 custody or a guarantee against device compromise.
 
-The narrowly scoped expired-opening, merchant-disable and claim-compensation recoveries retain the
+The narrowly scoped expired-opening, merchant-disable, claim-compensation and merchant-quote recoveries retain the
 original signed bytes, private candidate, predecessor and provider evidence in encrypted recovery history
 and backups. Only public facility/block state is requested from the server; the
 private candidate and original signed bytes are checked locally. Archiving does

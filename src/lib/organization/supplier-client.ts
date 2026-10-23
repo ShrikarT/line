@@ -68,7 +68,7 @@ export class OrganizationSupplierClient {
     return this.authentication;
   }
   async request(path: string, body?: object): Promise<unknown> {
-    if (!/^(?:catalog|network(?:\/(?:expired-opening|expired-disable|expired-compensation))?|orders(?:\/[0-9a-f-]{36}(?:\/redeem)?)?)$/.test(path)) throw new Error("Unknown supplier request.");
+    if (!/^(?:catalog|network(?:\/(?:expired-opening|expired-disable|expired-compensation|expired-quote))?|orders(?:\/[0-9a-f-]{36}(?:\/redeem)?)?)$/.test(path)) throw new Error("Unknown supplier request.");
     if (path !== "catalog" && !this.catalogChecked) await this.request("catalog");
     if (path === "network" && this.authenticatedUntil <= Date.now() + 120000) this.authenticated = false;
     if (path !== "catalog" && this.requiresAuthentication && !this.authenticated) await this.authenticate();

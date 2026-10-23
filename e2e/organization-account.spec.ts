@@ -5,6 +5,8 @@ import { readFileSync } from "node:fs";
 import { EXPIRED_OPENING, EXPIRED_OPENING_TRANSACTION_IDS } from "../src/lib/organization/expired-opening-policy.ts";
 import { EXPIRED_DISABLE } from "../src/lib/organization/expired-disable-policy.ts";
 import { EXPIRED_COMPENSATION } from "../src/lib/organization/expired-compensation-policy.ts";
+import { EXPIRED_QUOTE } from "../src/lib/organization/expired-quote-policy.ts";
+import { quoteCandidateFixture } from "../tests/fixtures/organization-quote.ts";
 import { compensationCandidateFixture } from "../tests/fixtures/organization-compensation.ts";
 import { candidateFixture } from "../tests/fixtures/organization-opening.ts";
 import { disableCandidateFixture } from "../tests/fixtures/organization-disable.ts";
@@ -88,6 +90,56 @@ for (const method of ["connect(preprod)", "getConfiguration"] as const) test(`co
     await expect(page.getByRole("dialog")).toContainText("no verified connection to compare");
   } else await expect(page.getByRole("button", { name: "Check connector reads", exact: true })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Your wallet is connected.", exact: true })).toHaveCount(0);
+});
+
+for (const scenario of ["ready", "changed receiving wallet", "changed network", "expired signed bytes"] as const) test(`fresh signed submission preserves its wallet guard without duplicate post-balance reads: ${scenario}`, async ({ page }) => {
+  const raw = readFileSync(new URL("../tests/fixtures/preprod-fees/confirmed-funded.bin", import.meta.url)).toString("hex");
+  await wallets(page, true, true); await page.goto("/app"); await connect(page, "a"); await unlock(page);
+  const result = await page.evaluate(async ({ raw, scenario }) => {
+    const { browserModuleUrl } = await import("/e2e/browser-module.ts" as any);
+    const { OrganizationAccount } = await import(browserModuleUrl("/src/lib/organization/account.ts"));
+    const { OrganizationNetwork } = await import(browserModuleUrl("/src/lib/organization/network.ts"));
+    const { getConnectedWallet } = await import(browserModuleUrl("/src/lib/runtime/wallet.ts"));
+    const { Transaction } = await import("/e2e/organization-provider.ts" as any);
+    // Existing public fixture exercises transport/custody only, not this
+    // release's proof validity or live chain acceptance. No wallet is contacted.
+    const tx = Transaction.deserialize("signature", "proof", "binding", Uint8Array.from(raw.match(/../g)!.map(x => parseInt(x, 16))));
+    const action = [...tx.intents!.values()].flatMap(i => i.actions)[0];
+    const wallet = getConnectedWallet()!, account = await OrganizationAccount.unlock(wallet, "Organization123!");
+    const client = await OrganizationNetwork.connect(account), events: string[] = [];
+    const originalGuard = account.assertWallet.bind(account);
+    account.assertWallet = async () => { events.push("check"); return originalGuard(); };
+    wallet.balanceUnsealedTransaction = async () => {
+      events.push("balance");
+      if (scenario === "changed receiving wallet") wallet.getUnshieldedAddress = async () => ({ unshieldedAddress: "changed" });
+      if (scenario === "changed network") wallet.getConnectionStatus = async () => ({ status: "connected", networkId: "preview" });
+      return { tx: raw };
+    };
+    wallet.submitTransaction = async bytes => {
+      events.push("submit");
+      if (bytes !== raw || account.pending()?.transaction !== raw || account.pending()?.txId !== tx.identifiers().at(-1)) throw Error("Original bytes were not saved before submission");
+    };
+    let error = "";
+    const now = Date.now;
+    try {
+      await account.exclusive(async () => {
+        await account.prepare({ id: "fresh-submit", kind: "call", circuit: "fundReserve", facilityId: null, contractAddress: action.address, sourceFingerprint: (client as any).release.sourceFingerprint, after: account.snapshot(), txId: null, transaction: null });
+        events.length = 0;
+        // Pin time inside the old public fixture's signed validity window.
+        if (scenario !== "expired signed bytes") Date.now = () => Math.min(...[...tx.intents!.values()].map(i => i.ttl.getTime())) - 1000;
+        const balanced = await (client as any).providers.walletProvider.balanceTx(tx);
+        await (client as any).providers.midnightProvider.submitTx(balanced);
+      });
+    } catch (failure) { error = (failure as Error).message; }
+    finally { Date.now = now; }
+    return { events, error, savedBytes: scenario === "ready" || scenario === "expired signed bytes" ? account.pending()?.transaction : undefined };
+  }, { raw, scenario });
+  if (scenario === "ready") expect(result).toMatchObject({ events: ["check", "balance", "check", "submit"], error: "", savedBytes: raw });
+  else {
+    expect(result.events).not.toContain("submit");
+    expect(result.error).toMatch(scenario === "expired signed bytes" ? /expired.*reconciliation/i : scenario === "changed network" ? /preprod session/i : /wallet|address|account/i);
+    if (scenario === "expired signed bytes") expect(result.savedBytes).toBe(raw);
+  }
 });
 
 test("built-page refresh restores the organization without development module imports", async ({ page }) => {
@@ -425,27 +477,46 @@ test("browser replays compensation against its exact retained claim and private 
   expect(result).toEqual({ ttl: 4600_000, changedRejected: true });
 });
 
+test("browser replays a merchant quote against its exact retained merchant candidate", async ({ page }) => {
+  const f = await quoteCandidateFixture();
+  await page.goto("/app");
+  const result = await page.evaluate(async ({ encoded, state, fingerprint }) => {
+    const { browserModuleUrl } = await import("/e2e/browser-module.ts" as any);
+    const { ContractState } = await import("/e2e/organization-provider.ts" as any);
+    const { decodeVaultJson } = await import(browserModuleUrl("/src/lib/security/vault.ts"));
+    const { validateQuoteCandidate } = await import(browserModuleUrl("/src/lib/organization/expired-quote.ts"));
+    const { before, pending } = decodeVaultJson(encoded) as any, predecessor = ContractState.deserialize(Uint8Array.from(state));
+    const ttl = validateQuoteCandidate(before, pending, predecessor, fingerprint);
+    pending.after.quotes.at(-1).quoteNonce = "cc".repeat(32);
+    let changedRejected = false;
+    try { validateQuoteCandidate(before, pending, predecessor, fingerprint); } catch { changedRejected = true; }
+    return { ttl, changedRejected };
+  }, { encoded: encodeVaultJson({ before: f.before, pending: f.pending }), state: [...f.predecessor.serialize()], fingerprint: f.pending.sourceFingerprint });
+  expect(result).toEqual({ ttl: 4600_000, changedRejected: true });
+});
+
 const openingPolicy = EXPIRED_OPENING;
 for (const scopedOpening of [
   ...EXPIRED_OPENING_TRANSACTION_IDS.map((txId, index) => ({ ...EXPIRED_OPENING, txId, circuit: "openLine", priorIds: EXPIRED_OPENING_TRANSACTION_IDS.slice(0, index) })),
   { ...EXPIRED_DISABLE, circuit: "disableMerchant", priorIds: [...EXPIRED_OPENING_TRANSACTION_IDS] },
   { ...EXPIRED_COMPENSATION, circuit: "cancelOrExpireNote", priorIds: [...EXPIRED_OPENING_TRANSACTION_IDS, EXPIRED_DISABLE.txId] },
+  { ...EXPIRED_QUOTE, circuit: "postQuote", priorIds: [] },
 ]) {
 const EXPIRED_OPENING = scopedOpening;
-const disabling = scopedOpening.circuit === "disableMerchant", compensating = scopedOpening.circuit === "cancelOrExpireNote";
-const laterCheckpoint = disabling || compensating;
+const disabling = scopedOpening.circuit === "disableMerchant", compensating = scopedOpening.circuit === "cancelOrExpireNote", quoting = scopedOpening.circuit === "postQuote";
+const laterCheckpoint = disabling || compensating || quoting;
 const expectedHistory = scopedOpening.priorIds.length + 1;
-test(`expired ${compensating ? "claim compensation" : disabling ? "merchant disable" : "opening"} ${scopedOpening.txId.slice(0, 8)} recovery is atomic, rejects stale reviews and retains encrypted history through every commit and restore`, async ({ page }) => {
+test(`expired ${quoting ? "merchant quote" : compensating ? "claim compensation" : disabling ? "merchant disable" : "opening"} ${scopedOpening.txId.slice(0, 8)} recovery is atomic, rejects stale reviews and retains encrypted history through every commit and restore`, async ({ page }) => {
   test.setTimeout(120_000);
-  const state = readFileSync(new URL(laterCheckpoint ? "../tests/fixtures/organization-merchant2-draw-state.hex" : "../tests/fixtures/organization-closed-state.hex", import.meta.url), "utf8");
+  const state = readFileSync(new URL(quoting ? "../tests/fixtures/organization-compensated-state.hex" : laterCheckpoint ? "../tests/fixtures/organization-merchant2-draw-state.hex" : "../tests/fixtures/organization-closed-state.hex", import.meta.url), "utf8");
   const L = await import("@midnight-ntwrk/ledger-v8"), checkpoint = L.ContractState.deserialize(Buffer.from(state, "hex"));
   const verifierKeys = Object.fromEntries(checkpoint.operations().map(name => [String(name), [...checkpoint.operation(name)!.verifierKey]]));
-  const evidence = { schema: compensating ? "line:expired-compensation-evidence/v1" : disabling ? "line:expired-disable-evidence/v1" : "line:expired-opening-evidence/v1", address: EXPIRED_OPENING.address, genesisHash: EXPIRED_OPENING.genesisHash, runtimeSpecVersion: EXPIRED_OPENING.runtimeSpecVersion,
-    baseline: { hash: EXPIRED_OPENING.baselineHash, height: EXPIRED_OPENING.baselineHeight, state }, finalized: { hash: "aa".repeat(32), height: laterCheckpoint ? 3104000 : 3077281, timestamp: laterCheckpoint ? 1792760400000 : 1792598700000, state } };
+  const evidence = { schema: quoting ? "line:expired-quote-evidence/v1" : compensating ? "line:expired-compensation-evidence/v1" : disabling ? "line:expired-disable-evidence/v1" : "line:expired-opening-evidence/v1", address: EXPIRED_OPENING.address, genesisHash: EXPIRED_OPENING.genesisHash, runtimeSpecVersion: EXPIRED_OPENING.runtimeSpecVersion,
+    baseline: { hash: EXPIRED_OPENING.baselineHash, height: EXPIRED_OPENING.baselineHeight, state }, finalized: { hash: "aa".repeat(32), height: quoting ? 3105000 : laterCheckpoint ? 3104000 : 3077281, timestamp: quoting ? 1792764600000 : laterCheckpoint ? 1792760400000 : 1792598700000, state } };
   const closed = readFileSync(new URL("../tests/fixtures/organization-closed-state.hex", import.meta.url), "utf8");
   const openingEvidence = { schema: "line:expired-opening-evidence/v1", address: openingPolicy.address, genesisHash: openingPolicy.genesisHash, runtimeSpecVersion: openingPolicy.runtimeSpecVersion,
     baseline: { hash: openingPolicy.baselineHash, height: openingPolicy.baselineHeight, state: closed }, finalized: { hash: "bb".repeat(32), height: 3077281, timestamp: 1792598700000, state: closed } };
-  const recoveryPath = `**/api/organization/network/${compensating ? "expired-compensation" : disabling ? "expired-disable" : "expired-opening"}`;
+  const recoveryPath = `**/api/organization/network/${quoting ? "expired-quote" : compensating ? "expired-compensation" : disabling ? "expired-disable" : "expired-opening"}`;
   await wallets(page, true, true);
   await page.route(recoveryPath, route => route.fulfill({ json: evidence }));
   await page.goto("/app"); await connect(page, "a"); await unlock(page);
@@ -456,11 +527,12 @@ test(`expired ${compensating ? "claim compensation" : disabling ? "merchant disa
     const { validateExpiredOpeningEvidence } = await import(browserModuleUrl("/src/lib/organization/expired-opening.ts"));
     const { validateExpiredDisableEvidence } = await import(browserModuleUrl("/src/lib/organization/expired-disable.ts"));
     const { validateExpiredCompensationEvidence } = await import(browserModuleUrl("/src/lib/organization/expired-compensation.ts"));
+    const { validateExpiredQuoteEvidence } = await import(browserModuleUrl("/src/lib/organization/expired-quote.ts"));
     const { getConnectedWallet } = await import(browserModuleUrl("/src/lib/runtime/wallet.ts"));
     // Controlled candidate-verification seam: the unit test separately replays
     // generated opening transcripts. This browser case tests actual encryption,
     // locks, durable reload, UI review and account commits, not a chain proof.
-    for (const [method, validate] of [["verifyExpiredOpening", validateExpiredOpeningEvidence], ["verifyExpiredDisable", validateExpiredDisableEvidence], ["verifyExpiredCompensation", validateExpiredCompensationEvidence]] as const) {
+    for (const [method, validate] of [["verifyExpiredOpening", validateExpiredOpeningEvidence], ["verifyExpiredDisable", validateExpiredDisableEvidence], ["verifyExpiredCompensation", validateExpiredCompensationEvidence], ["verifyExpiredQuote", validateExpiredQuoteEvidence]] as const) {
       (OrganizationNetwork.prototype as any)[method] = async function (_before: unknown, pending: any, evidence: any) {
         (window as any).expiryAccount = this.account;
         if (![policy.txId, ...policy.priorIds].includes(pending.txId) || pending.transaction !== "abcd") throw Error("Fixture original changed");
@@ -489,7 +561,7 @@ test(`expired ${compensating ? "claim compensation" : disabling ? "merchant disa
     await expect(page.getByRole("status").filter({ hasText: "Your wallet and organization contract release are ready" })).toBeVisible();
   };
   await reopen();
-  const review = page.getByRole("button", { name: compensating ? "Review expired claim recovery" : disabling ? "Review expired merchant disable recovery" : "Review expired opening recovery", exact: true });
+  const review = page.getByRole("button", { name: quoting ? "Review expired quote recovery" : compensating ? "Review expired claim recovery" : disabling ? "Review expired merchant disable recovery" : "Review expired opening recovery", exact: true });
   const archive = page.getByRole("button", { name: "Archive original with evidence", exact: true });
   await expect(review).toBeVisible();
   await review.click(); await expect(page.getByRole("dialog")).toContainText(evidence.finalized.height.toLocaleString("en-US"));
@@ -528,7 +600,7 @@ test(`expired ${compensating ? "claim compensation" : disabling ? "merchant disa
   await archive.click(); await expect(page.getByRole("alert")).toContainText("preprod session");
   await page.evaluate(() => { (window as any).expiryAccount.wallet.getConnectionStatus = (window as any).expiryStatus; });
   await review.click(); await expect(archive).toBeVisible(); await archive.click();
-  await expect(page.getByRole("status")).toContainText(compensating ? "Expired claim compensation archived with provider-backed nonapplication evidence" : disabling ? "Expired merchant disable archived with provider-backed nonapplication evidence" : "Expired opening archived with provider-backed nonapplication evidence");
+  await expect(page.getByRole("status")).toContainText(quoting ? "Expired merchant quote archived with provider-backed nonapplication evidence" : compensating ? "Expired claim compensation archived with provider-backed nonapplication evidence" : disabling ? "Expired merchant disable archived with provider-backed nonapplication evidence" : "Expired opening archived with provider-backed nonapplication evidence");
   await expect(review).toHaveCount(0);
   await expect(page.getByText(`Expired operation recovery history (${expectedHistory})`, { exact: true })).toBeVisible();
   const result = await page.evaluate(async ({ policy, expectedHistory }) => {
