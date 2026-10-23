@@ -68,6 +68,9 @@ clipboard handoff and the existing spent-state guard. Eight production-preview
 startup/refresh cases and two built-host tests also passed. Typecheck, production
 build, 37-file proving export, key/secret scans and managed-contract drift checks
 passed. These are controlled checks, not additional live financial acceptance.
+The owner then checked the deployed app: the first saved claim shows generation 2,
+100,000 payout, 2,000 fee, 102,000 total charge and a recorded redemption. This
+confirms the live claim-list presentation; no additional transaction was requested.
 
 ## Wave 1 — foundation
 
