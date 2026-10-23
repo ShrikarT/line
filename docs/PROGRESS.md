@@ -269,8 +269,8 @@ reserve accounting 1,998,000. All twelve verifier keys match and maintenance
 counter remains 11. This establishes this mode-1 compensation, not Merchant 2
 redemption or other compensation modes. A 13:00 UTC read-only audit reverified
 all 22 selected receipt rows and release keys, with zero encumbrance/fees and
-1,798,000 held assets; it started no wallet and submitted zero transactions. The expected private spending balance
-is 102,000 with 898,000 remaining; owner figure confirmation is pending. The
+1,798,000 held assets; it started no wallet and submitted zero transactions. The owner confirmed the private spending balance
+is 102,000 with 898,000 remaining. The
 original pool-ban cause remains unconfirmed.
 The recovery is live as `1c0fd1c`. Its authenticated production endpoint returned
 release-key-matched evidence at finalized block 3,104,109, hash
