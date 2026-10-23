@@ -4,6 +4,59 @@ Line combines Compact spending rules, wallet-approved Preprod transactions and
 encrypted organization records. Organizations fund and control their own agents;
 external borrowing and production credit underwriting are future work.
 
+## Target product architecture (planned, not deployed)
+
+The owner-directed product reset and delivery gates are in
+[Progress](PROGRESS.md#product-direction-reset--23-october-2026). The target is
+one real agent completing a useful paid-service task within explicit delegated
+authority, without human JSON transport or routine purchase-by-purchase signing.
+The current wallet-only path remains assisted checkout until those gates pass.
+
+| Boundary | Planned responsibility |
+| --- | --- |
+| Owner control plane | Guided setup, funding, explicit agent authorization, budget/supplier/fee policy, pause/revocation and exceptions |
+| Agent MCP/API adapter | Real tool execution against production task/order APIs; never the seeded local simulator |
+| Durable execution runner | Scoped signer/prover, private-book ownership, serialized updates, task/order journal, original-transaction reconciliation and restart recovery |
+| Supplier service | Authenticated catalog/quotes, automatic claim transport, single-use settlement, actual fulfillment and durable result retrieval |
+| User task workspace | Goal input, progress, approvals only when policy requires, useful result and total cost |
+| Activity/Explorer | Organization-scoped transaction history and task-linked evidence; simulation and provider-backed archives distinctly labeled |
+
+Signing feasibility is the first architecture gate. Existing browser approval
+cannot simply be suppressed or treated as delegation. Establish whether an
+owner-operated runner or a separately authorized hosted signer can hold only the
+necessary agent authority on the existing release. Document actual contract
+enforcement versus runtime-only controls, revocation latency and in-flight work.
+Never provision hosted custody, export an owner secret, or change an existing
+facility implicitly to make a demo work. A required contract change needs a
+separate versioned proposal; the current twelve circuits and deployed history
+remain intact.
+
+The runner must persist intent and signed identity before submission, bind
+automatic quote/claim transfers to the authenticated order and fixed recipient,
+and reconcile ambiguous outcomes before attempting another payment. A model
+output is an untrusted proposed action, not spending authorization. Concurrent
+tasks must not race a shared private book. Revocation stops new authorized work;
+it does not erase already-signed obligations or confirmed merchant claims.
+
+Use separate task, payment and fulfillment states. At minimum, expose queued,
+working, approval-needed, payment-pending, payment-uncertain, paid/awaiting-delivery,
+completed, failed and recovery-needed states with a contextual next action.
+Only a real delivered result completes the task. A receipt alone proves payment,
+not service delivery; business idempotency requires durable reconciliation,
+not an assumed exactly-once network.
+
+The free Render deployment cannot be relabeled as a persistent runner or supplier.
+M0 must choose operational ownership, storage, proof service, fee funding,
+restart/lease behavior, monitoring and costs. Keep the current host working while
+the new path is built. Existing encrypted records and backups require explicit
+compatibility; no migration may silently promote an uncertain candidate.
+
+The planned information architecture is Tasks/Home, Agents, Budget, Suppliers,
+Activity/Explorer and Settings. Each route has one primary purpose. Setup is
+resumable, exceptions are contextual, and technical packages/recovery diagnostics
+remain under advanced details. Do not repeat all role tabs and the full history
+on every page. Preserve the palette while rebuilding hierarchy and task flow.
+
 ## Components
 
 | Component | Responsibility |
@@ -16,7 +69,7 @@ external borrowing and production credit underwriting are future work.
 | `src/lib/runtime/` | Wallet discovery, connector adapters, network/proof providers |
 | `server/organization-server.mjs` | Built application, authenticated readers and organization API |
 | `server/organization-wallet.mjs` | Optional persistent supplier signing runtime |
-| `mcp/line-mcp.mjs` | Agent tool interface |
+| `mcp/line-mcp.mjs` | Local protocol simulator exposed as MCP; not a deployed autonomous purchaser |
 
 ## Transaction lifecycle
 

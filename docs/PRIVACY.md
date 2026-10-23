@@ -24,6 +24,21 @@ The leakage tests check counterexamples; they are not a privacy proof.
 
 ## Authorization and custody
 
+The planned autonomous product is not covered by the current browser-only
+custody assumptions. Before implementing delegated execution, document which
+runner holds the agent signing material and private book, who operates it, how
+authorization expires/revokes, what happens to in-flight payments, and what an
+operator or compromised model could access. Distinguish Compact-enforced budget
+constraints from application policy; do not market the latter as cryptographic
+restrictions. Do not reuse the owner's browser password as a hosted credential.
+
+Task inputs, supplier requests, model traces and purchased results introduce
+additional data exposure. Specify minimum data sent to each provider, retention,
+access control and redaction. Logs and Activity must exclude secrets and private
+book openings. Automated transport must preserve authenticated merchant binding
+and prevent cross-organization disclosure. These are planned requirements, not
+implemented guarantees. Full-history transaction privacy remains incomplete.
+
 The issuer authorizes governance, allowances, reserve changes and repayment
 acknowledgement. Merchants authorize quotes and redemption; the agent authorizes
 draws. Contract domains and nullifiers prevent cross-instance replay and repeated
