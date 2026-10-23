@@ -176,6 +176,12 @@ The form shares validation with the encoder and reports invalid input inline.
 The SDK rejects oversized references before wallet identity or network reads;
 it never truncates or substitutes a different invoice commitment.
 
+Transfer exports open a named dialog with the complete JSON selected, an explicit
+clipboard action and a download fallback. Closing restores focus to the opener;
+locking the vault removes the package. Clipboard failure selects the text for
+manual copying and never reports success. Exporting a saved quote neither posts
+another quote nor requests a proof, wallet signature or transaction submission.
+
 Optional organization fees use a Uint64 flat amount and 0-10,000 basis points,
 with zero defaults and whole-base-unit upward rounding. The policy is fixed by
 `openLine`. Purchase previews show price, fee and total allowance consumption;
