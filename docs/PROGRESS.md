@@ -13,8 +13,8 @@ privacy and independent commercial custody are not established.
 | Local verification | This follow-up: 695 core tests passed, one skipped. After adding the clock-skew and missing-capability checks, all 14 affected auth/adapter tests passed again. Two built wallet-only host tests, typecheck, production build, 37-file proving export, production key/secret scans and zero managed-contract drift passed |
 | Browser verification | 70 distinct organization, startup and wallet scenarios passed across the broad/focused runs, including duplicate-read, retained-cookie, missing-code and closed-original-tab cases. The broad run caught two missing backup-completion messages; those were corrected and their reruns passed. All eight final production-preview checks passed. Six further browser checks confirmed exact pending bytes, atomic recovery, backup/restore, outage export and lock protection; the startup checks also passed. Final UI/cache changes were verified after the full core run. CI now repeats these against built assets. Fixtures are controlled tests, not new network acceptance |
 | Full CI | The [refresh correction `1efc8b4`](https://github.com/ShrikarT/line/actions/runs/39776737263), [startup follow-up `568c093`](https://github.com/ShrikarT/line/actions/runs/39780636985), [code-download correction `cb754a5`](https://github.com/ShrikarT/line/actions/runs/39784089985) and [second-opening recovery `702194d`](https://github.com/ShrikarT/line/actions/runs/39901700502) all passed. Recovery's 39 focused tests, five browser cases, two built-host tests, typecheck, build, proving export and key/secret checks also passed locally |
-| Actual organization | Latest separately checked finalized draw: OPEN, generation 2, policy 1,000 + 100 bps, 100,000 principal encumbered and 2,000 fees pending; finalized fees remain zero. Its post-state holds 1,900,000 native-asset base units with reserve accounting 2,000,000. The extra reserve increase is observed; its funding receipt has not yet been separately audited. Latest workspace receipt count has not been reread |
-| Active blocker | Both expired openings are archived. Fresh reopening, generation-2 quote and fee-bearing purchase are finalized. The owner successfully used the corrected package handoff. Next steps are fee-bearing merchant redemption and finalized fee withdrawal; neither is yet accepted |
+| Actual organization | Latest separately checked finalized redemption: OPEN, generation 2, policy 1,000 + 100 bps, zero encumbrance and pending fees, 2,000 finalized fees. It paid 100,000 native base units to the registered owner/merchant wallet. Post-state custody is 1,800,000, reserve accounting 2,000,000 and cumulative redeemed principal 200,000. The extra reserve increase is observed; its funding receipt has not yet been separately audited. Latest workspace receipt count has not been reread |
+| Active blocker | Both expired openings are archived. Fresh reopening, generation-2 quote, fee-bearing purchase and merchant payout are finalized. The owner successfully used the corrected package handoff. Next acceptance step is withdrawing the 2,000 finalized fees |
 | Live testing | On 23 October the owner confirmed automatic wallet connection, a ready organization and an unlocked vault after refresh, then successfully reviewed and archived the newer opening. The displayed history records `006c2322...` at finalized block 3,092,740 and `00abb757...` at finalized block 3,099,704. These are encrypted local recovery records with provider-backed evidence, not finalized failure receipts or successful reopening acceptance |
 | Wallet / backup | Latest encrypted backup remains saved. On the new live build, the actual 1AM owner wallet connected with one click and restored itself after refresh. The owner subsequently reported an organization logout after refresh; a live tab showed a rate limit above the password form. The reproduced boundary was network-read failure being presented as vault logout; the correction retains the memory session for retry. On the corrected deployment, the actual owner tab restored the organization after refresh without password entry, displayed all 22 receipts, and completed wallet/contract-release setup. This is session verification, not a new chain transaction. Its original signed operation is retained. Prior connector failures included a rate limit, generic configuration failure and InternalError; none justified bypassing live guards |
 
@@ -132,6 +132,7 @@ units. All amounts below use base units.
 | Reopen with 1,000 flat fee + 100 bps | `5cceda1a3b762fd156a124d412e7b02db263fa4fed172f5f12e4fcf3aae74a65` | 3,099,871 |
 | Fresh generation-2 quote | `0f51c305f7ea3da7f97c2b41845423cfce0b4fb3898d2cd33e50810f91595eb7` | 3,099,949 |
 | Fee-bearing draw: 100,000 principal + 2,000 fee | `07cab8b6630d41753002e2a23b65556be44be2e97a559b44bfbaaefdd797b66b` | 3,100,335 |
+| Redeem generation-2 claim: 100,000 payout | `1deb6fafdfd3486aadcac2b4c5c7f703bbf2906db70ed9660ff0f678c7718357` | 3,100,433 |
 
 Separate read-only checks matched selected raw transactions, contract actions,
 identifiers, canonical finalized blocks and all twelve release-matched keys.
@@ -155,8 +156,13 @@ generation-2 quote finalized at block 3,099,949. After using the corrected packa
 dialog, the owner authorized the purchase; its canonical raw `draw` and aggregate
 SUCCESS were separately matched to RPC-finalized block 3,100,335. The post-state
 encumbers 100,000 principal and holds 2,000 pending fees, with custody unchanged.
-This is purchase authorization, not a merchant payout. Fee-bearing redemption
-and fee withdrawal still need fresh wallet-approved receipts.
+Its merchant redemption then finalized at block 3,100,433. Canonical raw outputs
+pay exactly 100,000 native base units to the registered owner/merchant receiving
+wallet; custody falls to 1,800,000, encumbrance and pending fees become zero, and
+2,000 fees become finalized. The owner first selected the old generation-1 claim;
+the review correctly showed Already redeemed and disabled duplicate redemption.
+Selecting the new generation-2, 2,000-fee claim completed the payout. This remains
+same-owner Preprod acceptance. Fee withdrawal still needs a fresh finalized receipt.
 
 ### Pending allowance and recovery
 
