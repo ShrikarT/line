@@ -7,6 +7,7 @@ import { encryptSecret, encodeVaultJson } from "../src/lib/security/vault.ts";
 import { readFileSync } from "node:fs";
 import { EXPIRED_OPENING as policy } from "../src/lib/organization/expired-opening-policy.ts";
 import { EXPIRED_DISABLE as disablePolicy } from "../src/lib/organization/expired-disable-policy.ts";
+import { EXPIRED_COMPENSATION as compensationPolicy } from "../src/lib/organization/expired-compensation-policy.ts";
 
 const accountId = "11".repeat(32), key = organizationAccountKey("preprod", accountId);
 const address = bech32m.encodeFromBytes("mn_addr_preprod", new Uint8Array(32).fill(4));
@@ -64,7 +65,7 @@ test("backup preserves reviewed service fee ceilings and rejects invalid limits 
   assert.doesNotThrow(() => validateOrganizationRecord(record, accountId));
 });
 
-test("backup preserves both scoped expired openings and exact disable without nesting archives inside candidates", async () => {
+test("backup preserves both scoped expired openings, disable and compensation without nesting archives inside candidates", async () => {
   const base = withPending(), original = base.pending!;
   Object.assign(original, { kind: "call", circuit: "openLine", contractAddress: policy.address, txId: policy.txId, sourceFingerprint: policy.sourceFingerprint });
   original.after.facilities[0].address = policy.address;
@@ -80,6 +81,11 @@ test("backup preserves both scoped expired openings and exact disable without ne
   disable.evidence = { schema: "line:expired-disable-evidence/v1", address: disablePolicy.address, genesisHash: disablePolicy.genesisHash, runtimeSpecVersion: disablePolicy.runtimeSpecVersion,
     baseline: { hash: disablePolicy.baselineHash, height: disablePolicy.baselineHeight, state: disableState }, finalized: { hash: "bb".repeat(32), height: 3102500, timestamp: 1792755000000, state: disableState } };
   record.recoveries!.push(disable);
+  const compensation = structuredClone(disable);
+  compensation.disposition = "expired-compensation-not-applied"; compensation.original.id = "owner-reviewed-compensation";
+  compensation.original.circuit = "cancelOrExpireNote"; compensation.original.txId = compensationPolicy.txId;
+  compensation.evidence.schema = "line:expired-compensation-evidence/v1";
+  record.recoveries!.push(compensation);
   const backup = await encryptSecret(key, encodeVaultJson(record), "BackupControl123!");
   assert.deepEqual(await decodeOrganizationBackup(JSON.stringify(backup), "BackupControl123!", key, accountId), record);
   assert.equal(isOrganizationEmpty({ ...initial(), recoveries: record.recoveries }), false);
@@ -96,5 +102,8 @@ test("backup preserves both scoped expired openings and exact disable without ne
     (r: OrganizationRecord) => { r.recoveries![2].evidence.baseline.hash = policy.baselineHash; },
     (r: OrganizationRecord) => { r.recoveries![2].disposition = "expired-opening-not-applied"; },
     (r: OrganizationRecord) => { r.recoveries![2].original.circuit = "draw"; },
+    (r: OrganizationRecord) => { r.recoveries![3].evidence.schema = "line:expired-disable-evidence/v1"; },
+    (r: OrganizationRecord) => { r.recoveries![3].disposition = "expired-disable-not-applied"; },
+    (r: OrganizationRecord) => { r.recoveries![3].original.txId = disablePolicy.txId; },
   ]) { const invalid = structuredClone(record); mutate(invalid); assert.throws(() => validateOrganizationRecord(invalid, accountId)); }
 });

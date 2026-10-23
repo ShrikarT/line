@@ -3,6 +3,7 @@ import type { OrganizationRecord, OrganizationSnapshot } from "./account.ts";
 import { receivingAddressBytes } from "./account.ts";
 import { EXPIRED_OPENING, matchesExpiredOpeningScope } from "./expired-opening-policy.ts";
 import { EXPIRED_DISABLE, matchesExpiredDisableScope } from "./expired-disable-policy.ts";
+import { EXPIRED_COMPENSATION, matchesExpiredCompensationScope } from "./expired-compensation-policy.ts";
 
 export const MAX_ORGANIZATION_BACKUP_BYTES = 64 * 1024 * 1024;
 const UINT64 = 18_446_744_073_709_551_615n;
@@ -92,12 +93,13 @@ export function validateOrganizationRecord(value: unknown, accountId: string): O
       const r = object(item), original = object(r.original), evidence = object(r.evidence);
       const opening = r.disposition === "expired-opening-not-applied" && matchesExpiredOpeningScope(original);
       const disable = r.disposition === "expired-disable-not-applied" && matchesExpiredDisableScope(original);
-      need((opening || disable) && r.recoveries === undefined);
-      const policy = opening ? EXPIRED_OPENING : EXPIRED_DISABLE;
+      const compensation = r.disposition === "expired-compensation-not-applied" && matchesExpiredCompensationScope(original);
+      need((opening || disable || compensation) && r.recoveries === undefined);
+      const policy = opening ? EXPIRED_OPENING : disable ? EXPIRED_DISABLE : EXPIRED_COMPENSATION;
       need(Number.isFinite(Date.parse(text(r.recordedAt))) && Number.isSafeInteger(r.ttl) && (r.ttl as number) > 0);
       const previous = validateOrganizationRecord({ snapshot: r.before, pending: r.original }, accountId);
       need(previous.snapshot.issuerSecret === current.issuerSecret && previous.snapshot.merchantSecret === current.merchantSecret);
-      need(evidence.schema === (opening ? "line:expired-opening-evidence/v1" : "line:expired-disable-evidence/v1") && evidence.address === policy.address && evidence.genesisHash === policy.genesisHash && evidence.runtimeSpecVersion === policy.runtimeSpecVersion);
+      need(evidence.schema === (opening ? "line:expired-opening-evidence/v1" : disable ? "line:expired-disable-evidence/v1" : "line:expired-compensation-evidence/v1") && evidence.address === policy.address && evidence.genesisHash === policy.genesisHash && evidence.runtimeSpecVersion === policy.runtimeSpecVersion);
       const baseline = object(evidence.baseline), finalized = object(evidence.finalized);
       need(baseline.hash === policy.baselineHash && baseline.height === policy.baselineHeight);
       hex(finalized.hash); need(Number.isSafeInteger(finalized.height) && (finalized.height as number) > policy.baselineHeight);

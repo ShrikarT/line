@@ -10,11 +10,11 @@ privacy and independent commercial custody are not established.
 | --- | --- |
 | Public application | [line-midnight.onrender.com](https://line-midnight.onrender.com/app), free wallet-only hosting; no hosted supplier signing wallet or automated supplier |
 | Product release | `0439698`, live Render deployment `dep-dbdkp8favr4c73ae188g` at 12:03:18 UTC on 23 October. Thirteen selected public JS chunks, including saved-transaction diagnostics and the unchanged memory holder, match the tested build by SHA-256. HTML selects the current entry with no-store; `/readyz` reports ready in wallet-only mode. No owner record was accessed or transaction submitted by this release check |
-| Local verification | Submission diagnostics: 50 focused transaction/evidence/backup/finality/provider tests, six recovery/resubmission browser cases, eight production-preview startup/refresh cases, two built-host tests, typecheck, production build, 37-file proving export, production key/secret scans and zero managed-contract drift passed. Inspection makes zero wallet reads/storage writes, exports exact public bytes without private fields and retains the operation after a pool rejection. The preceding full core run passed 695 tests with one skipped; this correction did not rerun that full core suite locally |
+| Local verification | Exact compensation recovery: 55 focused evidence/transaction/backup/finality/provider tests, eight recovery/replay/resubmission browser cases, eight production-preview startup/refresh cases, typecheck, production build, 37-file proving export, production key/secret scans and zero managed-contract drift passed. All four archive cases now exercise network-level backup restore with mixed history, storage aborts, stale reviews, wallet changes and backwards checkpoints. The full core suite is running. Fixtures are controlled tests, not live compensation acceptance |
 | Browser verification | 70 distinct organization, startup and wallet scenarios passed across the broad/focused runs, including duplicate-read, retained-cookie, missing-code and closed-original-tab cases. The broad run caught two missing backup-completion messages; those were corrected and their reruns passed. All eight final production-preview checks passed. Six further browser checks confirmed exact pending bytes, atomic recovery, backup/restore, outage export and lock protection; the startup checks also passed. Final UI/cache changes were verified after the full core run. CI now repeats these against built assets. Fixtures are controlled tests, not new network acceptance |
-| Full CI | The [submission diagnostics `0439698`](https://github.com/ShrikarT/line/actions/runs/39950249356) is running; local checks above passed. The [merchant-disable recovery `3051942`](https://github.com/ShrikarT/line/actions/runs/39938915159) passed all jobs; the local checks above also passed. The [claim-list correction `df43535`](https://github.com/ShrikarT/line/actions/runs/39917370912) passed all jobs; local checks above also passed. The [refresh correction `1efc8b4`](https://github.com/ShrikarT/line/actions/runs/39776737263), [startup follow-up `568c093`](https://github.com/ShrikarT/line/actions/runs/39780636985), [code-download correction `cb754a5`](https://github.com/ShrikarT/line/actions/runs/39784089985) and [second-opening recovery `702194d`](https://github.com/ShrikarT/line/actions/runs/39901700502) all passed. Recovery's 39 focused tests, five browser cases, two built-host tests, typecheck, build, proving export and key/secret checks also passed locally |
+| Full CI | The [submission diagnostics `0439698`](https://github.com/ShrikarT/line/actions/runs/39950249356) passed all jobs. The [merchant-disable recovery `3051942`](https://github.com/ShrikarT/line/actions/runs/39938915159) passed all jobs; the local checks above also passed. The [claim-list correction `df43535`](https://github.com/ShrikarT/line/actions/runs/39917370912) passed all jobs; local checks above also passed. The [refresh correction `1efc8b4`](https://github.com/ShrikarT/line/actions/runs/39776737263), [startup follow-up `568c093`](https://github.com/ShrikarT/line/actions/runs/39780636985), [code-download correction `cb754a5`](https://github.com/ShrikarT/line/actions/runs/39784089985) and [second-opening recovery `702194d`](https://github.com/ShrikarT/line/actions/runs/39901700502) all passed. Recovery's 39 focused tests, five browser cases, two built-host tests, typecheck, build, proving export and key/secret checks also passed locally |
 | Actual organization | Latest Merchant 2 draw: OPEN, generation 2, policy 1,000 + 100 bps, 100,000 encumbered principal, 2,000 pending fees and zero finalized fees. Custody remains 1,798,000, reserve accounting 1,998,000 and cumulative redeemed principal 200,000; the Merchant 2 payout is pending. The preceding cycle paid 100,000 to the first merchant and 2,000 to the fixed issuer. The additional 1,000,000 funding was separately verified at block 3,099,785. Latest workspace receipt count has not been reread |
-| Active blocker | Expired-claim compensation now has a retained signed `cancelOrExpireNote` after a transaction-pool ban; the journal blocks new mutations. The original merchant disable is archived, Merchant 2 remains active and its claim is unredeemed/uncancelled. No compensation or Merchant 2 payout is confirmed. Submission diagnosis, remaining disabling/compensation acceptance, independent suppliers/customer validation and full-history privacy remain outstanding |
+| Active blocker | Expired-claim compensation has a retained signed `cancelOrExpireNote` after a transaction-pool ban; the journal blocks new mutations until owner-reviewed exact recovery. A tested compensation recovery and mixed-history restore correction are ready for deployment. The original merchant disable is archived, Merchant 2 remains active and its claim is unredeemed/uncancelled. No compensation or Merchant 2 payout is confirmed. Submission diagnosis, remaining disabling/compensation acceptance, independent suppliers/customer validation and full-history privacy remain outstanding |
 | Live testing | On 23 October the owner confirmed automatic wallet connection, a ready organization and an unlocked vault after refresh, then successfully reviewed and archived the newer opening. The displayed history records `006c2322...` at finalized block 3,092,740 and `00abb757...` at finalized block 3,099,704. These are encrypted local recovery records with provider-backed evidence, not finalized failure receipts or successful reopening acceptance |
 | Wallet / backup | The owner confirmed automatic wallet connection, organization readiness and an unlocked vault after refresh on 23 October. After the fee-bearing cycle, the owner confirmed allowance 1,000,000, spending balance 102,000, remaining allowance 898,000, zero fees and assets held 1,798,000. A fresh encrypted backup was saved; only its existence was checked, without reading or decrypting it. Intermittent wallet rate limits remain possible; failed reads retain the memory session and never bypass live transaction guards |
 
@@ -218,32 +218,37 @@ The owner requested recovery of the expired Merchant 2 claim. The wallet returne
 `Operation failed: Transaction is temporarily banned`; Line retained its original
 signed `cancelOrExpireNote` identifier
 `00dd26b256427e8ad3dd29dc7054cf7447c697a383933ea8dd50c5a1aec73c3c27`.
-An exact indexer lookup returned zero records without errors. At finalized block
-3,103,413 the claim was unredeemed, uncancelled and unallocated, with 100,000
-encumbered principal and 2,000 pending fees. The configured read node reported
-31 peers and no syncing, and its pool later returned zero entries. That is not
-the wallet's submission-node status and does not establish nonapplication.
+An exact indexer lookup returned zero records without errors. The configured
+read node reported 31 peers and no syncing, and its pool later returned zero
+entries. That is not the wallet submission node's status or proof of nonapplication.
 The [pinned upstream pool implementation](https://github.com/paritytech/polkadot-sdk/blob/2e4dd0bc22366a5af820492528869a493b5a5208/substrate/client/transaction-pool/src/graph/rotator.rs)
-tracks temporary bans by extrinsic hash; the actual rejection cause and wallet
-node's ban duration remain unknown. No replacement was created or sent, and the
-existing opening/disable recovery scopes do not cover this compensation action.
+tracks temporary bans by extrinsic hash; the original rejection cause and wallet
+node's ban duration remain unknown. No replacement was created or sent.
 
-A read-only inspection/export now exposes this retained transaction's actual
-signed TTLs and public bytes without a vault password in chat. It reloads durable
-state under the account lock, validates canonical identity/action/target/release
-and exports a fixed field list excluding all private candidate and role material.
-The missing control was reproduced by a failing browser case. Six browser cases
-now pass, covering offline inspection with zero wallet reads/storage writes,
-exact downloaded bytes, no private fields, focus restoration, no automatic retry
-after the pool rejection, mixed archive preservation and ordinary expiry
-reconciliation. Fifty focused tests, typecheck, production build, 37-file proving
-export, key/secret scans and managed-contract drift pass. Eight production-preview
-startup/refresh cases and two built-host tests also pass. This is diagnosis only;
-the owner must export the actual report before its bytes can be inspected, and
-neither pool rejection nor expiry alone clears this new pending operation.
-The inspection control is live as `0439698`; the original signed compensation
-operation remains pending, and the actual owner diagnostic export has not yet
-been inspected. Wallet submission itself is not claimed repaired.
+The owner exported the public submission diagnostics. Canonical identity,
+action, facility and release checks passed; transaction hash is
+`a387400959500081a5e5d685bc6010d75ac06f8b2935d1d613526ad7cc8e54d1`.
+Its DUST intent TTL is 11:38:16 UTC and its contract-action TTL is 12:35:23 UTC on
+23 October. Their difference does not establish the original pool-ban cause.
+Read-only runtime validation at block 3,103,402 (11:37:06 UTC) returned valid;
+a current check returned custom error 182, the pinned node's generic transaction
+application error. The provider rejects `system_dryRun` as externally unsafe.
+No transaction was broadcast by these checks. The exact public contract transcript
+locally replays as mode-1 allocation of the intended 100,000 principal / 2,000 fee
+claim. This is transcript binding, not proof or transaction acceptance.
+
+At finalized block 3,104,009,
+`e87a4aa22717f68161a6b48674565cc2439d7a7183f575c8dedf818d0656c866`,
+time 12:37:48.001 UTC, the fixed provider reader and local evidence validator
+confirmed the entire state still equals the trusted draw predecessor,
+maintenance counter remains 11, and this claim remains unredeemed, uncancelled
+and unallocated. This is past the latest signed TTL plus uncertainty. The exact
+compensation recovery checks that evidence, canonical replay and the retained
+private candidate before an owner-reviewed atomic archive. It retains the
+unpromoted candidate and original bytes, creates no receipt and sends no
+replacement. It also fixes backup restore dispatch for archived merchant disables,
+which previously used the opening validator. Owner archival and compensation
+acceptance remain pending; wallet submission itself is not claimed repaired.
 
 ### Archived Merchant 2 disabling and expired claim
 

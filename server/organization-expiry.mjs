@@ -1,9 +1,11 @@
 import { EXPIRED_OPENING as openingPolicy } from '../src/lib/organization/expired-opening-policy.ts';
 import { EXPIRED_DISABLE as disablePolicy } from '../src/lib/organization/expired-disable-policy.ts';
+import { EXPIRED_COMPENSATION as compensationPolicy } from '../src/lib/organization/expired-compensation-policy.ts';
 
 /** Fixed public-state reads only. Neither signed bytes nor arbitrary RPC input is accepted. */
 export const expiredOpeningReader = options => expiredStateReader(options, openingPolicy, 'line:expired-opening-evidence/v1');
 export const expiredDisableReader = options => expiredStateReader(options, disablePolicy, 'line:expired-disable-evidence/v1');
+export const expiredCompensationReader = options => expiredStateReader(options, compensationPolicy, 'line:expired-compensation-evidence/v1');
 function expiredStateReader({ endpoints, fetchImpl = globalThis.fetch }, policy, schema) {
   let requestId = 0;
   async function post(url, body, signal) {
