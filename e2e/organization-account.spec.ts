@@ -679,12 +679,14 @@ async function unlock(page: Page, password = "Organization123!") {
     await page.getByRole("button", { name: "Open organization", exact: true }).click();
   }
   await expect(page.getByText("Organization vault unlocked", { exact: true })).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByRole("button", { name: "Create facility", exact: true })).toBeEnabled({ timeout: 30_000 });
+  await expect(page.getByRole("tab", { name: "Organization", exact: true })).toBeVisible({ timeout: 30_000 });
 }
 async function profile(page: Page) {
   await page.getByRole("tab", { name: "Merchant", exact: true }).click();
   await page.getByRole("button", { name: "Show merchant profile", exact: true }).click();
-  return JSON.parse(await page.getByLabel("Your public merchant profile", { exact: true }).inputValue());
+  const result = JSON.parse(await page.getByRole("textbox", { name: "Your public merchant profile", exact: true }).inputValue());
+  await page.getByRole("button", { name: "Close package", exact: true }).click();
+  return result;
 }
 
 test("merchant invoice references reject oversized UTF-8 before requesting a proof", async ({ page }) => {
@@ -767,7 +769,8 @@ for (const outcome of ["SucceedEntirely", "FailEntirely"] as const) test(`saved 
   if (outcome === "SucceedEntirely") {
     await expect(library).toContainText("Organization fee: 2000 base units · Total allowance charge: 102000 base units");
     await library.getByRole("button", { name: "Share saved quote", exact: true }).click();
-    expect(JSON.parse(await page.getByLabel("Saved merchant quote package", { exact: true }).inputValue())).toEqual(expected);
+    expect(JSON.parse(await page.getByRole("textbox", { name: "Saved merchant quote package", exact: true }).inputValue())).toEqual(expected);
+    await page.getByRole("button", { name: "Close package", exact: true }).click();
   } else {
     await expect(page.getByRole("alert")).toContainText("failed in a finalized block");
     await expect(library.getByRole("button", { name: "Share saved quote", exact: true })).toHaveCount(0);
@@ -780,7 +783,7 @@ for (const outcome of ["SucceedEntirely", "FailEntirely"] as const) test(`saved 
     await expect(library).toContainText("No saved quotes match this search.");
     await page.getByLabel("Find saved quotes", { exact: true }).fill(expected.invoiceId.toUpperCase());
     await library.getByRole("button", { name: "Share saved quote", exact: true }).click();
-    expect(JSON.parse(await page.getByLabel("Saved merchant quote package", { exact: true }).inputValue())).toEqual(expected);
+    expect(JSON.parse(await page.getByRole("textbox", { name: "Saved merchant quote package", exact: true }).inputValue())).toEqual(expected);
   }
   expect(await page.evaluate(() => ({ calls: (window as any).quoteCalls, proof: (window as any).organizationProofRequests, signatures: (window as any).organizationSignatures }))).toEqual({ calls: 1, proof: 0, signatures: 0 });
 });
@@ -820,10 +823,72 @@ test("saved merchant quotes paginate, survive encrypted backup and export histor
   await expect(library).toContainText("The saved fee terms exceed the supported fee range.");
   await expect(library).toContainText(`Unix second ${expected.original.expiry}`);
   await library.getByRole("button", { name: "Share saved quote", exact: true }).click();
-  expect(JSON.parse(await page.getByLabel("Saved merchant quote package", { exact: true }).inputValue())).toEqual(expected.original);
+  await expect(page.getByRole("textbox", { name: "Saved merchant quote package", exact: true })).toBeInViewport();
+  await expect(page.getByRole("textbox", { name: "Saved merchant quote package", exact: true })).toBeFocused();
+  expect(JSON.parse(await page.getByRole("textbox", { name: "Saved merchant quote package", exact: true }).inputValue())).toEqual(expected.original);
+  await page.getByRole("button", { name: "Close package", exact: true }).click();
   await library.getByLabel("Find saved quotes", { exact: true }).fill("AB".repeat(32));
   await expect(library).toContainText("Page 1 of 2");
   await expect(library.getByRole("article")).toHaveCount(10);
+  expect(await page.evaluate(() => ({ proof: (window as any).organizationProofRequests, signatures: (window as any).organizationSignatures }))).toEqual({ proof: 0, signatures: 0 });
+});
+
+test("saved quote sharing opens a focused dialog, copies complete JSON and supports denied clipboard access", async ({ page, context }) => {
+  test.setTimeout(120_000);
+  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+  await wallets(page, true); await page.goto("/app"); await connect(page, "a"); await unlock(page);
+  const expected = await page.evaluate(async () => {
+    const { browserModuleUrl } = await import("/e2e/browser-module.ts" as any);
+    const { OrganizationAccount } = await import(browserModuleUrl("/src/lib/organization/account.ts"));
+    const { getConnectedWallet } = await import(browserModuleUrl("/src/lib/runtime/wallet.ts"));
+    const { encodeQuote } = await import(browserModuleUrl("/src/lib/organization/transfers.ts"));
+    const account = await OrganizationAccount.unlock(getConnectedWallet()!, "Organization123!");
+    const quote = { contractAddress: "ab".repeat(32), domain: "12".repeat(32), merchantPk: "13".repeat(32), invoiceId: "14".repeat(32), quoteNonce: "15".repeat(32), amount: 100000n, expiry: BigInt(Math.floor(Date.now() / 1000) + 3600), generation: 2n, feeFlat: 1000n, feeBps: 100n, quoteCommitment: "16".repeat(32) };
+    await account.edit(snapshot => {
+      snapshot.quotes.push(quote);
+      snapshot.facilities.push({ id: "quote-copy-fixture", name: "Copy fixture", address: quote.contractAddress, instanceNonce: "17".repeat(32), maintenanceKey: "18".repeat(32), assetColor: "00".repeat(32), issuerRecipient: account.receivingAddress, merchants: [], agentSecret: "19".repeat(32), salt: "20".repeat(32), limit: 1000000n, outstanding: 0n, epoch: 0n, generation: 2n });
+    });
+    return encodeQuote(quote);
+  });
+  await unlock(page); await page.getByRole("tab", { name: "Merchant", exact: true }).click();
+  await page.setViewportSize({ width: 390, height: 844 });
+  const share = page.getByRole("button", { name: "Share saved quote", exact: true });
+  await share.click();
+  const dialog = page.getByRole("dialog", { name: "Saved merchant quote package", exact: true });
+  const text = dialog.getByRole("textbox", { name: "Saved merchant quote package", exact: true });
+  await expect(dialog).toBeInViewport(); await expect(text).toBeFocused();
+  await expect(text).toHaveValue(expected);
+  await dialog.getByRole("button", { name: "Copy package", exact: true }).click();
+  await expect(dialog.getByRole("status")).toHaveText("Package copied.");
+  const copied = await page.evaluate(() => navigator.clipboard.readText());
+  // Windows clipboard transport normalizes line endings. JSON fields and
+  // package contents must otherwise remain identical on every platform.
+  expect(copied.replace(/\r\n/g, "\n")).toBe(expected);
+  await page.evaluate(() => Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText: async () => { throw new DOMException("Denied", "NotAllowedError"); } } }));
+  await dialog.getByRole("button", { name: "Copy package", exact: true }).click();
+  await expect(dialog.getByRole("alert")).toContainText("package text is selected");
+  await expect(dialog.getByRole("status")).toHaveCount(0); await expect(text).toBeFocused();
+  expect(await text.evaluate((node: HTMLTextAreaElement) => [node.selectionStart, node.selectionEnd])).toEqual([0, expected.length]);
+  const downloadPromise = page.waitForEvent("download");
+  await dialog.getByRole("button", { name: "Download package", exact: true }).click();
+  const download = await downloadPromise;
+  expect(readFileSync((await download.path())!, "utf8")).toBe(expected);
+  await dialog.getByRole("button", { name: "Close package", exact: true }).click();
+  await expect(share).toBeFocused();
+  await page.getByRole("tab", { name: "Agent", exact: true }).click();
+  await page.getByText("Use a quote from another supplier", { exact: true }).click();
+  await page.getByLabel("Merchant quote package", { exact: true }).fill(copied);
+  await expect(page.getByLabel("Quoted purchase costs")).toContainText("Total allowance charge: 102000 base units");
+  await expect(page.getByRole("button", { name: "Authorize purchase in wallet", exact: true })).toBeEnabled();
+  await page.getByRole("tab", { name: "Merchant", exact: true }).click(); await share.click();
+  await expect(dialog.getByRole("status")).toHaveCount(0);
+  await page.evaluate(async () => {
+    const { browserModuleUrl } = await import("/e2e/browser-module.ts" as any);
+    const { lockVaultSession } = await import(browserModuleUrl("/src/lib/security/vault.ts"));
+    lockVaultSession();
+  });
+  await expect(dialog).toHaveCount(0);
+  await expect(page.getByLabel("Organization vault password", { exact: true })).toBeVisible();
   expect(await page.evaluate(() => ({ proof: (window as any).organizationProofRequests, signatures: (window as any).organizationSignatures }))).toEqual({ proof: 0, signatures: 0 });
 });
 

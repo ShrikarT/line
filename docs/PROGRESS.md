@@ -14,7 +14,7 @@ privacy and independent commercial custody are not established.
 | Browser verification | 70 distinct organization, startup and wallet scenarios passed across the broad/focused runs, including duplicate-read, retained-cookie, missing-code and closed-original-tab cases. The broad run caught two missing backup-completion messages; those were corrected and their reruns passed. All eight final production-preview checks passed. Six further browser checks confirmed exact pending bytes, atomic recovery, backup/restore, outage export and lock protection; the startup checks also passed. Final UI/cache changes were verified after the full core run. CI now repeats these against built assets. Fixtures are controlled tests, not new network acceptance |
 | Full CI | The [refresh correction `1efc8b4`](https://github.com/ShrikarT/line/actions/runs/39776737263), [startup follow-up `568c093`](https://github.com/ShrikarT/line/actions/runs/39780636985), [code-download correction `cb754a5`](https://github.com/ShrikarT/line/actions/runs/39784089985) and [second-opening recovery `702194d`](https://github.com/ShrikarT/line/actions/runs/39901700502) all passed. Recovery's 39 focused tests, five browser cases, two built-host tests, typecheck, build, proving export and key/secret checks also passed locally |
 | Actual organization | Latest separately checked finalized opening: OPEN, generation 2, twelve release-matched keys, maintenance counter 11, fees 1,000 + 100 bps, zero encumbrance and accrued fees. Its post-state holds 1,900,000 native-asset base units with reserve accounting 2,000,000. The extra reserve increase is observed; its funding receipt has not yet been separately audited. Latest workspace receipt count has not been reread |
-| Active blocker | Both expired openings are archived and the owner reports recovery history (2). The separately reviewed fresh reopening is now finalized. Next acceptance is a fresh generation-2 quote, fee-bearing purchase, redemption and finalized fee withdrawal |
+| Active blocker | Both expired openings are archived. Fresh fee-bearing reopening and a generation-2 quote are finalized. The owner reported that sharing the saved quote appeared not to work and pasted its summary into the package field. A tested dialog/copy correction is prepared; live purchase, redemption and finalized fee withdrawal remain outstanding |
 | Live testing | On 23 October the owner confirmed automatic wallet connection, a ready organization and an unlocked vault after refresh, then successfully reviewed and archived the newer opening. The displayed history records `006c2322...` at finalized block 3,092,740 and `00abb757...` at finalized block 3,099,704. These are encrypted local recovery records with provider-backed evidence, not finalized failure receipts or successful reopening acceptance |
 | Wallet / backup | Latest encrypted backup remains saved. On the new live build, the actual 1AM owner wallet connected with one click and restored itself after refresh. The owner subsequently reported an organization logout after refresh; a live tab showed a rate limit above the password form. The reproduced boundary was network-read failure being presented as vault logout; the correction retains the memory session for retry. On the corrected deployment, the actual owner tab restored the organization after refresh without password entry, displayed all 22 receipts, and completed wallet/contract-release setup. This is session verification, not a new chain transaction. Its original signed operation is retained. Prior connector failures included a rate limit, generic configuration failure and InternalError; none justified bypassing live guards |
 
@@ -44,6 +44,17 @@ late replies cannot restore it. Browser restart or loss of that memory requires
 the password again. The first-click retry is bounded to two attempts and covers
 only explicit transient connection/configuration failures, never signing,
 proving, balancing or submission.
+
+Saved-quote export generated JSON but left focus on the summary card without a
+copy control. A browser regression reproduced that handoff failure. Transfer
+exports now open a focused dialog with Copy package, Download package and an
+explicit close action. Four saved-quote browser cases pass, covering exact
+finality, backup/history export on mobile, the real clipboard, denied clipboard
+fallback, exact downloaded JSON, import into the 102,000-unit purchase preview
+and vault-lock cleanup. Eight production-preview startup/refresh cases and both
+built-host cases also pass, along with typecheck, build, proving export, key/secret
+scans and unchanged managed contracts. These are controlled browser checks, not
+live purchase acceptance.
 
 ## Wave 1 — foundation
 
@@ -117,6 +128,7 @@ units. All amounts below use base units.
 | Resume | `08435fb970a6856c5d15270dfb299005924eef050040476a781279b3d48fad42` | 3,059,694 |
 | Close with zero outstanding | `19b6095be3bb7a3eb03865a514c87386e5c340b593529ecdc3d120c9b30a54fc` | 3,062,090 |
 | Reopen with 1,000 flat fee + 100 bps | `5cceda1a3b762fd156a124d412e7b02db263fa4fed172f5f12e4fcf3aae74a65` | 3,099,871 |
+| Fresh generation-2 quote | `0f51c305f7ea3da7f97c2b41845423cfce0b4fb3898d2cd33e50810f91595eb7` | 3,099,949 |
 
 Separate read-only checks matched selected raw transactions, contract actions,
 identifiers, canonical finalized blocks and all twelve release-matched keys.
