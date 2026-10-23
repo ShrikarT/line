@@ -8,17 +8,19 @@ import { matchesExpiredOpeningScope } from "@/lib/organization/expired-opening-p
 import type { ExpiredOpeningReview } from "@/lib/organization/expired-opening";
 import { matchesExpiredDisableScope } from "@/lib/organization/expired-disable-policy";
 import type { ExpiredDisableReview } from "@/lib/organization/expired-disable";
+import { matchesExpiredCompensationScope } from "@/lib/organization/expired-compensation-policy";
+import type { ExpiredCompensationReview } from "@/lib/organization/expired-compensation";
 import type { OriginalOrganizationSubmissionDetails } from "@/lib/organization/transactions";
 
 export function OrganizationPendingRecovery() {
   const { recoveries, pending, busy, run } = useOrganization();
   const [reviewingId, setReviewingId] = useState<string | null>(null);
   const [submissionDetails, setSubmissionDetails] = useState<OriginalOrganizationSubmissionDetails | null>(null);
-  const [expiryReview, setExpiryReview] = useState<ExpiredOpeningReview | ExpiredDisableReview | null>(null);
+  const [expiryReview, setExpiryReview] = useState<ExpiredOpeningReview | ExpiredDisableReview | ExpiredCompensationReview | null>(null);
   if (!pending) {
     return recoveries.length ? <details className="organization-create"><summary>Expired operation recovery history ({recoveries.length})</summary><p>The original signed operation and private candidate remain in encrypted storage and backups. Recovery evidence comes from the configured TLS Preprod providers; it is separate from finalized transaction receipts.</p>{recoveries.map(entry => <p key={entry.txId} className="[overflow-wrap:anywhere]"><code>{entry.txId}</code> · nonapplication checked at finalized block {entry.blockHeight.toLocaleString()}.</p>)}</details> : null;
   }
-  const disabling = matchesExpiredDisableScope(pending);
+  const disabling = matchesExpiredDisableScope(pending), compensating = matchesExpiredCompensationScope(pending);
   const label = pending.kind === "key" ? `Register ${pending.circuit} verifier` : pending.circuit;
   return <section className="scope-callout"><div className="min-w-0 w-full">
     <h2>Resolve the saved operation first.</h2>
@@ -41,18 +43,18 @@ export function OrganizationPendingRecovery() {
         </Dialog>
       </>}
 
-      {(matchesExpiredOpeningScope(pending) || disabling) && <>
-        <Button variant="outline" disabled={busy} onClick={() => { setExpiryReview(null); void run(async client => setExpiryReview(await (disabling ? client.reviewExpiredDisable() : client.reviewExpiredOpening()))); }}>{disabling ? "Review expired merchant disable recovery" : "Review expired opening recovery"}</Button>
+      {(matchesExpiredOpeningScope(pending) || disabling || compensating) && <>
+        <Button variant="outline" disabled={busy} onClick={() => { setExpiryReview(null); void run(async client => setExpiryReview(await (compensating ? client.reviewExpiredCompensation() : disabling ? client.reviewExpiredDisable() : client.reviewExpiredOpening()))); }}>{compensating ? "Review expired claim recovery" : disabling ? "Review expired merchant disable recovery" : "Review expired opening recovery"}</Button>
         <Dialog open={expiryReview?.operationId === pending.id} onOpenChange={open => { if (!open) setExpiryReview(null); }}>
           <DialogContent className="max-h-[85dvh] overflow-y-auto">
-            <DialogHeader><DialogTitle>{disabling ? "Archive the expired merchant disable?" : "Archive the expired opening?"}</DialogTitle><DialogDescription>{disabling ? "The configured Preprod providers report that this facility is unchanged since the verified purchase checkpoint, Merchant 2 is still active, and finalized ledger time is past the signed transaction TTL. Its disable candidate has been checked against the original signed action." : "The configured Preprod providers report that this facility is unchanged since the verified closure and finalized ledger time is past the signed transaction TTL. Its opening candidate has been checked against the original signed action."}</DialogDescription></DialogHeader>
+            <DialogHeader><DialogTitle>{compensating ? "Archive the expired claim recovery?" : disabling ? "Archive the expired merchant disable?" : "Archive the expired opening?"}</DialogTitle><DialogDescription>{compensating ? "The configured Preprod providers report that this facility is unchanged since the verified purchase checkpoint, this claim remains unredeemed and unallocated, and finalized ledger time is past every signed intent TTL. Its compensation candidate has been checked against the original signed action." : disabling ? "The configured Preprod providers report that this facility is unchanged since the verified purchase checkpoint, Merchant 2 is still active, and finalized ledger time is past the signed transaction TTL. Its disable candidate has been checked against the original signed action." : "The configured Preprod providers report that this facility is unchanged since the verified closure and finalized ledger time is past the signed transaction TTL. Its opening candidate has been checked against the original signed action."}</DialogDescription></DialogHeader>
             {expiryReview && <>
               <code className="wallet-address block w-full">{expiryReview.txId}</code>
               <p>Signed transaction TTL: {new Date(expiryReview.ttl).toISOString()}.</p>
               <p>Finalized checkpoint: block {expiryReview.evidence.finalized.height.toLocaleString()}, {new Date(expiryReview.evidence.finalized.timestamp).toISOString()}.</p>
               <p>This saves the original signed bytes, private candidate and provider evidence in encrypted recovery history, then unblocks the workspace. It does not count as a failed receipt or approve a replacement transaction. Network fees may still have been charged. This relies on configured TLS providers.</p>
             </>}
-            <DialogFooter><Button variant="outline" onClick={() => setExpiryReview(null)}>Keep operation pending</Button><Button disabled={busy || !expiryReview} onClick={() => { const review = expiryReview!; setExpiryReview(null); void run(client => disabling ? client.recoverExpiredDisable(review as ExpiredDisableReview) : client.recoverExpiredOpening(review as ExpiredOpeningReview)); }}>Archive original with evidence</Button></DialogFooter>
+            <DialogFooter><Button variant="outline" onClick={() => setExpiryReview(null)}>Keep operation pending</Button><Button disabled={busy || !expiryReview} onClick={() => { const review = expiryReview!; setExpiryReview(null); void run(client => compensating ? client.recoverExpiredCompensation(review as ExpiredCompensationReview) : disabling ? client.recoverExpiredDisable(review as ExpiredDisableReview) : client.recoverExpiredOpening(review as ExpiredOpeningReview)); }}>Archive original with evidence</Button></DialogFooter>
           </DialogContent>
         </Dialog>
       </>}

@@ -24,6 +24,7 @@ import { organizationReadEndpoints } from "./read-endpoints";
 import { authenticatedOrganizationReads } from "./authenticated-reads";
 import { recoveryDigest, verifyExpiredOpening, type ExpiredOpeningReview } from "./expired-opening";
 import { verifyExpiredDisable, type ExpiredDisableReview } from "./expired-disable";
+import { verifyExpiredCompensation, type ExpiredCompensationReview } from "./expired-compensation";
 import { inspectMerchantClaim } from "./claims";
 
 type Circuit = keyof Contract<LinePrivateWitnessContext>["provableCircuits"];
@@ -124,7 +125,7 @@ export class OrganizationNetwork {
     this.report("Authenticating the backup and checking its facilities on Midnight");
     await this.account.restoreBackup(file, password, async record => {
       for (const recovery of record.recoveries ?? []) {
-        const verified = await verifyExpiredOpening(recovery.before, recovery.original, recovery.evidence, this.release.sourceFingerprint, name => this.providers.zkConfigProvider.getVerifierKey(name as Circuit));
+        const verified = await (recovery.disposition === "expired-opening-not-applied" ? this.verifyExpiredOpening(recovery.before, recovery.original, recovery.evidence) : recovery.disposition === "expired-disable-not-applied" ? this.verifyExpiredDisable(recovery.before, recovery.original, recovery.evidence) : this.verifyExpiredCompensation(recovery.before, recovery.original, recovery.evidence));
         if (verified.ttl !== recovery.ttl) throw new Error("The recovery history differs from the original signed expiry.");
       }
       if (record.pending && record.pending.sourceFingerprint !== this.release.sourceFingerprint) throw new Error("Restore the pending operation with its original contract release.");
@@ -567,6 +568,31 @@ export class OrganizationNetwork {
   }
   private verifyExpiredDisable(before: OrganizationSnapshot, pending: NonNullable<ReturnType<OrganizationAccount["pending"]>>, evidence: unknown) {
     return verifyExpiredDisable(before, pending, evidence, this.release.sourceFingerprint, name => this.providers.zkConfigProvider.getVerifierKey(name as Circuit));
+  }
+  async reviewExpiredCompensation(): Promise<ExpiredCompensationReview> {
+    return this.account.exclusive(async () => {
+      const pending = this.account.pending(), before = this.account.snapshot();
+      if (!pending?.txId) throw new Error("No original signed claim compensation is saved.");
+      this.report("Checking the pinned finalized state and original claim compensation candidate");
+      const verified = await this.verifyExpiredCompensation(before, pending, await this.supplier.request("network/expired-compensation"));
+      await this.account.assertWallet();
+      return { operationId: pending.id, txId: pending.txId, operationDigest: await recoveryDigest(pending), snapshotDigest: await recoveryDigest(before), checkedAt: Date.now(), ...verified };
+    });
+  }
+  async recoverExpiredCompensation(review: ExpiredCompensationReview) {
+    return this.account.exclusive(async () => {
+      const pending = this.account.pending(), before = this.account.snapshot();
+      if (!pending?.txId || pending.id !== review.operationId || pending.txId !== review.txId || await recoveryDigest(pending) !== review.operationDigest || await recoveryDigest(before) !== review.snapshotDigest || !Number.isSafeInteger(review.checkedAt) || review.checkedAt > Date.now() || Date.now() - review.checkedAt > 300_000) throw new Error("The saved operation or recovery review changed. Check it again.");
+      const verified = await this.verifyExpiredCompensation(before, pending, await this.supplier.request("network/expired-compensation"));
+      if (verified.evidence.finalized.height < review.evidence.finalized.height || verified.evidence.finalized.timestamp < review.evidence.finalized.timestamp) throw new Error("The recovery provider checkpoint moved backwards. Keep the original operation saved.");
+      await this.account.assertWallet();
+      await this.account.archiveExpiredCompensation(pending, verified.evidence, verified.ttl);
+      this.tx().finality.forget(pending.txId);
+      this.report("Expired claim compensation archived with provider-backed nonapplication evidence. No transaction was submitted. Review any new claim recovery request separately.");
+    });
+  }
+  private verifyExpiredCompensation(before: OrganizationSnapshot, pending: NonNullable<ReturnType<OrganizationAccount["pending"]>>, evidence: unknown) {
+    return verifyExpiredCompensation(before, pending, evidence, this.release.sourceFingerprint, name => this.providers.zkConfigProvider.getVerifierKey(name as Circuit));
   }
   private verifyExpiredOpening(before: OrganizationSnapshot, pending: NonNullable<ReturnType<OrganizationAccount["pending"]>>, evidence: unknown) {
     return verifyExpiredOpening(before, pending, evidence, this.release.sourceFingerprint, name => this.providers.zkConfigProvider.getVerifierKey(name as Circuit));

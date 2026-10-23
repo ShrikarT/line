@@ -99,6 +99,23 @@ failure receipts. Confirmation rereads evidence and identities under the account
 lock; storage failure, stale review or a backwards checkpoint keeps it pending.
 No replacement disable is prepared or approved by archival.
 
+One `cancelOrExpireNote` identifier, `00dd26b2...c73c3c27`, has a separate
+mode-1 compensation recovery scoped to Merchant 2's exact claim at the same draw
+checkpoint. The complete state, maintenance counter and release keys must remain
+unchanged, and the claim must still be unredeemed, uncancelled and unallocated.
+`draw` rejects existing note membership; mode 1 permanently sets
+`compensationAllocated`; neither expiry nor redemption can reset an allocated
+claim. Canonical replay must cancel and allocate this exact note, remove its
+100,000 principal and 2,000 pending fee encumbrance, and match the retained
+102,000 private book credit and refund opening. No other private candidate
+change is admitted. Finalized time must pass the latest of **all** intent TTLs
+plus the uncertainty margin, even when DUST has an earlier deadline. Atomic
+review/archive uses its own `line:expired-compensation-evidence/v1` schema and
+`expired-compensation-not-applied` disposition; it retains the unpromoted
+candidate and original bytes. It neither performs compensation nor approves a
+replacement. Backup restoration dispatches each archived disposition to its
+corresponding evidence/candidate validator, including the older disable record.
+
 Saved-transaction inspection uses that account lock to reload the durable pending
 operation without wallet RPCs or storage writes. The original decoder checks the
 release, canonical bytes, identifier, action and target before an allowlisted
