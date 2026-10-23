@@ -12,10 +12,10 @@ privacy and independent commercial custody are not established.
 | Product release | `702194d`, live Render deployment `dep-dbdeb80ae00c73ft0pp0` at 04:43:53 UTC on 23 October. Seven public JS chunks, including account/network/workspace code and the unchanged memory holder, match the tested build by SHA-256. HTML selects the current entry with no-store; `/readyz` reports ready in wallet-only mode. No transaction was submitted by this release check |
 | Local verification | This follow-up: 695 core tests passed, one skipped. After adding the clock-skew and missing-capability checks, all 14 affected auth/adapter tests passed again. Two built wallet-only host tests, typecheck, production build, 37-file proving export, production key/secret scans and zero managed-contract drift passed |
 | Browser verification | 70 distinct organization, startup and wallet scenarios passed across the broad/focused runs, including duplicate-read, retained-cookie, missing-code and closed-original-tab cases. The broad run caught two missing backup-completion messages; those were corrected and their reruns passed. All eight final production-preview checks passed. Six further browser checks confirmed exact pending bytes, atomic recovery, backup/restore, outage export and lock protection; the startup checks also passed. Final UI/cache changes were verified after the full core run. CI now repeats these against built assets. Fixtures are controlled tests, not new network acceptance |
-| Full CI | The [refresh correction `1efc8b4`](https://github.com/ShrikarT/line/actions/runs/39776737263), [startup follow-up `568c093`](https://github.com/ShrikarT/line/actions/runs/39780636985) and [code-download correction `cb754a5`](https://github.com/ShrikarT/line/actions/runs/39784089985) passed. [Second-opening recovery `702194d`](https://github.com/ShrikarT/line/actions/runs/39901700502) is running; its 39 focused tests, five browser cases, two built-host tests, typecheck, build, proving export and key/secret checks passed locally |
+| Full CI | The [refresh correction `1efc8b4`](https://github.com/ShrikarT/line/actions/runs/39776737263), [startup follow-up `568c093`](https://github.com/ShrikarT/line/actions/runs/39780636985), [code-download correction `cb754a5`](https://github.com/ShrikarT/line/actions/runs/39784089985) and [second-opening recovery `702194d`](https://github.com/ShrikarT/line/actions/runs/39901700502) all passed. Recovery's 39 focused tests, five browser cases, two built-host tests, typecheck, build, proving export and key/secret checks also passed locally |
 | Actual organization | Twelve verifier keys and 22 finalized workspace receipts. Last independently checked state: CLOSED, generation 1, 900,000 native-asset base units held, 1,000,000 reserve accounting, zero encumbrance and fees |
-| Active blocker | The first expired opening was archived at block 3,092,734. A newer signed `openLine`, `00abb757c332b831dd25c7640f417d50323639ede3361893571e361ec8eae44813`, is now pending and expired. The owner checked finality and explicitly retried the same bytes; expiry validation rejected the retry before wallet submission. No replacement was created during this investigation |
-| Live testing | The first opening was archived at finalized block 3,092,734, retaining recovery history (1). On 23 October the owner confirmed automatic wallet connection, a ready organization and an unlocked vault after refresh. The newer expired opening remains pending; its recovery review and archival have not yet been confirmed locally |
+| Active blocker | Both expired openings are archived and the owner reports recovery history (2). No new opening was created during recovery. Closed-line reopening and fee-bearing acceptance still require a separately reviewed wallet-approved transaction and finalized receipt |
+| Live testing | On 23 October the owner confirmed automatic wallet connection, a ready organization and an unlocked vault after refresh, then successfully reviewed and archived the newer opening. The displayed history records `006c2322...` at finalized block 3,092,740 and `00abb757...` at finalized block 3,099,704. These are encrypted local recovery records with provider-backed evidence, not finalized failure receipts or successful reopening acceptance |
 | Wallet / backup | Latest encrypted backup remains saved. On the new live build, the actual 1AM owner wallet connected with one click and restored itself after refresh. The owner subsequently reported an organization logout after refresh; a live tab showed a rate limit above the password form. The reproduced boundary was network-read failure being presented as vault logout; the correction retains the memory session for retry. On the corrected deployment, the actual owner tab restored the organization after refresh without password entry, displayed all 22 receipts, and completed wallet/contract-release setup. This is session verification, not a new chain transaction. Its original signed operation is retained. Prior connector failures included a rate limit, generic configuration failure and InternalError; none justified bypassing live guards |
 
 The owner reported a missing `account-m22_y_or.js` after deployment; the file
@@ -154,8 +154,11 @@ pass. Five browser cases cover both openings, preservation of the first archive
 when appending the second, stale reviews, wallet changes, storage failure, later
 commits, backup/restore and exact receipt reconciliation after expiry. Thirty-nine
 focused transaction, evidence, backup, finality and authenticated-provider tests
-also pass. These are controlled tests; the newer owner's operation is still
-pending until its local candidate check and explicit archive complete.
+also pass. These are controlled tests. The owner subsequently confirmed successful
+local candidate/evidence review and archival, with both originals retained in
+recovery history: `006c2322...` at block 3,092,740 and `00abb757...` at block
+3,099,704. This unblocks the workspace without promoting either candidate or
+creating a failure receipt. A fresh opening still needs separate owner review.
 
 Saved original identifier:
 `006c23221e7a0ebe76a1975d827166437f010f611e6a95bd38d6b0c5b55ab524e2`
@@ -281,10 +284,9 @@ compiled-contract tests do not replace fresh network receipts.
 
 ## Wave 3 — pilots and hardening
 
-1. Reconcile the newer expired allowance before starting another mutation.
-   Use exact finality or the narrowly scoped,
-   owner-reviewed recovery after its local candidate check succeeds. Do not
-   discard bytes based on expiry, a missing receipt or a latest CLOSED snapshot.
+1. Review and submit a fresh fee-bearing opening on the existing CLOSED facility.
+   Both expired originals remain in encrypted recovery history. Do not reuse or
+   replace their bytes; the new terms and wallet approval are a separate action.
 2. Complete fee-bearing and remaining twelve-action/compensation acceptance with
    finalized receipts and actual asset movements. The next 100,000-unit purchase
    under the proposed policy would charge a 2,000-unit fee, totaling 102,000.
