@@ -12,9 +12,9 @@ privacy and independent commercial custody are not established.
 | Product release | `9d95475`, live Render deployment `dep-dbdmagvavr4c73aivb30` at 13:48:19 UTC on 23 October. Nine selected public JS chunks match the tested build by SHA-256; the session memory holder is unchanged. HTML selects the current entry with no-store; `/readyz` is ready in wallet-only mode. The authenticated quote reader returned matching pinned state/keys and correctly rejected early archival at finalized block 3,104,723 (13:49:12 UTC). Verification used and revoked a new unfunded HTTP identity, without accessing the owner journal or submitting a transaction |
 | Local verification | Quote recovery and submission guards: 60 focused evidence/transaction/backup/finality/provider tests, 13 submission/replay/recovery browser cases, eight production-preview startup/refresh cases, typecheck, production build, 37-file proving export, production key/secret scans and zero managed-contract drift passed. All five archive cases exercise network-level backup restore, storage aborts, stale reviews, wallet changes and backwards checkpoints. The full core suite passed 713 tests with one skipped and zero failures. Fixtures are controlled tests, not live quote or propagation acceptance |
 | Browser verification | 70 distinct organization, startup and wallet scenarios passed across the broad/focused runs, including duplicate-read, retained-cookie, missing-code and closed-original-tab cases. The broad run caught two missing backup-completion messages; those were corrected and their reruns passed. All eight final production-preview checks passed. Six further browser checks confirmed exact pending bytes, atomic recovery, backup/restore, outage export and lock protection; the startup checks also passed. Final UI/cache changes were verified after the full core run. CI now repeats these against built assets. Fixtures are controlled tests, not new network acceptance |
-| Full CI | The [quote recovery/submission guard `9d95475`](https://github.com/ShrikarT/line/actions/runs/39964015926) is running; all local checks above passed. The [compensation recovery `1c0fd1c`](https://github.com/ShrikarT/line/actions/runs/39955741452) passed all jobs; the full local core suite and focused checks also passed. The [submission diagnostics `0439698`](https://github.com/ShrikarT/line/actions/runs/39950249356) passed all jobs. The [merchant-disable recovery `3051942`](https://github.com/ShrikarT/line/actions/runs/39938915159) passed all jobs; the local checks above also passed. The [claim-list correction `df43535`](https://github.com/ShrikarT/line/actions/runs/39917370912) passed all jobs; local checks above also passed. The [refresh correction `1efc8b4`](https://github.com/ShrikarT/line/actions/runs/39776737263), [startup follow-up `568c093`](https://github.com/ShrikarT/line/actions/runs/39780636985), [code-download correction `cb754a5`](https://github.com/ShrikarT/line/actions/runs/39784089985) and [second-opening recovery `702194d`](https://github.com/ShrikarT/line/actions/runs/39901700502) all passed. Recovery's 39 focused tests, five browser cases, two built-host tests, typecheck, build, proving export and key/secret checks also passed locally |
-| Actual organization | Finalized mode-1 compensation at block 3,104,191 cancelled Merchant 2's expired 100,000 + 2,000 claim and allocated compensation with no cash refund owed. OPEN, generation 2, policy 1,000 + 100 bps; principal encumbrance, pending fees and finalized fees are zero. Custody remains 1,798,000, reserve accounting 1,998,000 and cumulative redeemed principal 200,000. Merchant 2 remains active; its expired claim was cancelled without payout. Latest workspace receipt count has not been reread |
-| Remaining acceptance | A fresh Merchant 2 `postQuote` is signed and pending; its absent receipt does not authorize replacement. The two expired openings, merchant disable and first compensation remain preserved in encrypted recovery history. A separately owner-approved fresh compensation succeeded. Merchant disabling, a valid Merchant 2 payout, other compensation modes, original submission diagnosis, independent suppliers/customer validation and full-history privacy remain outstanding |
+| Full CI | The [quote recovery/submission guard `9d95475`](https://github.com/ShrikarT/line/actions/runs/39964015926) passed all jobs; all local checks above passed. The [compensation recovery `1c0fd1c`](https://github.com/ShrikarT/line/actions/runs/39955741452) passed all jobs; the full local core suite and focused checks also passed. The [submission diagnostics `0439698`](https://github.com/ShrikarT/line/actions/runs/39950249356) passed all jobs. The [merchant-disable recovery `3051942`](https://github.com/ShrikarT/line/actions/runs/39938915159) passed all jobs; the local checks above also passed. The [claim-list correction `df43535`](https://github.com/ShrikarT/line/actions/runs/39917370912) passed all jobs; local checks above also passed. The [refresh correction `1efc8b4`](https://github.com/ShrikarT/line/actions/runs/39776737263), [startup follow-up `568c093`](https://github.com/ShrikarT/line/actions/runs/39780636985), [code-download correction `cb754a5`](https://github.com/ShrikarT/line/actions/runs/39784089985) and [second-opening recovery `702194d`](https://github.com/ShrikarT/line/actions/runs/39901700502) all passed. Recovery's 39 focused tests, five browser cases, two built-host tests, typecheck, build, proving export and key/secret checks also passed locally |
+| Actual organization | Merchant 2's new quote/draw, disabling and subsequent redemption finalized at blocks 3,105,843 / 3,105,896 / 3,105,915 / 3,105,949. Its existing claim paid exactly 100,000 to its registered second wallet after disabling. OPEN generation 2; custody 1,698,000, reserve accounting 1,998,000, cumulative redeemed principal 300,000, finalized fees 2,000, zero principal encumbrance/pending fees. Merchant 2 is disabled. Its earlier expired claim remains compensated without payout. Latest workspace receipt count has not been reread |
+| Remaining acceptance | All twelve distinct circuit names now have finalized call acceptance on this facility. Compensation modes 0 and 2, remaining negative-path checks, original submission diagnosis, independent suppliers/customer validation and full-history privacy remain outstanding. The owner confirmed archival of the expired Merchant 2 quote; all five original operations remain in encrypted recovery history. Its replacement quote/draw and redemption were separately owner-approved |
 | Live testing | On 23 October the owner confirmed automatic wallet connection, a ready organization and an unlocked vault after refresh, then successfully reviewed and archived the newer opening. The displayed history records `006c2322...` at finalized block 3,092,740 and `00abb757...` at finalized block 3,099,704. These are encrypted local recovery records with provider-backed evidence, not finalized failure receipts or successful reopening acceptance |
 | Wallet / backup | The owner confirmed automatic wallet connection, organization readiness and an unlocked vault after refresh on 23 October. After the fee-bearing cycle, the owner confirmed allowance 1,000,000, spending balance 102,000, remaining allowance 898,000, zero fees and assets held 1,798,000. A fresh encrypted backup was saved; only its existence was checked, without reading or decrypting it. Intermittent wallet rate limits remain possible; failed reads retain the memory session and never bypass live transaction guards |
 
@@ -153,6 +153,10 @@ units. All amounts below use base units.
 | Merchant 2 quote: 100,000 principal + 2,000 fee | `4e84c89185ab29d3d1168c6a2d942b95b73ce7ce6bf7c07b9b52b8ee4056b751` | 3,102,136 |
 | Merchant 2 draw: 100,000 principal + 2,000 fee | `7032da078691a74615eaf7efe9d8bf608627655c8fa3118c3df673fc7efca04c` | 3,102,203 |
 | Merchant 2 expired-claim compensation, mode 1 | `e0d3a6728ebf74f2d3eb29869075aa70f2102e01ccda578d0bdbb963a8f387bb` | 3,104,191 |
+| Merchant 2 fresh quote, invoice 03 | `ccc53f034c8367245ba245bef39c29cf6116e7f13684e1e95f09110f31479529` | 3,105,843 |
+| Merchant 2 fresh draw: 100,000 + 2,000 fee | `fd5d32a81f0f00b18e9e7ed2ce629baf3d3ee3f88d8043cbb2acb38828b958ac` | 3,105,896 |
+| Disable Merchant 2; existing claim preserved | `c9b48cef17196e5bf43a817ee1e7b2d88e229e46dfcea7ea610c0b349089964e` | 3,105,915 |
+| Redeem existing Merchant 2 claim after disabling | `f1f950fa28d99fbfa9a70e2437e4c59650a3b3417cad60a765cb415bbac672ee` | 3,105,949 |
 
 Separate read-only checks matched selected raw transactions, contract actions,
 identifiers, canonical finalized blocks and all twelve release-matched keys.
@@ -166,12 +170,17 @@ encumbrance, zero fee terms and zero fees. A fresh read-only audit at 07:26 UTC 
 generation 2, custody 1,798,000, reserve accounting 1,998,000 and zero encumbrance
 or fees. Selected rows are not the full workspace receipt count; intermediate
 verifier installations are represented by their final registration checkpoint.
+A later read-only audit at 15:57 UTC reverified all 26 selected rows and twelve
+release-matched keys, including Merchant 2's accepted disable and subsequent
+100,000-unit payout. It read custody 1,698,000 and finalized fees 2,000, started
+no wallet and submitted no transaction.
 
-Fresh receipts cover eleven distinct call names: `registerMerchant`, `fundReserve`,
+Fresh receipts cover all twelve distinct call names: `registerMerchant`, `disableMerchant`, `fundReserve`,
 `withdrawUnencumberedReserve`, `withdrawFees`, `openLine`, `postQuote`, `draw`, `redeemDraw`,
 `acknowledgeRepayment`, `setStatus`, `cancelOrExpireNote` (mode 1 only). Verifier
-registration is not circuit-call acceptance. `disableMerchant` and compensation
-modes 0 and 2 remain unaccepted in this facility. Additional Merchant 2 registration finalized at block 3,101,980;
+registration is not circuit-call acceptance. Compensation modes 0 and 2 remain
+unaccepted in this facility. All twelve call names do not imply all branches or
+negative paths have live acceptance. Additional Merchant 2 registration finalized at block 3,101,980;
 its canonical raw `registerMerchant`, aggregate SUCCESS and RPC-finalized block
 were matched, with its supplied public key mapped to the exact second receiving
 wallet. Merchant 2 uses another owner-controlled wallet; this is permission
@@ -214,7 +223,7 @@ at generation 1, before the fresh opening. This completes the fee-bearing
 reopening/quote/draw/redemption/fee-withdrawal cycle on this facility. It does not
 establish independent fulfillment, a customer pilot or full-history privacy.
 
-### Pending fresh Merchant 2 quote
+### Archived Merchant 2 quote and subsequent accepted purchase
 
 The owner approved another Merchant 2 quote with invoice
 `line-merchant2-20261023-02`, price 100,000 and 120-minute validity. Its retained
@@ -260,7 +269,28 @@ checkpoint and all release keys at finalized block 3,104,723, hash
 `88ff105a0785da99b43c6c4151c585b87bb7f381bb8b235b0ef3b6e9b788b473`,
 time 13:49:12 UTC. The local time gate rejected archival because the last signed
 intent was still live. No owner candidate was decrypted, archived or replaced
-by that release check. Owner review remains pending after the finalized-time gate.
+by that release check. After the time gate, the owner confirmed: "Expired merchant
+quote archived with provider-backed nonapplication evidence. No transaction was
+submitted." The exact original and unpromoted candidate remain in encrypted
+recovery history; this is not a finalized failure receipt.
+
+The owner then separately approved invoice `line-merchant2-20261023-03`, price
+100,000, fee 2,000 and deadline Unix second 1792777183. Its exact quote commitment
+`6b790d33521c3984044d3374c0fb9cad67ee0b919238fbf81964ecefa329e195`
+was installed at block 3,105,843 and consumed by the draw at block 3,105,896.
+The resulting claim is
+`098c3854fba45be6a58ad0a3ac0692759f0f1b2adf7a331ca983f45d102c1bfc`.
+Merchant 2 was disabled at block 3,105,915 while that claim remained unredeemed
+and uncancelled. The subsequent redemption finalized at block 3,105,949, hash
+`b16676296d511d85c6466f7a4c0fa59bf95f6963bc57133b3ae9d857c4bec397`.
+Canonical raw output pays exactly 100,000 native base units to Merchant 2's
+registered receiving wallet ending `e826t0`, with the merchant key still disabled.
+The owner independently confirmed receipt in that wallet. Custody is 1,698,000;
+reserve accounting 1,998,000; cumulative principal paid 300,000; finalized fees
+2,000; encumbrance and pending fees zero. This establishes redemption of an
+existing claim after merchant disabling, using another same-owner wallet. It
+does not establish independent supplier fulfillment. The latest product full CI
+also passed. No transaction was submitted by receipt verification.
 
 ### Confirmed expired-claim compensation and retained recovery history
 
@@ -367,8 +397,8 @@ evidence, backup, finality, recovery, authenticated-read and server tests pass,
 including rejection of a different actual disabled key. Typecheck, production
 build, 37-file proving export, key/secret scans and managed-contract drift pass.
 Eight production-preview startup/refresh cases and two built-host tests also pass.
-These are controlled checks; the live owner archive and Merchant 2 disabling
-have not been accepted.
+These were controlled checks; the owner later confirmed the archive, and a
+separately approved Merchant 2 disabling finalized at block 3,105,915 above.
 
 The recovery update is live as `3051942`. A production request using an ephemeral,
 unfunded signing identity returned 401 before authentication and 200 after it;
@@ -377,11 +407,11 @@ and release-key validator. That temporary HTTP session was logged out. No owner
 vault or original candidate was accessed, no wallet was started and no chain
 transaction was submitted. The owner subsequently reported successful local archival: original bytes and
 candidate were retained with provider-backed nonapplication evidence and no
-transaction was submitted. A new disable still requires separate review; none
-has been requested following archival. At pinned finalized block 3,103,348
+transaction was submitted. At that checkpoint no replacement disable had been requested; the later
+separately approved disabling is recorded above. At pinned finalized block 3,103,348
 (`2026-10-23T11:31:42Z`), Merchant 2 remained active and its claim remained
 unredeemed/uncancelled. Its deadline had passed at `2026-10-23T11:28:48Z`.
-Redemption acceptance has not been established. The owner instead approved
+That original claim did not establish redemption acceptance. The owner instead approved
 expired-claim compensation for its 102,000-unit charge, now finalized above.
 The cause of the recurring wallet submission acknowledgement timeouts remains
 unresolved; this update does not claim to repair wallet submission.
@@ -454,9 +484,12 @@ compiled-contract tests do not replace fresh network receipts.
 ## Wave 3 — pilots and hardening
 
 1. Preserve the finalized generation-2 fee-bearing cycle, confirmed mode-1
-   compensation and all four encrypted recovery records in the latest backup.
-2. Complete Merchant 2 payout, disabling and compensation modes 0 and 2 with
-   finalized receipts and actual asset movements. Mode 1 is confirmed. The completed
+   compensation, the later Merchant 2 payout/disable and all five encrypted recovery
+   records in the latest backup.
+2. Complete compensation modes 0 and 2 with finalized receipts and actual asset
+   movements where applicable. Mode 1, Merchant 2 payout and disabling are confirmed.
+   The current organization UI exposes mode 1 recovery and mode 2 refund payment;
+   a separate mode 0 expiry action still needs an application entry point. The completed
    100,000-unit purchase charged a 2,000-unit fee, totaling 102,000 allowance units.
 3. Operate independently funded merchants and durable automated suppliers. The
    free public wallet-only host does not provide supplier automation.
