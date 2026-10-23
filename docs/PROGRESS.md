@@ -14,9 +14,9 @@ privacy and independent commercial custody are not established.
 | Browser verification | 70 distinct organization, startup and wallet scenarios passed across the broad/focused runs, including duplicate-read, retained-cookie, missing-code and closed-original-tab cases. The broad run caught two missing backup-completion messages; those were corrected and their reruns passed. All eight final production-preview checks passed. Six further browser checks confirmed exact pending bytes, atomic recovery, backup/restore, outage export and lock protection; the startup checks also passed. Final UI/cache changes were verified after the full core run. CI now repeats these against built assets. Fixtures are controlled tests, not new network acceptance |
 | Full CI | The [refresh correction `1efc8b4`](https://github.com/ShrikarT/line/actions/runs/39776737263), [startup follow-up `568c093`](https://github.com/ShrikarT/line/actions/runs/39780636985), [code-download correction `cb754a5`](https://github.com/ShrikarT/line/actions/runs/39784089985) and [second-opening recovery `702194d`](https://github.com/ShrikarT/line/actions/runs/39901700502) all passed. Recovery's 39 focused tests, five browser cases, two built-host tests, typecheck, build, proving export and key/secret checks also passed locally |
 | Actual organization | Latest separately checked finalized fee withdrawal: OPEN, generation 2, policy 1,000 + 100 bps, zero encumbrance, pending fees and finalized fees. The cycle paid 100,000 to the registered owner/merchant and 2,000 to the fixed issuer wallet. Post-state custody is 1,798,000, reserve accounting 1,998,000 and cumulative redeemed principal 200,000. The earlier extra reserve increase is observed; its funding receipt has not yet been separately audited. Latest workspace receipt count has not been reread |
-| Active blocker | The two expired openings are archived, and fresh fee-bearing reopening, quote, draw, merchant payout and fee withdrawal are all finalized. Remaining work includes final UI/backup checks, clearer claim selection, additional merchant/compensation acceptance, independent suppliers/customer validation and full-history privacy |
+| Active blocker | The two expired openings are archived, and fresh fee-bearing reopening, quote, draw, merchant payout and fee withdrawal are all finalized. The owner confirmed final UI figures and saved a fresh encrypted backup. Remaining work includes additional merchant/compensation acceptance, independent suppliers/customer validation and full-history privacy |
 | Live testing | On 23 October the owner confirmed automatic wallet connection, a ready organization and an unlocked vault after refresh, then successfully reviewed and archived the newer opening. The displayed history records `006c2322...` at finalized block 3,092,740 and `00abb757...` at finalized block 3,099,704. These are encrypted local recovery records with provider-backed evidence, not finalized failure receipts or successful reopening acceptance |
-| Wallet / backup | Latest encrypted backup remains saved. On the new live build, the actual 1AM owner wallet connected with one click and restored itself after refresh. The owner subsequently reported an organization logout after refresh; a live tab showed a rate limit above the password form. The reproduced boundary was network-read failure being presented as vault logout; the correction retains the memory session for retry. On the corrected deployment, the actual owner tab restored the organization after refresh without password entry, displayed all 22 receipts, and completed wallet/contract-release setup. This is session verification, not a new chain transaction. Its original signed operation is retained. Prior connector failures included a rate limit, generic configuration failure and InternalError; none justified bypassing live guards |
+| Wallet / backup | The owner confirmed automatic wallet connection, organization readiness and an unlocked vault after refresh on 23 October. After the fee-bearing cycle, the owner confirmed allowance 1,000,000, spending balance 102,000, remaining allowance 898,000, zero fees and assets held 1,798,000. A fresh encrypted backup was saved; only its existence was checked, without reading or decrypting it. Intermittent wallet rate limits remain possible; failed reads retain the memory session and never bypass live transaction guards |
 
 The owner reported a missing `account-m22_y_or.js` after deployment; the file
 returned 404 while the current build used a different hash. Code-load failures
@@ -57,6 +57,17 @@ scans and unchanged managed contracts. These are controlled browser checks, not
 live purchase acceptance. The dialog update is deployed as `49e6c21`; its
 [full CI run](https://github.com/ShrikarT/line/actions/runs/39911136195) passed.
 The prior recovery release's full CI also passed.
+
+Claim cards now show allowance generation, merchant payout, organization fee and
+total allowance charge, with newer generations first. Local redemption records
+are labeled as local; an unrecorded payout asks for a current Merchant workspace
+check. Older valid claims remain exportable. This corrects the ambiguous list
+that led the owner to select the already-redeemed generation-1 claim. Three
+focused browser cases passed, including mobile ordering, exact old/new exports,
+clipboard handoff and the existing spent-state guard. Eight production-preview
+startup/refresh cases and two built-host tests also passed. Typecheck, production
+build, 37-file proving export, key/secret scans and managed-contract drift checks
+passed. These are controlled checks, not additional live financial acceptance.
 
 ## Wave 1 — foundation
 
@@ -170,131 +181,48 @@ zero encumbrance, pending fees and finalized fees. This completes the fee-bearin
 reopening/quote/draw/redemption/fee-withdrawal cycle on this facility. It does not
 establish independent fulfillment, a customer pilot or full-history privacy.
 
-### Pending allowance and recovery
+### Archived expired openings
 
-On 23 October the owner confirmed automatic wallet connection, organization
-readiness and an unlocked vault after refresh. The pending identifier was the
-newer `00abb757c332b831dd25c7640f417d50323639ede3361893571e361ec8eae44813`,
-not the first original below. An exact identifier lookup returned zero records
-without GraphQL errors. Fresh scoped node/indexer evidence at finalized block
-3,099,172 (`2026-10-23T04:34:06.001Z`) matched the complete trusted closure state,
-all twelve release verifier keys and maintenance counter 11. This evidence does
-not itself validate the owner's retained candidate or establish a failure receipt.
+The owner completed local review and atomic archival of both expired fee-bearing
+openings on 23 October. Encrypted recovery history retains the original canonical
+signed bytes, predecessor, private candidate and nonapplication evidence:
 
-Recovery scope now includes exactly those two identifiers. Signed-byte identity,
-opening transcript/private-candidate replay, fixed terms, finalized TTL margin,
-durable review guards and atomic archival are unchanged. A failing browser case
-first reproduced the missing review button for the newer identifier; a failing
-encrypted backup case reproduced rejection of its recovery history. Both now
-pass. Five browser cases cover both openings, preservation of the first archive
-when appending the second, stale reviews, wallet changes, storage failure, later
-commits, backup/restore and exact receipt reconciliation after expiry. Thirty-nine
-focused transaction, evidence, backup, finality and authenticated-provider tests
-also pass. These are controlled tests. The owner subsequently confirmed successful
-local candidate/evidence review and archival, with both originals retained in
-recovery history: `006c2322...` at block 3,092,740 and `00abb757...` at block
-3,099,704. This unblocks the workspace without promoting either candidate or
-creating a failure receipt. A fresh opening still needs separate owner review.
+| Original identifier | Owner-displayed finalized evidence block |
+| --- | --- |
+| `006c23221e7a0ebe76a1975d827166437f010f611e6a95bd38d6b0c5b55ab524e2` | 3,092,740 |
+| `00abb757c332b831dd25c7640f417d50323639ede3361893571e361ec8eae44813` | 3,099,704 |
 
-Saved original identifier:
-`006c23221e7a0ebe76a1975d827166437f010f611e6a95bd38d6b0c5b55ab524e2`
-
-The owner approved a 1,000,000-unit allowance with seven-day expiry, a 1,000-unit
-flat fee and 100 basis points. Submission acknowledgement timed out. The exact
-signed bytes remain in the encrypted journal, with new mutations blocked.
-At 02:51 UTC on 21 October, a direct lookup returned HTTP 200, no GraphQL errors
-and zero records; current state remained CLOSED, generation 1, fees 0/0 and
-900,000 held. Neither a missing receipt nor a latest-state snapshot proves that
-an uncertain transaction never applied.
-
-The latest finality check through the recovered live session ended with
-`Finality has not been observed yet`. The owner's subsequent original-byte retry
-was rejected by expiry validation before wallet submission. The live workspace
-still shows the exact original identifier, CLOSED status, 900,000 units held and
-22 receipts. Signed bytes and the private candidate remain retained; expiry is
-not recorded as finalized failure. Earlier retries and a separate fresh-tab
-connection returned `Request failed`. No replacement was created.
-
-Explicit resubmission keeps the original bytes and identifier, validates the
-release, canonical encoding, action, target and expiry, and requires fresh wallet
-identity plus the account lock. Stale reviews, altered bytes and expired intents
-are rejected. It requests no new proof or balancing. Rejection or timeout retains
-the pending operation. Expiry alone never clears the journal. A generic expiry
-recovery procedure is not established; in this CLOSED facility `setStatus` is
-rejected, so it cannot be assumed to provide a cancellation fence.
-
-A narrowly scoped recovery implementation now targets only this original opening.
-Fresh node/indexer reads agreed at finalized block 3,077,413 (21 October,
-16:18:12 UTC). Its complete contract state still equals the separately
-rechecked closure checkpoint: generation 1, CLOSED and maintenance counter 11.
-Closure block hash is
+Both had timed out without observed finality. Retrying the retained bytes was
+rejected before submission because their signed TTLs had expired. Neither expiry
+nor missing receipts alone cleared the journal. The scoped recovery instead
+checked canonical identity/action/target/release, replayed the actual opening
+against the retained candidate and required complete serialized state equality
+with the trusted closure checkpoint at block 3,062,090. Its block hash is
 `07e0ca54c514da92538ec7d29b3c1aa9db4f315d6a61bd0142379a20dafc9306`;
-serialized state SHA-256 is
+state SHA-256 is
 `b7ff374bea501e82b6fb2210b1e1fed115f1b3688402cb49b6e1ba2211066cdd`.
-The observed runtime is `midnight` spec 1,000,300, using ledger 8.1.2.
-After deployment, an authenticated public read with an ephemeral, unfunded test
-identity also passed through the production recovery endpoint at finalized block
-3,077,645. Its state matched the pinned closure and all twelve local release keys.
-This checked hosted authentication and provider reads without accessing the
-owner's encrypted record or submitting a transaction.
-A later production check at block 3,078,006 (21 October, 17:17:30 UTC) again
-matched the pinned state and release keys. Readiness remained healthy in
-wallet-only mode, and deployed application assets still matched the tested build.
-The browser-control tools had no connected browser; the owner's local archive
-status therefore remains unverified.
+The unchanged generation, all twelve release-matched keys and nonsaturated
+maintenance counter 11 exclude an intervening opening under the verified ledger
+assumptions. Finalized time must exceed every signed intent TTL plus the node's
+30-second uncertainty margin. See [architecture](ARCHITECTURE.md) for assumptions
+and implementation references. These are configured TLS provider checks, not an
+independent full-node or light-client proof.
 
-The recovery checks all saved intent TTLs against pinned finalized block time,
-retains a 30-second uncertainty margin, verifies the exact signed action and
-replays its transcript against the predecessor to bind the generation-2 private
-candidate and approved fee terms. The unchanged, nonsaturated maintenance counter
-excludes intervening verifier/authority updates; generation cannot reset or wrap
-under this release. Details and source references are in
-[architecture](ARCHITECTURE.md). These rely on configured TLS providers and normal
-validated ledger history, not an independent full node or light-client proof.
+Confirmation rereads durable state, provider evidence and wallet identity under
+the account lock. One encrypted commit archives before unblocking, without
+promoting either candidate or inventing a finalized failure receipt. Recovery is
+limited to these two exact operations; a fresh opening still required separate
+owner approval and subsequently finalized as listed above. The history remains
+bounded, nonrecursive and validated through backup/restore.
 
-Owner confirmation triggers another provider read and wallet check under the
-account lock. A single encrypted commit preserves the original operation,
-predecessor, candidate and evidence in recovery history before unblocking.
-Ordinary expiry rejection and exact-receipt reconciliation remain unchanged.
-Recovery neither promotes the candidate nor creates a failure receipt. The real
-owner's encrypted operation has not yet passed this new local candidate check or
-been archived; that requires the existing vault to be opened locally after the
-verified product update. No replacement opening has been created.
-
-Two focused browser regressions passed for expired signed operations: no wallet
-submission, proof or balance request; exact bytes and candidate retained through
-encrypted backup and reopening; missing and unrelated receipts keep the journal
-blocked; exact finalized success or total failure can still reconcile it. These
-use serialization fixtures and controlled receipts, not fresh network evidence.
-All five transaction-validation tests and typecheck also passed. No production
-transaction behavior or contract changed in this verification update.
-
-After the owner restored 1AM and reopened the organization, the diagnostic release
-identified `getConfiguration` as the failed check. A later cooldown refresh failed
-at the same stage, before proof or submission. The session-check fix verifies
-service configuration at unlock and keeps a frozen in-memory copy. Later guards
-check the live connector session and Preprod network, then reread both identities.
-A failed live check cannot fall back to saved settings. Changed accounts still
-lock the vault; reconnect/reopen adopts changed service URLs. This reduces
-repeated configuration reads. On the deployed fix, the owner reopened the existing
-organization. 1AM initially rate limited the live session-status check; one later
-refresh after cooldown recovered the actual treasury without reconnecting or
-reopening again. It displayed CLOSED, twelve keys and 900,000 units held, with
-the same 22 receipts. This accepts the live read path, not a new financial call;
-intermittent wallet rate limiting remains unresolved.
-
-Identity reads remain sequential and bounded. Only explicit rate limits receive
-bounded read retries; generic failures, signatures, proofs and submission are not
-automatically retried. Fifteen focused finality/read cases and the real encrypted
-account regression cover configuration failure, wrong/disconnected networks,
-changed accounts, settings isolation, deadlines and no unauthorized mutation.
-
-Backup export reloads the latest durable record under the account lock without
-wallet RPCs, rechecks session validity after encryption and retains pending
-operations. Restore and financial operations still verify wallet identity.
-Keep the original organization password and latest encrypted backup. Extension
-unlocking and transaction approvals require the owner; no extension UI was
-automated.
+Five recovery browser cases cover both identifiers, appending the second archive,
+stale reviews, wallet changes, failed storage writes, later commits and encrypted
+backup/restore. Thirty-nine focused transaction, evidence, backup, finality and
+authenticated-provider tests passed. Separate expired-operation cases retain
+exact bytes/candidates across backups, reject resubmission, keep missing/unrelated
+receipts blocked and allow exact finalized success or total failure to reconcile
+after expiry. These fixtures do not replace the owner's live candidate review or
+network receipts.
 
 ### Historical checkpoints and test limitation
 
@@ -320,12 +248,11 @@ compiled-contract tests do not replace fresh network receipts.
 
 ## Wave 3 — pilots and hardening
 
-1. Preserve the finalized generation-2 opening and both encrypted recovery records.
-   Use a fresh quote bound to this generation for the next purchase; older
-   generation-1 quotes cannot establish acceptance of the reopened allowance.
-2. Complete fee-bearing and remaining twelve-action/compensation acceptance with
-   finalized receipts and actual asset movements. The next 100,000-unit purchase
-   under the proposed policy would charge a 2,000-unit fee, totaling 102,000.
+1. Preserve the finalized generation-2 fee-bearing cycle and both encrypted
+   recovery records in the latest backup.
+2. Complete additional merchant registration, disabling and all compensation-mode
+   acceptance with finalized receipts and actual asset movements. The completed
+   100,000-unit purchase charged a 2,000-unit fee, totaling 102,000 allowance units.
 3. Operate independently funded merchants and durable automated suppliers. The
    free public wallet-only host does not provide supplier automation.
 4. Complete the privacy redesign and test full-history inference before claiming

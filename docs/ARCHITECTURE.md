@@ -194,6 +194,9 @@ wallet. It shows the settlement asset, merchant payout, separately retained fee,
 deadline and observed unspent/redeemed/cancelled status. Editing the package
 invalidates the review. Redemption repeats the check under the account lock
 before preparing a transaction, so a claim spent since review is rejected early.
+Saved claim cards prioritize newer allowance generations and show payout, fee
+and total charge. A recorded redemption is explicitly local; absent local records
+require a current Merchant workspace check. Older claims remain exportable.
 Current allowance status/generation and merchant disabling do not invalidate an
 older claim. Provider-observed state is not a finalized payout receipt or a
 guarantee of payment; Compact still checks ledger time, custody and single use.

@@ -892,6 +892,48 @@ test("saved quote sharing opens a focused dialog, copies complete JSON and suppo
   expect(await page.evaluate(() => ({ proof: (window as any).organizationProofRequests, signatures: (window as any).organizationSignatures }))).toEqual({ proof: 0, signatures: 0 });
 });
 
+test("claim cards identify generations and fees, prioritize newer generations and preserve older exports", async ({ page }) => {
+  test.setTimeout(120_000);
+  await wallets(page, true); await page.goto("/app"); await connect(page, "a"); await unlock(page);
+  const expected = await page.evaluate(async () => {
+    const { browserModuleUrl } = await import("/e2e/browser-module.ts" as any);
+    const { OrganizationAccount } = await import(browserModuleUrl("/src/lib/organization/account.ts"));
+    const { getConnectedWallet } = await import(browserModuleUrl("/src/lib/runtime/wallet.ts"));
+    const { encodeNote } = await import(browserModuleUrl("/src/lib/organization/transfers.ts"));
+    const account = await OrganizationAccount.unlock(getConnectedWallet()!, "Organization123!");
+    const old = { contractAddress: "ab".repeat(32), domain: "12".repeat(32), identity: "13".repeat(32), merchantPk: "14".repeat(32), quoteCommitment: "15".repeat(32), amount: 100000n, fee: 0n, expiry: BigInt(Math.floor(Date.now() / 1000) + 3600), generation: 1n, noteNonce: "16".repeat(32), noteSalt: "17".repeat(32), noteCommitment: "18".repeat(32), redeemed: true };
+    const current = { ...old, generation: 2n, fee: 2000n, noteCommitment: "19".repeat(32) };
+    const importedLater = { ...old, redeemed: false, noteCommitment: "20".repeat(32) };
+    await account.edit(snapshot => {
+      snapshot.facilities.push({ id: "claim-list-fixture", name: "Claim list fixture", address: old.contractAddress, instanceNonce: "21".repeat(32), maintenanceKey: "22".repeat(32), assetColor: "00".repeat(32), issuerRecipient: account.receivingAddress, merchants: [], agentSecret: "23".repeat(32), salt: "24".repeat(32), limit: 1000000n, outstanding: 102000n, epoch: 1n, generation: 2n });
+      snapshot.notes.push(old, current, importedLater);
+    });
+    return [current, importedLater, old].map(note => JSON.parse(encodeNote(note)));
+  });
+  await unlock(page); await page.getByRole("tab", { name: "Agent", exact: true }).click();
+  await page.setViewportSize({ width: 390, height: 844 });
+  const library = page.getByRole("region", { name: "Saved merchant claims", exact: true });
+  await expect(library).toBeVisible();
+  const cards = library.getByRole("article");
+  await expect(cards).toHaveCount(3);
+  await expect(cards.nth(0)).toContainText("Allowance generation 2");
+  await expect(cards.nth(0)).toContainText("Organization fee: 2000 base units");
+  await expect(cards.nth(0)).toContainText("Total allowance charge: 102000 base units");
+  await expect(cards.nth(0)).toContainText("Redemption recorded in this workspace");
+  await expect(cards.nth(1)).toContainText("Allowance generation 1");
+  await expect(cards.nth(1)).toContainText("Check current payout status");
+  await expect(cards.nth(1)).not.toContainText("Unspent");
+  await expect(cards.nth(2)).toContainText("Organization fee: 0 base units");
+  for (let index = 0; index < expected.length; index++) {
+    await cards.nth(index).getByRole("button", { name: "Share claim", exact: true }).click();
+    const dialog = page.getByRole("dialog", { name: "Merchant claim package", exact: true });
+    expect(JSON.parse(await dialog.getByRole("textbox", { name: "Merchant claim package", exact: true }).inputValue())).toEqual(expected[index]);
+    await dialog.getByRole("button", { name: "Close package", exact: true }).click();
+  }
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+  expect(await page.evaluate(() => ({ proof: (window as any).organizationProofRequests, signatures: (window as any).organizationSignatures }))).toEqual({ proof: 0, signatures: 0 });
+});
+
 test("merchant claim review binds payout terms and rechecks spent state before transaction preparation", async ({ page }) => {
   test.setTimeout(120_000);
   await wallets(page, true); await page.goto("/app"); await connect(page, "a"); await unlock(page);
