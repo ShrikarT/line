@@ -2,6 +2,7 @@ import { decodeVaultJson, decryptSecret, type EncryptedEnvelope } from "../secur
 import type { OrganizationRecord, OrganizationSnapshot } from "./account.ts";
 import { receivingAddressBytes } from "./account.ts";
 import { EXPIRED_OPENING, matchesExpiredOpeningScope } from "./expired-opening-policy.ts";
+import { EXPIRED_DISABLE, matchesExpiredDisableScope } from "./expired-disable-policy.ts";
 
 export const MAX_ORGANIZATION_BACKUP_BYTES = 64 * 1024 * 1024;
 const UINT64 = 18_446_744_073_709_551_615n;
@@ -89,15 +90,17 @@ export function validateOrganizationRecord(value: unknown, accountId: string): O
     unique(recoveries.map(item => object(object(item).original).txId));
     for (const item of recoveries) {
       const r = object(item), original = object(r.original), evidence = object(r.evidence);
-      need(r.disposition === "expired-opening-not-applied" && r.recoveries === undefined);
+      const opening = r.disposition === "expired-opening-not-applied" && matchesExpiredOpeningScope(original);
+      const disable = r.disposition === "expired-disable-not-applied" && matchesExpiredDisableScope(original);
+      need((opening || disable) && r.recoveries === undefined);
+      const policy = opening ? EXPIRED_OPENING : EXPIRED_DISABLE;
       need(Number.isFinite(Date.parse(text(r.recordedAt))) && Number.isSafeInteger(r.ttl) && (r.ttl as number) > 0);
       const previous = validateOrganizationRecord({ snapshot: r.before, pending: r.original }, accountId);
       need(previous.snapshot.issuerSecret === current.issuerSecret && previous.snapshot.merchantSecret === current.merchantSecret);
-      need(matchesExpiredOpeningScope(original));
-      need(evidence.schema === "line:expired-opening-evidence/v1" && evidence.address === EXPIRED_OPENING.address && evidence.genesisHash === EXPIRED_OPENING.genesisHash && evidence.runtimeSpecVersion === EXPIRED_OPENING.runtimeSpecVersion);
+      need(evidence.schema === (opening ? "line:expired-opening-evidence/v1" : "line:expired-disable-evidence/v1") && evidence.address === policy.address && evidence.genesisHash === policy.genesisHash && evidence.runtimeSpecVersion === policy.runtimeSpecVersion);
       const baseline = object(evidence.baseline), finalized = object(evidence.finalized);
-      need(baseline.hash === EXPIRED_OPENING.baselineHash && baseline.height === EXPIRED_OPENING.baselineHeight);
-      hex(finalized.hash); need(Number.isSafeInteger(finalized.height) && (finalized.height as number) > EXPIRED_OPENING.baselineHeight);
+      need(baseline.hash === policy.baselineHash && baseline.height === policy.baselineHeight);
+      hex(finalized.hash); need(Number.isSafeInteger(finalized.height) && (finalized.height as number) > policy.baselineHeight);
       need(Number.isSafeInteger(finalized.timestamp) && Math.floor((finalized.timestamp as number) / 1000) > Math.floor((r.ttl as number) / 1000) + 30);
       for (const state of [baseline.state, finalized.state]) need(typeof state === "string" && state.length <= 256000 && /^(?:[0-9a-f]{2})+$/.test(state));
       need(baseline.state === finalized.state);

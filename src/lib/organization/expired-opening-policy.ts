@@ -30,9 +30,11 @@ export function matchesExpiredOpeningScope(pending: {
     && EXPIRED_OPENING_TRANSACTION_IDS.some(id => id === pending.txId);
 }
 
-export type ExpiredOpeningEvidence = {
-  schema: "line:expired-opening-evidence/v1";
+export type ExpiredStateEvidence = {
+  schema: string;
   address: string; genesisHash: string; runtimeSpecVersion: number;
   baseline: { hash: string; height: number; state: string };
   finalized: { hash: string; height: number; timestamp: number; state: string };
 };
+
+export type ExpiredOpeningEvidence = ExpiredStateEvidence & { schema: "line:expired-opening-evidence/v1" };

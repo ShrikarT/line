@@ -1,7 +1,10 @@
-import { EXPIRED_OPENING as policy } from '../src/lib/organization/expired-opening-policy.ts';
+import { EXPIRED_OPENING as openingPolicy } from '../src/lib/organization/expired-opening-policy.ts';
+import { EXPIRED_DISABLE as disablePolicy } from '../src/lib/organization/expired-disable-policy.ts';
 
 /** Fixed public-state reads only. Neither signed bytes nor arbitrary RPC input is accepted. */
-export function expiredOpeningReader({ endpoints, fetchImpl = globalThis.fetch }) {
+export const expiredOpeningReader = options => expiredStateReader(options, openingPolicy, 'line:expired-opening-evidence/v1');
+export const expiredDisableReader = options => expiredStateReader(options, disablePolicy, 'line:expired-disable-evidence/v1');
+function expiredStateReader({ endpoints, fetchImpl = globalThis.fetch }, policy, schema) {
   let requestId = 0;
   async function post(url, body, signal) {
     const response = await fetchImpl(url, { method: 'POST', redirect: 'error', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal });
@@ -38,7 +41,7 @@ export function expiredOpeningReader({ endpoints, fetchImpl = globalThis.fetch }
     const indexed = await post(endpoints.indexerUri, { query: 'query LINE_EXPIRY_BLOCK($offset: BlockOffset!) { block(offset:$offset) { hash height timestamp } }', variables: { offset: { hash: finalizedHash } } }, timeout);
     if (indexed.errors || indexed.data?.block?.hash !== finalizedHash || indexed.data.block.height !== height || indexed.data.block.timestamp !== timestamp) throw Error('Recovery providers disagree');
     const bytes = value => { if (typeof value !== 'string' || !/^(?:0x)?(?:[0-9a-f]{2})+$/.test(value) || value.length > 256000) throw Error('Recovery state unavailable'); return value.replace(/^0x/, ''); };
-    return { schema: 'line:expired-opening-evidence/v1', address: policy.address, genesisHash: policy.genesisHash, runtimeSpecVersion: runtime.specVersion,
+    return { schema, address: policy.address, genesisHash: policy.genesisHash, runtimeSpecVersion: runtime.specVersion,
       baseline: { hash: policy.baselineHash, height: policy.baselineHeight, state: bytes(baseline) }, finalized: { hash: finalizedHash, height, timestamp, state: bytes(state) } };
   };
 }
