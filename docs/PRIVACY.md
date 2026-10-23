@@ -86,3 +86,9 @@ timing and complete observer history before claiming private balances.
 
 No external security certification or production credit/custody acceptance is
 claimed. Current acceptance and remaining work are in [progress](PROGRESS.md).
+
+Optional submission diagnostics export the original public signed transaction,
+its identifiers/hash, action metadata and signed intent deadlines. The explicit
+field list excludes vault passwords, role secrets, private candidates and
+provider URLs. This is an unencrypted diagnostic file, separate from encrypted
+vault backup; exporting it neither submits the transaction nor proves its outcome.

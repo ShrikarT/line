@@ -29,6 +29,22 @@ export function decodeOriginalOrganizationTransaction(pending: OrganizationPendi
   return transaction;
 }
 
+/** Public signed bytes only. No snapshot, candidate, private key or provider URL
+ * enters this allowlist. Decoding remains available after TTL for diagnosis.
+ */
+export function originalOrganizationSubmissionDetails(pending: OrganizationPending, sourceFingerprint: string) {
+  const transaction = decodeOriginalOrganizationTransaction(pending, sourceFingerprint);
+  const expiries = [...transaction.intents!.values()].map(intent => intent.ttl.getTime()).sort((a, b) => a - b);
+  return {
+    schema: "line:organization-submission-diagnostics/v1" as const,
+    operationId: pending.id, identifier: pending.txId!, transactionHash: transaction.transactionHash(),
+    kind: pending.kind, circuit: pending.circuit, contractAddress: pending.contractAddress!, sourceFingerprint,
+    intentTtls: expiries.map(ttl => new Date(ttl).toISOString()),
+    transaction: pending.transaction!,
+  };
+}
+export type OriginalOrganizationSubmissionDetails = ReturnType<typeof originalOrganizationSubmissionDetails>;
+
 export function originalOrganizationTransaction(pending: OrganizationPending, sourceFingerprint: string, now = Date.now()) {
   const transaction = decodeOriginalOrganizationTransaction(pending, sourceFingerprint);
   if ([...transaction.intents!.values()].some(intent => intent.ttl.getTime() <= now)) throw new Error("The original signed transaction has expired. Keep it for reconciliation; expiry alone does not prove it was never applied.");

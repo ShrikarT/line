@@ -577,9 +577,10 @@ test("explicit resubmission retains the original signed bytes without another pr
     (window as any).originalSubmissionBytes = [];
     wallet.submitTransaction = async (bytes: string) => {
       (window as any).originalSubmissionBytes.push(bytes);
-      throw Error("Deliberate wallet submission rejection");
+      throw Error("Operation failed: Transaction is temporarily banned");
     };
     const account = await OrganizationAccount.unlock(wallet, "Organization123!");
+    (window as any).diagnosticsAccount = account;
     await account.exclusive(async () => {
       await account.prepare({ id: "original-maintenance", kind: "key", circuit: "draw", facilityId: null, contractAddress: address, sourceFingerprint, after: account.snapshot(), txId: null, transaction: null });
       await account.submitted(txId, transaction, address);
@@ -588,6 +589,47 @@ test("explicit resubmission retains the original signed bytes without another pr
   await reopenPending();
   await expect(page.getByRole("heading", { name: "Resolve the saved operation first.", exact: true })).toBeVisible();
   expect(await page.evaluate(() => (window as any).originalSubmissionBytes)).toEqual([]);
+  const details = page.getByRole("button", { name: "Inspect saved transaction", exact: true });
+  await expect(details).toBeVisible();
+  await page.evaluate(async () => {
+    const { browserModuleUrl } = await import("/e2e/browser-module.ts" as any);
+    const { OrganizationNetwork } = await import(browserModuleUrl("/src/lib/organization/network.ts"));
+    const originalDetails = OrganizationNetwork.prototype.savedSubmissionDetails;
+    (OrganizationNetwork.prototype as any).savedSubmissionDetails = function (this: any) {
+      (window as any).diagnosticsAccount = this.account;
+      return originalDetails.call(this);
+    };
+    const target = window as any, wallet = target.diagnosticsAccount.wallet;
+    target.diagnosticsReads = 0; target.diagnosticsWrites = 0;
+    target.diagnosticsMethods = Object.fromEntries(["getConfiguration", "getConnectionStatus", "getShieldedAddresses", "getUnshieldedAddress"].map(name => [name, wallet[name]]));
+    for (const name of Object.keys(target.diagnosticsMethods)) wallet[name] = async () => { target.diagnosticsReads++; throw Error("No wallet read is authorized for diagnostics"); };
+    target.diagnosticsPut = IDBObjectStore.prototype.put;
+    IDBObjectStore.prototype.put = function () { target.diagnosticsWrites++; throw Error("Diagnostics cannot mutate encrypted storage"); };
+  });
+  await details.click();
+  const detailDialog = page.getByRole("dialog", { name: "Saved transaction details", exact: true });
+  await expect(detailDialog).toContainText("Signed intent 1 TTL:");
+  await expect(detailDialog).toContainText([...signed.intents!.values()][0].ttl.toISOString());
+  const diagnosticDownload = page.waitForEvent("download");
+  await detailDialog.getByRole("button", { name: "Download submission diagnostics", exact: true }).click();
+  const downloaded = await diagnosticDownload;
+  expect(downloaded.suggestedFilename()).toBe("line-submission-diagnostics.json");
+  const report = JSON.parse(readFileSync((await downloaded.path())!, "utf8"));
+  expect(report).toMatchObject({ schema: "line:organization-submission-diagnostics/v1", operationId: "original-maintenance", identifier: txId, transaction, sourceFingerprint });
+  expect(report).not.toHaveProperty("after"); expect(report).not.toHaveProperty("before");
+  const inspection = await page.evaluate(() => {
+    const target = window as any, account = target.diagnosticsAccount;
+    return { reads: target.diagnosticsReads, writes: target.diagnosticsWrites, pendingBytes: account.pending().transaction, issuer: account.snapshot().issuerSecret, merchant: account.snapshot().merchantSecret, submissions: target.originalSubmissionBytes, proof: target.organizationProofRequests, signatures: target.organizationSignatures };
+  });
+  expect(JSON.stringify(report)).not.toContain(inspection.issuer); expect(JSON.stringify(report)).not.toContain(inspection.merchant);
+  expect(inspection).toMatchObject({ reads: 0, writes: 0, pendingBytes: transaction, submissions: [], proof: 0, signatures: 0 });
+  await detailDialog.getByRole("button", { name: "Close details", exact: true }).click();
+  await expect(details).toBeFocused();
+  await page.evaluate(() => {
+    const target = window as any;
+    IDBObjectStore.prototype.put = target.diagnosticsPut;
+    Object.assign(target.diagnosticsAccount.wallet, target.diagnosticsMethods);
+  });
   const retry = page.getByRole("button", { name: "Retry original submission", exact: true });
   await expect(retry).toBeVisible({ timeout: 5000 });
   await page.setViewportSize({ width: 390, height: 844 });
@@ -595,11 +637,10 @@ test("explicit resubmission retains the original signed bytes without another pr
   await retry.click();
   await expect(page.getByRole("dialog")).toContainText("same signed bytes");
   expect(await page.getByRole("dialog").evaluate(element => element.scrollWidth <= element.clientWidth + 1)).toBe(true);
-  await page.screenshot({ path: "test-results/organization-product/original-submission-mobile.png", fullPage: true });
   await page.setViewportSize({ width: 1280, height: 720 });
   expect(await page.evaluate(() => (window as any).originalSubmissionBytes)).toEqual([]);
   await page.getByRole("button", { name: "Resubmit same signed transaction", exact: true }).click();
-  await expect(page.getByRole("alert")).toContainText("Deliberate wallet submission rejection");
+  await expect(page.getByRole("alert")).toContainText("Transaction is temporarily banned");
   await expect(page.getByText(new RegExp(txId))).toBeVisible();
   expect(await page.evaluate(() => ({ bytes: (window as any).originalSubmissionBytes, signatures: (window as any).organizationSignatures, proofs: (window as any).organizationProofRequests }))).toEqual({ bytes: [transaction], signatures: 0, proofs: 0 });
   await page.getByRole("button", { name: "Lock organization", exact: true }).click(); await reopenPending();

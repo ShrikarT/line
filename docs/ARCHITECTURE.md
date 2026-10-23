@@ -99,6 +99,16 @@ failure receipts. Confirmation rereads evidence and identities under the account
 lock; storage failure, stale review or a backwards checkpoint keeps it pending.
 No replacement disable is prepared or approved by archival.
 
+Saved-transaction inspection uses that account lock to reload the durable pending
+operation without wallet RPCs or storage writes. The original decoder checks the
+release, canonical bytes, identifier, action and target before an allowlisted
+report exports only public signed bytes, identifiers/hash, action metadata and
+all intent TTLs. It excludes the snapshot, private candidate, role secrets and
+provider URLs. Inspection remains available after signed expiry and does not
+renew the vault session, submit, clear or replace an operation. The UI identifies
+TTL separately from allowance and claim deadlines and binds the display to the
+current pending identifier and bytes.
+
 Encrypted backup export holds the same account lock and reloads the latest durable
 record, including any pending operation. It requires the unlocked vault session
 but remains available when the wallet's remote read API fails. Export rechecks
