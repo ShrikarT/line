@@ -23,6 +23,7 @@ import { OrganizationSupplierClient } from "./supplier-client";
 import { organizationReadEndpoints } from "./read-endpoints";
 import { authenticatedOrganizationReads } from "./authenticated-reads";
 import { recoveryDigest, verifyExpiredOpening, type ExpiredOpeningReview } from "./expired-opening";
+import { verifyExpiredDisable, type ExpiredDisableReview } from "./expired-disable";
 import { inspectMerchantClaim } from "./claims";
 
 type Circuit = keyof Contract<LinePrivateWitnessContext>["provableCircuits"];
@@ -538,6 +539,31 @@ export class OrganizationNetwork {
       this.tx().finality.forget(pending.txId);
       this.report("Expired opening archived with provider-backed nonapplication evidence. No transaction was submitted. Review new allowance terms separately.");
     });
+  }
+  async reviewExpiredDisable(): Promise<ExpiredDisableReview> {
+    return this.account.exclusive(async () => {
+      const pending = this.account.pending(), before = this.account.snapshot();
+      if (!pending?.txId) throw new Error("No original signed merchant disable is saved.");
+      this.report("Checking the pinned finalized state and original merchant disable candidate");
+      const verified = await this.verifyExpiredDisable(before, pending, await this.supplier.request("network/expired-disable"));
+      await this.account.assertWallet();
+      return { operationId: pending.id, txId: pending.txId, operationDigest: await recoveryDigest(pending), snapshotDigest: await recoveryDigest(before), checkedAt: Date.now(), ...verified };
+    });
+  }
+  async recoverExpiredDisable(review: ExpiredDisableReview) {
+    return this.account.exclusive(async () => {
+      const pending = this.account.pending(), before = this.account.snapshot();
+      if (!pending?.txId || pending.id !== review.operationId || pending.txId !== review.txId || await recoveryDigest(pending) !== review.operationDigest || await recoveryDigest(before) !== review.snapshotDigest || !Number.isSafeInteger(review.checkedAt) || review.checkedAt > Date.now() || Date.now() - review.checkedAt > 300_000) throw new Error("The saved operation or recovery review changed. Check it again.");
+      const verified = await this.verifyExpiredDisable(before, pending, await this.supplier.request("network/expired-disable"));
+      if (verified.evidence.finalized.height < review.evidence.finalized.height || verified.evidence.finalized.timestamp < review.evidence.finalized.timestamp) throw new Error("The recovery provider checkpoint moved backwards. Keep the original operation saved.");
+      await this.account.assertWallet();
+      await this.account.archiveExpiredDisable(pending, verified.evidence, verified.ttl);
+      this.tx().finality.forget(pending.txId);
+      this.report("Expired merchant disable archived with provider-backed nonapplication evidence. No transaction was submitted. Review any new disable request separately.");
+    });
+  }
+  private verifyExpiredDisable(before: OrganizationSnapshot, pending: NonNullable<ReturnType<OrganizationAccount["pending"]>>, evidence: unknown) {
+    return verifyExpiredDisable(before, pending, evidence, this.release.sourceFingerprint, name => this.providers.zkConfigProvider.getVerifierKey(name as Circuit));
   }
   private verifyExpiredOpening(before: OrganizationSnapshot, pending: NonNullable<ReturnType<OrganizationAccount["pending"]>>, evidence: unknown) {
     return verifyExpiredOpening(before, pending, evidence, this.release.sourceFingerprint, name => this.providers.zkConfigProvider.getVerifierKey(name as Circuit));

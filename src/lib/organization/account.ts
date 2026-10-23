@@ -7,6 +7,7 @@ import { decodeOrganizationBackup, isOrganizationEmpty } from "./backup.ts";
 import { OrganizationTimeoutError, withinDeadline } from "./finality.ts";
 import { ORGANIZATION_SESSION_MINUTES } from "./session-policy.ts";
 import { matchesExpiredOpeningScope, type ExpiredOpeningEvidence } from "./expired-opening-policy.ts";
+import { matchesExpiredDisableScope, type ExpiredDisableEvidence } from "./expired-disable-policy.ts";
 import { rememberOrganizationTabSession, forgetOrganizationTabSession, type OrganizationTabSession } from "./tab-session.ts";
 
 function rateLimited(failure: unknown): boolean {
@@ -79,7 +80,7 @@ export type OrganizationNote = { contractAddress: string; domain: string; identi
 export type OrganizationServiceOrder = { id: string; facilityId: string; service: string; document: string; price: string; maxFee?: string; assetColor: string; merchantPk: string; merchantAddress: string; noteCommitment?: string; result?: Record<string, unknown>; delivered: boolean; cancelled?: boolean; requestId?: string; quoteCommitment?: string; quoteExpiry?: bigint; history?: { requestId: string; quoteCommitment?: string; noteCommitment?: string; retiredAt: string }[] };
 export type OrganizationSnapshot = { schema: "line:organization-account/v1"; networkId: "preprod"; accountId: string; issuerSecret: string; merchantSecret: string; facilities: OrganizationFacility[]; quotes: OrganizationQuote[]; notes: OrganizationNote[]; receipts: OrganizationReceipt[]; serviceOrders?: OrganizationServiceOrder[]; failures?: OrganizationReceipt[] };
 export type OrganizationPending = { id: string; kind: OrganizationReceipt["kind"]; circuit: string; facilityId: string | null; contractAddress: string | null; sourceFingerprint: string; after: OrganizationSnapshot; txId: string | null; transaction: string | null };
-export type OrganizationExpiredRecovery = { disposition: "expired-opening-not-applied"; before: OrganizationSnapshot; original: OrganizationPending; evidence: ExpiredOpeningEvidence; ttl: number; recordedAt: string };
+export type OrganizationExpiredRecovery = { disposition: "expired-opening-not-applied" | "expired-disable-not-applied"; before: OrganizationSnapshot; original: OrganizationPending; evidence: ExpiredOpeningEvidence | ExpiredDisableEvidence; ttl: number; recordedAt: string };
 export type OrganizationRecord = { snapshot: OrganizationSnapshot; pending: OrganizationPending | null; recoveries?: OrganizationExpiredRecovery[] };
 export const ORGANIZATION_SCHEMA = "line:organization-account/v1";
 
@@ -242,6 +243,15 @@ export class OrganizationAccount {
     const recoveries = copyAccount(this.record.recoveries ?? []);
     if (recoveries.some(entry => entry.original.txId === expected.txId)) throw new Error("This original operation already has recovery history.");
     recoveries.push({ disposition: "expired-opening-not-applied", before: copyAccount(this.record.snapshot), original: copyAccount(expected), evidence: copyAccount(evidence), ttl, recordedAt: new Date().toISOString() });
+    await this.commit({ snapshot: this.record.snapshot, pending: null, recoveries });
+  }
+  async archiveExpiredDisable(expected: OrganizationPending, evidence: ExpiredDisableEvidence, ttl: number) {
+    this.assertSession();
+    if (!matchesExpiredDisableScope(expected)) throw new Error("Only the explicitly scoped merchant disable can use this recovery path.");
+    if (!this.record.pending?.txId || encodeVaultJson(this.record.pending) !== encodeVaultJson(expected)) throw new Error("The saved operation changed. Review its recovery again.");
+    const recoveries = copyAccount(this.record.recoveries ?? []);
+    if (recoveries.some(entry => entry.original.txId === expected.txId)) throw new Error("This original operation already has recovery history.");
+    recoveries.push({ disposition: "expired-disable-not-applied", before: copyAccount(this.record.snapshot), original: copyAccount(expected), evidence: copyAccount(evidence), ttl, recordedAt: new Date().toISOString() });
     await this.commit({ snapshot: this.record.snapshot, pending: null, recoveries });
   }
   async discardUnsubmitted() {

@@ -83,6 +83,22 @@ validated during backup restore. Missing evidence, changed state/runtime/keys,
 wallet changes or failed storage writes retain the pending operation. Recovery
 does not prove that no network fees were charged or authorize another opening.
 
+One separate `disableMerchant` identifier, `0054af76...8649cce6`, is scoped to the
+verified Merchant 2 draw checkpoint at block 3,102,203. The complete public state
+and release keys must still match that checkpoint, with maintenance counter 11,
+OPEN generation 2 and the exact Merchant 2 key active at its registered recipient.
+In this release, disabling preserves map membership with value false;
+`registerMerchant` rejects existing membership and no circuit removes it. Thus
+an active key at the unchanged post-expiry checkpoint excludes prior application
+under the same validated-ledger assumptions. The exact retained signed action
+must replay to disable that key and match a candidate whose only private change
+is that merchant's disabled flag. Every signed intent TTL still needs the
+finalized-time margin. Evidence has its own `line:expired-disable-evidence/v1`
+schema and archive disposition, distinct from opening recovery and finalized
+failure receipts. Confirmation rereads evidence and identities under the account
+lock; storage failure, stale review or a backwards checkpoint keeps it pending.
+No replacement disable is prepared or approved by archival.
+
 Encrypted backup export holds the same account lock and reloads the latest durable
 record, including any pending operation. It requires the unlocked vault session
 but remains available when the wallet's remote read API fails. Export rechecks

@@ -221,10 +221,39 @@ At finalized block 3,102,407 (`2026-10-23T09:57:36Z`), an exact identifier query
 returned zero records without indexer errors; pinned node state still showed
 Merchant 2 active and its 100,000 + 2,000 claim unredeemed. These configured
 provider observations do not prove nonapplication or future impossibility.
-The encrypted pending operation remains blocked for exact receipt reconciliation
-or an explicit original-byte retry that still passes canonical/release/TTL checks.
-No replacement transaction or failure receipt has been created. The scoped
-expired-opening recovery does not apply to this different action.
+The owner then explicitly retried the retained bytes; expiry validation rejected
+them before wallet submission. They remain encrypted and blocked. No replacement
+transaction or failure receipt has been created.
+
+A separate recovery implementation now covers only that disable identifier,
+facility, release and Merchant 2 key. Its predecessor is the canonical finalized
+draw at block 3,102,203, hash
+`13d5551f24549e40163593496d37607654db72581c321a5d23cbd2ea291892ce`,
+with serialized public state SHA-256
+`6a719b9fa4fd187e102f158c040d7c4b9586d02c2df31fe4fc8f72c561a87cf7`.
+A fresh node/indexer read at finalized block 3,102,653 (`2026-10-23T10:22:12Z`)
+matched that complete state, all twelve release keys and maintenance counter 11.
+This is provider evidence only; the owner's original bytes/private candidate
+still require local validation after the update. Active membership cannot return
+after disabling under this release; details are in [architecture](ARCHITECTURE.md).
+The implementation checks the exact canonical signed identifier/action/target,
+replays the disabled key, permits only the retained disabled-flag candidate
+change and requires finalized time past every TTL plus uncertainty. Archival
+retains the original/predecessor/candidate/evidence atomically without promoting
+the candidate, fabricating a receipt or submitting another transaction.
+
+The missing review control was reproduced by a failing browser case. Six focused
+browser cases now pass, covering real generated opening/disable replay, both old
+archives, the new review and atomic mixed-history preservation. They reject
+storage aborts, changed operations/wallets and a backwards checkpoint; backup
+restore and later commits preserve all originals. Three ordinary resubmission and
+expired-reconciliation browser cases also pass. Forty-nine focused transaction,
+evidence, backup, finality, recovery, authenticated-read and server tests pass,
+including rejection of a different actual disabled key. Typecheck, production
+build, 37-file proving export, key/secret scans and managed-contract drift pass.
+Eight production-preview startup/refresh cases and two built-host tests also pass.
+These are controlled checks; the live owner archive and Merchant 2 disabling
+have not been accepted.
 
 ### Archived expired openings
 

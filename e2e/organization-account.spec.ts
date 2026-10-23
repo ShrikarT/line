@@ -3,7 +3,9 @@ import { bech32m } from "@scure/base";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { EXPIRED_OPENING, EXPIRED_OPENING_TRANSACTION_IDS } from "../src/lib/organization/expired-opening-policy.ts";
+import { EXPIRED_DISABLE } from "../src/lib/organization/expired-disable-policy.ts";
 import { candidateFixture } from "../tests/fixtures/organization-opening.ts";
+import { disableCandidateFixture } from "../tests/fixtures/organization-disable.ts";
 import { encodeVaultJson } from "../src/lib/security/vault.ts";
 
 async function wallets(page: Page, walletOnly = false, retiredReaders = false, identityRateLimit = false) {
@@ -386,57 +388,93 @@ test("browser replays the canonical opening action against its exact retained pr
   expect(result).toEqual({ ttl: 4600_000, changedRejected: true });
 });
 
-for (const scopedOpening of EXPIRED_OPENING_TRANSACTION_IDS.map(txId => ({ ...EXPIRED_OPENING, txId }))) {
+test("browser replays the canonical disable action against its exact retained private candidate", async ({ page }) => {
+  const f = await disableCandidateFixture();
+  await page.goto("/app");
+  const result = await page.evaluate(async ({ encoded, state, fingerprint }) => {
+    const { browserModuleUrl } = await import("/e2e/browser-module.ts" as any);
+    const { ContractState } = await import("/e2e/organization-provider.ts" as any);
+    const { decodeVaultJson } = await import(browserModuleUrl("/src/lib/security/vault.ts"));
+    const { validateDisableCandidate } = await import(browserModuleUrl("/src/lib/organization/expired-disable.ts"));
+    const { before, pending } = decodeVaultJson(encoded) as any, predecessor = ContractState.deserialize(Uint8Array.from(state));
+    const ttl = validateDisableCandidate(before, pending, predecessor, fingerprint);
+    pending.after.facilities[0].merchants[1].disabled = false;
+    let changedRejected = false; try { validateDisableCandidate(before, pending, predecessor, fingerprint); } catch { changedRejected = true; }
+    return { ttl, changedRejected };
+  }, { encoded: encodeVaultJson({ before: f.before, pending: f.pending }), state: [...f.predecessor.serialize()], fingerprint: EXPIRED_DISABLE.sourceFingerprint });
+  expect(result).toEqual({ ttl: 4600_000, changedRejected: true });
+});
+
+const openingPolicy = EXPIRED_OPENING;
+for (const scopedOpening of [
+  ...EXPIRED_OPENING_TRANSACTION_IDS.map((txId, index) => ({ ...EXPIRED_OPENING, txId, circuit: "openLine", priorIds: EXPIRED_OPENING_TRANSACTION_IDS.slice(0, index) })),
+  { ...EXPIRED_DISABLE, circuit: "disableMerchant", priorIds: [...EXPIRED_OPENING_TRANSACTION_IDS] },
+]) {
 const EXPIRED_OPENING = scopedOpening;
-const expectedHistory = scopedOpening.txId === EXPIRED_OPENING_TRANSACTION_IDS[0] ? 1 : 2;
-test(`expired opening ${scopedOpening.txId.slice(0, 8)} recovery is atomic, rejects stale reviews and retains encrypted history through every commit and restore`, async ({ page }) => {
+const disabling = scopedOpening.circuit === "disableMerchant";
+const expectedHistory = scopedOpening.priorIds.length + 1;
+test(`expired ${disabling ? "merchant disable" : "opening"} ${scopedOpening.txId.slice(0, 8)} recovery is atomic, rejects stale reviews and retains encrypted history through every commit and restore`, async ({ page }) => {
   test.setTimeout(120_000);
-  const state = readFileSync(new URL("../tests/fixtures/organization-closed-state.hex", import.meta.url), "utf8");
+  const state = readFileSync(new URL(disabling ? "../tests/fixtures/organization-merchant2-draw-state.hex" : "../tests/fixtures/organization-closed-state.hex", import.meta.url), "utf8");
   const L = await import("@midnight-ntwrk/ledger-v8"), checkpoint = L.ContractState.deserialize(Buffer.from(state, "hex"));
   const verifierKeys = Object.fromEntries(checkpoint.operations().map(name => [String(name), [...checkpoint.operation(name)!.verifierKey]]));
-  const evidence = { schema: "line:expired-opening-evidence/v1", address: EXPIRED_OPENING.address, genesisHash: EXPIRED_OPENING.genesisHash, runtimeSpecVersion: EXPIRED_OPENING.runtimeSpecVersion,
-    baseline: { hash: EXPIRED_OPENING.baselineHash, height: EXPIRED_OPENING.baselineHeight, state }, finalized: { hash: "aa".repeat(32), height: 3077281, timestamp: 1792598700000, state } };
+  const evidence = { schema: disabling ? "line:expired-disable-evidence/v1" : "line:expired-opening-evidence/v1", address: EXPIRED_OPENING.address, genesisHash: EXPIRED_OPENING.genesisHash, runtimeSpecVersion: EXPIRED_OPENING.runtimeSpecVersion,
+    baseline: { hash: EXPIRED_OPENING.baselineHash, height: EXPIRED_OPENING.baselineHeight, state }, finalized: { hash: "aa".repeat(32), height: disabling ? 3102500 : 3077281, timestamp: disabling ? 1792755000000 : 1792598700000, state } };
+  const closed = readFileSync(new URL("../tests/fixtures/organization-closed-state.hex", import.meta.url), "utf8");
+  const openingEvidence = { schema: "line:expired-opening-evidence/v1", address: openingPolicy.address, genesisHash: openingPolicy.genesisHash, runtimeSpecVersion: openingPolicy.runtimeSpecVersion,
+    baseline: { hash: openingPolicy.baselineHash, height: openingPolicy.baselineHeight, state: closed }, finalized: { hash: "bb".repeat(32), height: 3077281, timestamp: 1792598700000, state: closed } };
+  const recoveryPath = `**/api/organization/network/${disabling ? "expired-disable" : "expired-opening"}`;
   await wallets(page, true, true);
-  await page.route("**/api/organization/network/expired-opening", route => route.fulfill({ json: evidence }));
+  await page.route(recoveryPath, route => route.fulfill({ json: evidence }));
   await page.goto("/app"); await connect(page, "a"); await unlock(page);
-  await page.evaluate(async ({ policy, verifierKeys, evidence, previousTxId }) => {
+  await page.evaluate(async ({ policy, verifierKeys, disabling, openingEvidence }) => {
     const { browserModuleUrl } = await import("/e2e/browser-module.ts" as any);
     const { OrganizationAccount } = await import(browserModuleUrl("/src/lib/organization/account.ts"));
     const { OrganizationNetwork } = await import(browserModuleUrl("/src/lib/organization/network.ts"));
     const { validateExpiredOpeningEvidence } = await import(browserModuleUrl("/src/lib/organization/expired-opening.ts"));
+    const { validateExpiredDisableEvidence } = await import(browserModuleUrl("/src/lib/organization/expired-disable.ts"));
     const { getConnectedWallet } = await import(browserModuleUrl("/src/lib/runtime/wallet.ts"));
     // Controlled candidate-verification seam: the unit test separately replays
     // generated opening transcripts. This browser case tests actual encryption,
     // locks, durable reload, UI review and account commits, not a chain proof.
-    (OrganizationNetwork.prototype as any).verifyExpiredOpening = async function (_before: unknown, pending: any, evidence: any) {
+    (OrganizationNetwork.prototype as any)[disabling ? "verifyExpiredDisable" : "verifyExpiredOpening"] = async function (_before: unknown, pending: any, evidence: any) {
       (window as any).expiryAccount = this.account;
       if (pending.txId !== policy.txId || pending.transaction !== "abcd") throw Error("Fixture original changed");
-      await validateExpiredOpeningEvidence(evidence, async (name: string) => Uint8Array.from(verifierKeys[name]));
+      await (disabling ? validateExpiredDisableEvidence : validateExpiredOpeningEvidence)(evidence, async (name: string) => Uint8Array.from(verifierKeys[name]));
       return { evidence, ttl: 1792500000000 };
     };
     const account = await OrganizationAccount.unlock(getConnectedWallet()!, "Organization123!");
     await account.exclusive(async () => {
-      if (policy.txId !== previousTxId) {
+      for (const previousTxId of policy.priorIds) {
         // Model the owner's first archive before the newer opening. The same
         // controlled candidate seam applies; all encryption/commits are real.
         await account.prepare({ id: "previous-opening", kind: "call", circuit: "openLine", facilityId: null, contractAddress: policy.address, sourceFingerprint: policy.sourceFingerprint, after: account.snapshot(), txId: null, transaction: null });
         await account.submitted(previousTxId, "abcd", policy.address);
-        await account.archiveExpiredOpening(account.pending()!, evidence, 1792500000000);
+        await account.archiveExpiredOpening(account.pending()!, openingEvidence as any, 1792500000000);
       }
-      await account.prepare({ id: "expired-opening", kind: "call", circuit: "openLine", facilityId: null, contractAddress: policy.address, sourceFingerprint: policy.sourceFingerprint, after: account.snapshot(), txId: null, transaction: null });
+      const candidate = account.snapshot(); if (disabling) candidate.serviceOrders = [];
+      await account.prepare({ id: "expired-operation", kind: "call", circuit: policy.circuit as any, facilityId: null, contractAddress: policy.address, sourceFingerprint: policy.sourceFingerprint, after: candidate, txId: null, transaction: null });
       await account.submitted(policy.txId, "abcd", policy.address);
     });
-  }, { policy: EXPIRED_OPENING, verifierKeys, evidence, previousTxId: EXPIRED_OPENING_TRANSACTION_IDS[0] });
+  }, { policy: EXPIRED_OPENING, verifierKeys, disabling, openingEvidence });
   const reopen = async () => {
     await page.getByLabel("Organization vault password", { exact: true }).fill("Organization123!");
     await page.getByRole("button", { name: "Open organization", exact: true }).click();
     await expect(page.getByRole("status").filter({ hasText: "Your wallet and organization contract release are ready" })).toBeVisible();
   };
   await reopen();
-  const review = page.getByRole("button", { name: "Review expired opening recovery", exact: true });
+  const review = page.getByRole("button", { name: disabling ? "Review expired merchant disable recovery" : "Review expired opening recovery", exact: true });
   const archive = page.getByRole("button", { name: "Archive original with evidence", exact: true });
   await expect(review).toBeVisible();
-  await review.click(); await expect(page.getByRole("dialog")).toContainText("3077281".replace(/(\d)(?=(\d{3})+$)/g, "$1,"));
+  await review.click(); await expect(page.getByRole("dialog")).toContainText(evidence.finalized.height.toLocaleString("en-US"));
+  if (disabling) {
+    await page.unroute(recoveryPath);
+    await page.route(recoveryPath, route => route.fulfill({ json: { ...evidence, finalized: { ...evidence.finalized, height: evidence.finalized.height - 1 } } }));
+    await archive.click(); await expect(page.getByRole("alert")).toContainText("checkpoint moved backwards");
+    await expect(review).toBeVisible();
+    await page.unroute(recoveryPath); await page.route(recoveryPath, route => route.fulfill({ json: evidence }));
+    await review.click(); await expect(archive).toBeVisible();
+  }
   await page.evaluate(() => {
     (window as any).expiryPut = IDBObjectStore.prototype.put;
     IDBObjectStore.prototype.put = function (...args: Parameters<IDBObjectStore["put"]>) { const request = (window as any).expiryPut.apply(this, args); request.addEventListener("success", () => this.transaction.abort(), { once: true }); return request; };
@@ -464,9 +502,9 @@ test(`expired opening ${scopedOpening.txId.slice(0, 8)} recovery is atomic, reje
   await archive.click(); await expect(page.getByRole("alert")).toContainText("preprod session");
   await page.evaluate(() => { (window as any).expiryAccount.wallet.getConnectionStatus = (window as any).expiryStatus; });
   await review.click(); await expect(archive).toBeVisible(); await archive.click();
-  await expect(page.getByRole("status")).toContainText("Expired opening archived with provider-backed nonapplication evidence");
+  await expect(page.getByRole("status")).toContainText(disabling ? "Expired merchant disable archived with provider-backed nonapplication evidence" : "Expired opening archived with provider-backed nonapplication evidence");
   await expect(review).toHaveCount(0);
-  await expect(page.getByText(`Expired opening recovery history (${expectedHistory})`, { exact: true })).toBeVisible();
+  await expect(page.getByText(`Expired operation recovery history (${expectedHistory})`, { exact: true })).toBeVisible();
   const result = await page.evaluate(async ({ policy, expectedHistory }) => {
     const account = (window as any).expiryAccount;
     const { browserModuleUrl } = await import("/e2e/browser-module.ts" as any);
@@ -474,6 +512,7 @@ test(`expired opening ${scopedOpening.txId.slice(0, 8)} recovery is atomic, reje
     const { decodeOrganizationBackup } = await import(browserModuleUrl("/src/lib/organization/backup.ts"));
     const key = organizationAccountKey("preprod", account.accountId);
     const prepare = (id: string) => account.prepare({ id, kind: "key", circuit: "draw", facilityId: null, contractAddress: policy.address, sourceFingerprint: policy.sourceFingerprint, after: account.snapshot(), txId: null, transaction: null });
+    const candidatePromoted = account.snapshot().serviceOrders !== undefined;
     await account.edit((snapshot: any) => { snapshot.serviceOrders = []; });
     await account.exclusive(async () => { await prepare("discard"); await account.discardUnsubmitted(); });
     for (const [id, finish] of [["aa", "complete"], ["bb", "rejectFinalized"]]) await account.exclusive(async () => {
@@ -488,13 +527,31 @@ test(`expired opening ${scopedOpening.txId.slice(0, 8)} recovery is atomic, reje
     const restored = await OrganizationAccount.unlock(account.wallet, "Organization123!");
     await restored.restoreBackup(backup, "Organization123!", async (record: any) => { if (record.recoveries.length !== expectedHistory) throw Error("History missing"); });
     const roundTrip = await decodeOrganizationBackup(JSON.stringify(await restored.encryptedBackup()), "Organization123!", key, restored.accountId);
-    return { pending: roundTrip.pending, count: roundTrip.recoveries!.length, txId: roundTrip.recoveries!.at(-1)!.original.txId, txIds: roundTrip.recoveries!.map(entry => entry.original.txId), bytes: roundTrip.recoveries!.at(-1)!.original.transaction, evidence: roundTrip.recoveries!.at(-1)!.evidence, sameArchive: JSON.stringify(roundTrip.recoveries, (_key, v) => typeof v === "bigint" ? v.toString() : v) === JSON.stringify(record.recoveries, (_key, v) => typeof v === "bigint" ? v.toString() : v), receipts: roundTrip.snapshot.receipts.length, failures: roundTrip.snapshot.failures?.length, proofs: (window as any).organizationProofRequests, signatures: (window as any).organizationSignatures };
+    return { candidatePromoted, pending: roundTrip.pending, count: roundTrip.recoveries!.length, txId: roundTrip.recoveries!.at(-1)!.original.txId, txIds: roundTrip.recoveries!.map(entry => entry.original.txId), bytes: roundTrip.recoveries!.at(-1)!.original.transaction, evidence: roundTrip.recoveries!.at(-1)!.evidence, sameArchive: JSON.stringify(roundTrip.recoveries, (_key, v) => typeof v === "bigint" ? v.toString() : v) === JSON.stringify(record.recoveries, (_key, v) => typeof v === "bigint" ? v.toString() : v), receipts: roundTrip.snapshot.receipts.length, failures: roundTrip.snapshot.failures?.length, proofs: (window as any).organizationProofRequests, signatures: (window as any).organizationSignatures };
   }, { policy: EXPIRED_OPENING, expectedHistory });
-  expect(result).toMatchObject({ pending: null, count: expectedHistory, txId: EXPIRED_OPENING.txId, txIds: EXPIRED_OPENING_TRANSACTION_IDS.slice(0, expectedHistory), bytes: "abcd", evidence, sameArchive: true, receipts: 1, failures: 1, proofs: 0, signatures: 0 });
+  expect(result).toMatchObject({ pending: null, count: expectedHistory, txId: EXPIRED_OPENING.txId, txIds: [...scopedOpening.priorIds, scopedOpening.txId], candidatePromoted: false, bytes: "abcd", evidence, sameArchive: true, receipts: 1, failures: 1, proofs: 0, signatures: 0 });
   await reopen();
-  await expect(page.getByText(`Expired opening recovery history (${expectedHistory})`, { exact: true })).toBeVisible();
+  await expect(page.getByText(`Expired operation recovery history (${expectedHistory})`, { exact: true })).toBeVisible();
 });
 }
+
+test("the exact expired merchant disable offers evidence review while retaining the signed operation", async ({ page }) => {
+  await wallets(page, true, true); await page.goto("/app"); await connect(page, "a"); await unlock(page);
+  await page.evaluate(async () => {
+    const { browserModuleUrl } = await import("/e2e/browser-module.ts" as any);
+    const { OrganizationAccount } = await import(browserModuleUrl("/src/lib/organization/account.ts"));
+    const { getConnectedWallet } = await import(browserModuleUrl("/src/lib/runtime/wallet.ts"));
+    const account = await OrganizationAccount.unlock(getConnectedWallet()!, "Organization123!");
+    await account.exclusive(async () => {
+      await account.prepare({ id: "expired-disable", kind: "call", circuit: "disableMerchant", facilityId: null, contractAddress: "ab428f74f8a8e72dc66a2f521c932d97860525d848a4d7a3acf0c795b3ef7e73", sourceFingerprint: "057aa57267c0b8afd537cfb8950946db99bda45954a259c521877bdbb23e5157", after: account.snapshot(), txId: null, transaction: null });
+      await account.submitted("0054af76ef4d913f967d607a266633d5fb6c7d6db18b79b4ddb7c6d9158649cce6", "abcd", "ab428f74f8a8e72dc66a2f521c932d97860525d848a4d7a3acf0c795b3ef7e73");
+    });
+  });
+  await unlock(page);
+  await expect(page.getByRole("button", { name: "Review expired merchant disable recovery", exact: true })).toBeVisible();
+  await expect(page.getByText(/disableMerchant.*0054af76/)).toBeVisible();
+  expect(await page.evaluate(() => ({ proof: (window as any).organizationProofRequests, signatures: (window as any).organizationSignatures }))).toEqual({ proof: 0, signatures: 0 });
+});
 
 test("explicit resubmission retains the original signed bytes without another proof or balance request", async ({ page }) => {
   test.setTimeout(120_000);

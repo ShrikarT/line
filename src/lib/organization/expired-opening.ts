@@ -1,7 +1,7 @@
 import { ContractState, CostModel, QueryContext, ContractCall } from "@midnight-ntwrk/ledger-v8";
 import { ContractState as CompactState } from "@midnight-ntwrk/compact-runtime";
 import { ledger, Status } from "../../../contracts/managed/organization/contract/index.js";
-import { EXPIRED_OPENING as policy, matchesExpiredOpeningScope, type ExpiredOpeningEvidence } from "./expired-opening-policy.ts";
+import { EXPIRED_OPENING as policy, matchesExpiredOpeningScope, type ExpiredOpeningEvidence, type ExpiredStateEvidence } from "./expired-opening-policy.ts";
 import { copyAccount, type OrganizationPending, type OrganizationSnapshot } from "./account.ts";
 import { decodeOriginalOrganizationTransaction } from "./transactions.ts";
 import { matchesRestoredFacility } from "./recovery.ts";
@@ -9,15 +9,15 @@ import { encodeVaultJson } from "../security/vault.ts";
 import { hexToBytes, toHex } from "../bytes.ts";
 
 const CIRCUITS = ["registerMerchant", "disableMerchant", "fundReserve", "withdrawUnencumberedReserve", "withdrawFees", "openLine", "postQuote", "draw", "redeemDraw", "cancelOrExpireNote", "acknowledgeRepayment", "setStatus"];
-function need(condition: unknown): asserts condition { if (!condition) throw Error("The expired opening recovery assumptions could not be verified. Keep the original operation saved."); }
+function need(condition: unknown): asserts condition { if (!condition) throw Error("The expired operation recovery assumptions could not be verified. Keep the original operation saved."); }
 export const recoveryDigest = async (value: unknown) => toHex(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(encodeVaultJson(value)))));
 const sha256 = async (bytes: Uint8Array) => toHex(new Uint8Array(await crypto.subtle.digest("SHA-256", bytes as BufferSource)));
 const bookOf = (state: ContractState) => ledger(CompactState.deserialize(state.serialize()).data);
 
 /** Provider-backed evidence, deliberately limited to the audited predecessor. */
-export async function validateExpiredOpeningEvidence(value: unknown, verifierKey: (name: string) => Promise<Uint8Array>) {
-  const e = value as ExpiredOpeningEvidence | null;
-  need(e?.schema === "line:expired-opening-evidence/v1" && e.address === policy.address && e.genesisHash === policy.genesisHash && e.runtimeSpecVersion === policy.runtimeSpecVersion);
+export async function validatePinnedExpiryEvidence<E extends ExpiredStateEvidence>(value: unknown, verifierKey: (name: string) => Promise<Uint8Array>, policy: { address: string; genesisHash: string; runtimeSpecVersion: number; baselineHash: string; baselineHeight: number; baselineStateSha256: string }, schema: E["schema"], status: number, generation: bigint) {
+  const e = value as E | null;
+  need(e?.schema === schema && e.address === policy.address && e.genesisHash === policy.genesisHash && e.runtimeSpecVersion === policy.runtimeSpecVersion);
   need(e.baseline?.hash === policy.baselineHash && e.baseline.height === policy.baselineHeight);
   need(/^[0-9a-f]{64}$/.test(e.finalized?.hash) && Number.isSafeInteger(e.finalized.height) && e.finalized.height > policy.baselineHeight && Number.isSafeInteger(e.finalized.timestamp) && e.finalized.timestamp > 0);
   for (const state of [e.baseline.state, e.finalized.state]) need(typeof state === "string" && /^(?:[0-9a-f]{2})+$/.test(state) && state.length <= 256000);
@@ -29,8 +29,12 @@ export async function validateExpiredOpeningEvidence(value: unknown, verifierKey
   const names = state.operations();
   need(names.length === CIRCUITS.length && names.every(name => typeof name === "string" && CIRCUITS.includes(name)));
   for (const name of CIRCUITS) need(toHex(state.operation(name)!.verifierKey) === toHex(await verifierKey(name)));
-  const book = bookOf(state); need(book.status === Status.CLOSED && book.lineGeneration === 1n);
+  const book = bookOf(state); need(book.status === status && book.lineGeneration === generation);
   return { evidence: copyAccount(e), state };
+}
+
+export function validateExpiredOpeningEvidence(value: unknown, verifierKey: (name: string) => Promise<Uint8Array>) {
+  return validatePinnedExpiryEvidence<ExpiredOpeningEvidence>(value, verifierKey, policy, "line:expired-opening-evidence/v1", Status.CLOSED, 1n);
 }
 
 /** Replay the exact public action, rather than trusting candidate generation metadata.

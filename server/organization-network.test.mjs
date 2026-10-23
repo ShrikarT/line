@@ -9,7 +9,8 @@ import { WebSocket, WebSocketServer } from 'ws';
 import { bech32m } from '@scure/base';
 import * as L from '@midnight-ntwrk/ledger-v8';
 import { startOrganizationServer } from './organization-server.mjs';
-import { EXPIRED_OPENING as expiryPolicy } from '../src/lib/organization/expired-opening-policy.ts';
+import { EXPIRED_OPENING as openingPolicy } from '../src/lib/organization/expired-opening-policy.ts';
+import { EXPIRED_DISABLE as disablePolicy } from '../src/lib/organization/expired-disable-policy.ts';
 
 async function fixture(t) {
   const directory = mkdtempSync(join(tmpdir(), 'line-network-test-'));
@@ -66,10 +67,14 @@ test('the production entry provides authenticated public read URLs without retur
   assert.equal((await fetch(f.base + '/api/organization/network', { headers: { ...f.headers, Origin: 'https://other.example' } })).status, 403);
 });
 
-test('expired-opening endpoint pins finalized state reads, requires authentication and rejects provider disagreement', async t => {
-  const f = await fixture(t), path = f.base + '/api/organization/network/expired-opening';
-  const state = readFileSync(new URL('../tests/fixtures/organization-closed-state.hex', import.meta.url), 'utf8');
-  const head = 'aa'.repeat(32), height = 3077281, timestamp = 1792598700000;
+for (const configuration of [
+  { policy: openingPolicy, path: 'expired-opening', fixture: 'organization-closed-state.hex', schema: 'line:expired-opening-evidence/v1', height: 3077281, timestamp: 1792598700000 },
+  { policy: disablePolicy, path: 'expired-disable', fixture: 'organization-merchant2-draw-state.hex', schema: 'line:expired-disable-evidence/v1', height: 3102500, timestamp: 1792755000000 },
+]) test(`${configuration.path} endpoint pins finalized state reads, requires authentication and rejects provider disagreement`, async t => {
+  const expiryPolicy = configuration.policy;
+  const f = await fixture(t), path = f.base + '/api/organization/network/' + configuration.path;
+  const state = readFileSync(new URL('../tests/fixtures/' + configuration.fixture, import.meta.url), 'utf8');
+  const head = 'aa'.repeat(32), { height, timestamp } = configuration;
   const storage = Buffer.alloc(8); storage.writeBigUInt64LE(BigInt(timestamp));
   f.settings.rpc = (method, params) => {
     if (method === 'chain_getFinalizedHead') return '0x' + head;
@@ -85,6 +90,7 @@ test('expired-opening endpoint pins finalized state reads, requires authenticati
   assert.equal(f.requests.length, 0);
   const response = await fetch(path, { headers: f.headers }); assert.equal(response.status, 200);
   const evidence = await response.json();
+  assert.equal(evidence.schema, configuration.schema); assert.equal(evidence.baseline.hash, expiryPolicy.baselineHash);
   assert.equal(evidence.finalized.state, state); assert.equal(evidence.baseline.state, state); assert.equal(evidence.finalized.timestamp, timestamp);
   assert(!JSON.stringify(evidence).includes(f.token));
   assert.equal((await fetch(path + '?method=author_submitExtrinsic', { headers: f.headers })).status, 400);
