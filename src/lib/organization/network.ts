@@ -342,6 +342,23 @@ export class OrganizationNetwork {
       finally { this.input = null; }
     });
   }
+  async recordClaimExpiry(id: string, commitment: string) {
+    return this.account.exclusive(async () => {
+      const facility = this.facility(id), { book } = await this.inspect(facility.address!), after = this.account.snapshot();
+      const note = after.notes.find(n => n.noteCommitment === commitment && n.contractAddress === facility.address);
+      if (!note || note.redeemed || note.refund || note.expiryRecorded) throw new Error("Select an expired claim without a recorded redemption, expiry or compensation.");
+      const key = bytes32(commitment);
+      if (!matchesRestoredNotes(book, [note])) throw new Error("The saved claim does not match this facility's current state.");
+      const observed = book.notes.lookup(key);
+      if (observed.redeemed || observed.cancelled || observed.compensationAllocated) throw new Error("This claim was already redeemed or cancelled. No expiry transaction was prepared.");
+      if (note.expiry > BigInt(Math.floor(Date.now() / 1000))) throw new Error("The claim deadline has not passed. Compact also checks ledger time before recording expiry.");
+      note.expiryRecorded = true;
+      // Mode 0 has no private witnesses, book credit or asset transfer. Its local
+      // marker is promoted only by the exact finalized-success receipt.
+      this.input = null;
+      await this.operation("call", "cancelOrExpireNote", id, facility.address, after, () => this.tx().call(facility.address!, "cancelOrExpireNote", [key, 0n, 0n]));
+    });
+  }
   async cancelExpired(id: string, commitment: string) {
     return this.account.exclusive(async () => {
       const facility = this.facility(id), { book } = await this.inspect(facility.address!), after = this.account.snapshot();

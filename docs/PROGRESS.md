@@ -10,7 +10,7 @@ privacy and independent commercial custody are not established.
 | --- | --- |
 | Public application | [line-midnight.onrender.com](https://line-midnight.onrender.com/app), free wallet-only hosting; no hosted supplier signing wallet or automated supplier |
 | Product release | `9d95475`, live Render deployment `dep-dbdmagvavr4c73aivb30` at 13:48:19 UTC on 23 October. Nine selected public JS chunks match the tested build by SHA-256; the session memory holder is unchanged. HTML selects the current entry with no-store; `/readyz` is ready in wallet-only mode. The authenticated quote reader returned matching pinned state/keys and correctly rejected early archival at finalized block 3,104,723 (13:49:12 UTC). Verification used and revoked a new unfunded HTTP identity, without accessing the owner journal or submitting a transaction |
-| Local verification | Quote recovery and submission guards: 60 focused evidence/transaction/backup/finality/provider tests, 13 submission/replay/recovery browser cases, eight production-preview startup/refresh cases, typecheck, production build, 37-file proving export, production key/secret scans and zero managed-contract drift passed. All five archive cases exercise network-level backup restore, storage aborts, stale reviews, wallet changes and backwards checkpoints. The full core suite passed 713 tests with one skipped and zero failures. Fixtures are controlled tests, not live quote or propagation acceptance |
+| Local verification | Separate claim expiry: 715 core tests passed, one skipped, zero failures; 15 focused browser scenarios passed, including generated mode-0 execution, exact success/total-failure reconciliation, retained uncertain bytes/candidate, stale-state rejection and backup restoration. Eight production-preview startup/refresh cases, typecheck, production build, 37-file proving export, production key/secret scans and zero managed-contract drift passed. The generated fee-bearing sequence separately exercises modes 0, 1 and 2 with an actual modeled asset refund. Fixtures are controlled tests, not fresh live compensation acceptance |
 | Browser verification | 70 distinct organization, startup and wallet scenarios passed across the broad/focused runs, including duplicate-read, retained-cookie, missing-code and closed-original-tab cases. The broad run caught two missing backup-completion messages; those were corrected and their reruns passed. All eight final production-preview checks passed. Six further browser checks confirmed exact pending bytes, atomic recovery, backup/restore, outage export and lock protection; the startup checks also passed. Final UI/cache changes were verified after the full core run. CI now repeats these against built assets. Fixtures are controlled tests, not new network acceptance |
 | Full CI | The [quote recovery/submission guard `9d95475`](https://github.com/ShrikarT/line/actions/runs/39964015926) passed all jobs; all local checks above passed. The [compensation recovery `1c0fd1c`](https://github.com/ShrikarT/line/actions/runs/39955741452) passed all jobs; the full local core suite and focused checks also passed. The [submission diagnostics `0439698`](https://github.com/ShrikarT/line/actions/runs/39950249356) passed all jobs. The [merchant-disable recovery `3051942`](https://github.com/ShrikarT/line/actions/runs/39938915159) passed all jobs; the local checks above also passed. The [claim-list correction `df43535`](https://github.com/ShrikarT/line/actions/runs/39917370912) passed all jobs; local checks above also passed. The [refresh correction `1efc8b4`](https://github.com/ShrikarT/line/actions/runs/39776737263), [startup follow-up `568c093`](https://github.com/ShrikarT/line/actions/runs/39780636985), [code-download correction `cb754a5`](https://github.com/ShrikarT/line/actions/runs/39784089985) and [second-opening recovery `702194d`](https://github.com/ShrikarT/line/actions/runs/39901700502) all passed. Recovery's 39 focused tests, five browser cases, two built-host tests, typecheck, build, proving export and key/secret checks also passed locally |
 | Actual organization | Merchant 2's new quote/draw, disabling and subsequent redemption finalized at blocks 3,105,843 / 3,105,896 / 3,105,915 / 3,105,949. Its existing claim paid exactly 100,000 to its registered second wallet after disabling. OPEN generation 2; custody 1,698,000, reserve accounting 1,998,000, cumulative redeemed principal 300,000, finalized fees 2,000, zero principal encumbrance/pending fees. Merchant 2 is disabled. Its earlier expired claim remains compensated without payout. Latest workspace receipt count has not been reread |
@@ -71,6 +71,16 @@ passed. These are controlled checks, not additional live financial acceptance.
 The owner then checked the deployed app: the first saved claim shows generation 2,
 100,000 payout, 2,000 fee, 102,000 total charge and a recorded redemption. This
 confirms the live claim-list presentation; no additional transaction was requested.
+
+Saved claims now have a separate **Record claim expiry** control. It leaves the
+private spending book unchanged and keeps the original principal plus fee locked
+for compensation. The optional local expiry marker is published only after exact
+finalized success, is validated in encrypted backups and is checked against
+cancelled public state on restore. Existing one-step recovery and actual asset
+refund remain separate actions. New browser regressions reject an early,
+already-spent/cancelled or mismatched claim, retain an uncertain signed candidate,
+reject an unrelated receipt, and cover exact success/failure plus restored state.
+Fresh live mode-0/mode-2 acceptance remains outstanding.
 
 ## Wave 1 — foundation
 
@@ -488,8 +498,9 @@ compiled-contract tests do not replace fresh network receipts.
    records in the latest backup.
 2. Complete compensation modes 0 and 2 with finalized receipts and actual asset
    movements where applicable. Mode 1, Merchant 2 payout and disabling are confirmed.
-   The current organization UI exposes mode 1 recovery and mode 2 refund payment;
-   a separate mode 0 expiry action still needs an application entry point. The completed
+   A separate expiry-only control now reaches mode 0; recovery and refund payment
+   remain separate wallet-approved actions. Fresh live acceptance is still required
+   for modes 0 and 2. The completed
    100,000-unit purchase charged a 2,000-unit fee, totaling 102,000 allowance units.
 3. Operate independently funded merchants and durable automated suppliers. The
    free public wallet-only host does not provide supplier automation.

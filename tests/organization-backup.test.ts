@@ -37,6 +37,21 @@ test("backup rejects wrong password, another wallet, relocation and authenticate
   await assert.rejects(decodeOrganizationBackup(JSON.stringify({ ...envelope, ciphertextHex }), "BackupControl123!", key, accountId));
   await assert.rejects(decodeOrganizationBackup(JSON.stringify({ ...envelope, version: undefined }), "BackupControl123!", key, accountId));
 });
+
+test("encrypted backups preserve expiry-only records, reject malformed flags and accept older claims", async () => {
+  const record = initial();
+  record.snapshot.notes.push({ contractAddress: "44".repeat(32), domain: "55".repeat(32), identity: "66".repeat(32), merchantPk: "77".repeat(32), quoteCommitment: "88".repeat(32), amount: 100000n, fee: 2000n, expiry: 2000n, generation: 2n, noteNonce: "99".repeat(32), noteSalt: "aa".repeat(32), noteCommitment: "bb".repeat(32), redeemed: false, expiryRecorded: true });
+  const envelope = await encryptSecret(key, encodeVaultJson(record), "BackupControl123!");
+  assert.deepEqual(await decodeOrganizationBackup(JSON.stringify(envelope), "BackupControl123!", key, accountId), record);
+  for (const value of ["true", null, 0, {}]) {
+    const invalid = structuredClone(record); (invalid.snapshot.notes[0] as any).expiryRecorded = value;
+    assert.throws(() => validateOrganizationRecord(invalid, accountId));
+  }
+  const contradictory = structuredClone(record); contradictory.snapshot.notes[0].redeemed = true;
+  assert.throws(() => validateOrganizationRecord(contradictory, accountId));
+  delete record.snapshot.notes[0].expiryRecorded;
+  assert.doesNotThrow(() => validateOrganizationRecord(record, accountId));
+});
 test("decrypted malformed books cannot cross restore validation", () => {
   const record = withPending();
   for (const change of [

@@ -250,6 +250,37 @@ test('expired partially replenished claims pay the actual excess back once', () 
   assert.throws(() => f.execute('cancelOrExpireNote', [a.args[0], 2n, 20000n], refundPs), /already acknowledged/);
 });
 
+test('separate expiry preserves the book and backing before allocation and actual fee-inclusive refund', () => {
+  const f = fixture(1n, 100n), claim = f.draw(merchantA, 25n), note = claimPackage(f, claim), cost = note.amount + note.fee;
+  assert.equal(cost, 27n);
+  assert.equal(matchesRestoredNotes(f.read(), [{ ...note, expiryRecorded: true }]), false);
+  f.replenish(cost, 'expiry-refund-deposit');
+  assert.equal(f.private().lineOutstanding, 0n);
+  assert.throws(() => f.execute('cancelOrExpireNote', [claim.args[0], 0n, 0n]), /not expired/);
+  f.time(10001);
+  const bookBefore = toHex(f.read().lineCommit), custodyBefore = f.balance();
+  const expired = f.call('cancelOrExpireNote', [claim.args[0], 0n, 0n], { callerSecret: pad32('unrelated-expiry-caller') });
+  assert.equal(expired.unshieldedInputs.size, 0); assert.equal(expired.unshieldedOutputs.size, 0);
+  assert.equal(f.balance(), custodyBefore); assert.equal(toHex(f.read().lineCommit), bookBefore);
+  assert.equal(f.read().encumberedReserve, 0n); assert.equal(f.read().pendingFeeReserve, 0n); assert.equal(f.read().feeReserve, 0n);
+  assert.equal(f.read().refundReserve, cost);
+  const observed = f.read().notes.lookup(claim.args[0]);
+  assert(observed.cancelled && !observed.redeemed && !observed.compensationAllocated);
+  assert(matchesRestoredNotes(f.read(), [{ ...note, expiryRecorded: true }]));
+  assert.throws(() => f.execute('cancelOrExpireNote', [claim.args[0], 0n, 0n]), /already cancelled/);
+  const refundSalt = pad32('separate-expiry-refund');
+  f.call('cancelOrExpireNote', [claim.args[0], 1n, 20000n], { ...claim.ps, callerSecret: issuer, quoteMerchantPk: merchantPublicKey(merchantA), newSalt: refundSalt });
+  const allocated = { ...note, expiryRecorded: true, refund: { salt: toHex(refundSalt), amount: cost, paid: false } };
+  assert(matchesRestoredNotes(f.read(), [allocated]));
+  assert.equal(f.read().refundReserve, cost); assert.equal(f.balance(), custodyBefore);
+  const refundPs = { callerSecret: issuer, noteIdentity: agentId(agent), repayAmount: cost, salt: refundSalt, paymentRef: pad32('separate-expiry-payment') };
+  payout(f.call('cancelOrExpireNote', [claim.args[0], 2n, 20000n], refundPs), issuerAddress, cost);
+  assert.equal(f.balance(), 200n); assert.equal(f.read().totalReserve, 200n); assert.equal(f.read().refundReserve, 0n);
+  assert.equal(matchesRestoredNotes(f.read(), [allocated]), false);
+  assert(matchesRestoredNotes(f.read(), [{ ...allocated, refund: { ...allocated.refund, paid: true } }]));
+  assert.throws(() => f.execute('cancelOrExpireNote', [claim.args[0], 2n, 20000n], refundPs), /already acknowledged/);
+});
+
 test('restore rejects missing or wrong refund openings even when a prior-generation allocation leaves the current book unchanged', () => {
   const f = fixture(), claim = f.draw(merchantA, 25n);
   const note = { contractAddress: address, domain: toHex(f.read().contractDomain), identity: toHex(agentId(agent)), merchantPk: toHex(merchantPublicKey(merchantA)), quoteCommitment: toHex(claim.ps.noteQuoteCommit), amount: 25n, fee: 0n, expiry, generation: 1n, noteNonce: toHex(claim.ps.noteNonce), noteSalt: toHex(claim.ps.noteSalt), noteCommitment: toHex(claim.args[0]), redeemed: false };

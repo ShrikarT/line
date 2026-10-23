@@ -48,6 +48,7 @@ function snapshot(value: unknown, accountId: string): OrganizationSnapshot {
   for (const item of notes) {
     const n = object(item); for (const key of ["contractAddress", "domain", "identity", "merchantPk", "quoteCommitment", "noteNonce", "noteSalt", "noteCommitment"]) hex(n[key]);
     for (const key of ["amount", "fee", "expiry", "generation"]) uint(n[key]); need((n.amount as bigint) > 0n); bool(n.redeemed);
+    if (n.expiryRecorded !== undefined) { bool(n.expiryRecorded); need(!n.expiryRecorded || !n.redeemed); }
     if (n.refund !== undefined) { const r = object(n.refund); hex(r.salt); uint(r.amount); bool(r.paid); }
   }
   unique(receipts.map(item => object(item).txId)); receipts.forEach(receipt);
