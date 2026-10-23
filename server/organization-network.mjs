@@ -1,7 +1,7 @@
 import { WebSocket, WebSocketServer } from 'ws';
 import { parse, getOperationAST, visit } from 'graphql';
 import { OrganizationAuthError } from './organization-auth.mjs';
-import { expiredOpeningReader, expiredDisableReader, expiredCompensationReader } from './organization-expiry.mjs';
+import { expiredOpeningReader, expiredDisableReader, expiredCompensationReader, expiredQuoteReader } from './organization-expiry.mjs';
 
 const BASE = '/api/organization/network';
 const MAX_REQUEST = 65536;
@@ -31,7 +31,7 @@ async function readBounded(stream, limit) {
  * fixed server URLs, never in metadata, client frames or forwarded headers.
  */
 export function organizationNetwork({ server, auth, origin, endpoints }) {
-  const readExpiredOpening = expiredOpeningReader({ endpoints }), readExpiredDisable = expiredDisableReader({ endpoints }), readExpiredCompensation = expiredCompensationReader({ endpoints });
+  const readExpiredOpening = expiredOpeningReader({ endpoints }), readExpiredDisable = expiredDisableReader({ endpoints }), readExpiredCompensation = expiredCompensationReader({ endpoints }), readExpiredQuote = expiredQuoteReader({ endpoints });
   const queryUrl = new URL(endpoints.indexerUri), wsUrl = new URL(endpoints.indexerWsUri);
   for (const [url, schemes] of [[queryUrl, ['https:', 'http:']], [wsUrl, ['wss:', 'ws:']]]) {
     if (!schemes.includes(url.protocol) || url.username || url.password || url.hash) throw Error('Invalid supplier indexer configuration.');
@@ -69,12 +69,12 @@ export function organizationNetwork({ server, auth, origin, endpoints }) {
       const session = authorized(req); admit(session);
       if (req.url !== path) throw new OrganizationAuthError('Indexer URL parameters are not supported.', 400);
       if (path === BASE && req.method === 'GET') return send(res, 200, metadata);
-      if ([BASE + '/expired-opening', BASE + '/expired-disable', BASE + '/expired-compensation'].includes(path) && req.method === 'GET') {
+      if ([BASE + '/expired-opening', BASE + '/expired-disable', BASE + '/expired-compensation', BASE + '/expired-quote'].includes(path) && req.method === 'GET') {
         if (requests.size >= 8) throw new OrganizationAuthError('Recovery reads are busy.', 429);
         controller = new AbortController(); requests.add(controller);
         const abort = () => controller.abort(); res.once('close', abort);
         try {
-          const evidence = await (path === BASE + '/expired-compensation' ? readExpiredCompensation : path === BASE + '/expired-disable' ? readExpiredDisable : readExpiredOpening)(controller.signal);
+          const evidence = await (path === BASE + '/expired-quote' ? readExpiredQuote : path === BASE + '/expired-compensation' ? readExpiredCompensation : path === BASE + '/expired-disable' ? readExpiredDisable : readExpiredOpening)(controller.signal);
           auth.require(req.headers.cookie);
           if (!res.destroyed) return send(res, 200, evidence);
           return;

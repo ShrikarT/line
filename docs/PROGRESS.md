@@ -10,11 +10,11 @@ privacy and independent commercial custody are not established.
 | --- | --- |
 | Public application | [line-midnight.onrender.com](https://line-midnight.onrender.com/app), free wallet-only hosting; no hosted supplier signing wallet or automated supplier |
 | Product release | `1c0fd1c`, live Render deployment `dep-dbdldsoae00c738jq75g` at 12:47:11 UTC on 23 October. Nine selected public JS chunks, including recovery, account/network, both transaction chunks and the unchanged memory holder, match the tested build by SHA-256. HTML selects the current entry with no-store; `/readyz` is ready in wallet-only mode. The authenticated compensation reader returned valid pinned evidence; verification used a new unfunded HTTP identity and logged it out, without accessing the owner journal or submitting a transaction |
-| Local verification | Exact compensation recovery: 55 focused evidence/transaction/backup/finality/provider tests, eight recovery/replay/resubmission browser cases, eight production-preview startup/refresh cases, typecheck, production build, 37-file proving export, production key/secret scans and zero managed-contract drift passed. All four archive cases now exercise network-level backup restore with mixed history, storage aborts, stale reviews, wallet changes and backwards checkpoints. The full core suite passed 708 tests with one skipped and zero failures. Fixtures are controlled tests, not live compensation acceptance |
+| Local verification | Quote recovery and submission guards: 60 focused evidence/transaction/backup/finality/provider tests, 13 submission/replay/recovery browser cases, eight production-preview startup/refresh cases, typecheck, production build, 37-file proving export, production key/secret scans and zero managed-contract drift passed. All five archive cases exercise network-level backup restore, storage aborts, stale reviews, wallet changes and backwards checkpoints. The full core suite passed 713 tests with one skipped and zero failures. Fixtures are controlled tests, not live quote or propagation acceptance |
 | Browser verification | 70 distinct organization, startup and wallet scenarios passed across the broad/focused runs, including duplicate-read, retained-cookie, missing-code and closed-original-tab cases. The broad run caught two missing backup-completion messages; those were corrected and their reruns passed. All eight final production-preview checks passed. Six further browser checks confirmed exact pending bytes, atomic recovery, backup/restore, outage export and lock protection; the startup checks also passed. Final UI/cache changes were verified after the full core run. CI now repeats these against built assets. Fixtures are controlled tests, not new network acceptance |
-| Full CI | The [compensation recovery `1c0fd1c`](https://github.com/ShrikarT/line/actions/runs/39955741452) is running; the full local core suite and focused checks passed. The [submission diagnostics `0439698`](https://github.com/ShrikarT/line/actions/runs/39950249356) passed all jobs. The [merchant-disable recovery `3051942`](https://github.com/ShrikarT/line/actions/runs/39938915159) passed all jobs; the local checks above also passed. The [claim-list correction `df43535`](https://github.com/ShrikarT/line/actions/runs/39917370912) passed all jobs; local checks above also passed. The [refresh correction `1efc8b4`](https://github.com/ShrikarT/line/actions/runs/39776737263), [startup follow-up `568c093`](https://github.com/ShrikarT/line/actions/runs/39780636985), [code-download correction `cb754a5`](https://github.com/ShrikarT/line/actions/runs/39784089985) and [second-opening recovery `702194d`](https://github.com/ShrikarT/line/actions/runs/39901700502) all passed. Recovery's 39 focused tests, five browser cases, two built-host tests, typecheck, build, proving export and key/secret checks also passed locally |
+| Full CI | The [compensation recovery `1c0fd1c`](https://github.com/ShrikarT/line/actions/runs/39955741452) passed all jobs; the full local core suite and focused checks also passed. The [submission diagnostics `0439698`](https://github.com/ShrikarT/line/actions/runs/39950249356) passed all jobs. The [merchant-disable recovery `3051942`](https://github.com/ShrikarT/line/actions/runs/39938915159) passed all jobs; the local checks above also passed. The [claim-list correction `df43535`](https://github.com/ShrikarT/line/actions/runs/39917370912) passed all jobs; local checks above also passed. The [refresh correction `1efc8b4`](https://github.com/ShrikarT/line/actions/runs/39776737263), [startup follow-up `568c093`](https://github.com/ShrikarT/line/actions/runs/39780636985), [code-download correction `cb754a5`](https://github.com/ShrikarT/line/actions/runs/39784089985) and [second-opening recovery `702194d`](https://github.com/ShrikarT/line/actions/runs/39901700502) all passed. Recovery's 39 focused tests, five browser cases, two built-host tests, typecheck, build, proving export and key/secret checks also passed locally |
 | Actual organization | Finalized mode-1 compensation at block 3,104,191 cancelled Merchant 2's expired 100,000 + 2,000 claim and allocated compensation with no cash refund owed. OPEN, generation 2, policy 1,000 + 100 bps; principal encumbrance, pending fees and finalized fees are zero. Custody remains 1,798,000, reserve accounting 1,998,000 and cumulative redeemed principal 200,000. Merchant 2 remains active; its expired claim was cancelled without payout. Latest workspace receipt count has not been reread |
-| Remaining acceptance | The two expired openings, merchant disable and first compensation remain preserved in encrypted recovery history. A separately owner-approved fresh compensation succeeded. Merchant disabling, a valid Merchant 2 payout, other compensation modes, original submission diagnosis, independent suppliers/customer validation and full-history privacy remain outstanding |
+| Remaining acceptance | A fresh Merchant 2 `postQuote` is signed and pending; its absent receipt does not authorize replacement. The two expired openings, merchant disable and first compensation remain preserved in encrypted recovery history. A separately owner-approved fresh compensation succeeded. Merchant disabling, a valid Merchant 2 payout, other compensation modes, original submission diagnosis, independent suppliers/customer validation and full-history privacy remain outstanding |
 | Live testing | On 23 October the owner confirmed automatic wallet connection, a ready organization and an unlocked vault after refresh, then successfully reviewed and archived the newer opening. The displayed history records `006c2322...` at finalized block 3,092,740 and `00abb757...` at finalized block 3,099,704. These are encrypted local recovery records with provider-backed evidence, not finalized failure receipts or successful reopening acceptance |
 | Wallet / backup | The owner confirmed automatic wallet connection, organization readiness and an unlocked vault after refresh on 23 October. After the fee-bearing cycle, the owner confirmed allowance 1,000,000, spending balance 102,000, remaining allowance 898,000, zero fees and assets held 1,798,000. A fresh encrypted backup was saved; only its existence was checked, without reading or decrypting it. Intermittent wallet rate limits remain possible; failed reads retain the memory session and never bypass live transaction guards |
 
@@ -213,6 +213,48 @@ native inflow, custody 1,900,000 and reserve accounting 2,000,000 while still CL
 at generation 1, before the fresh opening. This completes the fee-bearing
 reopening/quote/draw/redemption/fee-withdrawal cycle on this facility. It does not
 establish independent fulfillment, a customer pilot or full-history privacy.
+
+### Pending fresh Merchant 2 quote
+
+The owner approved another Merchant 2 quote with invoice
+`line-merchant2-20261023-02`, price 100,000 and 120-minute validity. Its retained
+signed identifier is
+`0077dc714982d5af87aa9035d5fca6413f7de9367e890d74cfcb4d0644744dfd53`;
+canonical transaction hash is
+`7b791d81de16ec8c0be2b2ea3241e732a6b4ed9d9f49a7b7295c7f85041701ab`.
+The public diagnostic's identity, action, facility and source release passed
+canonical checks. DUST creation time is 13:08:54 UTC, its intent TTL 13:10:11 UTC,
+and the contract intent TTL 14:07:39 UTC on 23 October. The 77-second fee window
+is a confirmed constraint, not proof of the original propagation failure.
+The quote commitment is
+`3eaa15536ddac4b264da8b410976a7e8370fc64b3fae7c8c12657de5048154c6`.
+Public transcript replay against the verified compensation predecessor inserts
+exactly that unused generation-2 quote, expiring at Unix second 1792768054.
+
+The exact identifier lookup returned no records. Read-only runtime application
+simulation succeeded at historical blocks 3,104,321 and 3,104,323, then rejected
+at block 3,104,486 with generic application error 182. Mempool admission still
+reported valid at the latter block; the pinned node's soft validation cache is
+keyed by transaction bytes and may return an earlier success. Thus pool admission
+is not current execution or finality evidence. These were runtime overlays only;
+no transaction was broadcast or canonical ledger state committed by the probes.
+The original submission timing and wallet-node propagation remain unconfirmed.
+
+A regression reproduced an unnecessary duplicate identity/network check between
+wallet balancing and the SDK's immediate submission call. The duplicate RPCs
+are removed while session revocation and the fresh submission guard remain.
+A second regression reproduced initial forwarding of already-expired signed
+bytes; the initial send now retains the bytes durably, then applies the same
+expiry restriction as an explicit retry. Changed-wallet/network guards still
+block submission. These correct app defects; live propagation repair is not
+claimed before another owner-approved transaction is confirmed.
+
+The exact quote has a separate guarded recovery using the compensation receipt
+as its pinned predecessor. It cannot archive before finalized ledger time passes
+14:08:10 UTC (19:38:10 IST), regardless of the earlier DUST TTL. It must still
+verify complete state, release/history assumptions, quote absence, canonical
+replay and the retained merchant candidate locally. The encrypted original and
+unpromoted candidate remain preserved; no new quote is approved by archival.
 
 ### Confirmed expired-claim compensation and retained recovery history
 

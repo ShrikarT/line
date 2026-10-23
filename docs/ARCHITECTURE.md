@@ -116,6 +116,19 @@ candidate and original bytes. It neither performs compensation nor approves a
 replacement. Backup restoration dispatches each archived disposition to its
 corresponding evidence/candidate validator, including the older disable record.
 
+One retained Merchant 2 `postQuote`, `0077dc71...744dfd53`, is scoped to the
+verified compensation checkpoint at block 3,104,191. The exact quote commitment
+must be absent and the complete state, maintenance counter and twelve release
+keys unchanged. `postQuote` rejects existing quote membership; `draw` preserves
+membership while marking used; no release circuit removes it. Canonical replay
+must insert the exact commitment from the merchant account's retained opening,
+bind its private merchant role and preserve its other private records. The
+candidate is one appended quote, never an issuer book mutation. The server reads
+only this fixed checkpoint. Recovery still waits past every signed intent TTL
+plus uncertainty, with an explicit time message when the shorter DUST deadline
+has passed but the contract intent remains live. Its separate evidence schema
+and archive disposition are validated and retained through backup restore.
+
 Saved-transaction inspection uses that account lock to reload the durable pending
 operation without wallet RPCs or storage writes. The original decoder checks the
 release, canonical bytes, identifier, action and target before an allowlisted
@@ -179,6 +192,15 @@ Reload uses the current asset graph; code is never mixed across releases and
 financial operations are never automatically retried. HTML is served with
 `no-store`; content-hashed JS/CSS/WASM assets are immutable browser-cache entries.
 An older open tab can still need a reload for an unfetched chunk after deployment.
+
+The SDK immediately passes a wallet-balanced transaction to its submission
+provider. Line checks session revocation on return from balancing and performs
+one fresh network/both-identity check at that submission boundary. It retains the
+fresh check before balancing, and avoids repeating the same wallet RPCs between
+balancing and submission. After saving canonical signed bytes durably, the
+initial send now checks every signed intent deadline before calling the wallet,
+just as explicit resubmission does. An already-expired wallet result remains
+saved and blocked for reconciliation; no replacement is prepared automatically.
 
 The SDK wallet adapter is constructed through that same live account guard, using
 its checked public keys and in-memory settings. It does not issue another

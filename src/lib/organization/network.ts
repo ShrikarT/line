@@ -25,6 +25,7 @@ import { authenticatedOrganizationReads } from "./authenticated-reads";
 import { recoveryDigest, verifyExpiredOpening, type ExpiredOpeningReview } from "./expired-opening";
 import { verifyExpiredDisable, type ExpiredDisableReview } from "./expired-disable";
 import { verifyExpiredCompensation, type ExpiredCompensationReview } from "./expired-compensation";
+import { verifyExpiredQuote, type ExpiredQuoteReview } from "./expired-quote";
 import { inspectMerchantClaim } from "./claims";
 
 type Circuit = keyof Contract<LinePrivateWitnessContext>["provableCircuits"];
@@ -79,7 +80,10 @@ export class OrganizationNetwork {
     }, { sourceFingerprint: release.inputs.source.sha256, files: release.files }, report, supplier);
     const baseWallet = client.providers.walletProvider;
     client.providers = { ...client.providers,
-      walletProvider: { ...baseWallet, balanceTx: async (tx, ttl) => { await account.assertWallet(); report("Approve the transaction in your wallet"); const balanced = await withinDeadline(baseWallet.balanceTx(tx, ttl), 180_000, "Wallet approval timed out. No transaction was submitted by Line. Close the old wallet prompt before trying again."); await account.assertWallet(); return balanced; } },
+      // The SDK immediately hands the balanced result to submitTx below. Keep
+      // its fresh identity/network guard there; repeating those RPCs here burns
+      // the wallet's shorter DUST validity window. Revocation is still immediate.
+      walletProvider: { ...baseWallet, balanceTx: async (tx, ttl) => { await account.assertWallet(); report("Approve the transaction in your wallet"); const balanced = await withinDeadline(baseWallet.balanceTx(tx, ttl), 180_000, "Wallet approval timed out. No transaction was submitted by Line. Close the old wallet prompt before trying again."); account.assertSession(); return balanced; } },
       midnightProvider: { submitTx: async tx => {
         await account.assertWallet();
         const pending = account.pending();
@@ -93,6 +97,9 @@ export class OrganizationNetwork {
         if (!feeActions.some(action => action.spends.length > 0) || feeActions.some(action => action.spends.length === 0 && action.registrations.length === 0)) throw new Error("The wallet returned an empty DUST fee section. Synchronize or update the wallet before retrying.");
         if (!id) throw new Error("Transaction has no identifier.");
         await account.submitted(id, toHex(tx.serialize()), action.address);
+        // Preserve signed bytes before rejecting an expired wallet result. A
+        // rejected fresh send remains reconcilable, just like an explicit retry.
+        originalOrganizationTransaction(account.pending()!, client.release.sourceFingerprint);
         report("Sending the signed transaction. Waiting for the finalized receipt");
         return withinDeadline(wallet.midnightProvider.submitTx(tx), 30_000, "The submission acknowledgement timed out. The original signed transaction is saved; check its status before doing anything else.");
       } },
@@ -125,7 +132,7 @@ export class OrganizationNetwork {
     this.report("Authenticating the backup and checking its facilities on Midnight");
     await this.account.restoreBackup(file, password, async record => {
       for (const recovery of record.recoveries ?? []) {
-        const verified = await (recovery.disposition === "expired-opening-not-applied" ? this.verifyExpiredOpening(recovery.before, recovery.original, recovery.evidence) : recovery.disposition === "expired-disable-not-applied" ? this.verifyExpiredDisable(recovery.before, recovery.original, recovery.evidence) : this.verifyExpiredCompensation(recovery.before, recovery.original, recovery.evidence));
+        const verified = await (recovery.disposition === "expired-opening-not-applied" ? this.verifyExpiredOpening(recovery.before, recovery.original, recovery.evidence) : recovery.disposition === "expired-disable-not-applied" ? this.verifyExpiredDisable(recovery.before, recovery.original, recovery.evidence) : recovery.disposition === "expired-compensation-not-applied" ? this.verifyExpiredCompensation(recovery.before, recovery.original, recovery.evidence) : this.verifyExpiredQuote(recovery.before, recovery.original, recovery.evidence));
         if (verified.ttl !== recovery.ttl) throw new Error("The recovery history differs from the original signed expiry.");
       }
       if (record.pending && record.pending.sourceFingerprint !== this.release.sourceFingerprint) throw new Error("Restore the pending operation with its original contract release.");
@@ -593,6 +600,31 @@ export class OrganizationNetwork {
   }
   private verifyExpiredCompensation(before: OrganizationSnapshot, pending: NonNullable<ReturnType<OrganizationAccount["pending"]>>, evidence: unknown) {
     return verifyExpiredCompensation(before, pending, evidence, this.release.sourceFingerprint, name => this.providers.zkConfigProvider.getVerifierKey(name as Circuit));
+  }
+  async reviewExpiredQuote(): Promise<ExpiredQuoteReview> {
+    return this.account.exclusive(async () => {
+      const pending = this.account.pending(), before = this.account.snapshot();
+      if (!pending?.txId) throw new Error("No original signed merchant quote is saved.");
+      this.report("Checking the pinned finalized state and original merchant quote candidate");
+      const verified = await this.verifyExpiredQuote(before, pending, await this.supplier.request("network/expired-quote"));
+      await this.account.assertWallet();
+      return { operationId: pending.id, txId: pending.txId, operationDigest: await recoveryDigest(pending), snapshotDigest: await recoveryDigest(before), checkedAt: Date.now(), ...verified };
+    });
+  }
+  async recoverExpiredQuote(review: ExpiredQuoteReview) {
+    return this.account.exclusive(async () => {
+      const pending = this.account.pending(), before = this.account.snapshot();
+      if (!pending?.txId || pending.id !== review.operationId || pending.txId !== review.txId || await recoveryDigest(pending) !== review.operationDigest || await recoveryDigest(before) !== review.snapshotDigest || !Number.isSafeInteger(review.checkedAt) || review.checkedAt > Date.now() || Date.now() - review.checkedAt > 300_000) throw new Error("The saved operation or recovery review changed. Check it again.");
+      const verified = await this.verifyExpiredQuote(before, pending, await this.supplier.request("network/expired-quote"));
+      if (verified.evidence.finalized.height < review.evidence.finalized.height || verified.evidence.finalized.timestamp < review.evidence.finalized.timestamp) throw new Error("The recovery provider checkpoint moved backwards. Keep the original operation saved.");
+      await this.account.assertWallet();
+      await this.account.archiveExpiredQuote(pending, verified.evidence, verified.ttl);
+      this.tx().finality.forget(pending.txId);
+      this.report("Expired merchant quote archived with provider-backed nonapplication evidence. No transaction was submitted. Review any new quote request separately.");
+    });
+  }
+  private verifyExpiredQuote(before: OrganizationSnapshot, pending: NonNullable<ReturnType<OrganizationAccount["pending"]>>, evidence: unknown) {
+    return verifyExpiredQuote(before, pending, evidence, this.release.sourceFingerprint, name => this.providers.zkConfigProvider.getVerifierKey(name as Circuit));
   }
   private verifyExpiredOpening(before: OrganizationSnapshot, pending: NonNullable<ReturnType<OrganizationAccount["pending"]>>, evidence: unknown) {
     return verifyExpiredOpening(before, pending, evidence, this.release.sourceFingerprint, name => this.providers.zkConfigProvider.getVerifierKey(name as Circuit));

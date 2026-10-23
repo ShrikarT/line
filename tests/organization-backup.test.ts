@@ -8,6 +8,7 @@ import { readFileSync } from "node:fs";
 import { EXPIRED_OPENING as policy } from "../src/lib/organization/expired-opening-policy.ts";
 import { EXPIRED_DISABLE as disablePolicy } from "../src/lib/organization/expired-disable-policy.ts";
 import { EXPIRED_COMPENSATION as compensationPolicy } from "../src/lib/organization/expired-compensation-policy.ts";
+import { EXPIRED_QUOTE as quotePolicy } from "../src/lib/organization/expired-quote-policy.ts";
 
 const accountId = "11".repeat(32), key = organizationAccountKey("preprod", accountId);
 const address = bech32m.encodeFromBytes("mn_addr_preprod", new Uint8Array(32).fill(4));
@@ -86,6 +87,12 @@ test("backup preserves both scoped expired openings, disable and compensation wi
   compensation.original.circuit = "cancelOrExpireNote"; compensation.original.txId = compensationPolicy.txId;
   compensation.evidence.schema = "line:expired-compensation-evidence/v1";
   record.recoveries!.push(compensation);
+  const quote = structuredClone(compensation), quoteState = readFileSync(new URL("fixtures/organization-compensated-state.hex", import.meta.url), "utf8");
+  quote.disposition = "expired-quote-not-applied"; quote.original.id = "owner-reviewed-quote";
+  quote.original.circuit = "postQuote"; quote.original.txId = quotePolicy.txId;
+  quote.evidence = { schema: "line:expired-quote-evidence/v1", address: quotePolicy.address, genesisHash: quotePolicy.genesisHash, runtimeSpecVersion: quotePolicy.runtimeSpecVersion,
+    baseline: { hash: quotePolicy.baselineHash, height: quotePolicy.baselineHeight, state: quoteState }, finalized: { hash: "cc".repeat(32), height: 3105000, timestamp: 1792764600000, state: quoteState } };
+  record.recoveries!.push(quote);
   const backup = await encryptSecret(key, encodeVaultJson(record), "BackupControl123!");
   assert.deepEqual(await decodeOrganizationBackup(JSON.stringify(backup), "BackupControl123!", key, accountId), record);
   assert.equal(isOrganizationEmpty({ ...initial(), recoveries: record.recoveries }), false);
@@ -105,5 +112,8 @@ test("backup preserves both scoped expired openings, disable and compensation wi
     (r: OrganizationRecord) => { r.recoveries![3].evidence.schema = "line:expired-disable-evidence/v1"; },
     (r: OrganizationRecord) => { r.recoveries![3].disposition = "expired-disable-not-applied"; },
     (r: OrganizationRecord) => { r.recoveries![3].original.txId = disablePolicy.txId; },
+    (r: OrganizationRecord) => { r.recoveries![4].evidence.schema = "line:expired-compensation-evidence/v1"; },
+    (r: OrganizationRecord) => { r.recoveries![4].disposition = "expired-compensation-not-applied"; },
+    (r: OrganizationRecord) => { r.recoveries![4].evidence.baseline.hash = compensationPolicy.baselineHash; },
   ]) { const invalid = structuredClone(record); mutate(invalid); assert.throws(() => validateOrganizationRecord(invalid, accountId)); }
 });
