@@ -8,6 +8,14 @@ Line lets organizations fund autonomous agents, set purchasing allowances and se
 
 **Network:** Midnight Preprod · **Status:** working prototype
 
+**Product direction:** real autonomous purchasing is the next milestone, not a
+capability established by the current manual workspaces. The public deployment
+uses wallet-approved transactions and manual quote/claim exchange; its automated
+supplier catalog is disabled, and the existing MCP server is a local simulator.
+The [product plan](docs/PROGRESS.md#product-direction-reset--23-october-2026)
+defines the path to an authorized agent buying a useful service and returning its
+result without JSON handoffs or routine per-purchase owner signatures.
+
 [![CI](https://github.com/ShrikarT/line/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/ShrikarT/line/actions/workflows/ci.yml)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](LICENSE)
 
@@ -41,7 +49,7 @@ flowchart LR
     N --> R[Merchant redeems once]
 ```
 
-The canonical contract records accounting. A separate test-settlement profile has confirmed two-merchant Preprod test-token payouts. The organization-funded profile has completed fresh 1AM funding, allowance opening, quote, draw and a 0.1 tNIGHT redemption to its registered recipient. A subsequent 0.1 tNIGHT replenishment, 0.1 tNIGHT withdrawal, pause/resume and zero-outstanding allowance closure are also verified. Closure retained 0.9 tNIGHT in contract custody. This used the owner's merchant wallet; fee-bearing acceptance and independent merchant fulfillment remain open. These profiles are not interchangeable.
+The canonical contract records accounting. A separate test-settlement profile has confirmed two-merchant Preprod test-token payouts. The organization-funded profile has verified funding, allowance opening, purchases, payouts, replenishment, withdrawals and status changes. Its later fee-bearing cycle and redemption to a second same-owner wallet after merchant disabling are also verified; see the exact checkpoints in [progress](docs/PROGRESS.md). These establish protocol behavior with valueless Preprod assets, not autonomous task completion or independent merchant fulfillment. These profiles are not interchangeable.
 
 ## Midnight contracts
 
