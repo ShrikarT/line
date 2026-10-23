@@ -14,7 +14,7 @@ privacy and independent commercial custody are not established.
 | Browser verification | 70 distinct organization, startup and wallet scenarios passed across the broad/focused runs, including duplicate-read, retained-cookie, missing-code and closed-original-tab cases. The broad run caught two missing backup-completion messages; those were corrected and their reruns passed. All eight final production-preview checks passed. Six further browser checks confirmed exact pending bytes, atomic recovery, backup/restore, outage export and lock protection; the startup checks also passed. Final UI/cache changes were verified after the full core run. CI now repeats these against built assets. Fixtures are controlled tests, not new network acceptance |
 | Full CI | The [claim-list correction `df43535`](https://github.com/ShrikarT/line/actions/runs/39917370912) passed all jobs; local checks above also passed. The [refresh correction `1efc8b4`](https://github.com/ShrikarT/line/actions/runs/39776737263), [startup follow-up `568c093`](https://github.com/ShrikarT/line/actions/runs/39780636985), [code-download correction `cb754a5`](https://github.com/ShrikarT/line/actions/runs/39784089985) and [second-opening recovery `702194d`](https://github.com/ShrikarT/line/actions/runs/39901700502) all passed. Recovery's 39 focused tests, five browser cases, two built-host tests, typecheck, build, proving export and key/secret checks also passed locally |
 | Actual organization | Latest separately checked finalized fee withdrawal: OPEN, generation 2, policy 1,000 + 100 bps, zero encumbrance, pending fees and finalized fees. The cycle paid 100,000 to the registered owner/merchant and 2,000 to the fixed issuer wallet. Post-state custody is 1,798,000, reserve accounting 1,998,000 and cumulative redeemed principal 200,000. The additional 1,000,000 reserve funding was separately matched to finalized block 3,099,785 and exact native-asset inflow. Latest workspace receipt count has not been reread |
-| Active blocker | The two expired openings are archived, and fresh fee-bearing reopening, quote, draw, merchant payout and fee withdrawal are all finalized. The owner confirmed final UI figures and saved a fresh encrypted backup. Remaining work includes additional merchant/compensation acceptance, independent suppliers/customer validation and full-history privacy |
+| Active blocker | The two expired openings are archived, and fresh fee-bearing reopening, quote, draw, merchant payout and fee withdrawal are all finalized. The owner confirmed final UI figures and saved a fresh encrypted backup. Merchant 2 registration is finalized; its quote/payout and disabling checks remain, alongside compensation acceptance, independent suppliers/customer validation and full-history privacy |
 | Live testing | On 23 October the owner confirmed automatic wallet connection, a ready organization and an unlocked vault after refresh, then successfully reviewed and archived the newer opening. The displayed history records `006c2322...` at finalized block 3,092,740 and `00abb757...` at finalized block 3,099,704. These are encrypted local recovery records with provider-backed evidence, not finalized failure receipts or successful reopening acceptance |
 | Wallet / backup | The owner confirmed automatic wallet connection, organization readiness and an unlocked vault after refresh on 23 October. After the fee-bearing cycle, the owner confirmed allowance 1,000,000, spending balance 102,000, remaining allowance 898,000, zero fees and assets held 1,798,000. A fresh encrypted backup was saved; only its existence was checked, without reading or decrypting it. Intermittent wallet rate limits remain possible; failed reads retain the memory session and never bypass live transaction guards |
 
@@ -149,6 +149,7 @@ units. All amounts below use base units.
 | Fee-bearing draw: 100,000 principal + 2,000 fee | `07cab8b6630d41753002e2a23b65556be44be2e97a559b44bfbaaefdd797b66b` | 3,100,335 |
 | Redeem generation-2 claim: 100,000 payout | `1deb6fafdfd3486aadcac2b4c5c7f703bbf2906db70ed9660ff0f678c7718357` | 3,100,433 |
 | Withdraw 2,000 finalized fees | `8fed9b055aa3725c4164ace297bc5bc40d3d539fe534140b7c4ce23ebf72b802` | 3,100,508 |
+| Register Merchant 2 | `5d6f6f24bc8295ff64e0108afaa3c4f1cdab18a3bae35832a51cd6b0d43cce6d` | 3,101,980 |
 
 Separate read-only checks matched selected raw transactions, contract actions,
 identifiers, canonical finalized blocks and all twelve release-matched keys.
@@ -163,11 +164,16 @@ generation 2, custody 1,798,000, reserve accounting 1,998,000 and zero encumbran
 or fees. Selected rows are not the full workspace receipt count; intermediate
 verifier installations are represented by their final registration checkpoint.
 
-Fresh receipts cover nine distinct call names: `fundReserve`,
+Fresh receipts cover ten distinct call names: `registerMerchant`, `fundReserve`,
 `withdrawUnencumberedReserve`, `withdrawFees`, `openLine`, `postQuote`, `draw`, `redeemDraw`,
 `acknowledgeRepayment`, `setStatus`. Verifier registration is not circuit-call
-acceptance. Additional `registerMerchant`, `disableMerchant`,
-all `cancelOrExpireNote` modes remain unaccepted in this facility. Closed-line
+acceptance. `disableMerchant` and all `cancelOrExpireNote` modes remain unaccepted
+in this facility. Additional Merchant 2 registration finalized at block 3,101,980;
+its canonical raw `registerMerchant`, aggregate SUCCESS and RPC-finalized block
+were matched, with its supplied public key mapped to the exact second receiving
+wallet. Merchant 2 uses another owner-controlled wallet; this is permission
+acceptance, not independent supplier fulfillment. Its quote/payout checks remain.
+ Closed-line
 reopening with fees was separately verified on 23 October: exact canonical raw
 transaction, aggregate SUCCESS and RPC-finalized block 3,099,871. Its post-state
 is OPEN, generation 2, flat fee 1,000 and rate 100 bps, expiring
@@ -261,8 +267,8 @@ compiled-contract tests do not replace fresh network receipts.
 
 1. Preserve the finalized generation-2 fee-bearing cycle and both encrypted
    recovery records in the latest backup.
-2. Complete additional merchant registration, disabling and all compensation-mode
-   acceptance with finalized receipts and actual asset movements. The completed
+2. Complete Merchant 2 quote/payout, disabling and all compensation-mode acceptance
+   with finalized receipts and actual asset movements. The completed
    100,000-unit purchase charged a 2,000-unit fee, totaling 102,000 allowance units.
 3. Operate independently funded merchants and durable automated suppliers. The
    free public wallet-only host does not provide supplier automation.
