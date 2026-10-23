@@ -14,7 +14,7 @@ privacy and independent commercial custody are not established.
 | Browser verification | 70 distinct organization, startup and wallet scenarios passed across the broad/focused runs, including duplicate-read, retained-cookie, missing-code and closed-original-tab cases. The broad run caught two missing backup-completion messages; those were corrected and their reruns passed. All eight final production-preview checks passed. Six further browser checks confirmed exact pending bytes, atomic recovery, backup/restore, outage export and lock protection; the startup checks also passed. Final UI/cache changes were verified after the full core run. CI now repeats these against built assets. Fixtures are controlled tests, not new network acceptance |
 | Full CI | The [refresh correction `1efc8b4`](https://github.com/ShrikarT/line/actions/runs/39776737263) passed. The [startup follow-up `568c093`](https://github.com/ShrikarT/line/actions/runs/39780636985) passed. The [code-download correction `cb754a5`](https://github.com/ShrikarT/line/actions/runs/39784089985) passed |
 | Actual organization | Twelve verifier keys and 22 finalized workspace receipts. Last independently checked state: CLOSED, generation 1, 900,000 native-asset base units held, 1,000,000 reserve accounting, zero encumbrance and fees |
-| Active blocker | Resolved. The original signed fee-bearing `openLine` was safely reviewed and archived into encrypted recovery history with provider-backed nonapplication evidence at finalized block 3,092,734 (22 October, 17:50:18 UTC). No replacement was silently created, no invalid failure receipt was invented, and the workspace is unblocked |
+| Active blocker | The first expired opening was archived at block 3,092,734. A newer signed `openLine`, `00abb757c332b831dd25c7640f417d50323639ede3361893571e361ec8eae44813`, is now pending and expired. The owner checked finality and explicitly retried the same bytes; expiry validation rejected the retry before wallet submission. No replacement was created during this investigation |
 | Live testing | After reconnecting 1AM and unlocking the organization vault, the owner confirmed the scoped candidate/evidence review and archived the original operation with evidence at finalized block 3,092,734. The workspace now records Expired opening recovery history (1). Facility ab428f74... is ready for owner review of a new opening |
 | Wallet / backup | Latest encrypted backup remains saved. On the new live build, the actual 1AM owner wallet connected with one click and restored itself after refresh. The owner subsequently reported an organization logout after refresh; a live tab showed a rate limit above the password form. The reproduced boundary was network-read failure being presented as vault logout; the correction retains the memory session for retry. On the corrected deployment, the actual owner tab restored the organization after refresh without password entry, displayed all 22 receipts, and completed wallet/contract-release setup. This is session verification, not a new chain transaction. Its original signed operation is retained. Prior connector failures included a rate limit, generic configuration failure and InternalError; none justified bypassing live guards |
 
@@ -135,6 +135,27 @@ this facility. Its confirmed allowance used zero fees; fee-bearing checkout and
 fee withdrawal still need fresh wallet-approved receipts.
 
 ### Pending allowance and recovery
+
+On 23 October the owner confirmed automatic wallet connection, organization
+readiness and an unlocked vault after refresh. The pending identifier was the
+newer `00abb757c332b831dd25c7640f417d50323639ede3361893571e361ec8eae44813`,
+not the first original below. An exact identifier lookup returned zero records
+without GraphQL errors. Fresh scoped node/indexer evidence at finalized block
+3,099,172 (`2026-10-23T04:34:06.001Z`) matched the complete trusted closure state,
+all twelve release verifier keys and maintenance counter 11. This evidence does
+not itself validate the owner's retained candidate or establish a failure receipt.
+
+Recovery scope now includes exactly those two identifiers. Signed-byte identity,
+opening transcript/private-candidate replay, fixed terms, finalized TTL margin,
+durable review guards and atomic archival are unchanged. A failing browser case
+first reproduced the missing review button for the newer identifier; a failing
+encrypted backup case reproduced rejection of its recovery history. Both now
+pass. Five browser cases cover both openings, preservation of the first archive
+when appending the second, stale reviews, wallet changes, storage failure, later
+commits, backup/restore and exact receipt reconciliation after expiry. Thirty-nine
+focused transaction, evidence, backup, finality and authenticated-provider tests
+also pass. These are controlled tests; the newer owner's operation is still
+pending until its local candidate check and explicit archive complete.
 
 Saved original identifier:
 `006c23221e7a0ebe76a1975d827166437f010f611e6a95bd38d6b0c5b55ab524e2`
@@ -260,8 +281,8 @@ compiled-contract tests do not replace fresh network receipts.
 
 ## Wave 3 — pilots and hardening
 
-1. Reconcile the expired original allowance before starting another mutation.
-   The dApp connector currently blocks the live guard. Use exact finality or the narrowly scoped,
+1. Reconcile the newer expired allowance before starting another mutation.
+   Use exact finality or the narrowly scoped,
    owner-reviewed recovery after its local candidate check succeeds. Do not
    discard bytes based on expiry, a missing receipt or a latest CLOSED snapshot.
 2. Complete fee-bearing and remaining twelve-action/compensation acceptance with

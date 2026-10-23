@@ -2,7 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { bech32m } from "@scure/base";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
-import { EXPIRED_OPENING } from "../src/lib/organization/expired-opening-policy.ts";
+import { EXPIRED_OPENING, EXPIRED_OPENING_TRANSACTION_IDS } from "../src/lib/organization/expired-opening-policy.ts";
 import { candidateFixture } from "../tests/fixtures/organization-opening.ts";
 import { encodeVaultJson } from "../src/lib/security/vault.ts";
 
@@ -386,7 +386,10 @@ test("browser replays the canonical opening action against its exact retained pr
   expect(result).toEqual({ ttl: 4600_000, changedRejected: true });
 });
 
-test("expired opening recovery is atomic, rejects stale reviews and retains encrypted history through every commit and restore", async ({ page }) => {
+for (const scopedOpening of EXPIRED_OPENING_TRANSACTION_IDS.map(txId => ({ ...EXPIRED_OPENING, txId }))) {
+const EXPIRED_OPENING = scopedOpening;
+const expectedHistory = scopedOpening.txId === EXPIRED_OPENING_TRANSACTION_IDS[0] ? 1 : 2;
+test(`expired opening ${scopedOpening.txId.slice(0, 8)} recovery is atomic, rejects stale reviews and retains encrypted history through every commit and restore`, async ({ page }) => {
   test.setTimeout(120_000);
   const state = readFileSync(new URL("../tests/fixtures/organization-closed-state.hex", import.meta.url), "utf8");
   const L = await import("@midnight-ntwrk/ledger-v8"), checkpoint = L.ContractState.deserialize(Buffer.from(state, "hex"));
@@ -396,7 +399,7 @@ test("expired opening recovery is atomic, rejects stale reviews and retains encr
   await wallets(page, true, true);
   await page.route("**/api/organization/network/expired-opening", route => route.fulfill({ json: evidence }));
   await page.goto("/app"); await connect(page, "a"); await unlock(page);
-  await page.evaluate(async ({ policy, verifierKeys }) => {
+  await page.evaluate(async ({ policy, verifierKeys, evidence, previousTxId }) => {
     const { browserModuleUrl } = await import("/e2e/browser-module.ts" as any);
     const { OrganizationAccount } = await import(browserModuleUrl("/src/lib/organization/account.ts"));
     const { OrganizationNetwork } = await import(browserModuleUrl("/src/lib/organization/network.ts"));
@@ -413,10 +416,17 @@ test("expired opening recovery is atomic, rejects stale reviews and retains encr
     };
     const account = await OrganizationAccount.unlock(getConnectedWallet()!, "Organization123!");
     await account.exclusive(async () => {
+      if (policy.txId !== previousTxId) {
+        // Model the owner's first archive before the newer opening. The same
+        // controlled candidate seam applies; all encryption/commits are real.
+        await account.prepare({ id: "previous-opening", kind: "call", circuit: "openLine", facilityId: null, contractAddress: policy.address, sourceFingerprint: policy.sourceFingerprint, after: account.snapshot(), txId: null, transaction: null });
+        await account.submitted(previousTxId, "abcd", policy.address);
+        await account.archiveExpiredOpening(account.pending()!, evidence, 1792500000000);
+      }
       await account.prepare({ id: "expired-opening", kind: "call", circuit: "openLine", facilityId: null, contractAddress: policy.address, sourceFingerprint: policy.sourceFingerprint, after: account.snapshot(), txId: null, transaction: null });
       await account.submitted(policy.txId, "abcd", policy.address);
     });
-  }, { policy: EXPIRED_OPENING, verifierKeys });
+  }, { policy: EXPIRED_OPENING, verifierKeys, evidence, previousTxId: EXPIRED_OPENING_TRANSACTION_IDS[0] });
   const reopen = async () => {
     await page.getByLabel("Organization vault password", { exact: true }).fill("Organization123!");
     await page.getByRole("button", { name: "Open organization", exact: true }).click();
@@ -425,6 +435,7 @@ test("expired opening recovery is atomic, rejects stale reviews and retains encr
   await reopen();
   const review = page.getByRole("button", { name: "Review expired opening recovery", exact: true });
   const archive = page.getByRole("button", { name: "Archive original with evidence", exact: true });
+  await expect(review).toBeVisible();
   await review.click(); await expect(page.getByRole("dialog")).toContainText("3077281".replace(/(\d)(?=(\d{3})+$)/g, "$1,"));
   await page.evaluate(() => {
     (window as any).expiryPut = IDBObjectStore.prototype.put;
@@ -455,8 +466,8 @@ test("expired opening recovery is atomic, rejects stale reviews and retains encr
   await review.click(); await expect(archive).toBeVisible(); await archive.click();
   await expect(page.getByRole("status")).toContainText("Expired opening archived with provider-backed nonapplication evidence");
   await expect(review).toHaveCount(0);
-  await expect(page.getByText("Expired opening recovery history (1)", { exact: true })).toBeVisible();
-  const result = await page.evaluate(async policy => {
+  await expect(page.getByText(`Expired opening recovery history (${expectedHistory})`, { exact: true })).toBeVisible();
+  const result = await page.evaluate(async ({ policy, expectedHistory }) => {
     const account = (window as any).expiryAccount;
     const { browserModuleUrl } = await import("/e2e/browser-module.ts" as any);
     const { OrganizationAccount, organizationAccountKey } = await import(browserModuleUrl("/src/lib/organization/account.ts"));
@@ -475,14 +486,15 @@ test("expired opening recovery is atomic, rejects stale reviews and retains encr
     const { removeEncryptedSecret } = await import(browserModuleUrl("/src/lib/security/vault.ts"));
     await removeEncryptedSecret(key);
     const restored = await OrganizationAccount.unlock(account.wallet, "Organization123!");
-    await restored.restoreBackup(backup, "Organization123!", async (record: any) => { if (record.recoveries.length !== 1) throw Error("History missing"); });
+    await restored.restoreBackup(backup, "Organization123!", async (record: any) => { if (record.recoveries.length !== expectedHistory) throw Error("History missing"); });
     const roundTrip = await decodeOrganizationBackup(JSON.stringify(await restored.encryptedBackup()), "Organization123!", key, restored.accountId);
-    return { pending: roundTrip.pending, count: roundTrip.recoveries!.length, txId: roundTrip.recoveries![0].original.txId, bytes: roundTrip.recoveries![0].original.transaction, evidence: roundTrip.recoveries![0].evidence, sameArchive: JSON.stringify(roundTrip.recoveries, (_key, v) => typeof v === "bigint" ? v.toString() : v) === JSON.stringify(record.recoveries, (_key, v) => typeof v === "bigint" ? v.toString() : v), receipts: roundTrip.snapshot.receipts.length, failures: roundTrip.snapshot.failures?.length, proofs: (window as any).organizationProofRequests, signatures: (window as any).organizationSignatures };
-  }, EXPIRED_OPENING);
-  expect(result).toMatchObject({ pending: null, count: 1, txId: EXPIRED_OPENING.txId, bytes: "abcd", evidence, sameArchive: true, receipts: 1, failures: 1, proofs: 0, signatures: 0 });
+    return { pending: roundTrip.pending, count: roundTrip.recoveries!.length, txId: roundTrip.recoveries!.at(-1)!.original.txId, txIds: roundTrip.recoveries!.map(entry => entry.original.txId), bytes: roundTrip.recoveries!.at(-1)!.original.transaction, evidence: roundTrip.recoveries!.at(-1)!.evidence, sameArchive: JSON.stringify(roundTrip.recoveries, (_key, v) => typeof v === "bigint" ? v.toString() : v) === JSON.stringify(record.recoveries, (_key, v) => typeof v === "bigint" ? v.toString() : v), receipts: roundTrip.snapshot.receipts.length, failures: roundTrip.snapshot.failures?.length, proofs: (window as any).organizationProofRequests, signatures: (window as any).organizationSignatures };
+  }, { policy: EXPIRED_OPENING, expectedHistory });
+  expect(result).toMatchObject({ pending: null, count: expectedHistory, txId: EXPIRED_OPENING.txId, txIds: EXPIRED_OPENING_TRANSACTION_IDS.slice(0, expectedHistory), bytes: "abcd", evidence, sameArchive: true, receipts: 1, failures: 1, proofs: 0, signatures: 0 });
   await reopen();
-  await expect(page.getByText("Expired opening recovery history (1)", { exact: true })).toBeVisible();
+  await expect(page.getByText(`Expired opening recovery history (${expectedHistory})`, { exact: true })).toBeVisible();
 });
+}
 
 test("explicit resubmission retains the original signed bytes without another proof or balance request", async ({ page }) => {
   test.setTimeout(120_000);

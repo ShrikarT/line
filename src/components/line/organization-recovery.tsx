@@ -4,7 +4,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { MAX_ORGANIZATION_BACKUP_BYTES, isOrganizationEmpty } from "@/lib/organization/backup";
 import { useOrganization } from "./organization-session";
 import { OrganizationField, organizationField } from "./organization-ui";
-import { EXPIRED_OPENING } from "@/lib/organization/expired-opening-policy";
+import { matchesExpiredOpeningScope } from "@/lib/organization/expired-opening-policy";
 import type { ExpiredOpeningReview } from "@/lib/organization/expired-opening";
 
 export function OrganizationPendingRecovery() {
@@ -21,7 +21,7 @@ export function OrganizationPendingRecovery() {
     {pending.contractAddress && <p className="[overflow-wrap:anywhere]">Facility: <code>{pending.contractAddress}</code></p>}
     <div className="flex flex-wrap gap-3">
       <Button disabled={busy} onClick={() => void run(client => client.reconcile())}>Check original transaction</Button>
-      {pending.txId === EXPIRED_OPENING.txId && pending.contractAddress === EXPIRED_OPENING.address && <>
+      {matchesExpiredOpeningScope(pending) && <>
         <Button variant="outline" disabled={busy} onClick={() => { setExpiryReview(null); void run(async client => setExpiryReview(await client.reviewExpiredOpening())); }}>Review expired opening recovery</Button>
         <Dialog open={expiryReview?.operationId === pending.id} onOpenChange={open => { if (!open) setExpiryReview(null); }}>
           <DialogContent className="max-h-[85dvh] overflow-y-auto">
