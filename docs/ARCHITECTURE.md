@@ -253,6 +253,17 @@ with zero defaults and whole-base-unit upward rounding. The policy is fixed by
 wallet network fees are separate. Pending fees become withdrawable only after
 redemption. Withdrawals use the contract's fixed issuer recipient.
 
+Saved claims expose a separate expiry-only action (`cancelOrExpireNote`, mode 0).
+It rechecks the exact claim opening and current provider state under the account
+lock, rejects early/spent/cancelled claims and prepares no private book credit or
+asset transfer. Compact checks ledger time; an accepted expiry moves principal
+and pending fees into locked refund backing. The local `expiryRecorded` marker
+is promoted only by exact finalized success, remains in an uncertain candidate,
+and is explicitly validated in backups and against cancelled chain state during
+restore. Older backups without the marker remain compatible. Compensation
+allocation (mode 1) and the actual issuer-recipient asset refund (mode 2) remain
+separate wallet-approved actions. Existing one-step claim recovery still works.
+
 Merchant claim review reads the release-checked facility and binds the imported
 opening to its public note metadata, merchant key and registered receiving
 wallet. It shows the settlement asset, merchant payout, separately retained fee,

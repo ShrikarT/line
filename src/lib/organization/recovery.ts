@@ -21,6 +21,7 @@ export function matchesRestoredNotes(book: ReturnType<typeof ledger>, notes: Org
     const commitment = bytes32(note.noteCommitment);
     if (!same(bytes32(note.domain), book.contractDomain) || !book.notes.member(commitment)) return false;
     const observed = book.notes.lookup(commitment);
+    if (note.expiryRecorded && !observed.cancelled) return false;
     if (observed.amount !== note.amount || observed.fee !== note.fee || observed.expiry !== note.expiry || observed.lineGeneration !== note.generation || note.redeemed && !observed.redeemed) return false;
     const opening = drawNoteCommit({ domain: bytes32(note.domain), lineGeneration: note.generation, identity: bytes32(note.identity), quoteCommit: bytes32(note.quoteCommitment), merchantPk: bytes32(note.merchantPk), amount: note.amount, fee: note.fee, noteNonce: bytes32(note.noteNonce), expiry: note.expiry }, bytes32(note.noteSalt));
     if (!same(opening, commitment) || observed.compensationAllocated !== !!note.refund) return false;

@@ -1090,6 +1090,125 @@ test("saved quote sharing opens a focused dialog, copies complete JSON and suppo
   expect(await page.evaluate(() => ({ proof: (window as any).organizationProofRequests, signatures: (window as any).organizationSignatures }))).toEqual({ proof: 0, signatures: 0 });
 });
 
+for (const outcome of ["SucceedEntirely", "FailEntirely"] as const) test(`separate claim expiry rejects stale state and reconciles exact ${outcome} without early promotion`, async ({ page }) => {
+  test.setTimeout(120_000);
+  const fixture = await compensationCandidateFixture(0n);
+  await wallets(page, true, true); await page.goto("/app");
+  await page.evaluate(address => {
+    const provider = (window as any).midnight.a, original = provider.connect;
+    provider.connect = async (...args: any[]) => {
+      const api = await original(...args); api.getUnshieldedAddress = async () => ({ unshieldedAddress: address }); return api;
+    };
+  }, fixture.before.facilities[0].issuerRecipient);
+  await connect(page, "a"); await unlock(page);
+  const guards = await page.evaluate(async ({ snapshot, state, target, outcome }) => {
+    const { browserModuleUrl } = await import("/e2e/browser-module.ts" as any);
+    const { OrganizationAccount } = await import(browserModuleUrl("/src/lib/organization/account.ts"));
+    const { OrganizationNetwork } = await import(browserModuleUrl("/src/lib/organization/network.ts"));
+    const { getConnectedWallet } = await import(browserModuleUrl("/src/lib/runtime/wallet.ts"));
+    const { decodeVaultJson } = await import(browserModuleUrl("/src/lib/security/vault.ts"));
+    const { Contract, ledger } = await import("/contracts/managed/organization/contract/index.js" as any);
+    const { CompactContractState, createCircuitContext } = await import("/e2e/organization-provider.ts" as any);
+    const account = await OrganizationAccount.unlock(getConnectedWallet()!, "Organization123!");
+    const base = decodeVaultJson(snapshot) as any;
+    await account.edit(saved => Object.assign(saved, { issuerSecret: base.issuerSecret, merchantSecret: base.merchantSecret, facilities: base.facilities, notes: base.notes, quotes: base.quotes }));
+    const w = window as any, address = base.facilities[0].address;
+    w.expiryState = CompactContractState.deserialize(Uint8Array.from(state.match(/../g)!.map(x => parseInt(x, 16))));
+    w.expiryScenario = "uncertain"; w.expiryCalls = 0; w.expiryGuard = "ready";
+    const receipt = { identifiers: ["00" + "aa".repeat(32)], status: outcome, txHash: "bb".repeat(32), blockHeight: 321 };
+    w.expiryReceipt = receipt;
+    (OrganizationNetwork.prototype as any).inspect = async function () {
+      w.expiryAccount = this.account;
+      const book = ledger(w.expiryState.data);
+      const state = { balance: new Map(), operations: () => Array(12).fill("test-circuit") };
+      if (w.expiryGuard === "ready") return { book, state };
+      return { state, book: { ...book, notes: { member: (key: Uint8Array) => book.notes.member(key), lookup: (key: Uint8Array) => ({ ...book.notes.lookup(key), ...(w.expiryGuard === "redeemed" ? { redeemed: true } : w.expiryGuard === "cancelled" ? { cancelled: true } : { amount: 1n }) }) } } };
+    };
+    (OrganizationNetwork.prototype as any).tx = function () {
+      const client = this;
+      return {
+        call: async (destination: string, circuit: string, args: any[]) => {
+          w.expiryCalls++;
+          if (destination !== address || circuit !== "cancelOrExpireNote" || args[1] !== 0n || args[2] !== 0n) throw Error("Unexpected expiry action");
+          // Execute the generated branch with the real SDK's witness callbacks.
+          // Its input is null: mode 0 must request no role or book witness.
+          const context = createCircuitContext(address, "0".repeat(64), w.expiryState, {}, undefined, undefined, 2100);
+          const result = new Contract(client.witnesses).circuits.cancelOrExpireNote(context, ...args);
+          const next = new CompactContractState(); next.data = result.context.currentQueryContext.state;
+          w.expiryAppliedState = next;
+          if (result.context.currentQueryContext.effects.unshieldedOutputs.size || result.context.currentQueryContext.effects.unshieldedInputs.size) throw Error("Expiry moved assets");
+          await client.account.submitted(receipt.identifiers[0], "abcd", address);
+          if (w.expiryScenario === "uncertain") throw Error("Synthetic expiry acknowledgement unavailable");
+          return receipt;
+        },
+        finality: { wait: async () => w.expiryReceipt, forget: () => { w.expiryState = w.expiryAppliedState; } },
+      };
+    };
+    const client = await OrganizationNetwork.connect(account), rejected: string[] = [];
+    for (const scenario of ["redeemed", "cancelled", "wrong amount", "future deadline"]) {
+      w.expiryGuard = scenario === "future deadline" ? "ready" : scenario;
+      const now = Date.now;
+      try {
+        if (scenario === "future deadline") Date.now = () => 1000_000;
+        await client.recordClaimExpiry(base.facilities[0].id, target);
+      } catch (error) { rejected.push((error as Error).message); }
+      finally { Date.now = now; }
+    }
+    w.expiryGuard = "ready";
+    return { rejected, calls: w.expiryCalls, pending: account.pending() };
+  }, { snapshot: encodeVaultJson(fixture.before), state: Buffer.from(fixture.predecessor.serialize()).toString("hex"), target: fixture.target, outcome });
+  expect(guards).toMatchObject({ calls: 0, pending: null }); expect(guards.rejected).toHaveLength(4);
+  expect(guards.rejected[0]).toContain("already redeemed or cancelled");
+  expect(guards.rejected[1]).toContain("already redeemed or cancelled");
+  expect(guards.rejected[2]).toContain("does not match");
+  expect(guards.rejected[3]).toContain("deadline has not passed");
+  await unlock(page);
+  await page.getByRole("tab", { name: "Agent", exact: true }).click();
+  const card = page.getByRole("region", { name: "Saved merchant claims" }).getByRole("article").filter({ hasText: fixture.target });
+  await card.getByRole("button", { name: "Record claim expiry", exact: true }).click();
+  await expect(page.getByRole("alert")).toContainText("Synthetic expiry acknowledgement unavailable");
+  const uncertain = await page.evaluate(async () => {
+    const account = (window as any).expiryAccount;
+    const { browserModuleUrl } = await import("/e2e/browser-module.ts" as any);
+    const { decodeOrganizationBackup } = await import(browserModuleUrl("/src/lib/organization/backup.ts"));
+    const { organizationAccountKey } = await import(browserModuleUrl("/src/lib/organization/account.ts"));
+    const record = await decodeOrganizationBackup(JSON.stringify(await account.encryptedBackup()), "Organization123!", organizationAccountKey("preprod", account.accountId), account.accountId);
+    return { beforeFlag: record.snapshot.notes[0].expiryRecorded ?? false, candidateFlag: record.pending?.after.notes[0].expiryRecorded, originalBytes: record.pending?.transaction, bookUnchanged: JSON.stringify(record.snapshot.facilities, (_k, v) => typeof v === "bigint" ? String(v) : v) === JSON.stringify(record.pending?.after.facilities, (_k, v) => typeof v === "bigint" ? String(v) : v) };
+  });
+  expect(uncertain).toEqual({ beforeFlag: false, candidateFlag: true, originalBytes: "abcd", bookUnchanged: true });
+  await page.getByRole("button", { name: "Lock organization", exact: true }).click(); await unlock(page);
+  await page.evaluate(() => { const w = window as any; w.expiryReceipt = { ...w.expiryReceipt, identifiers: ["00" + "cc".repeat(32)] }; });
+  await page.getByRole("button", { name: "Check original transaction", exact: true }).click();
+  await expect(page.getByRole("alert").filter({ hasText: "exact organization transaction has not been observed" })).toBeVisible();
+  await page.evaluate(() => { const w = window as any; w.expiryReceipt = { ...w.expiryReceipt, identifiers: ["00" + "aa".repeat(32)] }; });
+  await page.getByRole("button", { name: "Check original transaction", exact: true }).click();
+  if (outcome === "SucceedEntirely") await expect(page.getByRole("status")).toContainText("Confirmed on Midnight Preprod");
+  else await expect(page.getByRole("alert").filter({ hasText: "original transaction failed in a finalized block" })).toBeVisible();
+  await page.getByRole("tab", { name: "Agent", exact: true }).click();
+  if (outcome === "SucceedEntirely") {
+    await expect(card).toContainText("Expiry recorded in this workspace. Compensation has not been allocated.");
+    await expect(card.getByRole("button", { name: "Record claim expiry", exact: true })).toBeDisabled();
+  } else {
+    await expect(card).not.toContainText("Expiry recorded in this workspace");
+    await expect(card.getByRole("button", { name: "Record claim expiry", exact: true })).toBeEnabled();
+  }
+  await expect(card.getByRole("button", { name: "Recover expired claim", exact: true })).toBeEnabled();
+  const restored = await page.evaluate(async () => {
+    const { browserModuleUrl } = await import("/e2e/browser-module.ts" as any);
+    const { OrganizationAccount, organizationAccountKey } = await import(browserModuleUrl("/src/lib/organization/account.ts"));
+    const { OrganizationNetwork } = await import(browserModuleUrl("/src/lib/organization/network.ts"));
+    const { removeEncryptedSecret } = await import(browserModuleUrl("/src/lib/security/vault.ts"));
+    const w = window as any, account = w.expiryAccount, backup = JSON.stringify(await account.encryptedBackup());
+    await removeEncryptedSecret(organizationAccountKey("preprod", account.accountId));
+    const reopened = await OrganizationAccount.unlock(account.wallet, "Organization123!");
+    const client = await OrganizationNetwork.connect(reopened);
+    (client as any).providers.publicDataProvider.queryContractState = async () => w.expiryState;
+    await client.restoreBackup(backup, "Organization123!");
+    return { expiryRecorded: reopened.snapshot().notes[0].expiryRecorded ?? false, refund: reopened.snapshot().notes[0].refund ?? null, pending: reopened.pending(), calls: w.expiryCalls, receipts: reopened.snapshot().receipts.length, failures: reopened.snapshot().failures?.length ?? 0, proofs: w.organizationProofRequests, signatures: w.organizationSignatures };
+  });
+  expect(restored).toEqual({ expiryRecorded: outcome === "SucceedEntirely", refund: null, pending: null, calls: 1, receipts: outcome === "SucceedEntirely" ? 1 : 0, failures: outcome === "FailEntirely" ? 1 : 0, proofs: 0, signatures: 0 });
+});
+
 test("claim cards identify generations and fees, prioritize newer generations and preserve older exports", async ({ page }) => {
   test.setTimeout(120_000);
   await wallets(page, true); await page.goto("/app"); await connect(page, "a"); await unlock(page);
