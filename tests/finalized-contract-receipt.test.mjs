@@ -47,6 +47,26 @@ test('reader validates raw bytes and finality when entire-success segment outcom
  assert.equal(result.networkFinalityVerified,true);
  assert.deepEqual(result.state.serialize(),state);
 });
+
+test('explicit outcome reader accepts exact finalized total failure without a resulting contract state',async()=>{
+ const f=fixture({mutate:tx=>{tx.transactionResult={status:'FAILURE',segments:null};tx.contractActions=[];}});
+ await assert.rejects(f.reader.read(row,address),/TRANSACTION_NOT_ENTIRELY_SUCCESSFUL/);
+ const result=await f.reader.readOutcome({kind:'call',name:'openLine',identifier:decoded.identifiers().at(-1)},address);
+ assert.equal(result.outcome,'failure');assert.equal(result.networkFinalityVerified,true);
+ assert.equal(result.state,null);assert.equal(result.compactState,null);
+ assert.equal(result.raw.transactionHash(),txHash);assert.deepEqual(result.finalizedHead,{hash:headHash,height:125});
+});
+
+test('outcome reader retains partial, contradictory and unrelated transactions',async()=>{
+ for(const mutate of [
+  tx=>{tx.transactionResult={status:'PARTIAL_SUCCESS',segments:[{id:0,success:false}]};},
+  tx=>{tx.transactionResult={status:'FAILURE',segments:[{id:0,success:true}]};},
+  tx=>{tx.transactionResult={status:'FAILURE',segments:[]};},
+  tx=>{tx.transactionResult={status:'FAILURE',segments:null};tx.identifiers=['00'+'aa'.repeat(32)];},
+ ]){
+  const f=fixture({mutate});await assert.rejects(f.reader.readOutcome(row,address),/TRANSACTION_NOT_ENTIRELY_SUCCESSFUL|FAILED_TRANSACTION_SEGMENT|RAW_TRANSACTION_IDENTIFIERS_MISMATCH/);
+ }
+});
 test('reader rejects a fabricated contract address even with matching indexer metadata',async()=>{
  const other='ab'.repeat(32),f=fixture({mutate:tx=>{tx.contractActions[0].address=other;}});
  await assert.rejects(f.reader.read(row,other),/RAW_CONTRACT_ACTION_NOT_UNIQUE/);
