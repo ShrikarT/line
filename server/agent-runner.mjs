@@ -118,6 +118,14 @@ export class AgentRunner {
 
   async quoteAndDraw(id) {
     let task = this.store.getTask(id), order;
+    // A saved quote retry is also an authority boundary: the supplier may sign
+    // or submit its retained preparation. Check before requesting it, not only
+    // after a quote response. Existing order/journal evidence stays retained.
+    try { await this.assertWriterFence(this.grant(this.store.getGrant(task.grantId))); }
+    catch {
+      await this.updateTask(id, { status: 'approval_needed', error: 'Clearance could not be proven.', denialReason: 'authorization_inactive' });
+      return;
+    }
     try {
       order = await this.supplier.createOrder({ id: task.orderId, contractAddress: task.facilityAddress, service: task.serviceId, document: task.document, objective: task.objective });
     } catch {

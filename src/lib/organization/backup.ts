@@ -5,6 +5,7 @@ import { EXPIRED_OPENING, matchesExpiredOpeningScope } from "./expired-opening-p
 import { EXPIRED_DISABLE, matchesExpiredDisableScope } from "./expired-disable-policy.ts";
 import { EXPIRED_COMPENSATION, matchesExpiredCompensationScope } from "./expired-compensation-policy.ts";
 import { EXPIRED_QUOTE, matchesExpiredQuoteScope } from "./expired-quote-policy.ts";
+import { validateBrowserDelegations, assertDelegatedSnapshotStable } from "../agent/ownership.ts";
 
 export const MAX_ORGANIZATION_BACKUP_BYTES = 64 * 1024 * 1024;
 const UINT64 = 18_446_744_073_709_551_615n;
@@ -26,7 +27,7 @@ function receipt(value: unknown) {
 }
 function snapshot(value: unknown, accountId: string): OrganizationSnapshot {
   const row = object(value);
-  need(row.recoveries === undefined && row.pending === undefined);
+  need(row.recoveries === undefined && row.pending === undefined && row.delegations === undefined);
   need(row.schema === "line:organization-account/v1" && row.networkId === "preprod" && row.accountId === accountId);
   hex(row.issuerSecret); hex(row.merchantSecret);
   const facilities = array(row.facilities, 50), quotes = array(row.quotes, 10_000), notes = array(row.notes, 10_000);
@@ -77,12 +78,15 @@ function snapshot(value: unknown, accountId: string): OrganizationSnapshot {
 
 export function validateOrganizationRecord(value: unknown, accountId: string): OrganizationRecord {
   hex(accountId); const record = object(value), current = snapshot(record.snapshot, accountId);
+  const delegations=validateBrowserDelegations(record.delegations,current);
   if (record.pending !== null) {
     const p = object(record.pending); text(p.id); need(["deploy", "key", "call"].includes(text(p.kind)));
     need(p.recoveries === undefined && p.pending === undefined);
     need(p.circuit === "deploy" && p.kind === "deploy" || circuits.has(text(p.circuit)));
     need(p.facilityId === null || typeof p.facilityId === "string"); need(p.contractAddress === null || hex(p.contractAddress)); hex(p.sourceFingerprint);
     const candidate = snapshot(p.after, accountId);
+    assertDelegatedSnapshotStable(current,candidate,delegations);
+    if (delegations.some(entry=>entry.facilityId===p.facilityId||entry.scope.facilityAddress===p.contractAddress)) need(p.kind==='call'&&p.circuit==='setStatus');
     need(candidate.issuerSecret === current.issuerSecret && candidate.merchantSecret === current.merchantSecret);
     if (p.facilityId !== null) need(candidate.facilities.some(f => f.id === p.facilityId));
     need((p.txId === null) === (p.transaction === null));
@@ -117,7 +121,7 @@ export function validateOrganizationRecord(value: unknown, accountId: string): O
 
 export function isOrganizationEmpty(record: OrganizationRecord): boolean {
   const s = record.snapshot;
-  return !record.pending && !record.recoveries?.length && !s.facilities.length && !s.quotes.length && !s.notes.length && !s.receipts.length && !s.failures?.length && !s.serviceOrders?.length;
+  return !record.pending && !record.recoveries?.length && !record.delegations?.length && !s.facilities.length && !s.quotes.length && !s.notes.length && !s.receipts.length && !s.failures?.length && !s.serviceOrders?.length;
 }
 
 /** Authenticate the entire original envelope before accepting its wallet scope. */

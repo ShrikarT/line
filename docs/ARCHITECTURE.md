@@ -75,6 +75,41 @@ or oversized envelopes. They do not establish durable staging, runner retirement
 authenticated handback, offer consumption or browser writer exclusion. Those
 lifecycle steps remain prerequisites for activating any delegation.
 
+The ownership branch now stages a fence and browser return key in encrypted
+account metadata outside transaction snapshots. It checks the current facility,
+retains the exact encrypted owner-authorized export before returning it, and
+refuses conflicting browser writes. The emergency `setStatus(DEFAULTED)` pause
+preserves the fence. Ordinary commits, backup restoration and reload cannot
+silently remove it; owner rejection, wallet changes and an aborted IndexedDB
+write leave staging intact. No runner activation or unfencing path is exposed.
+Retired-checkpoint handback is still required. This
+coordinates cooperating current clients, not old applications or copied keys;
+chain commitment equality alone cannot exclude a restored old copy before any
+draw has changed the commitment.
+
+`AgentPairingInbox` now retains its distinct X25519 and Schnorr identities and
+bounded offers in the same encrypted `AgentStore` checkpoint. Import verifies
+the owner signature, independently configured facility pins, exact private-book
+opening and the adapter's current owner/asset/state/all-twelve-key checks. One
+write consumes the offer, retains the exact encrypted package, imports grant/book
+and saves a signed acknowledgement. Exact lost-response retries return that
+acknowledgement, including after expiry, without resetting counters. Failed
+storage stops writes until reopen. The acknowledgement confirms retained import;
+it is neither a handback nor evidence of exclusive custody on other devices.
+This local composition seam has no public HTTP route, automatic wallet startup
+or UI activation. Runner retirement, complete claim handback and browser release
+remain prerequisites for enabling it in the product. The signed handover relies
+on the cooperating owner's fenced browser flow; the runner cannot remotely prove
+that every historical browser copy has honored it.
+
+Supplier retirement inspection has a separate non-submitting path. It checks
+the retained canonical bytes and original identifier through `readOutcome`,
+under the supplier mutation guard. Prepared, missing, partial and uncertain
+operations remain pending. Even exact finalized success/failure observations
+retain the original candidate and bytes; observation alone neither promotes a
+book nor clears a journal or establishes a durable retirement barrier. The
+paired client authenticates the owner and excludes other facilities' references.
+
 ### P02 decision - owner-operated runner first
 
 The current release can authenticate a draw without issuer material: `draw`

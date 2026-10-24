@@ -7,6 +7,7 @@ import type {
   AgentPairingPackage,
 } from './types.ts';
 import { AGENT_GRANT_FIELDS } from './types.ts';
+import { agentGrantMessage } from './grant.ts';
 
 const HEX32 = /^[0-9a-f]{64}$/;
 const HEX12 = /^[0-9a-f]{24}$/;
@@ -124,17 +125,38 @@ export async function importX25519PublicKey(publicKeyHex: string, label = 'publi
   }
 }
 
-export async function importX25519PrivateKey(privateKeyHex: string, label = 'private key'): Promise<CryptoKey> {
+export async function importX25519PrivateKey(privateKeyHex: string, label = 'private key', extractable = false): Promise<CryptoKey> {
   const bytes = validateRawX25519Key(privateKeyHex, label);
   const subtle = assertWebCrypto();
   const fullPkcs8 = new Uint8Array(48);
   fullPkcs8.set(X25519_PKCS8_PREFIX, 0);
   fullPkcs8.set(bytes, 16);
   try {
-    return await subtle.importKey('pkcs8', fullPkcs8, { name: 'X25519' }, false, ['deriveBits', 'deriveKey']);
+    return await subtle.importKey('pkcs8', fullPkcs8, { name: 'X25519' }, extractable, ['deriveBits', 'deriveKey']);
   } catch (err: any) {
     throw new Error(`Failed to import X25519 ${label}: ${err?.message ?? String(err)}`);
   }
+}
+
+/** Reopen-time identity check; only the public JWK coordinate is returned. */
+export async function x25519PublicKey(privateKeyHex: string): Promise<string> {
+  const key=await importX25519PrivateKey(privateKeyHex,'retained private key',true);
+  const jwk=await assertWebCrypto().exportKey('jwk',key);
+  if (typeof jwk.x!=='string') throw Error('Retained X25519 identity has no public coordinate.');
+  const bytes=Uint8Array.from(atob(jwk.x.replace(/-/g,'+').replace(/_/g,'/')),c=>c.charCodeAt(0));
+  return toHex(bytes);
+}
+
+/** A non-zero encoding can still be a low-order X25519 point. Reject it before
+ * retaining authority that would later require encrypting a handback to it. */
+export async function assertUsableX25519Recipient(publicKeyHex: string): Promise<void> {
+  const publicKey=await importX25519PublicKey(publicKeyHex,'browser return key'),subtle=assertWebCrypto();
+  try {
+    const generated=await subtle.generateKey({name:'X25519'},false,['deriveBits']);
+    if (!('privateKey' in generated)) throw Error('Expected a fresh X25519 key pair.');
+    const shared=new Uint8Array(await subtle.deriveBits({name:'X25519',public:publicKey},generated.privateKey,256));
+    if (!shared.some(byte=>byte!==0)) throw Error('X25519 shared secret is zero.');
+  } catch {throw Error('The browser return encryption key is unusable.');}
 }
 
 /** Structured canonical AAD: deterministic JSON object binding purpose, grantDigest, ephemeralPublicKey, and nonce. */
@@ -464,19 +486,7 @@ export function verifyPairingPackageStructure(pkg: unknown): AgentPairingPackage
   }
   const scope = p.scope as AgentGrantScope;
   record(scope, AGENT_GRANT_FIELDS, 'Grant scope');
-  // Wire structure only: no nested arbitrary objects can hitchhike in a grant.
-  // Owner-address checksum/signature and pinned identity are runtime checks.
-  for (const key of ['facilityAddress','domain','sourceFingerprint','runnerPublicKey','runnerSigningPublicKey','returnPublicKey','agentPk','bookCommitment','nonce'] as const) {
-    if (typeof scope[key] !== 'string' || !HEX32.test(scope[key])) throw Error('Invalid pairing grant bytes.');
-  }
-  for (const key of ['generation','maxSpend','maxFee'] as const) {
-    if (typeof scope[key] !== 'string' || !DEC_INT.test(scope[key]) || BigInt(scope[key]) > U64) throw Error('Invalid pairing grant amount.');
-  }
-  if (scope.schema !== 'line:agent-grant/v1' || scope.networkId !== 'preprod' || typeof scope.ownerAddress !== 'string' || !/^mn_addr_preprod1[a-z0-9]{20,128}$/.test(scope.ownerAddress) || typeof scope.runnerOrigin !== 'string' || new TextEncoder().encode(scope.runnerOrigin).length > MAX_ORIGIN_BYTES || !Number.isSafeInteger(scope.issuedAt) || !Number.isSafeInteger(scope.expiresAt) || scope.issuedAt <= 0 || scope.expiresAt <= scope.issuedAt || scope.expiresAt-scope.issuedAt > 7*86400_000) throw Error('Invalid pairing grant provenance or lifetime.');
-  for (const key of ['allowedServices','allowedMerchants'] as const) {
-    const values = scope[key];
-    if (!Array.isArray(values) || values.length < 1 || values.length > 16 || !values.every((v,i) => typeof v === 'string' && (key === 'allowedMerchants' ? HEX32.test(v) : /^[a-z][a-z0-9-]{0,63}$/.test(v)) && (i === 0 || values[i-1] < v))) throw Error('Invalid pairing grant supplier scope.');
-  }
+  agentGrantMessage(scope);
   if (!scope || typeof scope !== 'object' || scope.grantId !== p.packageId || scope.nonce !== p.offerNonce) {
     throw new Error('Pairing packageId and offerNonce do not bind to grant scope.');
   }
@@ -493,4 +503,16 @@ export function verifyPairingPackageStructure(pkg: unknown): AgentPairingPackage
   // Structural validation only; the receiving runtime must independently verify
   // the real owner signature and pinned full scope before decrypting/activating.
   return structuredClone({...p, encryptedOpening:env}) as unknown as AgentPairingPackage;
+}
+
+/** Shared exact-package binding for retained acknowledgements. Key ordering
+ * does not change identity; ciphertext bytes and every reviewed field do. */
+export function pairingPackageCanonicalMessage(pkg: unknown): string {
+  const captured=verifyPairingPackageStructure(pkg);
+  const canonical=(value: any): any=>Array.isArray(value)?value.map(canonical):value&&typeof value==='object'?Object.fromEntries(Object.keys(value).sort().map(key=>[key,canonical(value[key])])):value;
+  return 'line:agent-pairing-package/v1\0'+JSON.stringify(canonical(captured));
+}
+export async function browserPairingPackageDigest(pkg: unknown): Promise<string> {
+  const bytes=new TextEncoder().encode(pairingPackageCanonicalMessage(pkg));
+  return toHex(new Uint8Array(await assertWebCrypto().digest('SHA-256',bytes)));
 }

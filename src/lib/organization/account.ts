@@ -2,7 +2,7 @@ import type { Configuration, ConnectedAPI } from "@midnight-ntwrk/dapp-connector
 import { bech32m } from "@scure/base";
 import { decodeWalletPublicKey, getConnectedWallet, getWalletConfiguration } from "../runtime/wallet.ts";
 import { encodeVaultJson, encryptSecret, getVaultSessionPassphrase, getVaultSessionRevision, isVaultSessionUnlocked, loadEncryptedJson, lockVaultSession, saveEncryptedJson, unlockVaultSession } from "../security/vault.ts";
-import { hexToBytes, randomBytes32, toHex } from "../line/encoding.ts";
+import { agentId, contractDomain, issuerPublicKey, lineStateCommit, hexToBytes, randomBytes32, toHex } from "../line/encoding.ts";
 import { decodeOrganizationBackup, isOrganizationEmpty } from "./backup.ts";
 import { OrganizationTimeoutError, withinDeadline } from "./finality.ts";
 import { ORGANIZATION_SESSION_MINUTES } from "./session-policy.ts";
@@ -11,6 +11,11 @@ import { matchesExpiredDisableScope, type ExpiredDisableEvidence } from "./expir
 import { matchesExpiredCompensationScope, type ExpiredCompensationEvidence } from "./expired-compensation-policy.ts";
 import { matchesExpiredQuoteScope, type ExpiredQuoteEvidence } from "./expired-quote-policy.ts";
 import { rememberOrganizationTabSession, forgetOrganizationTabSession, type OrganizationTabSession } from "./tab-session.ts";
+import { assertDelegatedSnapshotStable, assertDelegationBook, validateBrowserDelegations, type BrowserAgentDelegation, type AgentDelegationRequest } from "../agent/ownership.ts";
+import { agentGrantMessage, browserAgentGrantDigest, verifyBrowserGrantOwner, walletAgentGrantProof } from "../agent/grant.ts";
+import { browserPairingPackageDigest, createPairingPackage, encryptBookOpening, generateX25519KeyPair, verifyPairingOffer } from "../agent/pairing.ts";
+import { pairingAcknowledgementSnapshot, verifyPairingAcknowledgement, type AgentPairingAcknowledgement } from "../agent/pairing-ack.ts";
+import type { AgentGrantScope } from "../agent/types.ts";
 
 function rateLimited(failure: unknown): boolean {
   if (!failure || typeof failure !== "object") return typeof failure === "string" && /rate[\s_-]*limit|too many requests/i.test(failure);
@@ -83,7 +88,7 @@ export type OrganizationServiceOrder = { id: string; facilityId: string; service
 export type OrganizationSnapshot = { schema: "line:organization-account/v1"; networkId: "preprod"; accountId: string; issuerSecret: string; merchantSecret: string; facilities: OrganizationFacility[]; quotes: OrganizationQuote[]; notes: OrganizationNote[]; receipts: OrganizationReceipt[]; serviceOrders?: OrganizationServiceOrder[]; failures?: OrganizationReceipt[] };
 export type OrganizationPending = { id: string; kind: OrganizationReceipt["kind"]; circuit: string; facilityId: string | null; contractAddress: string | null; sourceFingerprint: string; after: OrganizationSnapshot; txId: string | null; transaction: string | null };
 export type OrganizationExpiredRecovery = { disposition: "expired-opening-not-applied" | "expired-disable-not-applied" | "expired-compensation-not-applied" | "expired-quote-not-applied"; before: OrganizationSnapshot; original: OrganizationPending; evidence: ExpiredOpeningEvidence | ExpiredDisableEvidence | ExpiredCompensationEvidence | ExpiredQuoteEvidence; ttl: number; recordedAt: string };
-export type OrganizationRecord = { snapshot: OrganizationSnapshot; pending: OrganizationPending | null; recoveries?: OrganizationExpiredRecovery[] };
+export type OrganizationRecord = { snapshot: OrganizationSnapshot; pending: OrganizationPending | null; recoveries?: OrganizationExpiredRecovery[]; delegations?: BrowserAgentDelegation[] };
 export const ORGANIZATION_SCHEMA = "line:organization-account/v1";
 
 export function organizationAccountKey(network: string, publicKey: string): string {
@@ -137,12 +142,13 @@ export class OrganizationAccount {
     if (restored && !retained) { forgetOrganizationTabSession(); throw new Error("The saved organization record is unavailable. Open the vault explicitly before creating any records."); }
     if (wallet !== getConnectedWallet()) throw new Error("Wallet changed while opening the organization.");
     if (retained && (retained.snapshot?.schema !== ORGANIZATION_SCHEMA || retained.snapshot.accountId !== accountId || retained.snapshot.networkId !== "preprod")) throw new Error("Organization record belongs to another wallet or schema.");
+    if (retained) validateBrowserDelegations(retained.delegations, retained.snapshot);
     if (restored && restored.expiresAt <= Date.now()) throw new Error("The organization session expired. Enter its password again.");
     unlockVaultSession(passphrase, ORGANIZATION_SESSION_MINUTES, restored?.expiresAt);
     const account = new OrganizationAccount(wallet, accountId, unshielded.unshieldedAddress, getVaultSessionRevision(), retained ?? {
       snapshot: { schema: ORGANIZATION_SCHEMA, networkId: "preprod", accountId, issuerSecret: toHex(randomBytes32()), merchantSecret: toHex(randomBytes32()), facilities: [], quotes: [], notes: [], receipts: [] }, pending: null,
     }, configuration);
-    if (!retained) await account.save();
+    if (!retained) await account.commit(account.record);
     await account.retainSessionForReload();
     return account;
     });
@@ -173,13 +179,20 @@ export class OrganizationAccount {
   pending(): OrganizationPending | null { this.assertSession(); return copyAccount(this.record.pending); }
   recoveryHistory() { this.assertSession(); return (this.record.recoveries ?? []).map(entry => ({ txId: entry.original.txId, blockHeight: entry.evidence.finalized.height, recordedAt: entry.recordedAt })); }
   async save() {
-    await this.commit(this.record);
+    // A stale account instance must not publish over a newly staged fence.
+    // Initial creation commits separately while unlock holds the same lock.
+    await this.exclusive(() => this.commit(this.record));
   }
-  private async commit(record: OrganizationRecord) {
+  private async commit(record: OrganizationRecord, delegationTransition = false) {
     this.assertSession();
     const password = getVaultSessionPassphrase();
     if (!password) throw new Error("Organization vault is locked.");
     const next = copyAccount(record);
+    const delegations = validateBrowserDelegations(this.record.delegations, this.record.snapshot);
+    next.delegations ??= copyAccount(this.record.delegations);
+    if (!delegationTransition && encodeVaultJson(next.delegations ?? []) !== encodeVaultJson(delegations)) throw new Error("A saved agent delegation cannot be removed or replaced by an ordinary commit.");
+    assertDelegatedSnapshotStable(this.record.snapshot, next.snapshot, delegations);
+    validateBrowserDelegations(next.delegations, next.snapshot);
     // History lives outside candidate snapshots and survives every commit path.
     next.recoveries ??= copyAccount(this.record.recoveries);
     if ((next.recoveries?.length ?? 0) > 10 || this.record.recoveries?.some((entry, index) => encodeVaultJson(entry) !== encodeVaultJson(next.recoveries?.[index]))) throw new Error("Retained recovery history cannot be removed or replaced.");
@@ -201,13 +214,17 @@ export class OrganizationAccount {
       const current = await loadEncryptedJson<OrganizationRecord>(this.key(), password);
       this.assertSession();
       if (!current || current.snapshot.accountId !== this.accountId) throw new Error("Organization account cannot be recovered.");
+      validateBrowserDelegations(current.delegations, current.snapshot);
       this.record = current;
       return action();
     });
   }
-  async prepare(pending: OrganizationPending) {
+  async prepare(pending: OrganizationPending, options: { delegationPause?: boolean } = {}) {
     this.assertSession();
     if (this.record.pending) throw new Error("Reconcile the existing signed operation before starting another one.");
+    const delegated = this.record.delegations?.some(entry => entry.facilityId === pending.facilityId || entry.scope.facilityAddress === pending.contractAddress);
+    if (delegated && !(pending.kind === "call" && pending.circuit === "setStatus" && options.delegationPause === true)) throw new Error("This facility is delegated to its agent runner. Return its reconciled book before making another browser transaction.");
+    assertDelegatedSnapshotStable(this.record.snapshot, pending.after, this.record.delegations ?? []);
     await this.commit({ snapshot: this.record.snapshot, pending });
   }
   async submitted(txId: string, transaction: string, address: string) {
@@ -319,6 +336,88 @@ export class OrganizationAccount {
       if (this.record.pending) throw new Error("Resolve the pending network transaction before updating the organization.");
       const after = copyAccount(this.record.snapshot); action(after);
       await this.commit({ snapshot: after, pending: null });
+    });
+  }
+  agentDelegationReviews() {
+    this.assertSession();
+    return (this.record.delegations ?? []).map(({scope,phase,stagedAt,acknowledgement}) => ({scope:copyAccount(scope),phase,stagedAt,...(acknowledgement?{acknowledgement:copyAccount(acknowledgement)}:{})}));
+  }
+  async stageAgentDelegation(facilityId: string, request: AgentDelegationRequest, verify: (facility: OrganizationFacility, snapshot: OrganizationSnapshot, scope: AgentGrantScope) => Promise<void>) {
+    request = copyAccount(request);
+    if (typeof verify !== "function") throw new Error("Verify the current facility before delegating its agent book.");
+    return this.exclusive(async () => {
+      if (this.record.pending) throw new Error("Resolve the existing operation before delegating this agent.");
+      const current = this.record.delegations ?? [];
+      if (current.length >= 50 || current.some(entry => entry.facilityId === facilityId)) throw new Error("An existing agent delegation must be reconciled before another handover.");
+      const facility = this.record.snapshot.facilities.find(f => f.id === facilityId);
+      if (!facility?.address || facility.generation <= 0n || !facility.merchants[0]) throw new Error("Choose an opened organization facility.");
+      if (this.record.snapshot.serviceOrders?.some(order => order.facilityId === facilityId && !order.delivered && !order.cancelled)) throw new Error("Resolve existing saved purchases before delegating this agent.");
+      const offer = verifyPairingOffer(request.offer,request.pinned,new Set(current.map(entry=>entry.scope.nonce)));
+      const keys = await generateX25519KeyPair(), issuedAt = Date.now();
+      const domain = contractDomain(issuerPublicKey(bytes32(this.record.snapshot.issuerSecret)),bytes32(facility.merchants[0].publicKey),bytes32(facility.instanceNonce)), identity = agentId(bytes32(facility.agentSecret));
+      const scope: AgentGrantScope = {schema:"line:agent-grant/v1",grantId:crypto.randomUUID(),networkId:"preprod",facilityAddress:facility.address,domain:toHex(domain),sourceFingerprint:request.sourceFingerprint,ownerAddress:this.receivingAddress,runnerOrigin:offer.runnerOrigin,runnerPublicKey:offer.runnerPublicKey,runnerSigningPublicKey:offer.runnerSigningPublicKey,returnPublicKey:keys.publicKeyHex,agentPk:toHex(identity),generation:facility.generation.toString(),bookCommitment:toHex(lineStateCommit({domain,identity,limit:facility.limit,outstanding:facility.outstanding,epoch:facility.epoch},bytes32(facility.salt))),nonce:offer.offerNonce,issuedAt,expiresAt:request.expiresAt,maxSpend:request.maxSpend,maxFee:request.maxFee,allowedServices:[...request.allowedServices],allowedMerchants:[...request.allowedMerchants]};
+      assertDelegationBook(scope,facility,this.record.snapshot.issuerSecret);
+      await verify(copyAccount(facility),this.snapshot(),copyAccount(scope));
+      await this.assertWallet();
+      const entry: BrowserAgentDelegation = {schema:"line:browser-agent-delegation/v1",facilityId,scope,returnPrivateKey:keys.privateKeyHex,phase:"staged",stagedAt:issuedAt,package:null};
+      await this.commit({...this.record,delegations:[...current,entry]},true);
+      return {scope:copyAccount(scope),phase:entry.phase};
+    });
+  }
+  /** The wallet authorization is explicit and separate from staging. Export is
+   * returned only after the exact encrypted package is durably retained. */
+  async authorizeAgentDelegation(grantId: string, verify: (facility: OrganizationFacility, snapshot: OrganizationSnapshot, scope: AgentGrantScope) => Promise<void>) {
+    return this.exclusive(async () => {
+      if (this.record.pending) throw new Error("Resolve the existing operation before exporting an agent delegation.");
+      const entry = this.record.delegations?.find(row=>row.scope.grantId===grantId);
+      if (!entry) throw new Error("The staged agent delegation was not found.");
+      const scope = copyAccount(entry.scope), now = Date.now();
+      const facility = this.record.snapshot.facilities.find(f=>f.id===entry.facilityId)!;
+      assertDelegationBook(scope,facility,this.record.snapshot.issuerSecret);
+      if (entry.package) {
+        await verifyBrowserGrantOwner(scope,entry.package.ownerSignature);
+        this.assertSession();
+        return copyAccount(entry.package);
+      }
+      if (scope.issuedAt>now || scope.expiresAt<=now) throw new Error("The agent authorization has expired. Its durable fence remains for recovery.");
+      if (typeof verify!=="function") throw new Error("Verify the current facility before authorizing its agent export.");
+      await verify(copyAccount(facility),this.snapshot(),copyAccount(scope));
+      if (typeof this.wallet.signData!=="function") throw new Error("Update your wallet to support explicit agent authorization.");
+      const signed = await withinDeadline(this.wallet.signData(agentGrantMessage(scope),{encoding:"text",keyType:"unshielded"}),180_000,"Agent authorization timed out. The staged fence remains; close the old wallet prompt before retrying.");
+      const proof = walletAgentGrantProof(signed);
+      await this.assertWallet();
+      await verifyBrowserGrantOwner(scope,proof);
+      await verify(copyAccount(facility),this.snapshot(),copyAccount(scope));
+      const digest = await browserAgentGrantDigest(scope);
+      const encryptedOpening = await encryptBookOpening({purpose:"line:agent-pairing/v1",recipientPublicKeyHex:scope.runnerPublicKey,grantDigest:digest,nonce:scope.nonce,payload:{agentSecret:facility.agentSecret,salt:facility.salt,limit:facility.limit.toString(),outstanding:facility.outstanding.toString(),epoch:facility.epoch.toString(),generation:facility.generation.toString()}});
+      this.assertSession();
+      if (scope.expiresAt<=Date.now()) throw new Error("The agent authorization expired while preparing its export. The fence remains for recovery.");
+      const packet = createPairingPackage(scope,proof,encryptedOpening), next=copyAccount(this.record);
+      const retained=next.delegations!.find(row=>row.scope.grantId===grantId)!;
+      retained.phase="export-ready";retained.package=packet;
+      await this.commit(next,true);
+      return copyAccount(packet);
+    });
+  }
+  /** Retained import evidence is not permission to release the browser writer.
+   * A separate retired, chain-matched checkpoint is still required for handback. */
+  async recordAgentPairingAcknowledgement(grantId: string, input: AgentPairingAcknowledgement) {
+    const captured=pairingAcknowledgementSnapshot(input);
+    return this.exclusive(async()=>{
+      if(this.record.pending)throw new Error("Resolve the existing operation before recording a runner acknowledgement.");
+      const entry=this.record.delegations?.find(row=>row.scope.grantId===grantId);
+      if(!entry?.package||!['export-ready','imported'].includes(entry.phase))throw new Error("Retain the exact owner-authorized agent export first.");
+      await verifyBrowserGrantOwner(entry.scope,entry.package.ownerSignature);
+      const verified=await verifyPairingAcknowledgement(captured,entry.scope,await browserPairingPackageDigest(entry.package));
+      if(entry.acknowledgement){
+        if(encodeVaultJson(entry.acknowledgement)!==encodeVaultJson(verified))throw new Error("The runner acknowledgement differs from its retained original.");
+        this.assertSession();return copyAccount(entry.acknowledgement);
+      }
+      await this.assertWallet();
+      const next=copyAccount(this.record),retained=next.delegations!.find(row=>row.scope.grantId===grantId)!;
+      retained.phase='imported';retained.acknowledgement=verified;
+      await this.commit(next,true);
+      return copyAccount(verified);
     });
   }
   close() { lockVaultSession(); }
