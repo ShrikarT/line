@@ -22,19 +22,24 @@ const bytes=value=>{
  return new Uint8Array(Buffer.from(value.replace(/^0x/,''),'hex'));
 };
 const height=value=>Number.isSafeInteger(value)&&value>0;
-export function validateReceiptMetadata(row,tx,address,finalizedHeight,canonicalHash){
+export function validateReceiptMetadata(row,tx,address,finalizedHeight,canonicalHash,{allowFailure=false}={}){
  need(row&&typeof row==='object'&&tx&&typeof tx==='object','RECEIPT_METADATA_INVALID');
  need(['deploy','call','key-registration'].includes(row.kind),'CONTRACT_ACTION_KIND_INVALID');
  need(height(row.blockHeight)&&height(finalizedHeight),'RECEIPT_HEIGHT_INVALID');
  need(hash(tx.hash)===hash(row.txHash)&&tx.block?.height===row.blockHeight,'RECEIPT_HASH_HEIGHT_MISMATCH');
- need(tx.transactionResult?.status==='SUCCESS','TRANSACTION_NOT_ENTIRELY_SUCCESSFUL');
+ const failed=allowFailure&&tx.transactionResult?.status==='FAILURE';
+ need(tx.transactionResult?.status==='SUCCESS'||failed,'TRANSACTION_NOT_ENTIRELY_SUCCESSFUL');
  // Indexer v4 omits per-segment outcomes for entire success/failure; the
  // official Midnight.js provider uses them only for PARTIAL_SUCCESS. Keep
  // requiring explicit aggregate SUCCESS, and reject contradictory outcomes.
  const segments=tx.transactionResult.segments;
- need(segments===null||(Array.isArray(segments)&&segments.every(s=>s&&s.success===true)),'FAILED_TRANSACTION_SEGMENT');
+ need(segments===null||(Array.isArray(segments)&&(!failed||segments.length>0)&&segments.every(s=>s&&s.success===!failed)),'FAILED_TRANSACTION_SEGMENT');
  need(row.blockHeight<=finalizedHeight,'BLOCK_NOT_FINALIZED');
  need(hash(canonicalHash)===hash(tx.block.hash),'INDEXER_RPC_BLOCK_MISMATCH');
+ // Entire failure may have no resulting contract action/state in the indexer.
+ // The canonical raw transaction below must still bind kind, target, entrypoint
+ // and original identifier. No candidate state is promoted for this outcome.
+ if(failed)return null;
  need(Array.isArray(tx.contractActions),'CONTRACT_ACTIONS_INVALID');
  const actions=tx.contractActions.filter(action=>{need(action&&typeof action==='object','CONTRACT_ACTIONS_INVALID');return hash(action.address)===hash(address);});
  need(actions.length===1,'CONTRACT_ACTION_NOT_UNIQUE');const action=actions[0];
@@ -81,7 +86,7 @@ export function createFinalizedReceiptReader({endpoints,fetchImpl=globalThis.fet
   const requestId=++id,result=await post(nodeUri,{jsonrpc:'2.0',id:requestId,method,params});
   need(result&&result.jsonrpc==='2.0'&&result.id===requestId&&!result.error&&result.result!=null,'RPC_RESULT_INVALID');return result.result;
  }
- return {async read(row,address){
+ async function read(row,address,allowFailure){
   need(row&&typeof row==='object','RECEIPT_METADATA_INVALID');
   need(Boolean(row.txHash)!==Boolean(row.identifier),'RECEIPT_LOOKUP_INVALID');
   const offset=row.identifier?{identifier:identifier(row.identifier)}:{hash:hash(row.txHash)};
@@ -98,11 +103,12 @@ export function createFinalizedReceiptReader({endpoints,fetchImpl=globalThis.fet
   const expected={...row,txHash:row.txHash??tx.hash,blockHeight:row.blockHeight??tx.block?.height};
   need(height(expected.blockHeight),'RECEIPT_HEIGHT_INVALID');need(expected.blockHeight<=finalizedHeight,'BLOCK_NOT_FINALIZED');
   const canonicalHash=hash(await rpc('chain_getBlockHash',[expected.blockHeight]));
-  const action=validateReceiptMetadata(expected,tx,address,finalizedHeight,canonicalHash);
-  let raw,state,compactState;const encodedTx=bytes(tx.raw),encodedState=bytes(action.state);
-  try{raw=L.Transaction.deserialize('signature','proof','binding',encodedTx);state=L.ContractState.deserialize(encodedState);compactState=CompactContractState.deserialize(encodedState);}
+  const action=validateReceiptMetadata(expected,tx,address,finalizedHeight,canonicalHash,{allowFailure});
+  const failed=tx.transactionResult.status==='FAILURE';
+  let raw,state=null,compactState=null;const encodedTx=bytes(tx.raw),encodedState=failed?null:bytes(action.state);
+  try{raw=L.Transaction.deserialize('signature','proof','binding',encodedTx);if(encodedState){state=L.ContractState.deserialize(encodedState);compactState=CompactContractState.deserialize(encodedState);}}
   catch{throw new ReceiptError('NETWORK_BYTES_DECODE_FAILED');}
-  need(Buffer.from(raw.serialize()).equals(Buffer.from(encodedTx))&&Buffer.from(state.serialize()).equals(Buffer.from(encodedState)),'NETWORK_BYTES_NOT_CANONICAL');
+  need(Buffer.from(raw.serialize()).equals(Buffer.from(encodedTx))&&(!encodedState||Buffer.from(state.serialize()).equals(Buffer.from(encodedState))),'NETWORK_BYTES_NOT_CANONICAL');
   need(hash(raw.transactionHash())===hash(expected.txHash),'RAW_TRANSACTION_HASH_MISMATCH');
   need(Array.isArray(tx.identifiers),'TRANSACTION_IDENTIFIERS_INVALID');
   const identifiers=tx.identifiers.map(identifier).sort(),actual=raw.identifiers().map(identifier).sort();
@@ -112,7 +118,10 @@ export function createFinalizedReceiptReader({endpoints,fetchImpl=globalThis.fet
   need(actions.length===1,'RAW_CONTRACT_ACTION_NOT_UNIQUE');const rawAction=actions[0];
   need(row.kind==='call'?rawAction instanceof L.ContractCall:row.kind==='deploy'?rawAction instanceof L.ContractDeploy:rawAction instanceof L.MaintenanceUpdate,'RAW_CONTRACT_ACTION_KIND_MISMATCH');
   if(row.kind==='call')need((typeof rawAction.entryPoint==='string'?rawAction.entryPoint:Buffer.from(rawAction.entryPoint).toString('utf8'))===row.name,'RAW_CIRCUIT_ENTRY_POINT_MISMATCH');
-  return {transaction:tx,action,raw,state,compactState,canonicalHash,finalizedHead:{hash:finalizedHash,height:finalizedHeight},networkFinalityVerified:true,
+  return {transaction:tx,action,raw,state,compactState,canonicalHash,finalizedHead:{hash:finalizedHash,height:finalizedHeight},networkFinalityVerified:true,outcome:failed?'failure':'success',
    trust:'Configured TLS indexer and RPC; not independent full-node or local proof verification.'};
- }};
+ }
+ // Existing receipt consumers remain success-only. The explicit outcome reader
+ // also accepts exact total failure; partial/unknown outcomes remain rejected.
+ return {read:(row,address)=>read(row,address,false),readOutcome:(row,address)=>read(row,address,true)};
 }

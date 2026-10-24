@@ -73,7 +73,9 @@ service to implement in P04, not an existing deployed API or independent supplie
 Request contract: a stable UUID order ID, exact facility address, service ID,
 nonempty objective (up to 500 characters) and supplied document (up to 5,000
 Unicode code points). Enforce a UTF-8 JSON body ceiling explicitly: the current
-API is 32 KiB and currently accepts only two service IDs and no objective.
+API at planning time was 32 KiB with only two service IDs and no objective. The
+backend foundation adds the extraction service and objective while retaining both
+existing services; the public free deployment still has no automated supplier.
 No arbitrary URL fetching in this slice. Retrying an ID with different input or
 terms is rejected; store the document/objective digest and original terms.
 
@@ -191,12 +193,24 @@ worker completion alone is not acceptance. Initial P01/P02 reports needed
 corrections to wire schemas, settlement states, capability claims, writer
 ownership and expiry recovery. Those corrections are recorded above/in Architecture.
 
+Every major milestone is published on a new Git branch with a pull request.
+M0 is open as [PR #13](https://github.com/ShrikarT/line/pull/13), branch
+`feat/line-autonomous-m0`. Future implementation does not push directly to main.
+An opened PR, passing fixture tests or a worker completion message does not by
+itself establish deployed behavior or autonomous purchase acceptance.
+
 Workers own backend implementation only: first the runner (P03) and supplier
 (P04) in parallel, then production tools (P05) and the backend portions of setup,
 activity, supplier orders and recovery (P07-P10). They may not edit React, layout,
 styles or product copy. The coordinator owns the final UI/UX work (P06 and the
 screen portions of P07-P09) after the backend is reviewed. Integrate and audit the
 whole journey afterward; do not close split issues before both parts pass.
+
+P07's backend pairing/fencing prerequisite is tracked separately as
+[SHR-77](https://linear.app/shrikar/issue/SHR-77/p07a-implement-encrypted-runner-pairing-and-durable-writer-fencing).
+It must precede M1 activation and does not wait for the M2 screens. The parent
+setup issue still needs the coordinator's user interface; this split avoids
+leaving custody authorization until after an allegedly complete agent path.
 
 The older Wave 3 backlog and independent recruitment/pilot work are deferred by
 the latest owner instruction. P12 remains an unfulfilled external gate, not an
