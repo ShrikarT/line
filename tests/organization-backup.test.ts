@@ -1,6 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { bech32m } from "@scure/base";
+import { agentId, contractDomain, issuerPublicKey, lineStateCommit, hexToBytes, toHex } from "../src/lib/line/encoding.ts";
+import { generateX25519KeyPair } from "../src/lib/agent/pairing.ts";
 import { decodeOrganizationBackup, isOrganizationEmpty, validateOrganizationRecord } from "../src/lib/organization/backup.ts";
 import { organizationAccountKey, type OrganizationRecord } from "../src/lib/organization/account.ts";
 import { encryptSecret, encodeVaultJson } from "../src/lib/security/vault.ts";
@@ -111,6 +113,18 @@ test("backup preserves both scoped expired openings, disable and compensation wi
   const backup = await encryptSecret(key, encodeVaultJson(record), "BackupControl123!");
   assert.deepEqual(await decodeOrganizationBackup(JSON.stringify(backup), "BackupControl123!", key, accountId), record);
   assert.equal(isOrganizationEmpty({ ...initial(), recoveries: record.recoveries }), false);
+  // A later, controlled handover must preserve all five original encrypted
+  // archives without copying either archive or fence into old candidates.
+  const delegated=structuredClone(record),facility=delegated.snapshot.facilities[0];
+  Object.assign(facility,{generation:2n,limit:1000000n,merchants:[{publicKey:"aa".repeat(32),address:facility.issuerRecipient,name:"Controlled merchant"}]});
+  const domain=contractDomain(issuerPublicKey(hexToBytes(delegated.snapshot.issuerSecret)),hexToBytes(facility.merchants[0].publicKey),hexToBytes(facility.instanceNonce)),identity=agentId(hexToBytes(facility.agentSecret));
+  const returned=await generateX25519KeyPair(),runner=await generateX25519KeyPair(),stagedAt=Date.now();
+  delegated.delegations=[{schema:"line:browser-agent-delegation/v1",facilityId:facility.id,scope:{schema:"line:agent-grant/v1",grantId:crypto.randomUUID(),networkId:"preprod",facilityAddress:facility.address!,domain:toHex(domain),sourceFingerprint:policy.sourceFingerprint,ownerAddress:facility.issuerRecipient,runnerOrigin:"http://127.0.0.1:8000",runnerPublicKey:runner.publicKeyHex,runnerSigningPublicKey:"99".repeat(32),returnPublicKey:returned.publicKeyHex,agentPk:toHex(identity),generation:"2",bookCommitment:toHex(lineStateCommit({domain,identity,limit:facility.limit,outstanding:facility.outstanding,epoch:facility.epoch},hexToBytes(facility.salt))),nonce:"88".repeat(32),issuedAt:stagedAt,expiresAt:stagedAt+3600000,maxSpend:"100000",maxFee:"1500",allowedServices:["line-doc-extract-v1"],allowedMerchants:[facility.merchants[0].publicKey]},returnPrivateKey:returned.privateKeyHex,phase:"staged",stagedAt,package:null}];
+  const fencedBackup=await encryptSecret(key,encodeVaultJson(delegated),"BackupControl123!");
+  const fenced=await decodeOrganizationBackup(JSON.stringify(fencedBackup),"BackupControl123!",key,accountId);
+  assert.deepEqual(fenced.recoveries,record.recoveries);
+  assert.deepEqual(fenced.delegations,delegated.delegations);
+  assert(fenced.recoveries!.every(entry=>!("delegations" in entry.before)&&!("delegations" in entry.original.after)));
   for (const mutate of [
     (r: OrganizationRecord) => { r.recoveries!.push(structuredClone(r.recoveries![0])); },
     (r: OrganizationRecord) => { r.recoveries![0].original.txId = "00" + "ff".repeat(32); },

@@ -75,6 +75,18 @@ or oversized envelopes. They do not establish durable staging, runner retirement
 authenticated handback, offer consumption or browser writer exclusion. Those
 lifecycle steps remain prerequisites for activating any delegation.
 
+The ownership branch now stages a fence and browser return key in encrypted
+account metadata outside transaction snapshots. It checks the current facility,
+retains the exact encrypted owner-authorized export before returning it, and
+refuses conflicting browser writes. The emergency `setStatus(DEFAULTED)` pause
+preserves the fence. Ordinary commits, backup restoration and reload cannot
+silently remove it; owner rejection, wallet changes and an aborted IndexedDB
+write leave staging intact. No runner activation or unfencing path is exposed.
+Retired-checkpoint handback and durable runner import are still required. This
+coordinates cooperating current clients, not old applications or copied keys;
+chain commitment equality alone cannot exclude a restored old copy before any
+draw has changed the commitment.
+
 ### P02 decision - owner-operated runner first
 
 The current release can authenticate a draw without issuer material: `draw`

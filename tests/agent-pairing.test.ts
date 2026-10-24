@@ -501,6 +501,6 @@ test('authenticated envelopes reject wrong keys, cross-purpose ciphertext, extra
   await assert.rejects(decryptBookOpening({...options,envelope:{...envelope,ciphertext:envelope.ciphertext+'a'}}),/Invalid authenticated envelope/);
   await assert.rejects(decryptBookOpening({...options,envelope:{...envelope,issuerSecret:'forbidden'} as any}),/disallowed/);
   const pkg = createPairingPackage(f.scope,f.proof,envelope);
-  assert.throws(()=>verifyPairingPackageStructure({...pkg,scope:{...f.scope,ownerAddress:{issuerSecret:'forbidden'}}}),/provenance/);
+  assert.throws(()=>verifyPairingPackageStructure({...pkg,scope:{...f.scope,ownerAddress:{issuerSecret:'forbidden'}}}),/receiving wallet/);
   assert.throws(()=>verifyPairingPackageStructure({...pkg,scope:{...f.scope,issuerSecret:'forbidden'}}),/disallowed/);
 });
