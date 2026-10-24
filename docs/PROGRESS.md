@@ -54,12 +54,86 @@ Autonomy is bounded authority, not unrestricted key access. A required wallet
 popup for every normal purchase is assisted checkout and cannot pass this goal.
 The signing/proving model is an explicit feasibility gate, not an assumption.
 
+### P01 decision - first useful task (reviewed scope, implementation pending)
+
+The first task is: "Extract the evidence relevant to my question from this public
+Markdown/plain-text document, then prepare a brief with source citations."
+A real external MCP agent chooses the paid extraction tool and uses its returned
+source spans to write the brief. The queue itself is not an AI agent. An in-app
+model runner is outside this first slice; the connection must identify the actual
+MCP client and capture its tool invocation/result without exposing secrets.
+
+**Chosen implementation:** a first-party `line-doc-extract-v1` service that parses
+headings, paragraphs and lists, selects passages relevant to a bounded objective,
+and returns verbatim source spans with stable offsets. It executes on actual
+input; word counts/fingerprints alone do not satisfy extraction. It makes no
+claim of semantic/legal judgment. The agent does synthesis. This is a concrete
+service to implement in P04, not an existing deployed API or independent supplier.
+
+Request contract: a stable UUID order ID, exact facility address, service ID,
+nonempty objective (up to 500 characters) and supplied document (up to 5,000
+Unicode code points). Enforce a UTF-8 JSON body ceiling explicitly: the current
+API is 32 KiB and currently accepts only two service IDs and no objective.
+No arbitrary URL fetching in this slice. Retrying an ID with different input or
+terms is rejected; store the document/objective digest and original terms.
+
+Result contract: service/version, input digest, passages containing heading path,
+verbatim text and half-open UTF-16 offsets, and an explicit no-matching-evidence
+outcome. Every passage must satisfy `document.slice(start, end) === text`;
+relevance selection and all length limits must handle Unicode consistently.
+A brief cites these spans and identifies the supplied source; no invented facts,
+confidence values, payout hashes or finalized block numbers appear in examples.
+The real run must retain separate actual task, payment and delivery evidence.
+
+Proposed first-party tariff: 50,000 native base units (0.05 tNIGHT) per bounded
+request. This is a proposed test tariff, not agreed commercial pricing. Quote
+terms must be read from the facility and accepted within the owner's grant.
+Fee = flat + ceil(price * basisPoints / 10,000). For the current generation-2
+policy, 50,000 + (1,000 + 500) = 51,500 allowance units. Wallet network fees/DUST
+are separate and must not be invented as part of this calculation.
+
+Wire formats reuse `src/lib/organization/transfers.ts`: exact schema tags,
+64-character lowercase hex byte fields and decimal-string amounts/expiry/generation.
+Claim includes fee. Generate a deterministic 32-byte invoice digest bound to the
+order and terms; do not put a long service name plus UUID into a 32-byte invoice.
+Supplier checks the public facility and recipient, not the private allowance.
+
+| State | Evidence / next step |
+| --- | --- |
+| queued / evaluating | Agent task accepted; decides whether approved paid extraction is needed |
+| approval_needed / denied | A policy exception needs a specific owner decision; denial causes no payment |
+| quote_pending / quoted | Supplier retains original quote operation; exact finality makes quote usable |
+| payment_pending / payment_uncertain | Runner prepares draw; unknown outcome retains bytes/candidate and blocks new facility writes |
+| claim_authorized | Exact finalized draw created the claim; merchant payout is still pending |
+| redemption_pending / redemption_uncertain | Supplier retains and reconciles its original redemption identity |
+| paid_awaiting_delivery / paid_undelivered | Exact finalized redemption paid the registered recipient; service result is pending or failed |
+| completed | Service processed actual input and the agent returned the source-linked brief |
+| failed / recovery_needed | Distinguish provably unsubmitted failure from retained uncertain payment and storage/book problems |
+
+The owner controls setup, funding and chain status. The runner receives only
+explicitly authorized agent/book material plus its own fee wallet; issuer and
+merchant credentials remain separate. Agent material can also authorize mode-1
+compensation under Compact, so a draw-only tool surface is a runtime restriction.
+P02 must establish pairing, writer transfer and issuer book synchronization.
+
+Outstanding gates: implement the useful service and production adapter; connect
+an actual MCP agent; arrange persistent runner/supplier storage and a proof
+service; fund a separately authorized fee wallet locally. No model API key is
+required for the deterministic extraction service itself. No actual delegation,
+live payment, independent supplier/customer confirmation or commercial agreement
+is claimed. Supplier delivery failure after payout needs an explicit remedy:
+expired-claim compensation does not reverse an already redeemed purchase.
+Independent pilot/recruitment and the old Wave 3 backlog remain deferred by the
+owner's latest instruction. Live owner wallet testing remains stopped.
+
 ### Delivery milestones and work queue
 
 Execution tracker: [Line — First autonomous purchase](https://linear.app/shrikar/project/line-first-autonomous-purchase-21f3ded481c0/overview),
 created 23–24 October with five milestones and twelve issues. This document holds
-scope, dependency order and exit gates. P01/P02 (SHR-65/66) are Todo; remaining
-implementation items are Backlog with prerequisites in their descriptions.
+scope, dependency order and exit gates. P01/P02 decisions were reviewed and
+corrected by the coordinator on 24 October; runtime/delegation and service
+implementation are still pending. Remaining implementation items have their
+prerequisites in their Linear descriptions.
 Assign people and dates only when availability and the signing/infrastructure
 gate are established. P0 maps to High priority in Linear; P1 maps to Medium.
 
@@ -108,6 +182,27 @@ M1 exits with the complete agent/service path running in a controlled environmen
 M2 exits with that same path through the user interface; M3 requires fresh live
 evidence and usability observations. No calendar completion date is promised
 before M0 resolves the external dependencies.
+
+### Supervised delivery order - 24 October owner instruction
+
+Orca run `run_cd21a7280cd6` supervises two Antigravity workers. The coordinator
+reviews every task against source and the intended journey before advancing it;
+worker completion alone is not acceptance. Initial P01/P02 reports needed
+corrections to wire schemas, settlement states, capability claims, writer
+ownership and expiry recovery. Those corrections are recorded above/in Architecture.
+
+Workers own backend implementation only: first the runner (P03) and supplier
+(P04) in parallel, then production tools (P05) and the backend portions of setup,
+activity, supplier orders and recovery (P07-P10). They may not edit React, layout,
+styles or product copy. The coordinator owns the final UI/UX work (P06 and the
+screen portions of P07-P09) after the backend is reviewed. Integrate and audit the
+whole journey afterward; do not close split issues before both parts pass.
+
+The older Wave 3 backlog and independent recruitment/pilot work are deferred by
+the latest owner instruction. P12 remains an unfulfilled external gate, not an
+accepted pilot. No live owner wallet testing or new custody activation is implied
+by supervising implementation. Build the concrete flow before requesting any
+necessary final local approval.
 
 ### Focus and completion rules
 
