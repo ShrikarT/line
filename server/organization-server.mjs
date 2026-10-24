@@ -27,7 +27,7 @@ async function servePublic(req, res, root) {
 /** One persistent process serves the built app and owns one supplier wallet.
  * A runtime factory is injectable solely for transport/lifecycle tests.
  */
-export async function startOrganizationServer({ env = process.env, createService, port = Number(env.PORT ?? 3000), host = '0.0.0.0', publicDirectory = resolve('dist') } = {}) {
+export async function startOrganizationServer({ env = process.env, createService, port = Number(env.PORT ?? 3000), host = '0.0.0.0', publicDirectory = resolve('dist'), finalizedStateReader } = {}) {
   const mode = env.LINE_ORGANIZATION_MODE ?? 'supplier';
   if (!['supplier', 'wallet-only'].includes(mode)) throw Error('Configure supplier or wallet-only organization mode.');
   const origin = env.LINE_PUBLIC_ORIGIN;
@@ -67,7 +67,7 @@ export async function startOrganizationServer({ env = process.env, createService
       ? import('./organization-wallet-only.mjs').then(module => module.createWalletOnlyOrganizationService(env))
       : import('./organization-wallet.mjs').then(module => module.createStandaloneOrganizationMerchants(env)));
     api = organizationApi({ service, origin, auth });
-    network = organizationNetwork({ server, auth, origin, endpoints: service.endpoints });
+    network = organizationNetwork({ server, auth, origin, endpoints: service.endpoints, finalizedStateReader });
     return app;
   } catch (error) { startupFailure = true; await app.close(); throw error; }
 }

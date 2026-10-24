@@ -10,6 +10,8 @@ import { bech32m } from '@scure/base';
 import * as L from '@midnight-ntwrk/ledger-v8';
 import * as R from '@midnight-ntwrk/compact-runtime';
 import { startOrganizationServer } from './organization-server.mjs';
+import { finalizedFacilityStateReader, createOrganizationReleaseArtifactsLoader } from './organization-finalized-state.mjs';
+import { createOrganizationReleaseFixture } from '../tests/fixtures/organization-release-fixture.mjs';
 import { EXPIRED_OPENING as openingPolicy } from '../src/lib/organization/expired-opening-policy.ts';
 import { EXPIRED_DISABLE as disablePolicy } from '../src/lib/organization/expired-disable-policy.ts';
 import { EXPIRED_QUOTE as quotePolicy } from '../src/lib/organization/expired-quote-policy.ts';
@@ -70,7 +72,16 @@ async function fixture(t) {
   const upstreamOrigin = `http://127.0.0.1:${upstream.address().port}`;
   const token = 'synthetic-provider-credential-control';
   const origin = 'https://line.example';
-  const app = await startOrganizationServer({ env: { LINE_PUBLIC_ORIGIN: origin }, port: 0, host: '127.0.0.1', publicDirectory: directory, createService: async () => ({
+  const releaseFixture = await createOrganizationReleaseFixture(t);
+  const artifactsLoader = createOrganizationReleaseArtifactsLoader({ projectRoot: releaseFixture.projectRoot });
+  const finalizedStateReader = finalizedFacilityStateReader({
+    endpoints: {
+      nodeUri: `${upstreamOrigin}/rpc?project_id=${token}`,
+      indexerUri: `${upstreamOrigin}/graphql?project_id=${token}`,
+    },
+    artifactsLoader,
+  });
+  const app = await startOrganizationServer({ env: { LINE_PUBLIC_ORIGIN: origin }, port: 0, host: '127.0.0.1', publicDirectory: directory, finalizedStateReader, createService: async () => ({
     endpoints: { nodeUri: `${upstreamOrigin}/rpc?project_id=${token}`, indexerUri: `${upstreamOrigin}/graphql?project_id=${token}`, indexerWsUri: `${upstreamOrigin.replace('http:', 'ws:')}/ws?project_id=${token}` },
     catalog: () => ({ services: [] }), close: async () => {},
   }) });

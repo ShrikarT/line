@@ -1,9 +1,17 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import * as L from '@midnight-ntwrk/ledger-v8';
 import * as R from '@midnight-ntwrk/compact-runtime';
-import { finalizedFacilityStateReader, CIRCUITS, loadOrganizationReleaseArtifacts } from './organization-finalized-state.mjs';
+import {
+  finalizedFacilityStateReader,
+  CIRCUITS,
+  loadOrganizationReleaseArtifacts,
+  createOrganizationReleaseArtifactsLoader,
+} from './organization-finalized-state.mjs';
+import { createOrganizationReleaseFixture } from '../tests/fixtures/organization-release-fixture.mjs';
 import { OrganizationAuthError } from './organization-auth.mjs';
 import {
   validateFinalizedFacilityStateEvidence,
@@ -1300,8 +1308,23 @@ test('finalizedFacilityStateReader is immune to endpoint object mutation after i
   assert.equal(mock.indexerCalls.length, 1);
 });
 
-test('loadOrganizationReleaseArtifacts returns detached immutable release identity and defensive verifiers without exposing mutable provider', async () => {
-  const artifacts1 = await loadOrganizationReleaseArtifacts();
+test('loadOrganizationReleaseArtifacts fails closed when contract release artifacts are missing', async (t) => {
+  const emptyDir = mkdtempSync(join(tmpdir(), 'line-missing-release-'));
+  t.after(() => rmSync(emptyDir, { recursive: true, force: true }));
+  const loader = createOrganizationReleaseArtifactsLoader({ projectRoot: emptyDir });
+  await assert.rejects(
+    async () => loader(),
+    /ENOENT|Line artifacts/
+  );
+  await assert.rejects(
+    async () => loadOrganizationReleaseArtifacts({ projectRoot: emptyDir }),
+    /ENOENT|Line artifacts/
+  );
+});
+
+test('loadOrganizationReleaseArtifacts returns detached immutable release identity and defensive verifiers without exposing mutable provider', async (t) => {
+  const fixture = await createOrganizationReleaseFixture(t);
+  const artifacts1 = await loadOrganizationReleaseArtifacts({ projectRoot: fixture.projectRoot });
   assert.equal(artifacts1.verifiers.size, 12);
   assert.equal(artifacts1.zk, undefined); // Provider is not exposed
   assert.equal(Object.isFrozen(artifacts1), true);
@@ -1323,11 +1346,32 @@ test('loadOrganizationReleaseArtifacts returns detached immutable release identi
   artifacts1.verifiers.set('maliciousCircuit', new Uint8Array(32));
   origKey[0] = (origByte + 1) % 256;
 
-  const artifacts2 = await loadOrganizationReleaseArtifacts();
+  const artifacts2 = await loadOrganizationReleaseArtifacts({ projectRoot: fixture.projectRoot });
   assert.equal(artifacts2.verifiers.has('maliciousCircuit'), false);
   assert.equal(artifacts2.verifiers.get(sampleKey)[0], origByte);
   assert.equal(artifacts2.sourceFingerprint, policy.sourceFingerprint);
   assert.equal(artifacts2.release.inputs.source.sha256, policy.sourceFingerprint);
+});
+
+test('createOrganizationReleaseArtifactsLoader maintains isolated closure caches per root', async (t) => {
+  const fixture1 = await createOrganizationReleaseFixture(t);
+  const fixture2 = await createOrganizationReleaseFixture(t);
+
+  const loader1 = createOrganizationReleaseArtifactsLoader({ projectRoot: fixture1.projectRoot });
+  const loader2 = createOrganizationReleaseArtifactsLoader({ projectRoot: fixture2.projectRoot });
+
+  const a1 = await loader1();
+  const a2 = await loader2();
+
+  assert.equal(a1.sourceFingerprint, policy.sourceFingerprint);
+  assert.equal(a2.sourceFingerprint, policy.sourceFingerprint);
+
+  // Both have independent verifier maps and defensive copies
+  assert.notEqual(a1.verifiers, a2.verifiers);
+  for (const name of CIRCUITS) {
+    assert.deepEqual(a1.verifiers.get(name), a2.verifiers.get(name));
+    assert.notEqual(a1.verifiers.get(name), a2.verifiers.get(name));
+  }
 });
 
 test('finalizedFacilityStateReader captures policy synchronously before asynchronous provider work', async () => {
