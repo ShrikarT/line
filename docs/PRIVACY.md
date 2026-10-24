@@ -39,6 +39,16 @@ book openings. Automated transport must preserve authenticated merchant binding
 and prevent cross-organization disclosure. These are planned requirements, not
 implemented guarantees. Full-history transaction privacy remains incomplete.
 
+The runner foundation under review stores source text, its objective, supplier
+evidence, agent-written briefs and the private agent book in its encrypted local
+checkpoint. The running owner process can read them. The supplier receives the
+document/objective; the external agent receives returned evidence and task
+results. The prover receives draw witness material under the existing provider
+trust assumptions. Public task views omit book openings, role secrets, candidates
+and claim packages. These API boundaries do not protect against the runtime
+operator. No new delegation has been activated; remote supplier authentication
+and hosted custody guarantees remain unimplemented.
+
 The issuer authorizes governance, allowances, reserve changes and repayment
 acknowledgement. Merchants authorize quotes and redemption; the agent authorizes
 draws. Contract domains and nullifiers prevent cross-instance replay and repeated

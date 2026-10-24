@@ -11,7 +11,7 @@ import { ORGANIZATION_SERVICES, fulfillOrganizationService } from './organizatio
 import { NativeOperationJournal } from './native-operation-journal.mjs';
 // Keep this new product profile independent of the legacy operator module cache.
 import { resolveContractRelease, validateContractArtifacts } from '../scripts/contract-artifacts.mjs?organization=v1';
-import { canonicalInvoiceIdBytes, merchantPublicKey, quoteCommit, toHex, hexToBytes } from '../src/lib/line/encoding.ts';
+import { canonicalInvoiceIdBytes, merchantPublicKey, quoteCommit, drawNoteCommit, requiredDrawFee, toHex, hexToBytes } from '../src/lib/line/encoding.ts';
 import { decodeNote, encodeQuote } from '../src/lib/organization/transfers.ts';
 import { withinDeadline } from '../src/lib/organization/finality.ts';
 
@@ -23,6 +23,12 @@ const digest=value=>createHash('sha256').update(value).digest('hex');
 const clone=value=>structuredClone(value);
 /** Line's two first-party API suppliers. They never receive organization role keys. */
 export class OrganizationMerchants extends NativeOperationJournal {
+ #fulfill;
+ constructor({fulfill=fulfillOrganizationService}={}){
+  super();
+  if(typeof fulfill!=='function')throw Error('A supplier fulfillment function is required.');
+  this.#fulfill=fulfill;
+ }
  static async create(parent,recipients){
   const service=new OrganizationMerchants();
   const release=validateContractArtifacts({artifactDir:resolveContractRelease({profile:'organization'}),profile:'organization'});
@@ -80,7 +86,20 @@ export class OrganizationMerchants extends NativeOperationJournal {
  order(id){
   this.assertJournalWritable();
   const order=this.state.orders.find(order=>order.id===id);if(!order)return null;
-  return {id:order.id,contractAddress:order.address,service:order.service,status:order.status,quotePackage:order.status==='created'?null:encodeQuote(order.quote),result:order.status==='delivered'?order.result:null,receipts:this.state.receipts.filter(receipt=>receipt.id===`quote-${id}`||receipt.id===`redeem-${id}`).map(({name,contractAddress,txHash,blockHeight})=>({circuit:name,contractAddress,txHash,blockHeight})),pending:this.state.pending?.id===`quote-${id}`||this.state.pending?.id===`redeem-${id}`};
+  const paymentStatus=order.paymentStatus??(order.status==='delivered'?'redeemed':order.status==='created'?'unpaid':'quoted');
+  const deliveryStatus=order.deliveryStatus??(order.status==='delivered'?'delivered':'pending');
+  return {
+   id:order.id,contractAddress:order.address,service:order.service,status:order.status,
+   paymentStatus,deliveryStatus,
+   quotePackage:order.status==='created'?null:encodeQuote(order.quote),
+   result:deliveryStatus==='delivered'?order.result:null,
+   deliveryError:deliveryStatus==='undelivered'?(order.deliveryError??'Delivery failed.'):null,
+   deliveryTimeoutAt:order.deliveryTimeoutAt??null,
+   inputDigest:order.inputDigest,objectiveDigest:order.objectiveDigest??null,
+   noteCommitment:order.noteCommitment??null,
+   receipts:this.state.receipts.filter(receipt=>receipt.id===`quote-${id}`||receipt.id===`redeem-${id}`).map(({name,contractAddress,txHash,blockHeight})=>({circuit:name,contractAddress,txHash,blockHeight})),
+   pending:this.state.pending?.id===`quote-${id}`||this.state.pending?.id===`redeem-${id}`
+  };
  }
  runMutation(action){
   if(this.closed)return Promise.reject(Error('The supplier service is closed.'));
@@ -90,14 +109,15 @@ export class OrganizationMerchants extends NativeOperationJournal {
   this.activeMutation=task;return task;
  }
  recoverPending(){return this.runMutation(()=>super.recoverPending());}
- quote(id,address,serviceId,document){return this.runMutation(()=>this.quoteOrder(id,address,serviceId,document));}
- async quoteOrder(id,address,serviceId,document){
+ quote(id,address,serviceId,document,objective=''){return this.runMutation(()=>this.quoteOrder(id,address,serviceId,document,objective));}
+ async quoteOrder(id,address,serviceId,document,objective=''){
   if(!/^[a-f0-9-]{36}$/.test(id))throw Error('A stable purchase request is required.');
   const service=ORGANIZATION_SERVICES.find(service=>service.id===serviceId);if(!service)throw Error('Unknown merchant service.');
-  fulfillOrganizationService(serviceId,document);
+  fulfillOrganizationService(serviceId,document,objective);
   if(this.state.pending)await super.recoverPending();
+  const inputDigest=digest(document),objectiveDigest=objective?digest(objective):null;
   let order=this.state.orders.find(order=>order.id===id);
-  if(order&&(order.address!==address||order.service!==serviceId||order.inputDigest!==digest(document)))throw Error('The purchase request is already bound to different terms.');
+  if(order&&(order.address!==address||order.service!==serviceId||order.inputDigest!==inputDigest||((order.objectiveDigest??null)!==objectiveDigest)))throw Error('The purchase request is already bound to different terms.');
   if(order&&order.status!=='created')return this.order(id);
   const book=await this.inspect(address,service.merchant);
   if(!book.registeredMerchants.lookup(merchantPublicKey(this.merchantKeys[service.merchant])))throw Error('The organization disabled new quotes from this supplier.');
@@ -107,11 +127,12 @@ export class OrganizationMerchants extends NativeOperationJournal {
    if(this.state.orders.filter(row=>row.ownerRecipient===ownerRecipient&&row.createdAt>createdAt-600000).length>=6)throw Error('Too many new supplier quotes for this organization. Retry after ten minutes; existing orders remain recoverable.');
    const amount=BigInt(service.price),free=book.totalReserve-book.encumberedReserve-book.redeemedReserve-book.feeReserve-book.pendingFeeReserve-book.refundReserve-book.reportedRefundReserve;
    if(free<amount)throw Error('Deposit sufficient assets before requesting a paid API quote.');
-   const expiry=BigInt(Math.floor(Date.now()/1000)+3600),nonce=bytes(),invoiceId=canonicalInvoiceIdBytes(`line-api:${serviceId}:${id}`),pk=merchantPublicKey(this.merchantKeys[service.merchant]);
+   const expiry=BigInt(Math.floor(Date.now()/1000)+3600),nonce=bytes(),invoiceId=canonicalInvoiceIdBytes(digest([this.catalog().network,address,serviceId,id,inputDigest,objectiveDigest??''].join(':'))),pk=merchantPublicKey(this.merchantKeys[service.merchant]);
    const quote={contractAddress:address,domain:toHex(book.contractDomain),merchantPk:toHex(pk),invoiceId:toHex(invoiceId),quoteNonce:toHex(nonce),amount,expiry,generation:book.lineGeneration,feeFlat:book.feeFlat,feeBps:book.feeBps,quoteCommitment:toHex(quoteCommit({merchantPk:pk,invoiceId,nonce,amount,expiry,generation:book.lineGeneration,domain:book.contractDomain,feeFlat:book.feeFlat,feeBps:book.feeBps}))};
-   order={id,address,service:serviceId,inputDigest:digest(document),document,quote,status:'created',result:null,createdAt,ownerRecipient};this.state.orders.push(order);await this.save();
+   order={id,address,service:serviceId,inputDigest,objectiveDigest,document,objective:objective||null,quote,status:'created',paymentStatus:'unpaid',deliveryStatus:'pending',result:null,createdAt,ownerRecipient,deliveryTimeoutAt:null,deliveryError:null};this.state.orders.push(order);await this.save();
   }
-  this.state.contractAddress=address;const after=clone(this.state);after.orders.find(order=>order.id===id).status='quoted';
+  this.state.contractAddress=address;const after=clone(this.state);
+  const target=after.orders.find(order=>order.id===id);target.status='quoted';target.paymentStatus='quoted';target.deliveryStatus='pending';
   await this.operation(`quote-${id}`,'call','postQuote',{callerSecret:this.merchantKeys[service.merchant],invoiceId:hexToBytes(order.quote.invoiceId),quoteNonce:hexToBytes(order.quote.quoteNonce),quoteAmount:order.quote.amount},after,async()=>{const bound=await this.bindOrganization(address);return bound.callTx.postQuote(order.quote.expiry);});
   return this.order(id);
  }
@@ -119,15 +140,30 @@ export class OrganizationMerchants extends NativeOperationJournal {
  async redeemOrder(id,claim){
   if(this.state.pending)await super.recoverPending();
   const order=this.state.orders.find(order=>order.id===id);if(!order)throw Error('Unknown merchant order.');
-  if(order.status==='delivered')return this.order(id);
-  const service=ORGANIZATION_SERVICES.find(service=>service.id===order.service),note=decodeNote(claim);
-  if(note.contractAddress!==order.address||note.quoteCommitment!==order.quote.quoteCommitment||note.merchantPk!==order.quote.merchantPk||note.amount!==order.quote.amount||note.expiry!==order.quote.expiry||note.generation!==order.quote.generation||note.domain!==order.quote.domain)throw Error('The claim is not for this exact service order.');
+  const service=ORGANIZATION_SERVICES.find(service=>service.id===order.service);if(!service)throw Error('Unknown merchant service.');
+  const note=decodeNote(claim),expectedFee=requiredDrawFee(order.quote.amount,order.quote.feeFlat,order.quote.feeBps);
+  if(note.contractAddress!==order.address||note.quoteCommitment!==order.quote.quoteCommitment||note.merchantPk!==order.quote.merchantPk||note.amount!==order.quote.amount||note.expiry!==order.quote.expiry||note.generation!==order.quote.generation||note.domain!==order.quote.domain||note.fee!==expectedFee)throw Error('The claim is not for this exact service order.');
+  const commitment=toHex(drawNoteCommit({domain:hexToBytes(note.domain),lineGeneration:note.generation,identity:hexToBytes(note.identity),quoteCommit:hexToBytes(note.quoteCommitment),merchantPk:hexToBytes(note.merchantPk),amount:note.amount,fee:note.fee,noteNonce:hexToBytes(note.noteNonce),expiry:note.expiry},hexToBytes(note.noteSalt)));
+  if(commitment!==note.noteCommitment)throw Error('The claim commitment does not match its original opening.');
+  if(order.claimIdentity&&order.claimIdentity!==note.identity)throw Error('The purchase request is already bound to a different claim.');
+  if(order.noteCommitment&&order.noteCommitment!==note.noteCommitment)throw Error('The purchase request is already bound to a different claim.');
+  if((order.paymentStatus==='redeemed'||['redeemed','paid_undelivered','delivered'].includes(order.status))&&!order.noteCommitment)throw Error('The legacy paid order remains available. Its original claim must be reconciled before a redemption retry.');
+  if(order.deliveryStatus==='delivered')return this.order(id);
   await this.inspect(order.address,service.merchant);
-  if(order.status!=='redeemed'){
-   this.state.contractAddress=order.address;const after=clone(this.state);after.orders.find(order=>order.id===id).status='redeemed';
+  if(order.paymentStatus!=='redeemed'&&order.status!=='redeemed'&&order.status!=='paid_undelivered'){
+   this.state.contractAddress=order.address;const after=clone(this.state);
+   const target=after.orders.find(order=>order.id===id);target.paymentStatus='redeemed';target.status='paid_awaiting_delivery';target.claimIdentity=note.identity;target.noteCommitment=note.noteCommitment;target.deliveryTimeoutAt=Date.now()+60000;
    await this.operation(`redeem-${id}`,'call','redeemDraw',{callerSecret:this.merchantKeys[service.merchant],noteIdentity:hexToBytes(note.identity),noteQuoteCommit:hexToBytes(note.quoteCommitment),noteNonce:hexToBytes(note.noteNonce),noteSalt:hexToBytes(note.noteSalt),redeemAmount:note.amount},after,async()=>{const bound=await this.bindOrganization(order.address);return bound.callTx.redeemDraw(hexToBytes(note.noteCommitment),note.expiry);});
   }
-  const delivered=clone(this.state),retained=delivered.orders.find(order=>order.id===id);retained.result=fulfillOrganizationService(order.service,retained.document);retained.status='delivered';await this.save(delivered);this.state=delivered;
+  const delivered=clone(this.state),retained=delivered.orders.find(order=>order.id===id);retained.noteCommitment=note.noteCommitment;
+  try{
+   if(digest(retained.document)!==retained.inputDigest||(retained.objective?digest(retained.objective):null)!==(retained.objectiveDigest??null))throw Error('The retained supplier input differs from the original order.');
+   retained.result=await this.#fulfill(order.service,retained.document,retained.objective??'');
+   retained.deliveryStatus='delivered';retained.status='delivered';retained.deliveredAt=Date.now();retained.deliveryError=null;
+  }catch(err){
+   retained.result=null;retained.deliveryStatus='undelivered';retained.status='paid_undelivered';retained.deliveryError=err instanceof Error?err.message:String(err);
+  }
+  await this.save(delivered);this.state=delivered;
   return this.order(id);
  }
  async persistWallet(){return this.parent.persistWallet();}

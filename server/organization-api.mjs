@@ -24,7 +24,12 @@ export function organizationApi({ service, origin, auth = new OrganizationAuth(o
   const middleware = async (req, res, next) => {
     const path = (req.url ?? '').split('?')[0];
     if (!path.startsWith('/api/organization/')) return next();
-    const send = (status, body, headers = {}) => { res.writeHead(status, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', ...headers }); res.end(JSON.stringify(body)); };
+    const send = (status, body, headers = {}) => {
+      if (res.headersSent) return;
+      const payload = JSON.stringify(body, (_, v) => typeof v === 'bigint' ? v.toString() : v);
+      res.writeHead(status, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', ...headers });
+      res.end(payload);
+    };
     if (closed) return send(503, { error: 'The supplier service is shutting down.' });
     try {
       // Never trust a caller-controlled forwarded Host as the sign-in domain.
@@ -48,8 +53,11 @@ export function organizationApi({ service, origin, auth = new OrganizationAuth(o
         return send(200, { authenticated: true, expiresAt: session.expiresAt }, { 'Set-Cookie': auth.cookie(session.token, session.expiresAt) });
       }
       if (req.method === 'POST' && path === '/api/organization/auth/logout') return send(200, { authenticated: false }, { 'Set-Cookie': auth.revoke(req.headers.cookie) });
+      // Public grant JSON is not authentication. Remote agent delegation is
+      // unavailable until its signed, replay-bound transport is implemented.
+      if (req.headers['x-line-agent-grant']) throw new OrganizationAuthError('Remote agent delegation is not configured.', 401);
       const session = auth.require(req.headers.cookie);
-      if(req.headers['x-line-wallet'] && organizationRecipient(req.headers['x-line-wallet'])!==session.recipient)throw new OrganizationAuthError('Sign in with the selected organization wallet.');
+      if (req.headers['x-line-wallet'] && organizationRecipient(req.headers['x-line-wallet']) !== session.recipient) throw new OrganizationAuthError('Sign in with the selected organization wallet.');
       if (req.method === 'GET' && path === '/api/organization/auth/session') {
         if (typeof req.headers['x-line-wallet'] !== 'string') throw new OrganizationAuthError('Select the organization wallet before restoring its sign-in.');
         // This read neither renews the cookie nor extends its server deadline.
@@ -74,16 +82,20 @@ export function organizationApi({ service, origin, auth = new OrganizationAuth(o
         if (typeof input.claim !== 'string' || input.claim.length > 16384 || !existing) throw new OrganizationAuthError('Organization order not found.', 404);
         address = existing.contractAddress;
       } else {
-        if (typeof input.contractAddress !== 'string' || !/^[0-9a-f]{64}$/.test(input.contractAddress) || !['text-metrics', 'content-integrity'].includes(input.service) || typeof input.document !== 'string' || !input.document.trim() || input.document.length > 5000) throw new OrganizationAuthError('Supply an exact facility, service and document.', 400);
+        const ALLOWED_SERVICES = ['text-metrics', 'content-integrity', 'line-doc-extract-v1'];
+        if (typeof input.contractAddress !== 'string' || !/^[0-9a-f]{64}$/.test(input.contractAddress) || !ALLOWED_SERVICES.includes(input.service) || typeof input.document !== 'string' || !input.document.trim() || [...input.document].length > 5000) throw new OrganizationAuthError('Supply an exact facility, service and document.', 400);
+        if (input.service === 'line-doc-extract-v1') {
+          if (typeof input.objective !== 'string' || !input.objective.trim() || [...input.objective].length > 500) throw new OrganizationAuthError('Supply an exact facility, service, document and extraction objective.', 400);
+        }
         address = input.contractAddress;
-        if (existing && existing.contractAddress !== address) throw new OrganizationAuthError('The purchase request belongs to different terms.', 409);
+        if (existing && (existing.contractAddress !== address || existing.service !== input.service)) throw new OrganizationAuthError('The purchase request belongs to different terms.', 409);
       }
       await authorize(address, session); auth.require(req.headers.cookie);
       // Both body streaming and owner lookup yield. Admission is atomic here.
       if (closed) return send(503, { error: 'The supplier service is shutting down.' });
       if (job) return send(409, { error: 'The supplier wallet is completing another operation.' });
       errors.delete(id); activeId = id; activeRecipient = session.recipient;
-      job = Promise.resolve().then(() => redeem ? service.redeem(id, input.claim) : service.quote(id, address, input.service, input.document)).catch(error => {
+      job = Promise.resolve().then(() => redeem ? service.redeem(id, input.claim) : service.quote(id, address, input.service, input.document, input.objective)).catch(error => {
         if (errors.size >= 1000) errors.delete(errors.keys().next().value);
         errors.set(id, { recipient: session.recipient, message: sanitizeServiceError(error instanceof Error ? error.message : 'The supplier operation needs reconciliation.') });
       }).finally(() => { job = null; activeId = null; activeRecipient = null; });

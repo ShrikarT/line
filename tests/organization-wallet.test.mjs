@@ -11,6 +11,8 @@ import { Contract, ledger } from '../contracts/managed/organization/contract/ind
 import { WITNESSES, blankPrivate } from '../src/lib/line/compact-harness.ts';
 import { pad32, issuerPublicKey, merchantPublicKey, toHex } from '../src/lib/line/encoding.ts';
 import { encodeNote } from '../src/lib/organization/transfers.ts';
+import { createHash } from 'node:crypto';
+import { drawNoteCommit, hexToBytes } from '../src/lib/line/encoding.ts';
 
 // Published BIP39 test vectors only. No facade, RPC client or chain submission
 // is started by these storage/ownership tests.
@@ -90,7 +92,11 @@ test('the actual encrypted supplier controller reopens without historical operat
     env.MIDNIGHT_STORAGE_PASSWORD = 'ChangedEnvironmentControl123!';
     const service = await storageService(owner);
     assert.equal(owner.facade, undefined); assert.equal(owner.api, undefined);
-    assert.equal(service.catalog().services.length, 2);
+    assert.deepEqual(service.catalog().services.map(s => ({ id: s.id, price: s.price })), [
+      { id: 'text-metrics', price: '25000' },
+      { id: 'content-integrity', price: '20000' },
+      { id: 'line-doc-extract-v1', price: '50000' }
+    ]);
     assert(resolve(service.directory).startsWith(resolve(env.LINE_SUPPLIER_DATA_DIR) + sep));
     service.state.orders.push(retained); await service.save();
     service.ownsParent = true; await service.close();
@@ -150,7 +156,9 @@ test('a service result stays unpublished through an aborted encrypted delivery w
   // Synthetic prior redemption state isolates the actual encrypted delivery
   // commit. It does not assert a funded payout or proof observation.
   const note={contractAddress:hex,domain:hex,identity:hex,merchantPk:hex,quoteCommitment:hex,amount:25000n,fee:0n,expiry:1000n,generation:1n,noteNonce:hex,noteSalt:hex,noteCommitment:hex};
-  service.state.orders.push({id,address:hex,service:'text-metrics',status:'redeemed',document:'Real content for result computation.',result:null,quote:{...note,invoiceId:hex,quoteNonce:hex,feeFlat:0n,feeBps:0n}});
+  note.noteCommitment=toHex(drawNoteCommit({domain:hexToBytes(note.domain),lineGeneration:note.generation,identity:hexToBytes(note.identity),quoteCommit:hexToBytes(note.quoteCommitment),merchantPk:hexToBytes(note.merchantPk),amount:note.amount,fee:note.fee,noteNonce:hexToBytes(note.noteNonce),expiry:note.expiry},hexToBytes(note.noteSalt)));
+  const document='Real content for result computation.',inputDigest=createHash('sha256').update(document).digest('hex');
+  service.state.orders.push({id,address:hex,service:'text-metrics',status:'redeemed',document,inputDigest,objectiveDigest:null,noteCommitment:note.noteCommitment,claimIdentity:note.identity,result:null,quote:{...note,invoiceId:hex,quoteNonce:hex,feeFlat:0n,feeBps:0n}});
   await service.save();service.inspect=async()=>({});
   let entered,rejectWrite;
   const writing=new Promise(resolve=>{entered=resolve;});
