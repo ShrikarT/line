@@ -12,10 +12,11 @@ Line hides plaintext spending-book openings from the public application. It does
 | Encrypted organization records and pending candidates | Purchase amounts, fees, expiry and reserve changes |
 | Backup plaintext | Transparent deposit/payout amounts and receiving addresses |
 
-The book commitment binds the contract domain, agent identity, limit, balance and
-epoch with `persistentCommit`. Quotes, claims and nullifiers use domain-separated
-`persistentHash` encodings. Neither primitive is replaced by a general-purpose
-hash in the protocol.
+The book and draw-note commitments bind their respective preimages and salts with
+`persistentCommit` (the book commitment binds domain, agent identity, limit, balance and
+epoch; `drawNoteCommit` in `encoding.ts` uses `persistentCommit(DRAW_NOTE_PREIMAGE_TYPE, ..., noteSalt)`).
+Quotes and nullifiers use domain-separated `persistentHash` encodings. Neither primitive is
+replaced by a general-purpose hash in the protocol.
 
 An observer who knows the book starts at zero can reconstruct debt from public
 draw amounts and fees. Later repayments can add uncertainty, but do not establish
