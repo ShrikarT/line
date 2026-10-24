@@ -6,6 +6,7 @@ import { join, resolve, sep } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { AgentStore, AgentStoreError } from '../server/agent-store.mjs';
+import { createPrivateAgentDirectory } from './fixtures/private-agent-directory.ts';
 
 function createHex(fillByte = 0x11): string {
   return Buffer.alloc(32, fillByte).toString('hex');
@@ -17,9 +18,7 @@ function createHex66(fillByte = 0x11): string {
 
 async function createTempDir() {
   const parent = await mkdtemp(join(tmpdir(), 'agent-store-test-'));
-  // Let the production store create its dedicated child. Windows hosted runner
-  // temp roots can carry explicit unrelated ACLs, which must remain rejected.
-  const root = join(parent, 'private');
+  const root = await createPrivateAgentDirectory(parent);
   return {
     root,
     cleanup: async () => {

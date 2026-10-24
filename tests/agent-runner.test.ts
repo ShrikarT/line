@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, rm } from 'node:fs/promises';
+import { createPrivateAgentDirectory } from './fixtures/private-agent-directory.ts';
 import { tmpdir } from 'node:os';
 import { join, resolve, sep } from 'node:path';
 import { randomBytes, randomUUID, createHash } from 'node:crypto';
@@ -111,7 +112,7 @@ async function setupTestEnvironment(overrides?: {
   now?: () => number;
 }) {
   const parent = await mkdtemp(join(tmpdir(), 'agent-runner-test-'));
-  const dir = join(parent, 'private');
+  const dir = await createPrivateAgentDirectory(parent);
   const store = await AgentStore.open({
     directory: dir,
     password: PASSWORD,
