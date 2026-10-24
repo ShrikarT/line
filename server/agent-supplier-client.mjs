@@ -52,4 +52,13 @@ export class AgentSupplierClient {
     // The supplier binds the exact quote/claim and reconciles its original bytes.
     return this.service.redeem(id, claim);
   }
+  async observePending() {
+    await this.authorize();
+    need(typeof this.service.observePending==='function','The supplier cannot safely inspect its retained operation.');
+    const observed=await this.service.observePending();
+    // The signing wallet may be shared by several facilities. Never expose
+    // another organization's operation reference to this paired agent.
+    need(observed&&typeof observed.pendingOperation==='boolean'&&(!observed.pendingOperation||observed.contractAddress===this.scope.facilityAddress),'Another supplier operation must be reconciled before retirement.');
+    return observed;
+  }
 }

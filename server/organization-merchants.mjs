@@ -109,6 +109,7 @@ export class OrganizationMerchants extends NativeOperationJournal {
   this.activeMutation=task;return task;
  }
  recoverPending(){return this.runMutation(()=>super.recoverPending());}
+ observePending(){return this.runMutation(()=>super.observePending());}
  quote(id,address,serviceId,document,objective=''){return this.runMutation(()=>this.quoteOrder(id,address,serviceId,document,objective));}
  async quoteOrder(id,address,serviceId,document,objective=''){
   if(!/^[a-f0-9-]{36}$/.test(id))throw Error('A stable purchase request is required.');

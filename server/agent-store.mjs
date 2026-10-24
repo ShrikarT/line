@@ -533,11 +533,12 @@ export class AgentStore {
     return this.state.version;
   }
 
-  async commit(mutator) {
+  async commit(mutator, { skipUnchanged = false } = {}) {
     this.assertWritable();
     if (typeof mutator !== 'function') {
       throw new AgentStoreError('commit requires a mutator function.');
     }
+    if (typeof skipUnchanged !== 'boolean') throw new AgentStoreError('Invalid checkpoint write policy.');
 
     const prev = this.queue;
     let release;
@@ -583,6 +584,15 @@ export class AgentStore {
       validateRunnerPairingTransition(this.state.pairing, candidate.pairing);
 
       validateSnapshot(candidate, this.binding, this.sourceFingerprint);
+
+      // Pairing retries can race before either has retained the first import.
+      // A validated no-op under this same store lock must not write a second
+      // checkpoint (or poison an accepted import on an unnecessary disk write).
+      if (skipUnchanged) {
+        const unchanged = structuredClone(this.state);
+        unchanged.revision = expectedRevision;
+        if (isDeepStrictEqual(candidate, unchanged)) return structuredClone(this.state);
+      }
 
       try {
         await this.store.save(COMPOSITE_KEY, candidate);

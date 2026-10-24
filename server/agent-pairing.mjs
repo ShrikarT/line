@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
 import * as L from '@midnight-ntwrk/ledger-v8';
-import { decryptBookOpening, generateX25519KeyPair, x25519PublicKey, verifyPairingOffer, verifyPairingPackageStructure, pairingPackageCanonicalMessage } from '../src/lib/agent/pairing.ts';
+import { decryptBookOpening, generateX25519KeyPair, x25519PublicKey, verifyPairingOffer, verifyPairingPackageStructure, pairingPackageCanonicalMessage, assertUsableX25519Recipient } from '../src/lib/agent/pairing.ts';
 import { pairingAcknowledgementMessage } from '../src/lib/agent/pairing-ack.ts';
 import { grantOwnerRecipient } from '../src/lib/agent/grant.ts';
 import { agentId, hexToBytes, lineStateCommit, toHex } from '../src/lib/line/encoding.ts';
@@ -71,15 +71,16 @@ export function validateRunnerPairingTransition(before,after) {
 export class AgentPairingInbox {
   static async create({store,pins,adapter,now=Date.now}) {
     const reviewed=pinsSnapshot(pins);
-    need(store.sourceFingerprint===reviewed.sourceFingerprint&&typeof adapter?.inspect==='function','Configure the matching store and actual Midnight inspector.');
+    need(store.sourceFingerprint===reviewed.sourceFingerprint&&adapter?.sourceFingerprint===reviewed.sourceFingerprint&&typeof adapter.inspect==='function','Configure the matching store, release and actual Midnight inspector.');
     store.assertWritable();
     const existing=store.snapshot().pairing;
     if(!existing){
       const encryption=await generateX25519KeyPair(),signingKey=L.sampleSigningKey();
       await store.commit(state=>{
+        if(state.pairing){need(isDeepStrictEqual(state.pairing.pins,reviewed),'A different runner identity was initialized concurrently.');return;}
         need(!state.pairing&&!state.pending&&!Object.keys(state.books).length&&!Object.keys(state.grants).length&&!Object.keys(state.tasks).length&&!state.receipts.length,'An existing runner must be reconciled before initializing a pairing identity.');
         state.pairing={schema:'line:runner-pairing-state/v1',pins:reviewed,identity:{encryptionPublicKey:encryption.publicKeyHex,encryptionPrivateKey:encryption.privateKeyHex,signingPublicKey:L.signatureVerifyingKey(signingKey),signingKey},offers:[],phase:'unpaired',accepted:null};
-      });
+      },{skipUnchanged:true});
     }
     const retained=store.snapshot().pairing;
     need(isDeepStrictEqual(retained.pins,reviewed),'Retained runner facility pins differ; implicit rotation is refused.');
@@ -118,6 +119,7 @@ export class AgentPairingInbox {
     need(offer,'Pairing offer was not durably issued by this runner.');
     verifyPairingOffer(offer,publicIdentity(before),undefined,this.now());
     const scope=pkg.scope,digest=verifyAgentGrant(scope,pkg.ownerSignature,expectedScope(before,scope),this.now());
+    await assertUsableX25519Recipient(scope.returnPublicKey);
     const opening=await decryptBookOpening({envelope:pkg.encryptedOpening,expectedPurpose:'line:agent-pairing/v1',expectedGrantDigest:digest,expectedNonce:scope.nonce,recipientPrivateKeyHex:before.identity.encryptionPrivateKey});
     const book={facilityAddress:scope.facilityAddress,domain:scope.domain,agentPk:scope.agentPk,agentSecret:opening.agentSecret,salt:opening.salt,limit:BigInt(opening.limit),outstanding:BigInt(opening.outstanding),epoch:BigInt(opening.epoch),generation:BigInt(opening.generation)};
     need(toHex(agentId(hexToBytes(book.agentSecret)))===scope.agentPk&&book.generation===BigInt(scope.generation)&&toHex(lineStateCommit({domain:hexToBytes(book.domain),identity:hexToBytes(book.agentPk),limit:book.limit,outstanding:book.outstanding,epoch:book.epoch},hexToBytes(book.salt)))===scope.bookCommitment,'Imported agent book differs from the signed checkpoint.');
@@ -138,7 +140,7 @@ export class AgentPairingInbox {
       state.grants[scope.grantId]={grantId:scope.grantId,facilityAddress:scope.facilityAddress,maxSpend:BigInt(scope.maxSpend),maxFee:BigInt(scope.maxFee),allowedServices:[...scope.allowedServices],generation:book.generation,expiresAt:scope.expiresAt,authorization:{scope,proof:pkg.ownerSignature,digest},spent:0n,reserved:0n,revoked:false};
       p.offers=p.offers.filter(row=>row.offerNonce!==scope.nonce);p.phase='active';
       p.accepted={package:pkg,packageDigest,acknowledgement};
-    });
+    },{skipUnchanged:true});
     return structuredClone(committed.pairing.accepted.acknowledgement);
   }
   assertWriterFence(scope){

@@ -17,7 +17,7 @@ import { browserPairingPackageDigest, createPairingPackage, encryptBookOpening, 
 import { verifyPairingAcknowledgement } from '../src/lib/agent/pairing-ack.ts';
 
 const hex=()=>randomBytes(32).toString('hex');
-async function fixture(t) {
+async function fixture(t,{initialize=true}={}) {
   const parent=await mkdtemp(join(tmpdir(),'agent-pairing-test-')),directory=await createPrivateAgentDirectory(parent);
   const password='controlled-pairing-fixture-password',binding=hex(),sourceFingerprint=hex();
   const ownerKey=L.sampleSigningKey(),ownerPublic=L.signatureVerifyingKey(ownerKey);
@@ -26,8 +26,8 @@ async function fixture(t) {
   const pins={networkId:'preprod',facilityAddress:hex(),domain:hex(),sourceFingerprint,ownerAddress,runnerOrigin:'http://127.0.0.1:6789',agentPk:toHex(agentId(hexToBytes(opening.agentSecret))),generation:'2',bookCommitment:''};
   pins.bookCommitment=toHex(lineStateCommit({domain:hexToBytes(pins.domain),identity:hexToBytes(pins.agentPk),limit:1000000n,outstanding:0n,epoch:0n},hexToBytes(opening.salt)));
   let store=await AgentStore.open({directory,password,binding,sourceFingerprint}),inspections=0,now=Date.now();
-  const adapter={inspect:async(book,owner)=>{inspections++;assert.equal(owner,ownerAddress);assert.equal(book.facilityAddress,pins.facilityAddress);assert.equal(book.agentPk,pins.agentPk);}};
-  const inbox=await AgentPairingInbox.create({store,pins,adapter,now:()=>now});
+  const adapter={sourceFingerprint,inspect:async(book,owner)=>{inspections++;assert.equal(owner,ownerAddress);assert.equal(book.facilityAddress,pins.facilityAddress);assert.equal(book.agentPk,pins.agentPk);}};
+  const inbox=initialize?await AgentPairingInbox.create({store,pins,adapter,now:()=>now}):null;
   t.after(async()=>{await store.close();assert(resolve(parent).startsWith(resolve(tmpdir())+sep+'agent-pairing-test-'));await rm(parent,{recursive:true,force:true});});
   return {directory,password,binding,sourceFingerprint,pins,opening,ownerKey,ownerPublic,adapter,inbox,get store(){return store;},get inspections(){return inspections;},get now(){return now;},clock:delta=>{now+=delta;},
     async reopen(){await store.close();store=await AgentStore.open({directory,password,binding,sourceFingerprint});return AgentPairingInbox.create({store,pins,adapter,now:()=>now});},
@@ -40,6 +40,7 @@ async function fixture(t) {
 
 test('one durable import retains identity, consumed offer, grant, book and signed exact-retry acknowledgement',async t=>{
   const f=await fixture(t),offer=await f.inbox.issueOffer(),pkg=await f.packet(offer);
+  await assert.rejects(AgentPairingInbox.create({store:f.store,pins:f.pins,adapter:{...f.adapter,sourceFingerprint:hex()}}),/matching store, release/);
   const before=f.store.revision,ack=await f.inbox.importPackage(pkg),snapshot=f.store.snapshot();
   assert.equal(snapshot.revision,before+1);assert.equal(snapshot.pairing.phase,'active');assert.equal(snapshot.pairing.offers.length,0);
   assert.equal(snapshot.grants[pkg.scope.grantId].reserved,0n);assert.equal(snapshot.books[f.pins.facilityAddress].agentSecret,f.opening.agentSecret);
@@ -91,13 +92,41 @@ test('unknown or stale offers are refused; offer bounds and identity survive reo
 
 test('concurrent exact imports never reset counters or create a second authority',async t=>{
   const f=await fixture(t),offer=await f.inbox.issueOffer(),pkg=await f.packet(offer);
+  const revision=f.store.revision;
   const [one,two]=await Promise.all([f.inbox.importPackage(pkg),f.inbox.importPackage(structuredClone(pkg))]);
   assert.deepEqual(one,two);assert.equal(f.store.listGrants().length,1);assert.equal(f.store.listBooks().length,1);
+  assert.equal(f.store.revision,revision+1,'concurrent exact retry writes only the first accepted checkpoint');
   await f.store.commit(state=>{state.grants[pkg.scope.grantId].spent=100n;});
   assert.deepEqual(await f.inbox.importPackage(pkg),one);assert.equal(f.store.getGrant(pkg.scope.grantId).spent,100n);
   await assert.rejects(f.store.commit(state=>{delete state.pairing;}),/cannot be removed/);
   await assert.rejects(f.store.commit(state=>{state.pairing.phase='unpaired';state.pairing.accepted=null;}),/cannot be removed/);
   await assert.rejects(f.store.commit(state=>{delete state.books[f.pins.facilityAddress];}),/retain its grant, book/);
+});
+
+test('concurrent fresh inbox initialization retains one identity and one checkpoint',async t=>{
+  const f=await fixture(t,{initialize:false}),revision=f.store.revision;
+  const [one,two]=await Promise.all([AgentPairingInbox.create({store:f.store,pins:f.pins,adapter:f.adapter}),AgentPairingInbox.create({store:f.store,pins:f.pins,adapter:f.adapter})]);
+  assert.deepEqual(one.identity(),two.identity());assert.equal(f.store.revision,revision+1);
+});
+
+test('owner-selected return keys reject zero, key reuse and low-order points before consuming an offer',async t=>{
+  const f=await fixture(t),offer=await f.inbox.issueOffer(),revision=f.store.revision;
+  for(const key of ['00'.repeat(32),f.inbox.identity().runnerPublicKey,f.inbox.identity().runnerSigningPublicKey])await assert.rejects(f.packet(offer,{returnPublicKey:key}),/non-zero and distinct/);
+  const lowOrder=await f.packet(offer,{returnPublicKey:'01'+'00'.repeat(31)});
+  await assert.rejects(f.inbox.importPackage(lowOrder),/return encryption key is unusable/);
+  assert.equal(f.store.revision,revision);assert.equal(f.store.snapshot().pairing.offers.length,1);
+});
+
+test('incoming caller mutation during inspection cannot replace captured owner scope or add vault material',async t=>{
+  const f=await fixture(t),offer=await f.inbox.issueOffer(),pkg=await f.packet(offer),original=structuredClone(pkg);
+  let release,entered;const waiting=new Promise(resolve=>{entered=resolve;});
+  f.adapter.inspect=async()=>{entered();await new Promise(resolve=>{release=resolve;});};
+  const work=f.inbox.importPackage(pkg);await waiting;
+  pkg.scope.maxSpend='2000000';pkg.encryptedOpening.ciphertext='ff'.repeat(32);pkg.issuerSecret='must-not-be-retained';
+  release();const ack=await work;
+  assert.deepEqual(f.store.snapshot().pairing.accepted.package,original);
+  assert.equal(f.store.getGrant(original.scope.grantId).maxSpend,1000000n);
+  await verifyPairingAcknowledgement(ack,original.scope,pairingPackageDigest(original));
 });
 
 test('failed import persistence returns no acknowledgement and poisons writes; reopen retains unconsumed offer',async t=>{

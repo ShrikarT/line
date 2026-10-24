@@ -221,15 +221,30 @@ itself establish deployed behavior or autonomous purchase acceptance.
 Workers own backend implementation only: first the runner (P03) and supplier
 (P04) in parallel, then production tools (P05) and the backend portions of setup,
 activity, supplier orders and recovery (P07-P10). They may not edit React, layout,
-styles or product copy. The coordinator owns the final UI/UX work (P06 and the
-screen portions of P07-P09) after the backend is reviewed. Integrate and audit the
-whole journey afterward; do not close split issues before both parts pass.
+styles or product copy. The latest owner instruction strictly enforces that the
+root coordinator must NOT implement backend fixes; root only plans, reviews and
+directs workers, and handles final UI/UX after backend acceptance gates pass.
+All backend patches, corrections, and PR preparations remain strictly worker-owned.
+Integrate and audit the whole journey afterward; do not close split issues before both parts pass.
+
+The parallel execution map enforces a hard cap of FIVE active agents total
+(root coordinator + existing quota watcher + three dispatched workers in the same checkout):
+- Worker A (`ctx_2820b4ad3c47` / SHR-77): owns finishing existing PR #15 WIP,
+  agent pairing/store/runner, account/backup/signing files, package.json, and consolidated docs.
+- Worker B (`ctx_44472b54aa32` / SHR-78): owns `server/organization-network.mjs`,
+  finalized-state reader/client new modules, and dedicated tests.
+- Worker C (`ctx_e35cf6aebee8` / SHR-79): owns new handback helper modules and tests.
+Workers coordinate seams via messages; no branch switching, full-tree staging, or Git writes without explicit coordinator approval.
 
 P07's backend pairing/fencing prerequisite is tracked separately as
 [SHR-77](https://linear.app/shrikar/issue/SHR-77/p07a-implement-encrypted-runner-pairing-and-durable-writer-fencing).
 It must precede M1 activation and does not wait for the M2 screens. The parent
 setup issue still needs the coordinator's user interface; this split avoids
 leaving custody authorization until after an allegedly complete agent path.
+Under SHR-77, backend handback prerequisites are tracked by three child issues:
+- [SHR-78 — Add authenticated pinned finalized facility-state reads](https://linear.app/shrikar/issue/SHR-78/p07a-add-authenticated-pinned-finalized-facility-state-reads) (Worker B: `server/organization-network.mjs`, finalized-state API and client)
+- [SHR-79 — Define retired handback transport and complete claim payload](https://linear.app/shrikar/issue/SHR-79/p07a-define-retired-handback-transport-and-complete-claim-payload) (Worker C: handback transport schema and claim envelope)
+- [SHR-80 — Integrate durable retirement and atomic browser handback](https://linear.app/shrikar/issue/SHR-80/p07a-integrate-durable-retirement-and-atomic-browser-handback) (Backlog: planned backend integration after SHR-77, SHR-78, and SHR-79 acceptance).
 
 The older Wave 3 backlog and independent recruitment/pilot work are deferred by
 the latest owner instruction. P12 remains an unfulfilled external gate, not an
