@@ -48,6 +48,30 @@ The organization owns its delegated agent. The current opening flow needs an
 agent-secret witness under issuer authorization; it does not establish independent
 outside borrower/issuer custody.
 
+Planned P02 implementation chooses an owner-operated runner first, with explicit
+owner-reviewed encrypted pairing of agent/book material only. This is a proposed
+custody boundary, not implemented confidentiality or rollback resistance. The
+runner operator and any proof provider processing witnesses must be trusted for
+that material. Stolen agent material can authorize draws and mode-1 compensation;
+runner-only supplier subsets, task ceilings and operational grant expiry do not
+constrain an attacker who bypasses the runner. The chain outstanding-capacity
+limit can be restored by replenishment/compensation and is not a lifetime cap.
+
+An authenticated writer handover must fence browser mutations and survive
+crashes/restores. Issuer book mutations require quiescence, original-transaction
+reconciliation and a chain-matched private checkpoint before resuming. A local
+file lock cannot revoke historical copied keys. Chain pause/expiry cannot cancel
+already accepted merchant obligations; relative transaction ordering matters.
+
+Encrypted durable journals must retain necessary private openings and signed
+candidates for recovery. Public status, model context, logs and Activity exclude
+those witnesses and secrets. Supplier requests necessarily expose facility,
+quote/claim and registered recipient metadata as well as the selected document
+and objective; do not promise these identities are omitted. Define retention,
+authorization and deletion for tasks/results separately before hosting them.
+No inference provider is required for the chosen deterministic extraction service;
+a real external MCP agent may send task content to its own configured provider.
+
 Browser accounts encrypt private records with AES-GCM and password-derived keys.
 They are scoped to the connected Preprod wallet. Pending candidates remain
 encrypted until finalized receipts authorize publication. An uncertain transaction
