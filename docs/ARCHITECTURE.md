@@ -82,10 +82,25 @@ refuses conflicting browser writes. The emergency `setStatus(DEFAULTED)` pause
 preserves the fence. Ordinary commits, backup restoration and reload cannot
 silently remove it; owner rejection, wallet changes and an aborted IndexedDB
 write leave staging intact. No runner activation or unfencing path is exposed.
-Retired-checkpoint handback and durable runner import are still required. This
+Retired-checkpoint handback is still required. This
 coordinates cooperating current clients, not old applications or copied keys;
 chain commitment equality alone cannot exclude a restored old copy before any
 draw has changed the commitment.
+
+`AgentPairingInbox` now retains its distinct X25519 and Schnorr identities and
+bounded offers in the same encrypted `AgentStore` checkpoint. Import verifies
+the owner signature, independently configured facility pins, exact private-book
+opening and the adapter's current owner/asset/state/all-twelve-key checks. One
+write consumes the offer, retains the exact encrypted package, imports grant/book
+and saves a signed acknowledgement. Exact lost-response retries return that
+acknowledgement, including after expiry, without resetting counters. Failed
+storage stops writes until reopen. The acknowledgement confirms retained import;
+it is neither a handback nor evidence of exclusive custody on other devices.
+This local composition seam has no public HTTP route, automatic wallet startup
+or UI activation. Runner retirement, complete claim handback and browser release
+remain prerequisites for enabling it in the product. The signed handover relies
+on the cooperating owner's fenced browser flow; the runner cannot remotely prove
+that every historical browser copy has honored it.
 
 ### P02 decision - owner-operated runner first
 

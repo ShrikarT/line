@@ -37,4 +37,10 @@ test('browser verification captures signature material before asynchronous ledge
   assert.throws(()=>agentGrantMessage({...scope,ownerAddress:scope.ownerAddress.slice(0,-1)+'x'}),/receiving wallet/);
   const accessor={...scope};Object.defineProperty(accessor,'maxSpend',{enumerable:true,get(){return '100000';}});
   assert.throws(()=>agentGrantMessage(accessor),/Unexpected agent grant fields/);
+  const sparse={...scope,allowedServices:new Array<string>(1)};
+  assert.throws(()=>agentGrantMessage(sparse),/supplier scope/);
+  let reads=0;const services=['line-doc-extract-v1'];
+  Object.defineProperty(services,'0',{enumerable:true,get(){reads++;return 'line-doc-extract-v1';}});
+  assert.throws(()=>agentGrantMessage({...scope,allowedServices:services}),/supplier scope/);
+  assert.equal(reads,0,'canonical grant validation never executes supplier-scope getters');
 });
