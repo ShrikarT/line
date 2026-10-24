@@ -56,6 +56,13 @@ password, issuer, merchant, maintenance and instance-nonce material stay local.
 The runner receiving that opening will know its contents. Staging is not active
 delegation, and a browser fence cannot revoke historical copied credentials.
 
+The local pairing inbox stores its encryption/signing private keys, issued
+offers and accepted encrypted package inside the runner's encrypted composite.
+Its public acknowledgement contains only package/grant bindings and revision,
+not the private book or organization role secrets. It authenticates retained
+import, not remote browser storage or exclusive custody. This is a local backend
+seam; no owner credential was transferred and no live delegation was activated.
+
 The issuer authorizes governance, allowances, reserve changes and repayment
 acknowledgement. Merchants authorize quotes and redemption; the agent authorizes
 draws. Contract domains and nullifiers prevent cross-instance replay and repeated

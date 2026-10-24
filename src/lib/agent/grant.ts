@@ -33,7 +33,7 @@ export function agentGrantMessage(scope: AgentGrantScope): string {
   need(Number.isSafeInteger(scope.issuedAt) && scope.issuedAt>0 && Number.isSafeInteger(scope.expiresAt) && scope.expiresAt>scope.issuedAt && scope.expiresAt-scope.issuedAt<=7*86400_000, 'Invalid agent grant lifetime.');
   for (const key of ['allowedServices','allowedMerchants'] as const) {
     const values=scope[key];
-    need(Array.isArray(values) && values.length>0 && values.length<=16 && values.every(value=>typeof value==='string' && (key==='allowedMerchants'?HEX.test(value):/^[a-z][a-z0-9-]{0,63}$/.test(value))), 'Invalid agent grant supplier scope.');
+    need(Array.isArray(values) && values.length>0 && values.length<=16 && Object.keys(values).length===values.length && Array.from({length:values.length},(_,index)=>Object.getOwnPropertyDescriptor(values,String(index))).every(descriptor=>descriptor&&Object.hasOwn(descriptor,'value')&&typeof descriptor.value==='string'&&(key==='allowedMerchants'?HEX.test(descriptor.value):/^[a-z][a-z0-9-]{0,63}$/.test(descriptor.value))), 'Invalid agent grant supplier scope.');
     need(values.every((value,i)=>i===0||values[i-1]<value), 'Agent grant supplier scope must be sorted and unique.');
   }
   return 'Line autonomous purchasing authorization\n'+JSON.stringify(Object.fromEntries(AGENT_GRANT_FIELDS.map(key=>[key,scope[key]])));

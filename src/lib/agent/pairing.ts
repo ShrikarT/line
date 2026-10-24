@@ -125,17 +125,26 @@ export async function importX25519PublicKey(publicKeyHex: string, label = 'publi
   }
 }
 
-export async function importX25519PrivateKey(privateKeyHex: string, label = 'private key'): Promise<CryptoKey> {
+export async function importX25519PrivateKey(privateKeyHex: string, label = 'private key', extractable = false): Promise<CryptoKey> {
   const bytes = validateRawX25519Key(privateKeyHex, label);
   const subtle = assertWebCrypto();
   const fullPkcs8 = new Uint8Array(48);
   fullPkcs8.set(X25519_PKCS8_PREFIX, 0);
   fullPkcs8.set(bytes, 16);
   try {
-    return await subtle.importKey('pkcs8', fullPkcs8, { name: 'X25519' }, false, ['deriveBits', 'deriveKey']);
+    return await subtle.importKey('pkcs8', fullPkcs8, { name: 'X25519' }, extractable, ['deriveBits', 'deriveKey']);
   } catch (err: any) {
     throw new Error(`Failed to import X25519 ${label}: ${err?.message ?? String(err)}`);
   }
+}
+
+/** Reopen-time identity check; only the public JWK coordinate is returned. */
+export async function x25519PublicKey(privateKeyHex: string): Promise<string> {
+  const key=await importX25519PrivateKey(privateKeyHex,'retained private key',true);
+  const jwk=await assertWebCrypto().exportKey('jwk',key);
+  if (typeof jwk.x!=='string') throw Error('Retained X25519 identity has no public coordinate.');
+  const bytes=Uint8Array.from(atob(jwk.x.replace(/-/g,'+').replace(/_/g,'/')),c=>c.charCodeAt(0));
+  return toHex(bytes);
 }
 
 /** Structured canonical AAD: deterministic JSON object binding purpose, grantDigest, ephemeralPublicKey, and nonce. */
@@ -482,4 +491,16 @@ export function verifyPairingPackageStructure(pkg: unknown): AgentPairingPackage
   // Structural validation only; the receiving runtime must independently verify
   // the real owner signature and pinned full scope before decrypting/activating.
   return structuredClone({...p, encryptedOpening:env}) as unknown as AgentPairingPackage;
+}
+
+/** Shared exact-package binding for retained acknowledgements. Key ordering
+ * does not change identity; ciphertext bytes and every reviewed field do. */
+export function pairingPackageCanonicalMessage(pkg: unknown): string {
+  const captured=verifyPairingPackageStructure(pkg);
+  const canonical=(value: any): any=>Array.isArray(value)?value.map(canonical):value&&typeof value==='object'?Object.fromEntries(Object.keys(value).sort().map(key=>[key,canonical(value[key])])):value;
+  return 'line:agent-pairing-package/v1\0'+JSON.stringify(canonical(captured));
+}
+export async function browserPairingPackageDigest(pkg: unknown): Promise<string> {
+  const bytes=new TextEncoder().encode(pairingPackageCanonicalMessage(pkg));
+  return toHex(new Uint8Array(await assertWebCrypto().digest('SHA-256',bytes)));
 }
