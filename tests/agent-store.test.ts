@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve, sep } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { AgentStore, AgentStoreError } from '../server/agent-store.mjs';
@@ -16,11 +16,15 @@ function createHex66(fillByte = 0x11): string {
 }
 
 async function createTempDir() {
-  const root = await mkdtemp(join(tmpdir(), 'agent-store-test-'));
+  const parent = await mkdtemp(join(tmpdir(), 'agent-store-test-'));
+  // Let the production store create its dedicated child. Windows hosted runner
+  // temp roots can carry explicit unrelated ACLs, which must remain rejected.
+  const root = join(parent, 'private');
   return {
     root,
     cleanup: async () => {
-      await rm(root, { recursive: true, force: true });
+      assert(resolve(parent).startsWith(resolve(tmpdir()) + sep + 'agent-store-test-'));
+      await rm(parent, { recursive: true, force: true });
     },
   };
 }
