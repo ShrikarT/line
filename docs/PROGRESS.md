@@ -196,6 +196,25 @@ ownership and expiry recovery. Those corrections are recorded above/in Architect
 Every major milestone is published on a new Git branch with a pull request.
 M0 is open as [PR #13](https://github.com/ShrikarT/line/pull/13), branch
 `feat/line-autonomous-m0`. Future implementation does not push directly to main.
+The reviewed backend foundation is open as
+[PR #14](https://github.com/ShrikarT/line/pull/14), branch
+`feat/line-agent-foundations`, stacked on M0. It adds the runner, actual supplier
+service, signature/crypto helpers and exact-original receipt handling. M1 remains
+open until pairing ownership, production agent tools and full runtime composition
+are accepted. Current ownership work is on `feat/line-agent-ownership`; it stages
+durable browser fences and adds atomic local runner import with an exact signed
+acknowledgement. The foundation's full CI passed at `128cbf9`. Local ownership
+checks passed the core suite (722 passed, one existing skip), 97 focused agent
+tests, five controlled browser regressions, typecheck and build. The named local
+browser review confirmed staging, encrypted backup and the retained fence after
+reload using a fresh mock-wallet profile; it requested no real wallet action.
+The custody work still has no public activation/unfencing path: retirement,
+complete claim handback, active-runner restore and production composition remain
+open. The protocol-review worker's completion was reviewed against source;
+incorrect pause terminology and a too-small payload estimate were corrected.
+Supplier `recoverPending()` can submit prepared bytes and is not a read-only
+retirement barrier; uncertain supplier operations must stay retained until an
+exact reconciliation path is available.
 An opened PR, passing fixture tests or a worker completion message does not by
 itself establish deployed behavior or autonomous purchase acceptance.
 
