@@ -7,6 +7,7 @@ import type {
   AgentPairingPackage,
 } from './types.ts';
 import { AGENT_GRANT_FIELDS } from './types.ts';
+import { agentGrantMessage } from './grant.ts';
 
 const HEX32 = /^[0-9a-f]{64}$/;
 const HEX12 = /^[0-9a-f]{24}$/;
@@ -464,19 +465,7 @@ export function verifyPairingPackageStructure(pkg: unknown): AgentPairingPackage
   }
   const scope = p.scope as AgentGrantScope;
   record(scope, AGENT_GRANT_FIELDS, 'Grant scope');
-  // Wire structure only: no nested arbitrary objects can hitchhike in a grant.
-  // Owner-address checksum/signature and pinned identity are runtime checks.
-  for (const key of ['facilityAddress','domain','sourceFingerprint','runnerPublicKey','runnerSigningPublicKey','returnPublicKey','agentPk','bookCommitment','nonce'] as const) {
-    if (typeof scope[key] !== 'string' || !HEX32.test(scope[key])) throw Error('Invalid pairing grant bytes.');
-  }
-  for (const key of ['generation','maxSpend','maxFee'] as const) {
-    if (typeof scope[key] !== 'string' || !DEC_INT.test(scope[key]) || BigInt(scope[key]) > U64) throw Error('Invalid pairing grant amount.');
-  }
-  if (scope.schema !== 'line:agent-grant/v1' || scope.networkId !== 'preprod' || typeof scope.ownerAddress !== 'string' || !/^mn_addr_preprod1[a-z0-9]{20,128}$/.test(scope.ownerAddress) || typeof scope.runnerOrigin !== 'string' || new TextEncoder().encode(scope.runnerOrigin).length > MAX_ORIGIN_BYTES || !Number.isSafeInteger(scope.issuedAt) || !Number.isSafeInteger(scope.expiresAt) || scope.issuedAt <= 0 || scope.expiresAt <= scope.issuedAt || scope.expiresAt-scope.issuedAt > 7*86400_000) throw Error('Invalid pairing grant provenance or lifetime.');
-  for (const key of ['allowedServices','allowedMerchants'] as const) {
-    const values = scope[key];
-    if (!Array.isArray(values) || values.length < 1 || values.length > 16 || !values.every((v,i) => typeof v === 'string' && (key === 'allowedMerchants' ? HEX32.test(v) : /^[a-z][a-z0-9-]{0,63}$/.test(v)) && (i === 0 || values[i-1] < v))) throw Error('Invalid pairing grant supplier scope.');
-  }
+  agentGrantMessage(scope);
   if (!scope || typeof scope !== 'object' || scope.grantId !== p.packageId || scope.nonce !== p.offerNonce) {
     throw new Error('Pairing packageId and offerNonce do not bind to grant scope.');
   }

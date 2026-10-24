@@ -27,6 +27,8 @@ import { verifyExpiredDisable, type ExpiredDisableReview } from "./expired-disab
 import { verifyExpiredCompensation, type ExpiredCompensationReview } from "./expired-compensation";
 import { verifyExpiredQuote, type ExpiredQuoteReview } from "./expired-quote";
 import { inspectMerchantClaim } from "./claims";
+import type { AgentDelegationRequest } from "../agent/ownership.ts";
+import type { AgentGrantScope } from "../agent/types.ts";
 
 type Circuit = keyof Contract<LinePrivateWitnessContext>["provableCircuits"];
 type Providers = ContractProviders<Contract<LinePrivateWitnessContext>>;
@@ -173,8 +175,8 @@ export class OrganizationNetwork {
     this.tx().finality.forget(pending.txId);
     this.report("Confirmed on Midnight Preprod");
   }
-  private async operation(kind: OrganizationReceipt["kind"], circuit: string, facilityId: string | null, address: string | null, after: OrganizationSnapshot, action: () => Promise<FinalizedTxData>) {
-    await this.account.prepare({ id: crypto.randomUUID(), kind, circuit, facilityId, contractAddress: address, sourceFingerprint: this.release.sourceFingerprint, after, txId: null, transaction: null });
+  private async operation(kind: OrganizationReceipt["kind"], circuit: string, facilityId: string | null, address: string | null, after: OrganizationSnapshot, action: () => Promise<FinalizedTxData>, delegationPause = false) {
+    await this.account.prepare({ id: crypto.randomUUID(), kind, circuit, facilityId, contractAddress: address, sourceFingerprint: this.release.sourceFingerprint, after, txId: null, transaction: null }, {delegationPause});
     try { await this.finish(await action()); }
     catch (failure) { if (!this.account.pending()?.txId) await this.account.discardUnsubmitted(); throw failure; }
   }
@@ -338,9 +340,19 @@ export class OrganizationNetwork {
       const after = this.account.snapshot();
       if (status === "close" && after.serviceOrders?.some(order => order.facilityId === id && !order.delivered && !order.cancelled)) throw new Error("Complete or cancel the saved API purchases before closing this allowance.");
       this.input = { callerSecret: bytes32(after.issuerSecret), salt: bytes32(facility.salt), lineLimit: facility.limit, lineOutstanding: facility.outstanding, lineEpoch: facility.epoch };
-      try { await this.operation("call", "setStatus", id, facility.address, after, () => this.tx().call(facility.address!, "setStatus", [status === "pause" ? Status.DEFAULTED : status === "resume" ? Status.OPEN : Status.CLOSED])); }
+      try { await this.operation("call", "setStatus", id, facility.address, after, () => this.tx().call(facility.address!, "setStatus", [status === "pause" ? Status.DEFAULTED : status === "resume" ? Status.OPEN : Status.CLOSED]),status === "pause"); }
       finally { this.input = null; }
     });
+  }
+  async stageAgentDelegation(id: string, request: Omit<AgentDelegationRequest,"sourceFingerprint">) {
+    return this.account.stageAgentDelegation(id,{...request,sourceFingerprint:this.release.sourceFingerprint},(facility,snapshot,scope)=>this.verifyAgentDelegationFacility(facility,snapshot,scope));
+  }
+  async authorizeAgentDelegation(grantId: string) {
+    return this.account.authorizeAgentDelegation(grantId,(facility,snapshot,scope)=>this.verifyAgentDelegationFacility(facility,snapshot,scope));
+  }
+  private async verifyAgentDelegationFacility(facility: OrganizationFacility, snapshot: OrganizationSnapshot, scope: AgentGrantScope) {
+    const {book}=await this.inspect(facility.address!);
+    if (scope.sourceFingerprint!==this.release.sourceFingerprint || book.status!==Status.OPEN || book.lineExpiry*1000n<BigInt(scope.expiresAt) || facility.assetColor!=="00".repeat(32) || !matchesRestoredFacility(book,facility,snapshot.issuerSecret)) throw new Error("Verify an open, native-asset facility with its current book and an authorization ending before the line expires.");
   }
   async recordClaimExpiry(id: string, commitment: string) {
     return this.account.exclusive(async () => {

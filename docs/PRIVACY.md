@@ -49,6 +49,13 @@ and claim packages. These API boundaries do not protect against the runtime
 operator. No new delegation has been activated; remote supplier authentication
 and hosted custody guarantees remain unimplemented.
 
+The ownership branch retains browser return private keys and handover records
+inside the encrypted organization account and backup. Its export contains an
+owner-signed public scope and only the encrypted agent/book opening; the vault
+password, issuer, merchant, maintenance and instance-nonce material stay local.
+The runner receiving that opening will know its contents. Staging is not active
+delegation, and a browser fence cannot revoke historical copied credentials.
+
 The issuer authorizes governance, allowances, reserve changes and repayment
 acknowledgement. Merchants authorize quotes and redemption; the agent authorizes
 draws. Contract domains and nullifiers prevent cross-instance replay and repeated

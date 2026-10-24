@@ -1,39 +1,12 @@
 import { createHash } from 'node:crypto';
 import { addressFromKey, verifySignature } from '@midnight-ntwrk/ledger-v8';
 import { organizationRecipient, organizationSigningBytes } from './organization-auth.mjs';
-import { AGENT_GRANT_FIELDS } from '../src/lib/agent/types.ts';
+import { agentGrantMessage } from '../src/lib/agent/grant.ts';
+export { agentGrantMessage } from '../src/lib/agent/grant.ts';
 
 const HEX = /^[0-9a-f]{64}$/;
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const U64 = (1n << 64n) - 1n;
-const FIELDS = AGENT_GRANT_FIELDS;
 const requireValue = (condition, message) => { if (!condition) throw Error(message); };
-const amount = value => typeof value === 'string' && /^(0|[1-9][0-9]{0,19})$/.test(value) && BigInt(value) <= U64;
-
-/** Public authorization only. Verification does not export keys, activate a runner,
- * establish a browser writer fence, or make runtime policies circuit-enforced. */
-export function agentGrantMessage(scope) {
-  requireValue(scope && typeof scope === 'object' && !Array.isArray(scope), 'Invalid agent grant.');
-  requireValue(Object.keys(scope).length === FIELDS.length && FIELDS.every(key => Object.hasOwn(scope, key)), 'Unexpected agent grant fields.');
-  requireValue(scope.schema === 'line:agent-grant/v1' && scope.networkId === 'preprod' && UUID.test(scope.grantId), 'Unsupported agent grant.');
-  for (const key of ['facilityAddress', 'domain', 'sourceFingerprint', 'runnerPublicKey', 'runnerSigningPublicKey', 'returnPublicKey', 'agentPk', 'bookCommitment', 'nonce']) {
-    requireValue(typeof scope[key] === 'string' && HEX.test(scope[key]), `Invalid agent grant ${key}.`);
-  }
-  requireValue(scope.runnerPublicKey !== scope.runnerSigningPublicKey, 'Agent runner encryption key and signing key must be distinct.');
-  organizationRecipient(scope.ownerAddress);
-  let runnerUrl;
-  try { runnerUrl = new URL(scope.runnerOrigin); } catch {}
-  requireValue(runnerUrl && runnerUrl.origin === scope.runnerOrigin && Buffer.byteLength(scope.runnerOrigin) <= 200 && (runnerUrl.protocol === 'https:' || runnerUrl.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(runnerUrl.hostname)), 'Agent runner origin must be HTTPS or loopback HTTP.');
-  requireValue(amount(scope.generation) && amount(scope.maxSpend) && BigInt(scope.maxSpend) > 0n && amount(scope.maxFee) && BigInt(scope.maxFee) <= BigInt(scope.maxSpend), 'Invalid agent grant amounts.');
-  requireValue(Number.isSafeInteger(scope.issuedAt) && scope.issuedAt > 0 && Number.isSafeInteger(scope.expiresAt) && scope.expiresAt > scope.issuedAt && scope.expiresAt - scope.issuedAt <= 7 * 86400_000, 'Invalid agent grant lifetime.');
-  for (const key of ['allowedServices', 'allowedMerchants']) {
-    const values = scope[key];
-    requireValue(Array.isArray(values) && values.length > 0 && values.length <= 16 && values.every(value => typeof value === 'string' && (key === 'allowedMerchants' ? HEX.test(value) : /^[a-z][a-z0-9-]{0,63}$/.test(value))), 'Invalid agent grant supplier scope.');
-    requireValue(values.every((value, i) => i === 0 || values[i - 1] < value), 'Agent grant supplier scope must be sorted and unique.');
-  }
-  const canonical = Object.fromEntries(FIELDS.map(key => [key, scope[key]]));
-  return 'Line autonomous purchasing authorization\n' + JSON.stringify(canonical);
-}
 
 export function agentGrantDigest(scope) {
   return createHash('sha256').update(agentGrantMessage(scope)).digest('hex');

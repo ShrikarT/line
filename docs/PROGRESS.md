@@ -196,6 +196,13 @@ ownership and expiry recovery. Those corrections are recorded above/in Architect
 Every major milestone is published on a new Git branch with a pull request.
 M0 is open as [PR #13](https://github.com/ShrikarT/line/pull/13), branch
 `feat/line-autonomous-m0`. Future implementation does not push directly to main.
+The reviewed backend foundation is open as
+[PR #14](https://github.com/ShrikarT/line/pull/14), branch
+`feat/line-agent-foundations`, stacked on M0. It adds the runner, actual supplier
+service, signature/crypto helpers and exact-original receipt handling. M1 remains
+open until pairing ownership, production agent tools and full runtime composition
+are accepted. Current ownership work is on `feat/line-agent-ownership`; it stages
+durable browser fences but does not activate delegation or permit unfencing yet.
 An opened PR, passing fixture tests or a worker completion message does not by
 itself establish deployed behavior or autonomous purchase acceptance.
 
