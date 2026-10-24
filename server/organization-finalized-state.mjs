@@ -1,5 +1,5 @@
 import { pathToFileURL } from 'node:url';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { ContractState as LedgerContractState } from '@midnight-ntwrk/ledger-v8';
 import { ContractState as CompactRuntimeContractState } from '@midnight-ntwrk/compact-runtime';
 import { NodeZkConfigProvider } from '@midnight-ntwrk/midnight-js-node-zk-config-provider';
@@ -32,47 +32,71 @@ function createAbortError() {
   return err;
 }
 
-let defaultArtifacts = null;
+export function createOrganizationReleaseArtifactsLoader(options = {}) {
+  const projectRoot = options.projectRoot ? resolve(options.projectRoot) : null;
+  let cachedArtifacts = null;
 
-export async function loadOrganizationReleaseArtifacts() {
-  if (!defaultArtifacts) {
-    const release = validateContractArtifacts({
-      artifactDir: resolveContractRelease({ profile: 'organization' }),
-      profile: 'organization',
-    });
-    const zk = new NodeZkConfigProvider(release.artifactDir);
-    const generated = await import(pathToFileURL(join(release.artifactDir, 'contract/index.js')).href);
-    const verifiers = new Map();
-    for (const name of CIRCUITS) {
-      verifiers.set(name, await zk.getVerifierKey(name));
+  return async function loadArtifacts() {
+    if (!cachedArtifacts) {
+      const artifactDir = resolveContractRelease({
+        ...(projectRoot ? { projectRoot } : {}),
+        profile: 'organization',
+      });
+      const release = validateContractArtifacts({
+        artifactDir,
+        ...(projectRoot ? { projectRoot } : {}),
+        profile: 'organization',
+      });
+      const zk = new NodeZkConfigProvider(release.artifactDir);
+      const generated = await import(pathToFileURL(join(release.artifactDir, 'contract/index.js')).href);
+      const verifiers = new Map();
+      for (const name of CIRCUITS) {
+        verifiers.set(name, await zk.getVerifierKey(name));
+      }
+      const sourceFingerprint = Object.freeze(String(release.inputs.source.sha256).toLowerCase());
+      cachedArtifacts = Object.freeze({
+        sourceFingerprint,
+        decodeLedger: generated.ledger,
+        verifiers,
+      });
     }
-    const sourceFingerprint = Object.freeze(String(release.inputs.source.sha256).toLowerCase());
-    defaultArtifacts = Object.freeze({
-      sourceFingerprint,
-      decodeLedger: generated.ledger,
-      verifiers,
-    });
-  }
 
-  // Return a detached immutable minimal release identity and copied keys; no mutable cached release/provider exposure
-  const verifiersCopy = new Map(
-    [...defaultArtifacts.verifiers.entries()].map(([k, v]) => [k, new Uint8Array(v)])
-  );
+    // Return a detached immutable minimal release identity and copied keys; no mutable cached release/provider exposure
+    const verifiersCopy = new Map(
+      [...cachedArtifacts.verifiers.entries()].map(([k, v]) => [k, new Uint8Array(v)])
+    );
 
-  const detachedRelease = Object.freeze({
-    inputs: Object.freeze({
-      source: Object.freeze({
-        sha256: defaultArtifacts.sourceFingerprint,
+    const detachedRelease = Object.freeze({
+      inputs: Object.freeze({
+        source: Object.freeze({
+          sha256: cachedArtifacts.sourceFingerprint,
+        }),
       }),
-    }),
-  });
+    });
 
-  return Object.freeze({
-    release: detachedRelease,
-    sourceFingerprint: defaultArtifacts.sourceFingerprint,
-    decodeLedger: defaultArtifacts.decodeLedger,
-    verifiers: verifiersCopy,
-  });
+    return Object.freeze({
+      release: detachedRelease,
+      sourceFingerprint: cachedArtifacts.sourceFingerprint,
+      decodeLedger: cachedArtifacts.decodeLedger,
+      verifiers: verifiersCopy,
+    });
+  };
+}
+
+const defaultLoader = createOrganizationReleaseArtifactsLoader();
+const rootCaches = new Map();
+
+export async function loadOrganizationReleaseArtifacts(options) {
+  if (options?.projectRoot) {
+    const root = resolve(options.projectRoot);
+    let loader = rootCaches.get(root);
+    if (!loader) {
+      loader = createOrganizationReleaseArtifactsLoader({ projectRoot: root });
+      rootCaches.set(root, loader);
+    }
+    return loader();
+  }
+  return defaultLoader();
 }
 
 /** Provider-backed read for finalized organization facility state on Midnight Preprod.
@@ -81,7 +105,7 @@ export async function loadOrganizationReleaseArtifacts() {
  * unsafe height/timestamp, non-canonical state, or indexer discrepancy.
  */
 export function finalizedFacilityStateReader(options = {}) {
-  const { endpoints, fetchImpl = globalThis.fetch } = options;
+  const { endpoints, fetchImpl = globalThis.fetch, artifactsLoader = loadOrganizationReleaseArtifacts } = options;
 
   if (!endpoints?.nodeUri || !endpoints?.indexerUri) {
     throw new Error('Facility state reader requires nodeUri and indexerUri endpoints.');
@@ -208,7 +232,7 @@ export function finalizedFacilityStateReader(options = {}) {
           decodeLedger: options.decodeLedger,
           verifiers: options.verifiers,
         }
-      : await loadOrganizationReleaseArtifacts();
+      : await artifactsLoader();
 
     const capturedPolicy = Object.freeze({
       genesisHash: capturedPreAwaitPolicy.genesisHash,
