@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve, sep } from 'node:path';
 import { randomBytes, randomUUID, createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import * as L from '@midnight-ntwrk/ledger-v8';
@@ -110,7 +110,8 @@ async function setupTestEnvironment(overrides?: {
   customSupplier?: Partial<any>;
   now?: () => number;
 }) {
-  const dir = await mkdtemp(join(tmpdir(), 'agent-runner-test-'));
+  const parent = await mkdtemp(join(tmpdir(), 'agent-runner-test-'));
+  const dir = join(parent, 'private');
   const store = await AgentStore.open({
     directory: dir,
     password: PASSWORD,
@@ -324,7 +325,8 @@ async function setupTestEnvironment(overrides?: {
     now,
     cleanup: async () => {
       await runner.close();
-      await rm(dir, { recursive: true, force: true });
+      assert(resolve(parent).startsWith(resolve(tmpdir()) + sep + 'agent-runner-test-'));
+      await rm(parent, { recursive: true, force: true });
     },
   };
 }
