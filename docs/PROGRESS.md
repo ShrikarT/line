@@ -1,8 +1,233 @@
 # Wave progress
 
-Updated 23 October 2026. Line is a Midnight Preprod prototype for
+Product plan updated 24 October 2026; chain checkpoints below retain their original dates. Line is a Midnight Preprod prototype for
 organization-funded agent purchases. Production credit, complete historical
 privacy and independent commercial custody are not established.
+
+## Product direction reset — 23 October 2026
+
+The owner explicitly stopped the live acceptance exercise and asked for a real,
+understandable autonomous-agent product. Do not resume wallet testing merely to
+finish circuit coverage. The approved next work is product planning and delivery
+against the milestones below. No new signing delegation or paid hosting is
+authorized by this plan alone.
+
+### Outcome and honest baseline
+
+Line should let a budget owner authorize an agent, give it a useful task, and
+receive a purchased service result with a clear cost and audit trail. Within an
+explicit, revocable authorization, the agent must execute the purchasing workflow
+without the owner moving JSON or approving each routine contract step.
+
+The current deployment is a real Preprod settlement prototype, not that finished
+product. Verified custody, spending checks, payouts and recovery are useful
+foundations. The public host is wallet-only with an empty automated supplier
+catalog. `mcp/line-mcp.mjs` is a local simulator. A person clicking the Agent role
+is not autonomous agent execution; a scripted transcript or simulated payout
+cannot close the product milestone.
+
+The experience drifted because circuit coverage became the delivery measure,
+people became the transport between roles, and each recovery case added controls
+and prose to the main workflow. Organization/Agent/Merchant routes reuse one
+tabbed workspace and append full transaction history. The older Explorer reads
+a different runtime store. Styling alone cannot repair these product boundaries.
+
+### First complete journey
+
+Working first use case: a research agent uses one registered paid extraction API
+to turn a user-supplied public document into a structured, source-linked brief.
+This is a bounded planning choice, subject to confirming one real supplier's
+capability and terms before implementation. Do not build a marketplace first.
+
+1. Owner connects once, completes guided setup, funds a budget and explicitly
+   authorizes an agent with expiry, permitted supplier and spending/fee limits.
+2. User submits a document and desired result. The agent decides whether the
+   approved paid tool is needed, obtains terms and checks the remaining budget.
+3. A durable runner obtains the authenticated quote, makes the authorized
+   purchase, sends the claim to the supplier and tracks settlement automatically.
+4. Supplier executes the actual service and returns a durable result. The agent
+   uses that result to complete the task. Payment and delivery are separate states.
+5. User sees task progress, result, supplier and total cost; transaction evidence
+   is available on demand. Policy exceptions request a specific owner decision.
+
+Autonomy is bounded authority, not unrestricted key access. A required wallet
+popup for every normal purchase is assisted checkout and cannot pass this goal.
+The signing/proving model is an explicit feasibility gate, not an assumption.
+
+### P01 decision - first useful task (reviewed scope, implementation pending)
+
+The first task is: "Extract the evidence relevant to my question from this public
+Markdown/plain-text document, then prepare a brief with source citations."
+A real external MCP agent chooses the paid extraction tool and uses its returned
+source spans to write the brief. The queue itself is not an AI agent. An in-app
+model runner is outside this first slice; the connection must identify the actual
+MCP client and capture its tool invocation/result without exposing secrets.
+
+**Chosen implementation:** a first-party `line-doc-extract-v1` service that parses
+headings, paragraphs and lists, selects passages relevant to a bounded objective,
+and returns verbatim source spans with stable offsets. It executes on actual
+input; word counts/fingerprints alone do not satisfy extraction. It makes no
+claim of semantic/legal judgment. The agent does synthesis. This is a concrete
+service to implement in P04, not an existing deployed API or independent supplier.
+
+Request contract: a stable UUID order ID, exact facility address, service ID,
+nonempty objective (up to 500 characters) and supplied document (up to 5,000
+Unicode code points). Enforce a UTF-8 JSON body ceiling explicitly: the current
+API is 32 KiB and currently accepts only two service IDs and no objective.
+No arbitrary URL fetching in this slice. Retrying an ID with different input or
+terms is rejected; store the document/objective digest and original terms.
+
+Result contract: service/version, input digest, passages containing heading path,
+verbatim text and half-open UTF-16 offsets, and an explicit no-matching-evidence
+outcome. Every passage must satisfy `document.slice(start, end) === text`;
+relevance selection and all length limits must handle Unicode consistently.
+A brief cites these spans and identifies the supplied source; no invented facts,
+confidence values, payout hashes or finalized block numbers appear in examples.
+The real run must retain separate actual task, payment and delivery evidence.
+
+Proposed first-party tariff: 50,000 native base units (0.05 tNIGHT) per bounded
+request. This is a proposed test tariff, not agreed commercial pricing. Quote
+terms must be read from the facility and accepted within the owner's grant.
+Fee = flat + ceil(price * basisPoints / 10,000). For the current generation-2
+policy, 50,000 + (1,000 + 500) = 51,500 allowance units. Wallet network fees/DUST
+are separate and must not be invented as part of this calculation.
+
+Wire formats reuse `src/lib/organization/transfers.ts`: exact schema tags,
+64-character lowercase hex byte fields and decimal-string amounts/expiry/generation.
+Claim includes fee. Generate a deterministic 32-byte invoice digest bound to the
+order and terms; do not put a long service name plus UUID into a 32-byte invoice.
+Supplier checks the public facility and recipient, not the private allowance.
+
+| State | Evidence / next step |
+| --- | --- |
+| queued / evaluating | Agent task accepted; decides whether approved paid extraction is needed |
+| approval_needed / denied | A policy exception needs a specific owner decision; denial causes no payment |
+| quote_pending / quoted | Supplier retains original quote operation; exact finality makes quote usable |
+| payment_pending / payment_uncertain | Runner prepares draw; unknown outcome retains bytes/candidate and blocks new facility writes |
+| claim_authorized | Exact finalized draw created the claim; merchant payout is still pending |
+| redemption_pending / redemption_uncertain | Supplier retains and reconciles its original redemption identity |
+| paid_awaiting_delivery / paid_undelivered | Exact finalized redemption paid the registered recipient; service result is pending or failed |
+| completed | Service processed actual input and the agent returned the source-linked brief |
+| failed / recovery_needed | Distinguish provably unsubmitted failure from retained uncertain payment and storage/book problems |
+
+The owner controls setup, funding and chain status. The runner receives only
+explicitly authorized agent/book material plus its own fee wallet; issuer and
+merchant credentials remain separate. Agent material can also authorize mode-1
+compensation under Compact, so a draw-only tool surface is a runtime restriction.
+P02 must establish pairing, writer transfer and issuer book synchronization.
+
+Outstanding gates: implement the useful service and production adapter; connect
+an actual MCP agent; arrange persistent runner/supplier storage and a proof
+service; fund a separately authorized fee wallet locally. No model API key is
+required for the deterministic extraction service itself. No actual delegation,
+live payment, independent supplier/customer confirmation or commercial agreement
+is claimed. Supplier delivery failure after payout needs an explicit remedy:
+expired-claim compensation does not reverse an already redeemed purchase.
+Independent pilot/recruitment and the old Wave 3 backlog remain deferred by the
+owner's latest instruction. Live owner wallet testing remains stopped.
+
+### Delivery milestones and work queue
+
+Execution tracker: [Line — First autonomous purchase](https://linear.app/shrikar/project/line-first-autonomous-purchase-21f3ded481c0/overview),
+created 23–24 October with five milestones and twelve issues. This document holds
+scope, dependency order and exit gates. P01/P02 decisions were reviewed and
+corrected by the coordinator on 24 October; runtime/delegation and service
+implementation are still pending. Remaining implementation items have their
+prerequisites in their Linear descriptions.
+Assign people and dates only when availability and the signing/infrastructure
+gate are established. P0 maps to High priority in Linear; P1 maps to Medium.
+
+The [older 60-issue roadmap](https://linear.app/shrikar/project/line-wave-3-privacy-and-full-product-roadmap-ef77dff749c6/overview)
+is retained as the broader backlog, not the current execution order. Its baseline
+predates completed recovery/acceptance work. Relevant supplier, onboarding and
+pilot issues are referenced by the new delivery gates; reuse their implementation
+and evidence rather than commissioning duplicate work. Do not assume all old
+issues are still outstanding or close them without checking their criteria.
+
+| Planning key | Linear issue |
+| --- | --- |
+| P01 | [SHR-65 — First useful journey](https://linear.app/shrikar/issue/SHR-65/p01-define-the-first-useful-autonomous-purchase-journey) |
+| P02 | [SHR-66 — Autonomous signing and hosting](https://linear.app/shrikar/issue/SHR-66/p02-resolve-scoped-autonomous-signing-and-persistent-execution) |
+| P03 | [SHR-67 — Durable runner](https://linear.app/shrikar/issue/SHR-67/p03-build-the-durable-agent-task-and-purchase-runner) |
+| P04 | [SHR-68 — Real supplier integration](https://linear.app/shrikar/issue/SHR-68/p04-integrate-one-real-supplier-with-automatic-quote-to-result) |
+| P05 | [SHR-69 — Production agent tools](https://linear.app/shrikar/issue/SHR-69/p05-connect-a-real-agent-through-production-mcpapi-purchasing-tools) |
+| P06 | [SHR-70 — Task-first UX](https://linear.app/shrikar/issue/SHR-70/p06-replace-role-consoles-with-a-task-first-product-experience) |
+| P07 | [SHR-71 — Setup and authorization](https://linear.app/shrikar/issue/SHR-71/p07-build-guided-setup-and-explicit-agent-budget-authorization) |
+| P08 | [SHR-72 — Dedicated Activity/Explorer](https://linear.app/shrikar/issue/SHR-72/p08-move-transaction-history-into-a-dedicated-activity-and-explorer) |
+| P09 | [SHR-73 — Supplier workspace](https://linear.app/shrikar/issue/SHR-73/p09-build-the-supplier-orders-and-payouts-workspace) |
+| P10 | [SHR-74 — Recovery and migration](https://linear.app/shrikar/issue/SHR-74/p10-integrate-safe-recovery-and-preserve-existing-user-records) |
+| P11 | [SHR-75 — Product acceptance](https://linear.app/shrikar/issue/SHR-75/p11-accept-the-complete-autonomous-journey-with-real-users) |
+| P12 | [SHR-76 — Independent pilot](https://linear.app/shrikar/issue/SHR-76/p12-run-an-independent-buyer-and-supplier-pilot) |
+
+| Key | Priority / milestone | Deliverable and acceptance criteria | Depends on |
+| --- | --- | --- | --- |
+| P01 | P0 / M0: journey | Confirm one useful API service and task contract. Specify owner, agent and supplier responsibilities; sample input/output; total-cost presentation; success, approval, denial, uncertain payment and paid-but-undelivered states. Record supplier and customer assumptions in this section. No demo transcript counts as execution. | None |
+| P02 | P0 / M0: authority | Establish feasible autonomous signing/proving and durable execution on the existing twelve-circuit release. Compare owner-operated runner versus hosted delegated custody; specify separate role keys, scope, expiry, pause/revoke, key rotation, fees/DUST and compromise impact. Identify which constraints are enforced by Compact versus the runner. Owner authorization must be explicit; never copy the browser vault password to a server. Document limitations and a concrete host/cost option without provisioning paid resources. If the existing contract cannot support the required boundary, stop and propose a versioned design without touching the current facility. | None |
+| P03 | P0 / M1: durable runner | Implement isolated agent execution and persisted task/purchase states. Bind task, order, quote, claim and original signed identity. Resume after process restart; serialize private-book updates; reject duplicate requests and stale terms. An ambiguous submission blocks that purchase and reconciles its original identity; never silently replaces it. Scope concurrent blocking honestly. | P01, P02 |
+| P04 | P0 / M1: supplier | Deliver one real authenticated supplier integration with discovery, quote, automatic claim handoff, redemption and result retrieval. Durable idempotent orders; fixed registered recipient; bounded payloads; delivery failure/timeout and dispute/refund semantics documented. Paid-but-undelivered never displays success. A same-owner service proves integration only, not an independent pilot. | P01, P02 |
+| P05 | P0 / M1: agent tools | Connect one real agent runtime through a production MCP/API adapter to the runner and supplier. Tools return structured task, cost, policy and result data. An agent invokes the paid service and uses its actual response; no seeded simulator, hidden manual quote/claim steps or per-purchase wallet approval on the authorized path. Record tool-call evidence with secrets excluded. | P03, P04 |
+| P06 | P0 / M2: task interface | Replace the universal role console with task-first navigation and an explicit screen/state map. Home shows tasks, budget and attention needed; task detail shows progress/result/cost and one contextual next action. Keep the current palette but use compact summaries, aligned controls, consistent spacing and readable token units. No JSON, hashes or protocol prose on the normal path. Mobile and keyboard flows included. | P01; integration waits for P05 |
+| P07 | P0 / M2: setup and controls | Build resumable organization setup and a real agent connection/authorization flow. Expose budget, allowed suppliers, approval policy, expiry and pause/revoke distinctly. Explain required setup signatures before they occur, persist setup progress and eliminate repeated setup once ready. Show on-chain enforcement separately from runner policy; no false permissions. | P02, P06 |
+| P08 | P1 / M2: activity explorer | Move previous transactions into a dedicated organization Activity/Explorer route with filters, pagination and task/order links. Receipt detail distinguishes finalized success/failure, uncertain operations and provider-backed nonapplication archives. Remove full receipt tables from each role page. Keep the legacy simulator clearly separate; never blend synthetic records with live history. | P03, P06 |
+| P09 | P1 / M2: supplier workspace | Give suppliers a focused orders/payouts screen with automatic transport and status updates. Profiles, quotes and claims move through authenticated integration or scoped invitations; JSON remains an advanced export/import fallback. Supplier should not act as organization or agent to fulfill an order. | P04, P06 |
+| P10 | P0 / M3: failure and migration | Integrate plain-language exception handling with the durable runner. Preserve existing encrypted accounts, sessions, backups, facilities, receipts and five archived operations. Cover crash/restart, duplicate tool calls, insufficient budget, changed fee, revoked authorization, supplier outage and paid-but-undelivered outcomes. Recovery details move behind task-specific attention and advanced diagnostics. Payment safety tests are targeted to changed behavior. | P03–P09 |
+| P11 | P0 / M3: product acceptance | When the owner resumes live testing, demonstrate the first complete journey: real agent tool use, actual service output, finalized settlement, zero JSON handoffs and zero per-purchase owner signatures inside approved authority. Show denial outside budget and one resumed interrupted purchase without duplicate payment. Record time-to-result, approval count and manual handoffs. Three new users should complete the task without coaching and identify cost/result/status. Local tests precede one bounded owner session. | P05–P10 |
+| P12 | P1 / M4: independent pilot | Recruit one independent budget owner and supplier; run a useful task, confirm fulfillment and reconcile spending. Record usability findings and willingness to pay. Same-owner wallets, test assets and successful circuit calls do not establish customers or revenue. Define operating costs/support and explicit release limits. | P11 |
+
+Critical path: P01/P02 → P03/P04 → P05 → integrated P06/P07/P08/P09 →
+P10 → P11 → P12. Screen design may proceed after P01 while runtime work proceeds,
+but a polished empty dashboard cannot close M1. M0 exits only with a feasible
+authority model, chosen service, host requirements and a concrete cost estimate.
+M1 exits with the complete agent/service path running in a controlled environment;
+M2 exits with that same path through the user interface; M3 requires fresh live
+evidence and usability observations. No calendar completion date is promised
+before M0 resolves the external dependencies.
+
+### Supervised delivery order - 24 October owner instruction
+
+Orca run `run_cd21a7280cd6` supervises two Antigravity workers. The coordinator
+reviews every task against source and the intended journey before advancing it;
+worker completion alone is not acceptance. Initial P01/P02 reports needed
+corrections to wire schemas, settlement states, capability claims, writer
+ownership and expiry recovery. Those corrections are recorded above/in Architecture.
+
+Workers own backend implementation only: first the runner (P03) and supplier
+(P04) in parallel, then production tools (P05) and the backend portions of setup,
+activity, supplier orders and recovery (P07-P10). They may not edit React, layout,
+styles or product copy. The coordinator owns the final UI/UX work (P06 and the
+screen portions of P07-P09) after the backend is reviewed. Integrate and audit the
+whole journey afterward; do not close split issues before both parts pass.
+
+The older Wave 3 backlog and independent recruitment/pilot work are deferred by
+the latest owner instruction. P12 remains an unfulfilled external gate, not an
+accepted pilot. No live owner wallet testing or new custody activation is implied
+by supervising implementation. Build the concrete flow before requesting any
+necessary final local approval.
+
+### Focus and completion rules
+
+- Work one milestone at a time and keep at most one implementation item active
+  per contributor. Every change must name its issue, journey step and acceptance
+  criterion; unrelated ideas go to Backlog.
+- Definition of done: working integrated behavior, relevant automated checks,
+  user-facing states including failure, evidence appropriate to the claim, and
+  updated docs/tracker. Commit count, test count and circuit count are not product
+  completion metrics. A blocker remains visible rather than becoming a new demo.
+- Review at each milestone: can the user achieve the outcome more directly, and
+  is agent execution actually live or still simulated? Report exactly which.
+- Keep the theme; postpone branding, animation, videos, marketplace breadth,
+  multi-agent orchestration and new protocol features until the first journey works.
+- Full-history privacy remains a separately scoped release limitation; do not
+  make stronger claims while deferring its redesign. Existing authentication,
+  commitments, domain separation and financial recovery invariants remain binding.
+- The owner stopped live testing. Do not request wallet actions now. Compensation
+  modes 0/2 and other remaining protocol checks stay open; schedule relevant
+  acceptance explicitly when the owner resumes, not as an endless prerequisite
+  to doing product work.
+- Before any later live work, reconcile current journal/state. A new Merchant 1
+  refund-test quote/claim was supplied, but its exact finality and the suggested
+  subsequent deposit were not independently confirmed before testing stopped.
+  The historical balances below are checkpoints, not a fresh current balance.
 
 ## Current status
 

@@ -4,6 +4,120 @@ Line combines Compact spending rules, wallet-approved Preprod transactions and
 encrypted organization records. Organizations fund and control their own agents;
 external borrowing and production credit underwriting are future work.
 
+## Target product architecture (planned, not deployed)
+
+The owner-directed product reset and delivery gates are in
+[Progress](PROGRESS.md#product-direction-reset--23-october-2026). The target is
+one real agent completing a useful paid-service task within explicit delegated
+authority, without human JSON transport or routine purchase-by-purchase signing.
+The current wallet-only path remains assisted checkout until those gates pass.
+
+| Boundary | Planned responsibility |
+| --- | --- |
+| Owner control plane | Guided setup, funding, explicit agent authorization, budget/supplier/fee policy, pause/revocation and exceptions |
+| Agent MCP/API adapter | Real tool execution against production task/order APIs; never the seeded local simulator |
+| Durable execution runner | Scoped signer/prover, private-book ownership, serialized updates, task/order journal, original-transaction reconciliation and restart recovery |
+| Supplier service | Authenticated catalog/quotes, automatic claim transport, single-use settlement, actual fulfillment and durable result retrieval |
+| User task workspace | Goal input, progress, approvals only when policy requires, useful result and total cost |
+| Activity/Explorer | Organization-scoped transaction history and task-linked evidence; simulation and provider-backed archives distinctly labeled |
+
+### P02 decision - owner-operated runner first (planned, not implemented)
+
+The current release can authenticate a draw without issuer material: `draw`
+checks `agentSecret`, the current private book opening and quote/note witnesses.
+A separate headless fee wallet can balance and sign the transaction using the
+existing SDK pattern in `server/organization-wallet.mjs`. This establishes a
+feasible integration seam, not a tested autonomous runner or completed delegation.
+The runtime also needs a release-matched prover and actual funded fee capability.
+No owner mnemonic or browser password is required by Compact for a draw.
+
+Choose one owner-operated persistent Node runner for the first slice. A hosted
+operator would receive equivalent agent/book access and introduces a different
+custody decision; defer hosted custody and paid provisioning until explicitly
+reviewed. The runner gets agent material only, never issuer, merchant or maintenance
+secrets. Agent material can also authorize mode-1 compensation; a draw-only tool
+API restricts the implementation, not the cryptographic capability of a stolen key.
+
+| Boundary | Actual release behavior / planned runtime responsibility |
+| --- | --- |
+| Compact | Agent identity, current book commitment, outstanding-capacity limit, OPEN status, line/quote expiry, generation, committed fees, registered merchant membership, reserve backing and single use |
+| Compact merchant disabling | Stops new quotes; already-posted quotes remain drawable and valid existing claims remain redeemable |
+| Runner policy | Approved service/supplier subset, per-task and aggregate authorized spend ceilings, maximum fees, operational expiry, request admission and rate limits |
+| Compromised runner | May bypass runtime policy and use agent material up to contract constraints; replenishment/compensation can restore capacity, so outstanding limit is not a lifetime spend cap |
+| Owner chain control | Pause blocks draws ordered after it on-chain; it cannot undo a preceding draw or valid merchant claim. Closure additionally requires a current zero-outstanding book |
+
+**Required pairing protocol:** explicit owner-reviewed encrypted transfer to a
+pinned runner encryption identity, bound to the origin, Preprod facility/domain,
+release, generation, owner receiving identity, grant ID/nonce, scope, expiry and
+initial book commitment. Owner signs the exact grant with the existing wallet
+message-signature format; runner verifies owner receiving identity against the
+facility and validates every imported book/agent commitment. Use authenticated
+transport and encrypted persistent storage. No plaintext secret package download,
+whole-vault export, implicit credential copying or automatic pairing is allowed.
+This protocol and its exact schema still need implementation and targeted review.
+
+**Single writer and issuer synchronization:** before transfer, browser account
+lock reloads durable state and refuses any pending operation. A staged handover
+marks that facility delegated in encrypted browser storage before the runner can
+be activated; crashes leave it fenced. Browser agent/book-changing actions must
+honor the fence, across reload and backup restore. The runner uses an exclusive
+persistent-store lease plus a serialized facility queue. A file lease alone does
+not exclude a browser or historical copied key. Compact's stale-commit check is
+the final conflict check, not a recovery strategy for competing writers.
+
+For issuer replenishment/closure or writer return, quiesce new runner work and
+reconcile every signed operation first. Where needed, finalize an owner pause
+before changing the book. Transfer an authenticated monotonic checkpoint and
+verify its private opening against current chain commitment; never overwrite it
+from an older browser snapshot. Perform the issuer mutation while the runner is
+fenced, verify exact finality and synchronize the new opening before resuming.
+A lost runner/checkpoint leaves the facility paused or recovery-needed; it never
+silently resets debt, keys or the facility. Old copied credentials remain a risk
+until chain control/expiry/identity rotation fences them. No stronger rollback
+resistance or adversarial exclusive custody is claimed.
+
+**Implementation seams:** isolate `AgentRunner` state/policy and encrypted
+`AgentStore`; production transaction gateway reuses generated Compact witnesses,
+Node SDK wallet balancing and the fixed finalized receipt reader. Persist signed
+bytes, all intent deadlines, predecessor/candidate and task/order bindings before
+submission. Guard the latest applicable TTL at submission; do not assume a typical
+DUST window. Every uncertain quote/draw/redemption keeps its exact identity and
+blocks conflicting work. Exact finalized success promotes; total failure records
+failure; partial/missing outcomes remain unresolved. Expiry alone never clears
+anything. Existing provider-backed archives remain narrowly scoped, separate
+from receipts, and do not generalize to arbitrary new runner transactions.
+
+Task, claim authorization, redemption/payment and fulfillment have separate
+states. Automatically move exact quote/claim packages through authenticated
+order APIs, then expose useful result/status through production MCP. Keep the
+old simulator separate. The model is an untrusted proposer and receives no
+signing witnesses. Supplier failure after payout cannot be repaired by claiming
+that expired-note compensation reverses a redeemed purchase.
+
+**Operating baseline:** owner-operated hardware adds no new hosting subscription,
+but requires an awake host, disk, network, a prover and separately authorized fee
+wallet; electricity, proof-provider and network costs are not asserted zero.
+EncryptedCheckoutStore provides a reusable exclusive-store/durable-write seam;
+its documented Windows power-loss limits remain. Benchmark actual SDK/prover
+memory before choosing hosted capacity. Health reports must distinguish ready,
+locked, syncing, pending payment, uncertain storage and service failure.
+
+As a budget illustration checked 24 October 2026, Render lists $7/month for
+0.5 CPU/512 MB compute and $0.25/GB-month disks: one such process plus 10 GB is
+$9.50/month before proof service, bandwidth, backups, taxes or additional processes.
+This is arithmetic, not a capacity guarantee or deployment approval. A separately
+hosted supplier adds its own resources. [Official pricing](https://render.com/pricing),
+[free service limitations](https://render.com/docs/free) and
+[persistent disks](https://render.com/docs/disks) confirm the existing free host
+cannot retain local runner state across restarts or attach a persistent disk.
+No paid resource or new signing authority has been provisioned by this decision.
+
+The planned information architecture is Tasks/Home, Agents, Budget, Suppliers,
+Activity/Explorer and Settings. Each route has one primary purpose. Setup is
+resumable, exceptions are contextual, and technical packages/recovery diagnostics
+remain under advanced details. Do not repeat all role tabs and the full history
+on every page. Preserve the palette while rebuilding hierarchy and task flow.
+
 ## Components
 
 | Component | Responsibility |
@@ -16,7 +130,7 @@ external borrowing and production credit underwriting are future work.
 | `src/lib/runtime/` | Wallet discovery, connector adapters, network/proof providers |
 | `server/organization-server.mjs` | Built application, authenticated readers and organization API |
 | `server/organization-wallet.mjs` | Optional persistent supplier signing runtime |
-| `mcp/line-mcp.mjs` | Agent tool interface |
+| `mcp/line-mcp.mjs` | Local protocol simulator exposed as MCP; not a deployed autonomous purchaser |
 
 ## Transaction lifecycle
 
