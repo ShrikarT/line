@@ -2,6 +2,7 @@ import { WebSocket, WebSocketServer } from 'ws';
 import { parse, getOperationAST, visit } from 'graphql';
 import { OrganizationAuthError } from './organization-auth.mjs';
 import { expiredOpeningReader, expiredDisableReader, expiredCompensationReader, expiredQuoteReader } from './organization-expiry.mjs';
+import { finalizedFacilityStateReader } from './organization-finalized-state.mjs';
 
 const BASE = '/api/organization/network';
 const MAX_REQUEST = 65536;
@@ -23,15 +24,22 @@ function readOperation(input, allowed) {
 
 async function readBounded(stream, limit) {
   let length = 0; const chunks = [];
-  for await (const chunk of stream) { length += chunk.length; if (length > limit) throw new OrganizationAuthError('Indexer payload is too large.', 413); chunks.push(Buffer.from(chunk)); }
+  for await (const chunk of stream) { length += chunk.length; if (length > limit) throw new OrganizationAuthError('Payload is too large.', 413); chunks.push(Buffer.from(chunk)); }
   return Buffer.concat(chunks).toString('utf8');
 }
 
 /** Same-origin public-ledger reads. Provider credentials exist only in the two
  * fixed server URLs, never in metadata, client frames or forwarded headers.
  */
-export function organizationNetwork({ server, auth, origin, endpoints }) {
+export function organizationNetwork({ server, auth, origin, endpoints, finalizedStateReader }) {
   const readExpiredOpening = expiredOpeningReader({ endpoints }), readExpiredDisable = expiredDisableReader({ endpoints }), readExpiredCompensation = expiredCompensationReader({ endpoints }), readExpiredQuote = expiredQuoteReader({ endpoints });
+  const readFinalizedFacilityState = finalizedStateReader ?? (
+    endpoints?.nodeUri && endpoints?.indexerUri
+      ? finalizedFacilityStateReader({ endpoints })
+      : async () => {
+          throw new Error('Facility state reader requires nodeUri and indexerUri endpoints.');
+        }
+  );
   const queryUrl = new URL(endpoints.indexerUri), wsUrl = new URL(endpoints.indexerWsUri);
   for (const [url, schemes] of [[queryUrl, ['https:', 'http:']], [wsUrl, ['wss:', 'ws:']]]) {
     if (!schemes.includes(url.protocol) || url.username || url.password || url.hash) throw Error('Invalid supplier indexer configuration.');
@@ -80,6 +88,40 @@ export function organizationNetwork({ server, auth, origin, endpoints }) {
           return;
         } finally { res.off('close', abort); }
       }
+      if (path === BASE + '/finalized-facility-state') {
+        if (req.method !== 'POST') throw new OrganizationAuthError('Use POST for finalized facility state read.', 405);
+        if (!(req.headers['content-type'] ?? '').toLowerCase().startsWith('application/json')) throw new OrganizationAuthError('Use a JSON request.', 415);
+        let input;
+        try {
+          input = JSON.parse(await readBounded(req, 512));
+        } catch (error) {
+          if (error instanceof OrganizationAuthError) throw error;
+          throw new OrganizationAuthError('Invalid JSON request body.', 400);
+        }
+        if (!input || typeof input !== 'object' || Array.isArray(input)) throw new OrganizationAuthError('Supply a JSON object.', 400);
+        const keys = Object.keys(input);
+        if (keys.length !== 1 || keys[0] !== 'address' || typeof input.address !== 'string' || !/^[0-9a-f]{64}$/i.test(input.address)) {
+          throw new OrganizationAuthError('Supply a valid 64-hex facility address.', 400);
+        }
+        if (requests.size >= 8) throw new OrganizationAuthError('Facility state reads are busy.', 429);
+        controller = new AbortController();
+        requests.add(controller);
+        const abort = () => controller.abort();
+        res.once('close', abort);
+        try {
+          const evidence = await readFinalizedFacilityState({
+            address: input.address,
+            sessionRecipient: session.recipient,
+            signal: controller.signal,
+          });
+          const liveSession = auth.require(req.headers.cookie);
+          if (liveSession.recipient !== session.recipient) throw new OrganizationAuthError('Session recipient changed.', 401);
+          if (!res.destroyed && !controller.signal.aborted) return send(res, 200, clean(evidence));
+          return;
+        } finally {
+          res.off('close', abort);
+        }
+      }
       if (path !== BASE + '/indexer' || req.method !== 'POST') throw new OrganizationAuthError('Unknown indexer read.', 404);
       if (!(req.headers['content-type'] ?? '').toLowerCase().startsWith('application/json')) throw new OrganizationAuthError('Use a JSON indexer query.', 415);
       let input; try { input = JSON.parse(await readBounded(req, MAX_REQUEST)); } catch (error) { if (error instanceof OrganizationAuthError) throw error; throw new OrganizationAuthError('Invalid indexer query.', 400); }
@@ -96,7 +138,7 @@ export function organizationNetwork({ server, auth, origin, endpoints }) {
         return send(res, 200, { ...(value.data !== undefined ? { data: clean(value.data) } : {}), ...(value.errors ? { errors: [{ message: 'The Preprod indexer could not complete this read.' }] } : {}) });
       } finally { res.off('close', abort); }
     } catch (error) {
-      if (!res.destroyed) send(res, error instanceof OrganizationAuthError ? error.status : 503, { ...(error instanceof OrganizationAuthError && error.status === 401 ? { code: 'WALLET_AUTH_REQUIRED' } : {}), error: error instanceof OrganizationAuthError ? error.message : 'The Preprod indexer is unavailable. Retry the original operation.' });
+      if (!res.destroyed) send(res, error instanceof OrganizationAuthError ? error.status : 503, { ...(error instanceof OrganizationAuthError && error.status === 401 ? { code: 'WALLET_AUTH_REQUIRED' } : {}), error: error instanceof OrganizationAuthError ? error.message : (path === BASE + '/finalized-facility-state' ? 'The Preprod finalized facility state is unavailable. Retry the original operation.' : 'The Preprod indexer is unavailable. Retry the original operation.') });
     } finally { if (controller) requests.delete(controller); }
   };
   const wss = new WebSocketServer({ noServer: true, maxPayload: MAX_REQUEST, perMessageDeflate: false, handleProtocols: protocols => protocols.has('graphql-transport-ws') ? 'graphql-transport-ws' : false });
