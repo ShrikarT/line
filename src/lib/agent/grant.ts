@@ -24,7 +24,7 @@ export function agentGrantMessage(scope: AgentGrantScope): string {
   need(Object.keys(scope).length === AGENT_GRANT_FIELDS.length && AGENT_GRANT_FIELDS.every(key => Object.hasOwn(scope,key) && Object.hasOwn(Object.getOwnPropertyDescriptor(scope,key)!,'value')), 'Unexpected agent grant fields.');
   need(scope.schema === 'line:agent-grant/v1' && scope.networkId === 'preprod' && UUID.test(scope.grantId), 'Unsupported agent grant.');
   for (const key of ['facilityAddress','domain','sourceFingerprint','runnerPublicKey','runnerSigningPublicKey','returnPublicKey','agentPk','bookCommitment','nonce'] as const) need(typeof scope[key] === 'string' && HEX.test(scope[key]), `Invalid agent grant ${key}.`);
-  need(scope.runnerPublicKey !== scope.runnerSigningPublicKey, 'Agent runner encryption key and signing key must be distinct.');
+  need(new Set([scope.runnerPublicKey,scope.runnerSigningPublicKey,scope.returnPublicKey]).size===3 && [scope.runnerPublicKey,scope.runnerSigningPublicKey,scope.returnPublicKey].every(key=>key!=='00'.repeat(32)), 'Agent encryption, signing and return keys must be non-zero and distinct.');
   grantOwnerRecipient(scope.ownerAddress);
   let origin: URL | undefined;
   try { origin = new URL(scope.runnerOrigin); } catch {}

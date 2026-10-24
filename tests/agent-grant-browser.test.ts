@@ -34,7 +34,7 @@ test('browser verification captures signature material before asynchronous ledge
   const verifying=verifyBrowserGrantOwner(scope,proof);
   proof.signature='ff'.repeat(64);
   await verifying;
-  assert.throws(()=>agentGrantMessage({...scope,ownerAddress:scope.ownerAddress.slice(0,-1)+'x'}),/receiving wallet/);
+  assert.throws(()=>agentGrantMessage({...scope,ownerAddress:scope.ownerAddress.endsWith('x') ? scope.ownerAddress.slice(0,-1)+'y' : scope.ownerAddress.slice(0,-1)+'x'}),/receiving wallet/);
   const accessor={...scope};Object.defineProperty(accessor,'maxSpend',{enumerable:true,get(){return '100000';}});
   assert.throws(()=>agentGrantMessage(accessor),/Unexpected agent grant fields/);
   const sparse={...scope,allowedServices:new Array<string>(1)};

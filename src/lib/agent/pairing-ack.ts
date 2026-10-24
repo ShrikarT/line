@@ -22,12 +22,18 @@ export function pairingAcknowledgementMessage(payload: AgentPairingAcknowledgeme
   return 'Line agent pairing acknowledgement\n'+JSON.stringify(Object.fromEntries(fields.map(key=>[key,payload[key]])));
 }
 
+export function pairingAcknowledgementSnapshot(value: unknown): AgentPairingAcknowledgement {
+  if (!value || typeof value!=='object' || Object.keys(value).sort().join()!=='payload,signature' || ['payload','signature'].some(key=>!Object.hasOwn(Object.getOwnPropertyDescriptor(value,key)!,'value'))) throw Error('Invalid runner pairing acknowledgement.');
+  const ack=value as AgentPairingAcknowledgement;
+  pairingAcknowledgementMessage(ack.payload);
+  if (typeof ack.signature!=='string'||!/^[0-9a-f]{128}$/.test(ack.signature)) throw Error('Invalid runner pairing acknowledgement signature.');
+  return structuredClone(ack);
+}
+
 /** Acknowledges retained import only. It never authorizes browser unfencing or
  * proves exclusive custody of copied credentials on another device. */
 export async function verifyPairingAcknowledgement(value: AgentPairingAcknowledgement, scope: AgentGrantScope, expectedPackageDigest: string): Promise<AgentPairingAcknowledgement> {
-  if (!value || typeof value!=='object' || Object.keys(value).sort().join()!=='payload,signature' || ['payload','signature'].some(key=>!Object.hasOwn(Object.getOwnPropertyDescriptor(value,key)!,'value'))) throw Error('Invalid runner pairing acknowledgement.');
-  const message=pairingAcknowledgementMessage(value.payload), captured=structuredClone(value), pinned=structuredClone(scope);
-  if (typeof captured.signature!=='string'||!/^[0-9a-f]{128}$/.test(captured.signature)) throw Error('Invalid runner pairing acknowledgement signature.');
+  const captured=pairingAcknowledgementSnapshot(value), message=pairingAcknowledgementMessage(captured.payload), pinned=structuredClone(scope);
   const digest=await browserAgentGrantDigest(pinned), p=captured.payload;
   if (p.grantId!==pinned.grantId||p.grantDigest!==digest||p.packageDigest!==expectedPackageDigest||p.offerNonce!==pinned.nonce||p.bookCommitment!==pinned.bookCommitment||p.acceptedAt<pinned.issuedAt||p.acceptedAt>=pinned.expiresAt) throw Error('Runner pairing acknowledgement differs from the reviewed package.');
   const ledger=await import('@midnight-ntwrk/ledger-v8');

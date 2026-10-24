@@ -2060,6 +2060,11 @@ async function stagedAgentFixture(page: Page, rejectSignature = false) {
   // Dedicated test wallet only. Chain verification is a controlled boundary;
   // this fixture never proves, pays, activates a runner or contacts an extension.
   const key=ownershipLedger.sampleSigningKey(),verifyingKey=ownershipLedger.signatureVerifyingKey(key);
+  const runnerSigningKey=ownershipLedger.sampleSigningKey(),runnerSigningPublicKey=ownershipLedger.signatureVerifyingKey(runnerSigningKey);
+  await page.exposeFunction("controlledAgentRunnerSign",(message:string)=>{
+    if(!message.startsWith("Line agent pairing acknowledgement\n"))throw Error("Unexpected fixture runner signature request");
+    return ownershipLedger.signData(runnerSigningKey,new TextEncoder().encode(`midnight_signed_message:${Buffer.byteLength(message,"utf8")}:`+message));
+  });
   const address=bech32m.encodeFromBytes("mn_addr_preprod",Buffer.from(ownershipLedger.addressFromKey(verifyingKey),"hex"));
   let authorizations=0;
   await page.exposeFunction("controlledAgentOwnerSign",(message:string)=>{
@@ -2079,7 +2084,7 @@ async function stagedAgentFixture(page: Page, rejectSignature = false) {
     };
   },address);
   await page.goto("/app");await connect(page,"a");await unlock(page);
-  const staged=await page.evaluate(async()=>{
+  const staged=await page.evaluate(async runnerSigningPublicKey=>{
     const {browserModuleUrl}=await import("/e2e/browser-module.ts" as any);
     const {OrganizationAccount,bytes32}=await import(browserModuleUrl("/src/lib/organization/account.ts"));
     const {getConnectedWallet}=await import(browserModuleUrl("/src/lib/runtime/wallet.ts"));
@@ -2088,11 +2093,11 @@ async function stagedAgentFixture(page: Page, rejectSignature = false) {
     const account=await OrganizationAccount.unlock(getConnectedWallet()!,"Organization123!"),facilityId=crypto.randomUUID();
     await account.edit(snapshot=>snapshot.facilities.push({id:facilityId,name:"Controlled delegated facility",address:"ab".repeat(32),instanceNonce:toHex(randomBytes32()),maintenanceKey:"33".repeat(32),assetColor:"00".repeat(32),issuerRecipient:account.receivingAddress,merchants:[{name:"Controlled merchant",publicKey:toHex(merchantPublicKey(bytes32(snapshot.merchantSecret))),address:account.receivingAddress}],agentSecret:toHex(randomBytes32()),salt:toHex(randomBytes32()),limit:1000000n,outstanding:0n,epoch:0n,generation:2n}));
     const beforeBackup=JSON.stringify(await account.encryptedBackup()),runner=await generateX25519KeyPair();
-    const pinned={runnerOrigin:"http://127.0.0.1:8000",runnerPublicKey:runner.publicKeyHex,runnerSigningPublicKey:"55".repeat(32)};
+    const pinned={runnerOrigin:"http://127.0.0.1:8000",runnerPublicKey:runner.publicKeyHex,runnerSigningPublicKey};
     const request={offer:{schema:"line:agent-pairing-offer/v1" as const,...pinned,offerNonce:toHex(randomBytes32()),timestamp:Date.now()},pinned,sourceFingerprint:"cd".repeat(32),expiresAt:Date.now()+3600_000,maxSpend:"100000",maxFee:"1500",allowedServices:["line-doc-extract-v1"],allowedMerchants:[account.snapshot().facilities[0].merchants[0].publicKey]};
     const review=await account.stageAgentDelegation(facilityId,request,async()=>{});
     return {grantId:review.scope.grantId,facilityId,beforeBackup,runnerPrivateKey:runner.privateKeyHex,accountId:account.accountId};
-  });
+  },runnerSigningPublicKey);
   return {...staged,authorizations:()=>authorizations};
 }
 
@@ -2159,6 +2164,50 @@ test("agent delegation exports only its durable encrypted original and repeats i
     return JSON.stringify(await account.authorizeAgentDelegation(grantId,async()=>{throw Error("An exact retained export must not prepare another delegation");}));
   },fixture.grantId);
   expect(repeated).toBe(original.packet);expect(fixture.authorizations()).toBe(1);
+});
+
+test("agent delegation import acknowledgement is verified, atomic and retained after reload without unfencing",async({page})=>{
+  test.setTimeout(90_000);
+  const fixture=await stagedAgentFixture(page);
+  const result=await page.evaluate(async grantId=>{
+    const {browserModuleUrl}=await import("/e2e/browser-module.ts" as any);
+    const {OrganizationAccount}=await import(browserModuleUrl("/src/lib/organization/account.ts"));
+    const {getConnectedWallet}=await import(browserModuleUrl("/src/lib/runtime/wallet.ts"));
+    const {browserAgentGrantDigest}=await import(browserModuleUrl("/src/lib/agent/grant.ts"));
+    const {browserPairingPackageDigest}=await import(browserModuleUrl("/src/lib/agent/pairing.ts"));
+    const {pairingAcknowledgementMessage}=await import(browserModuleUrl("/src/lib/agent/pairing-ack.ts"));
+    const account=await OrganizationAccount.unlock(getConnectedWallet()!,"Organization123!"),packet=await account.authorizeAgentDelegation(grantId,async()=>{}),scope=packet.scope;
+    const payload={schema:"line:agent-pairing-ack/v1" as const,grantId,grantDigest:await browserAgentGrantDigest(scope),packageDigest:await browserPairingPackageDigest(packet),offerNonce:scope.nonce,bookCommitment:scope.bookCommitment,storeRevision:3,acceptedAt:Date.now()};
+    const acknowledgement={payload,signature:await (window as any).controlledAgentRunnerSign(pairingAcknowledgementMessage(payload))};
+    let forgedRejected=false,aborted=false,writes=0;
+    try{await account.recordAgentPairingAcknowledgement(grantId,{...acknowledgement,signature:"ff".repeat(64)});}catch{forgedRejected=true;}
+    const put=IDBObjectStore.prototype.put;
+    IDBObjectStore.prototype.put=function(...args:Parameters<typeof put>){writes++;const request=put.apply(this,args);request.addEventListener("success",()=>this.transaction.abort(),{once:true});return request;};
+    try{await account.recordAgentPairingAcknowledgement(grantId,acknowledgement);}catch{aborted=true;}finally{IDBObjectStore.prototype.put=put;}
+    const afterAbort=account.agentDelegationReviews()[0].phase;
+    await account.recordAgentPairingAcknowledgement(grantId,acknowledgement);
+    let repeatedWrites=0;
+    IDBObjectStore.prototype.put=function(...args:Parameters<typeof put>){repeatedWrites++;return put.apply(this,args);};
+    try{await account.recordAgentPairingAcknowledgement(grantId,acknowledgement);}finally{IDBObjectStore.prototype.put=put;}
+    const {decodeOrganizationBackup}=await import(browserModuleUrl("/src/lib/organization/backup.ts"));
+    const {organizationAccountKey}=await import(browserModuleUrl("/src/lib/organization/account.ts"));
+    const backup=JSON.stringify(await account.encryptedBackup());
+    const restored=await decodeOrganizationBackup(backup,"Organization123!",organizationAccountKey("preprod",account.accountId),account.accountId);
+    return {forgedRejected,aborted,writes,afterAbort,repeatedWrites,phase:account.agentDelegationReviews()[0].phase,backupPhase:restored.delegations![0].phase,acknowledgement:JSON.stringify(acknowledgement)};
+  },fixture.grantId);
+  expect(result).toMatchObject({forgedRejected:true,aborted:true,writes:1,afterAbort:"export-ready",repeatedWrites:0,phase:"imported",backupPhase:"imported"});
+  await page.reload();await expect(page.getByText("Organization vault unlocked",{exact:true})).toBeVisible();
+  const reopened=await page.evaluate(async grantId=>{
+    const {browserModuleUrl}=await import("/e2e/browser-module.ts" as any);
+    const {OrganizationAccount}=await import(browserModuleUrl("/src/lib/organization/account.ts"));
+    const {getConnectedWallet}=await import(browserModuleUrl("/src/lib/runtime/wallet.ts"));
+    const account=await OrganizationAccount.unlock(getConnectedWallet()!,"Organization123!");
+    let blocked=false;try{await account.edit(snapshot=>{snapshot.facilities[0].salt="ee".repeat(32);});}catch{blocked=true;}
+    const review=account.agentDelegationReviews()[0];
+    return {blocked,phase:review.phase,acknowledgement:JSON.stringify(review.acknowledgement),grantId:review.scope.grantId,pending:account.pending()};
+  },fixture.grantId);
+  expect(reopened).toEqual({blocked:true,phase:"imported",acknowledgement:result.acknowledgement,grantId:fixture.grantId,pending:null});
+  expect(fixture.authorizations()).toBe(1);
 });
 
 test("an aborted agent delegation export never returns a package or clears its durable staged fence",async({page})=>{

@@ -147,6 +147,18 @@ export async function x25519PublicKey(privateKeyHex: string): Promise<string> {
   return toHex(bytes);
 }
 
+/** A non-zero encoding can still be a low-order X25519 point. Reject it before
+ * retaining authority that would later require encrypting a handback to it. */
+export async function assertUsableX25519Recipient(publicKeyHex: string): Promise<void> {
+  const publicKey=await importX25519PublicKey(publicKeyHex,'browser return key'),subtle=assertWebCrypto();
+  try {
+    const generated=await subtle.generateKey({name:'X25519'},false,['deriveBits']);
+    if (!('privateKey' in generated)) throw Error('Expected a fresh X25519 key pair.');
+    const shared=new Uint8Array(await subtle.deriveBits({name:'X25519',public:publicKey},generated.privateKey,256));
+    if (!shared.some(byte=>byte!==0)) throw Error('X25519 shared secret is zero.');
+  } catch {throw Error('The browser return encryption key is unusable.');}
+}
+
 /** Structured canonical AAD: deterministic JSON object binding purpose, grantDigest, ephemeralPublicKey, and nonce. */
 export function createCanonicalAad(
   purpose: 'line:agent-pairing/v1' | 'line:agent-handback/v1',

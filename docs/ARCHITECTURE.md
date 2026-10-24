@@ -102,6 +102,14 @@ remain prerequisites for enabling it in the product. The signed handover relies
 on the cooperating owner's fenced browser flow; the runner cannot remotely prove
 that every historical browser copy has honored it.
 
+Supplier retirement inspection has a separate non-submitting path. It checks
+the retained canonical bytes and original identifier through `readOutcome`,
+under the supplier mutation guard. Prepared, missing, partial and uncertain
+operations remain pending. Even exact finalized success/failure observations
+retain the original candidate and bytes; observation alone neither promotes a
+book nor clears a journal or establishes a durable retirement barrier. The
+paired client authenticates the owner and excludes other facilities' references.
+
 ### P02 decision - owner-operated runner first
 
 The current release can authenticate a draw without issuer material: `draw`

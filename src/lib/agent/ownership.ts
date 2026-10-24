@@ -4,6 +4,7 @@ import { encodeVaultJson } from '../security/vault-codec.ts';
 import { agentGrantMessage } from './grant.ts';
 import { verifyPairingPackageStructure } from './pairing.ts';
 import type { AgentGrantScope, AgentPairingOffer, AgentPairingPackage } from './types.ts';
+import { pairingAcknowledgementSnapshot, type AgentPairingAcknowledgement } from './pairing-ack.ts';
 
 /** Encrypted account metadata, outside transaction candidate snapshots. Neither
  * expiry nor loss of an acknowledgement releases this fence. Handback is a
@@ -13,9 +14,10 @@ export interface BrowserAgentDelegation {
   facilityId: string;
   scope: AgentGrantScope;
   returnPrivateKey: string;
-  phase: 'staged' | 'export-ready';
+  phase: 'staged' | 'export-ready' | 'imported';
   stagedAt: number;
   package: AgentPairingPackage | null;
+  acknowledgement?: AgentPairingAcknowledgement;
 }
 export interface AgentDelegationRequest {
   offer: AgentPairingOffer;
@@ -42,8 +44,8 @@ export function validateBrowserDelegations(value: unknown, snapshot: Organizatio
   need(Array.isArray(value) && value.length<=50);
   const entries=value as BrowserAgentDelegation[], grants=new Set<string>(), nonces=new Set<string>(), facilities=new Set<string>();
   for (const entry of entries) {
-    need(entry && typeof entry==='object' && !Array.isArray(entry) && Object.keys(entry).sort().join()===['schema','facilityId','scope','returnPrivateKey','phase','stagedAt','package'].sort().join());
-    need(entry.schema==='line:browser-agent-delegation/v1' && ['staged','export-ready'].includes(entry.phase) && typeof entry.returnPrivateKey==='string' && /^[0-9a-f]{64}$/.test(entry.returnPrivateKey) && entry.returnPrivateKey!=='00'.repeat(32));
+    need(entry && typeof entry==='object' && !Array.isArray(entry) && Object.keys(entry).sort().join()===['schema','facilityId','scope','returnPrivateKey','phase','stagedAt','package',...(entry.phase==='imported'?['acknowledgement']:[])].sort().join());
+    need(entry.schema==='line:browser-agent-delegation/v1' && ['staged','export-ready','imported'].includes(entry.phase) && typeof entry.returnPrivateKey==='string' && /^[0-9a-f]{64}$/.test(entry.returnPrivateKey) && entry.returnPrivateKey!=='00'.repeat(32));
     const facility=snapshot.facilities.find(f=>f.id===entry.facilityId);
     need(facility);
     assertDelegationBook(entry.scope,facility!,snapshot.issuerSecret);
@@ -53,6 +55,10 @@ export function validateBrowserDelegations(value: unknown, snapshot: Organizatio
     else {
       const pkg=verifyPairingPackageStructure(entry.package);
       need(agentGrantMessage(pkg.scope)===agentGrantMessage(entry.scope));
+      if(entry.phase==='imported') {
+        const {payload}=pairingAcknowledgementSnapshot(entry.acknowledgement);
+        need(payload.grantId===entry.scope.grantId&&payload.offerNonce===entry.scope.nonce&&payload.bookCommitment===entry.scope.bookCommitment&&payload.acceptedAt>=entry.scope.issuedAt&&payload.acceptedAt<entry.scope.expiresAt);
+      }
     }
   }
   return structuredClone(entries);

@@ -11,29 +11,37 @@ import { validateBrowserDelegations, assertDelegatedSnapshotStable, type Browser
 import { generateX25519KeyPair, encryptBookOpening, createPairingPackage } from '../src/lib/agent/pairing.ts';
 import { agentGrantMessage, browserAgentGrantDigest } from '../src/lib/agent/grant.ts';
 import { organizationMessageBytes } from '../src/lib/organization/signing.ts';
+import { browserPairingPackageDigest } from '../src/lib/agent/pairing.ts';
+import { pairingAcknowledgementMessage } from '../src/lib/agent/pairing-ack.ts';
 
 async function fixture() {
   const issuer=pad32('delegation-control-issuer'),agent=pad32('delegation-control-agent'),merchant=pad32('delegation-control-merchant');
   const ownerKey=L.sampleSigningKey(),verifyingKey=L.signatureVerifyingKey(ownerKey),owner=bech32m.encodeFromBytes('mn_addr_preprod',Buffer.from(L.addressFromKey(verifyingKey),'hex'));
   const nonce=pad32('delegation-control-instance'),salt=pad32('delegation-control-salt');
   const domain=contractDomain(issuerPublicKey(issuer),merchantPublicKey(merchant),nonce),identity=agentId(agent);
-  const runner=await generateX25519KeyPair(),returned=await generateX25519KeyPair();
+  const runner=await generateX25519KeyPair(),returned=await generateX25519KeyPair(),runnerSigningKey=L.sampleSigningKey();
   const record:OrganizationRecord={snapshot:{schema:'line:organization-account/v1',networkId:'preprod',accountId:'11'.repeat(32),issuerSecret:toHex(issuer),merchantSecret:toHex(merchant),facilities:[{id:randomUUID(),name:'Controlled facility',address:'ab'.repeat(32),instanceNonce:toHex(nonce),maintenanceKey:'33'.repeat(32),assetColor:'00'.repeat(32),issuerRecipient:owner,merchants:[{name:'Controlled merchant',publicKey:toHex(merchantPublicKey(merchant)),address:owner}],agentSecret:toHex(agent),salt:toHex(salt),limit:1000000n,outstanding:100000n,epoch:1n,generation:2n}],quotes:[],notes:[],receipts:[]},pending:null};
-  const scope={schema:'line:agent-grant/v1' as const,grantId:randomUUID(),networkId:'preprod' as const,facilityAddress:'ab'.repeat(32),domain:toHex(domain),sourceFingerprint:'44'.repeat(32),ownerAddress:owner,runnerOrigin:'http://127.0.0.1:8000',runnerPublicKey:runner.publicKeyHex,runnerSigningPublicKey:L.signatureVerifyingKey(L.sampleSigningKey()),returnPublicKey:returned.publicKeyHex,agentPk:toHex(identity),generation:'2',bookCommitment:toHex(lineStateCommit({domain,identity,limit:1000000n,outstanding:100000n,epoch:1n},salt)),nonce:'55'.repeat(32),issuedAt:1000,expiresAt:2000,maxSpend:'100000',maxFee:'1500',allowedServices:['line-doc-extract-v1'],allowedMerchants:[toHex(merchantPublicKey(merchant))]};
+  const scope={schema:'line:agent-grant/v1' as const,grantId:randomUUID(),networkId:'preprod' as const,facilityAddress:'ab'.repeat(32),domain:toHex(domain),sourceFingerprint:'44'.repeat(32),ownerAddress:owner,runnerOrigin:'http://127.0.0.1:8000',runnerPublicKey:runner.publicKeyHex,runnerSigningPublicKey:L.signatureVerifyingKey(runnerSigningKey),returnPublicKey:returned.publicKeyHex,agentPk:toHex(identity),generation:'2',bookCommitment:toHex(lineStateCommit({domain,identity,limit:1000000n,outstanding:100000n,epoch:1n},salt)),nonce:'55'.repeat(32),issuedAt:1000,expiresAt:2000,maxSpend:'100000',maxFee:'1500',allowedServices:['line-doc-extract-v1'],allowedMerchants:[toHex(merchantPublicKey(merchant))]};
   const entry:BrowserAgentDelegation={schema:'line:browser-agent-delegation/v1',facilityId:record.snapshot.facilities[0].id,scope,returnPrivateKey:returned.privateKeyHex,phase:'staged',stagedAt:1000,package:null};
   record.delegations=[entry];
-  return {record,entry,ownerKey,verifyingKey,runner,returned};
+  return {record,entry,ownerKey,verifyingKey,runner,returned,runnerSigningKey};
 }
 
 test('staged and export-ready fences survive encrypted backup without nesting into candidates',async()=>{
-  const {record,entry,ownerKey,verifyingKey}=await fixture();
+  const {record,entry,ownerKey,verifyingKey,runnerSigningKey}=await fixture();
   const key=organizationAccountKey('preprod',record.snapshot.accountId);
-  for (const phase of ['staged','export-ready'] as const) {
+  for (const phase of ['staged','export-ready','imported'] as const) {
     if (phase==='export-ready') {
       const proof={verifyingKey,signature:L.signData(ownerKey,organizationMessageBytes(agentGrantMessage(entry.scope)))};
       const f=record.snapshot.facilities[0];
       entry.package=createPairingPackage(entry.scope,proof,await encryptBookOpening({purpose:'line:agent-pairing/v1',recipientPublicKeyHex:entry.scope.runnerPublicKey,grantDigest:await browserAgentGrantDigest(entry.scope),nonce:entry.scope.nonce,payload:{agentSecret:f.agentSecret,salt:f.salt,limit:f.limit.toString(),outstanding:f.outstanding.toString(),epoch:f.epoch.toString(),generation:f.generation.toString()}}));
       entry.phase=phase;
+    }
+    if(phase==='imported') {
+      const payload={schema:'line:agent-pairing-ack/v1' as const,grantId:entry.scope.grantId,grantDigest:await browserAgentGrantDigest(entry.scope),packageDigest:await browserPairingPackageDigest(entry.package),offerNonce:entry.scope.nonce,bookCommitment:entry.scope.bookCommitment,storeRevision:3,acceptedAt:1500};
+      entry.phase=phase;entry.acknowledgement={payload,signature:L.signData(runnerSigningKey,organizationMessageBytes(pairingAcknowledgementMessage(payload)))};
+      const wrong=structuredClone(record);wrong.delegations![0].acknowledgement!.payload.grantId=randomUUID();
+      assert.throws(()=>validateOrganizationRecord(wrong,record.snapshot.accountId));
     }
     const backup=await encryptSecret(key,encodeVaultJson(record),'ControlledBackup123!');
     assert.deepEqual(await decodeOrganizationBackup(JSON.stringify(backup),'ControlledBackup123!',key,record.snapshot.accountId),record);

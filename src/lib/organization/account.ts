@@ -13,7 +13,8 @@ import { matchesExpiredQuoteScope, type ExpiredQuoteEvidence } from "./expired-q
 import { rememberOrganizationTabSession, forgetOrganizationTabSession, type OrganizationTabSession } from "./tab-session.ts";
 import { assertDelegatedSnapshotStable, assertDelegationBook, validateBrowserDelegations, type BrowserAgentDelegation, type AgentDelegationRequest } from "../agent/ownership.ts";
 import { agentGrantMessage, browserAgentGrantDigest, verifyBrowserGrantOwner, walletAgentGrantProof } from "../agent/grant.ts";
-import { createPairingPackage, encryptBookOpening, generateX25519KeyPair, verifyPairingOffer } from "../agent/pairing.ts";
+import { browserPairingPackageDigest, createPairingPackage, encryptBookOpening, generateX25519KeyPair, verifyPairingOffer } from "../agent/pairing.ts";
+import { pairingAcknowledgementSnapshot, verifyPairingAcknowledgement, type AgentPairingAcknowledgement } from "../agent/pairing-ack.ts";
 import type { AgentGrantScope } from "../agent/types.ts";
 
 function rateLimited(failure: unknown): boolean {
@@ -339,7 +340,7 @@ export class OrganizationAccount {
   }
   agentDelegationReviews() {
     this.assertSession();
-    return (this.record.delegations ?? []).map(({scope,phase,stagedAt}) => ({scope:copyAccount(scope),phase,stagedAt}));
+    return (this.record.delegations ?? []).map(({scope,phase,stagedAt,acknowledgement}) => ({scope:copyAccount(scope),phase,stagedAt,...(acknowledgement?{acknowledgement:copyAccount(acknowledgement)}:{})}));
   }
   async stageAgentDelegation(facilityId: string, request: AgentDelegationRequest, verify: (facility: OrganizationFacility, snapshot: OrganizationSnapshot, scope: AgentGrantScope) => Promise<void>) {
     request = copyAccount(request);
@@ -396,6 +397,27 @@ export class OrganizationAccount {
       retained.phase="export-ready";retained.package=packet;
       await this.commit(next,true);
       return copyAccount(packet);
+    });
+  }
+  /** Retained import evidence is not permission to release the browser writer.
+   * A separate retired, chain-matched checkpoint is still required for handback. */
+  async recordAgentPairingAcknowledgement(grantId: string, input: AgentPairingAcknowledgement) {
+    const captured=pairingAcknowledgementSnapshot(input);
+    return this.exclusive(async()=>{
+      if(this.record.pending)throw new Error("Resolve the existing operation before recording a runner acknowledgement.");
+      const entry=this.record.delegations?.find(row=>row.scope.grantId===grantId);
+      if(!entry?.package||!['export-ready','imported'].includes(entry.phase))throw new Error("Retain the exact owner-authorized agent export first.");
+      await verifyBrowserGrantOwner(entry.scope,entry.package.ownerSignature);
+      const verified=await verifyPairingAcknowledgement(captured,entry.scope,await browserPairingPackageDigest(entry.package));
+      if(entry.acknowledgement){
+        if(encodeVaultJson(entry.acknowledgement)!==encodeVaultJson(verified))throw new Error("The runner acknowledgement differs from its retained original.");
+        this.assertSession();return copyAccount(entry.acknowledgement);
+      }
+      await this.assertWallet();
+      const next=copyAccount(this.record),retained=next.delegations!.find(row=>row.scope.grantId===grantId)!;
+      retained.phase='imported';retained.acknowledgement=verified;
+      await this.commit(next,true);
+      return copyAccount(verified);
     });
   }
   close() { lockVaultSession(); }
