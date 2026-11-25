@@ -1,0 +1,78 @@
+import { createHash } from 'node:crypto';
+import { addressFromKey, verifySignature } from '@midnight-ntwrk/ledger-v8';
+import { organizationRecipient, organizationSigningBytes } from './organization-auth.mjs';
+import { AGENT_GRANT_FIELDS } from '../src/lib/agent/types.ts';
+
+const HEX = /^[0-9a-f]{64}$/;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+const U64 = (1n << 64n) - 1n;
+const FIELDS = AGENT_GRANT_FIELDS;
+const requireValue = (condition, message) => { if (!condition) throw Error(message); };
+const amount = value => typeof value === 'string' && /^(0|[1-9][0-9]{0,19})$/.test(value) && BigInt(value) <= U64;
+
+/** Public authorization only. Verification does not export keys, activate a runner,
+ * establish a browser writer fence, or make runtime policies circuit-enforced. */
+export function agentGrantMessage(scope) {
+  requireValue(scope && typeof scope === 'object' && !Array.isArray(scope), 'Invalid agent grant.');
+  requireValue(Object.keys(scope).length === FIELDS.length && FIELDS.every(key => Object.hasOwn(scope, key)), 'Unexpected agent grant fields.');
+  requireValue(scope.schema === 'line:agent-grant/v1' && scope.networkId === 'preprod' && UUID.test(scope.grantId), 'Unsupported agent grant.');
+  for (const key of ['facilityAddress', 'domain', 'sourceFingerprint', 'runnerPublicKey', 'runnerSigningPublicKey', 'returnPublicKey', 'agentPk', 'bookCommitment', 'nonce']) {
+    requireValue(typeof scope[key] === 'string' && HEX.test(scope[key]), `Invalid agent grant ${key}.`);
+  }
+  requireValue(scope.runnerPublicKey !== scope.runnerSigningPublicKey, 'Agent runner encryption key and signing key must be distinct.');
+  organizationRecipient(scope.ownerAddress);
+  let runnerUrl;
+  try { runnerUrl = new URL(scope.runnerOrigin); } catch {}
+  requireValue(runnerUrl && runnerUrl.origin === scope.runnerOrigin && Buffer.byteLength(scope.runnerOrigin) <= 200 && (runnerUrl.protocol === 'https:' || runnerUrl.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(runnerUrl.hostname)), 'Agent runner origin must be HTTPS or loopback HTTP.');
+  requireValue(amount(scope.generation) && amount(scope.maxSpend) && BigInt(scope.maxSpend) > 0n && amount(scope.maxFee) && BigInt(scope.maxFee) <= BigInt(scope.maxSpend), 'Invalid agent grant amounts.');
+  requireValue(Number.isSafeInteger(scope.issuedAt) && scope.issuedAt > 0 && Number.isSafeInteger(scope.expiresAt) && scope.expiresAt > scope.issuedAt && scope.expiresAt - scope.issuedAt <= 7 * 86400_000, 'Invalid agent grant lifetime.');
+  for (const key of ['allowedServices', 'allowedMerchants']) {
+    const values = scope[key];
+    requireValue(Array.isArray(values) && values.length > 0 && values.length <= 16 && values.every(value => typeof value === 'string' && (key === 'allowedMerchants' ? HEX.test(value) : /^[a-z][a-z0-9-]{0,63}$/.test(value))), 'Invalid agent grant supplier scope.');
+    requireValue(values.every((value, i) => i === 0 || values[i - 1] < value), 'Agent grant supplier scope must be sorted and unique.');
+  }
+  const canonical = Object.fromEntries(FIELDS.map(key => [key, scope[key]]));
+  return 'Line autonomous purchasing authorization\n' + JSON.stringify(canonical);
+}
+
+export function agentGrantDigest(scope) {
+  return createHash('sha256').update(agentGrantMessage(scope)).digest('hex');
+}
+
+export function verifyAgentGrant(scope, proof, expected, now = Date.now()) {
+  const message = agentGrantMessage(scope);
+  requireValue(Number.isSafeInteger(now) && scope.issuedAt <= now && now < scope.expiresAt, 'Agent grant is not currently valid.');
+  // The caller supplies its pinned deployment/pairing identity, never a subset
+  // inferred from the untrusted incoming grant.
+  for (const key of ['networkId', 'facilityAddress', 'domain', 'sourceFingerprint', 'ownerAddress', 'runnerOrigin', 'runnerPublicKey', 'runnerSigningPublicKey', 'returnPublicKey', 'agentPk', 'generation', 'bookCommitment']) {
+    requireValue(expected && Object.hasOwn(expected, key) && expected[key] === scope[key], `Agent grant ${key} does not match the pinned pairing.`);
+  }
+  requireValue(proof && typeof proof === 'object' && Object.keys(proof).every(key => ['scheme', 'verifyingKey', 'signature'].includes(key)) && (proof.scheme === undefined || proof.scheme === 'schnorr_bip340') && HEX.test(proof.verifyingKey) && /^[0-9a-f]{128}$/.test(proof.signature), 'Invalid agent grant signature format.');
+  let valid = false;
+  try {
+    valid = addressFromKey(proof.verifyingKey) === organizationRecipient(scope.ownerAddress) && verifySignature(proof.verifyingKey, organizationSigningBytes(message), proof.signature);
+  } catch {}
+  requireValue(valid, 'Agent grant owner signature is invalid.');
+  return agentGrantDigest(scope);
+}
+
+export function agentInputDigest(document, objective) {
+  requireValue(typeof document === 'string' && document.trim() && [...document].length <= 5000, 'Supply a document of up to 5000 Unicode code points.');
+  requireValue(typeof objective === 'string' && objective.trim() && [...objective].length <= 500, 'Supply an objective of up to 500 Unicode code points.');
+  const encoded = JSON.stringify([document, objective]);
+  requireValue(Buffer.byteLength(encoded) <= 30 * 1024, 'The encoded task input is too large.');
+  return createHash('sha256').update('line:agent-input/v1\0').update(encoded).digest('hex');
+}
+
+/** A lifetime spend counter is separate from the circuit's outstanding balance.
+ * Reserved costs survive uncertain transactions; repayment never resets either. */
+export function requireAgentBudget(scope, { spent, reserved, revoked }, { service, merchantPk, principal, fee }, now = Date.now()) {
+  agentGrantMessage(scope);
+  requireValue(now >= scope.issuedAt && now < scope.expiresAt && !revoked, 'Agent authorization is inactive.');
+  requireValue(scope.allowedServices.includes(service) && scope.allowedMerchants.includes(merchantPk), 'Supplier is outside the agent authorization.');
+  requireValue([spent, reserved, principal, fee].every(value => typeof value === 'bigint' && value >= 0n && value <= U64) && principal > 0n, 'Invalid agent budget values.');
+  requireValue(fee <= BigInt(scope.maxFee), 'Purchase fee exceeds the authorized maximum.');
+  const charge = principal + fee;
+  requireValue(charge <= U64 && spent + reserved + charge <= BigInt(scope.maxSpend), 'Purchase exceeds the remaining lifetime authorization.');
+  return charge;
+}

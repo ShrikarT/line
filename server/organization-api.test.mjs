@@ -35,6 +35,12 @@ test('production HTTP authenticates wallet ownership, serializes streamed reques
   try {
     assert.equal((await request('catalog')).status, 200);
     assert.equal((await request('orders', input)).status, 401); assert.equal(quotes, 0);
+    for (const delegated of [recipient, '{bad-json', JSON.stringify({ recipient, grantId: 'forged', expiresAt: Date.now() + 86400000 })]) {
+      const forged = await fetch(origin + '/api/organization/orders', { method: 'POST', headers: { ...headers, 'X-Line-Agent-Grant': delegated }, body: JSON.stringify(input) });
+      assert.equal(forged.status, 401);
+      assert.equal(quotes, 0, 'Caller-provided recipient/grant must never authenticate a supplier mutation');
+      assert.equal((await fetch(origin + '/api/organization/orders/' + id, { headers: { ...headers, 'X-Line-Agent-Grant': delegated } })).status, 401);
+    }
     const wrong = await signIn(other), cookie = await signIn(owner);
     const wrongWallet = bech32m.encodeFromBytes('mn_addr_preprod', Buffer.from(L.addressFromKey(L.signatureVerifyingKey(other)), 'hex'));
     const ownerWallet = bech32m.encodeFromBytes('mn_addr_preprod', Buffer.from(L.addressFromKey(L.signatureVerifyingKey(owner)), 'hex'));

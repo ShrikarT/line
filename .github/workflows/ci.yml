@@ -35,6 +35,8 @@ jobs:
         run: npm ci
       - name: Check private directory ACLs without module discovery
         run: node --experimental-strip-types --test --test-name-pattern="Windows checkpoint" server/checkout-durability.test.ts
+      - name: Verify agent checkpoint ownership and restart recovery
+        run: node --experimental-strip-types --test tests/agent-store.test.ts
 
   verify:
     runs-on: ubuntu-latest
@@ -91,6 +93,9 @@ jobs:
         env:
           COMPACT_ADDRESS_MANAGED_DIR: .compact-keys/address-bound-managed
         run: npm test
+
+      - name: Autonomous runner authority, journal and supplier integration
+        run: npm run test:agent
 
       - name: Address-bound coordinator owner approvals and recovery
         env:

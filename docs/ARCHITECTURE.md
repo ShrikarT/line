@@ -21,7 +21,61 @@ The current wallet-only path remains assisted checkout until those gates pass.
 | User task workspace | Goal input, progress, approvals only when policy requires, useful result and total cost |
 | Activity/Explorer | Organization-scoped transaction history and task-linked evidence; simulation and provider-backed archives distinctly labeled |
 
-### P02 decision - owner-operated runner first (planned, not implemented)
+### Runner foundation under review - 24 October
+
+The new backend modules are local work; public startup does not activate them.
+`AgentStore` reuses `EncryptedCheckoutStore.openBound` to commit tasks, grant
+counters, book, signed operation and receipts in one checkpoint. Storage binding
+and contract source fingerprint are separate values. Persistence failure stops
+further writes until reopen. Admission stops at 50 tasks or a 1 MB encoded archive
+to leave journal space; authenticated archival remains future work.
+
+Grants bind the existing Midnight wallet message signature to exact terms,
+runner origin/key, facility/domain, owner, generation, source and initial book.
+Signature verification does not establish the browser writer fence. Activation
+requires the separate pairing component; its absent verifier fails closed.
+
+`MidnightAgentAdapter` constructs/proves a real SDK draw and balances it with an
+explicitly started fee wallet, checking that the call transcript is preserved.
+Preparation cannot submit. The runner commits canonical signed bytes and their
+candidate before recording a submission attempt and sending those bytes. The
+receipt reader's existing `read` stays success-only; explicit `readOutcome` also
+accepts exact total failure after checking raw bytes and node-pinned finality.
+Partial/missing outcomes remain unresolved under the same TLS provider trust.
+
+The supplier client composes with the real owner-operated supplier in-process,
+checking its signed owner scope and facility ownership. Remote grant headers
+are rejected; browser HTTP keeps wallet-cookie authentication. A draw creates
+an authorized claim. A paid result requires finalized redemption, exact claim
+metadata and its fixed-recipient asset output. Evidence must match source slices
+before `result_ready`; an external agent supplies a cited brief for completion.
+
+Production MCP composition, pairing activation, browser fencing/handback, actual
+wallet/prover setup and full product acceptance remain outstanding. Fixture tests
+and historical bytes do not establish live autonomous purchasing or current-release
+acceptance. The decisions below still govern the remaining implementation.
+
+A controlled integration test now runs the generated organization draw through
+the installed SDK's `createUnprovenCallTx` and reaches the external prover
+boundary. It uses synthetic ledger state and historical public operation-key
+encodings; it does not prove, balance, sign or submit a transaction. Policy-denied
+tasks retain the original quote and cost, stop before preparation and remain
+denied on retries. Supplier cached results also validate the claim commitment's
+actual persistent opening; paid delivery retries use unchanged stored input.
+Payout verification additionally binds the release's public `notes.member(D)`
+query to the exact claim; a previously redeemed note plus an unrelated same-value
+payout is insufficient. The query parser is release-specific and exercised with
+the generated SDK redemption transcript.
+
+Pairing helpers use WebCrypto X25519, HKDF-SHA256 and AES-256-GCM with purpose
+separation and the complete signed grant digest in authenticated data. The grant
+separately pins runner encryption/signing keys and the browser return key. These
+helpers capture allowlisted material before asynchronous work and reject altered
+or oversized envelopes. They do not establish durable staging, runner retirement,
+authenticated handback, offer consumption or browser writer exclusion. Those
+lifecycle steps remain prerequisites for activating any delegation.
+
+### P02 decision - owner-operated runner first
 
 The current release can authenticate a draw without issuer material: `draw`
 checks `agentSecret`, the current private book opening and quote/note witnesses.
@@ -73,7 +127,8 @@ from an older browser snapshot. Perform the issuer mutation while the runner is
 fenced, verify exact finality and synchronize the new opening before resuming.
 A lost runner/checkpoint leaves the facility paused or recovery-needed; it never
 silently resets debt, keys or the facility. Old copied credentials remain a risk
-until chain control/expiry/identity rotation fences them. No stronger rollback
+until owner chain controls, applicable on-chain line expiry or identity rotation
+fence them. Runtime grant expiry does not revoke a copied key. No stronger rollback
 resistance or adversarial exclusive custody is claimed.
 
 **Implementation seams:** isolate `AgentRunner` state/policy and encrypted
