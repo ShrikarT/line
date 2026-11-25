@@ -12,10 +12,11 @@ Line hides plaintext spending-book openings from the public application. It does
 | Encrypted organization records and pending candidates | Purchase amounts, fees, expiry and reserve changes |
 | Backup plaintext | Transparent deposit/payout amounts and receiving addresses |
 
-The book commitment binds the contract domain, agent identity, limit, balance and
-epoch with `persistentCommit`. Quotes, claims and nullifiers use domain-separated
-`persistentHash` encodings. Neither primitive is replaced by a general-purpose
-hash in the protocol.
+The book and draw-note commitments bind their respective preimages and salts with
+`persistentCommit` (the book commitment binds domain, agent identity, limit, balance and
+epoch; `drawNoteCommit` in `encoding.ts` uses `persistentCommit(DRAW_NOTE_PREIMAGE_TYPE, ..., noteSalt)`).
+Quotes and nullifiers use domain-separated `persistentHash` encodings. Neither primitive is
+replaced by a general-purpose hash in the protocol.
 
 An observer who knows the book starts at zero can reconstruct debt from public
 draw amounts and fees. Later repayments can add uncertainty, but do not establish
@@ -48,6 +49,20 @@ trust assumptions. Public task views omit book openings, role secrets, candidate
 and claim packages. These API boundaries do not protect against the runtime
 operator. No new delegation has been activated; remote supplier authentication
 and hosted custody guarantees remain unimplemented.
+
+The ownership branch retains browser return private keys and handover records
+inside the encrypted organization account and backup. Its export contains an
+owner-signed public scope and only the encrypted agent/book opening; the vault
+password, issuer, merchant, maintenance and instance-nonce material stay local.
+The runner receiving that opening will know its contents. Staging is not active
+delegation, and a browser fence cannot revoke historical copied credentials.
+
+The local pairing inbox stores its encryption/signing private keys, issued
+offers and accepted encrypted package inside the runner's encrypted composite.
+Its public acknowledgement contains only package/grant bindings and revision,
+not the private book or organization role secrets. It authenticates retained
+import, not remote browser storage or exclusive custody. This is a local backend
+seam; no owner credential was transferred and no live delegation was activated.
 
 The issuer authorizes governance, allowances, reserve changes and repayment
 acknowledgement. Merchants authorize quotes and redemption; the agent authorizes

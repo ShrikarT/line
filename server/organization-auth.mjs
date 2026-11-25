@@ -2,6 +2,7 @@ import { randomBytes, createHash } from 'node:crypto';
 import { bech32m } from '@scure/base';
 import { addressFromKey, verifySignature } from '@midnight-ntwrk/ledger-v8';
 import { organizationSignInMessage } from '../src/lib/organization/sign-in.ts';
+import { organizationMessageBytes } from '../src/lib/organization/signing.ts';
 
 export class OrganizationAuthError extends Error { constructor(message, status = 401) { super(message); this.status = status; } }
 export function organizationRecipient(value) {
@@ -13,7 +14,7 @@ export function organizationRecipient(value) {
 }
 // Connector v4 signs the UTF-8 byte count, not JS's UTF-16 string length.
 export function organizationSigningBytes(message) {
-  return Buffer.from(`midnight_signed_message:${Buffer.byteLength(message, 'utf8')}:` + message, 'utf8');
+  return Buffer.from(organizationMessageBytes(message));
 }
 
 /** Ephemeral sign-in sessions. A restart requires another wallet signature;

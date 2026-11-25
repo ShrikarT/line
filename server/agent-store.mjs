@@ -1,4 +1,6 @@
 import { EncryptedCheckoutStore } from './checkout-storage.ts';
+import { isDeepStrictEqual } from 'node:util';
+import { validateRunnerPairingState, validateRunnerPairingTransition } from './agent-pairing.mjs';
 
 export class AgentStoreError extends Error {}
 
@@ -54,6 +56,7 @@ export function validateSnapshot(snapshot, expectedBinding, expectedSourceFinger
   if (snapshot.sourceFingerprint !== expectedSourceFingerprint) {
     throw new AgentStoreError('Store sourceFingerprint does not match expected contract source fingerprint.');
   }
+  validateRunnerPairingState(snapshot.pairing, expectedSourceFingerprint);
   if (
     typeof snapshot.revision !== 'number' ||
     !Number.isSafeInteger(snapshot.revision) ||
@@ -352,6 +355,16 @@ export function validateSnapshot(snapshot, expectedBinding, expectedSourceFinger
       }
     }
   }
+  if (snapshot.pairing?.phase === 'active') {
+    const accepted = snapshot.pairing.accepted, scope = accepted.package.scope;
+    const grant = snapshot.grants[scope.grantId], book = snapshot.books[scope.facilityAddress];
+    if (!grant || !book || grant.authorization?.digest !== accepted.acknowledgement.payload.grantDigest ||
+        !isDeepStrictEqual(grant.authorization.scope, scope) || !isDeepStrictEqual(grant.authorization.proof, accepted.package.ownerSignature) ||
+        book.domain !== scope.domain || book.agentPk !== scope.agentPk || book.generation !== BigInt(scope.generation) ||
+        accepted.acknowledgement.payload.storeRevision > snapshot.revision) {
+      throw new AgentStoreError('Accepted pairing must retain its grant, book and acknowledgement revision.');
+    }
+  }
 }
 
 export class AgentStore {
@@ -520,11 +533,12 @@ export class AgentStore {
     return this.state.version;
   }
 
-  async commit(mutator) {
+  async commit(mutator, { skipUnchanged = false } = {}) {
     this.assertWritable();
     if (typeof mutator !== 'function') {
       throw new AgentStoreError('commit requires a mutator function.');
     }
+    if (typeof skipUnchanged !== 'boolean') throw new AgentStoreError('Invalid checkpoint write policy.');
 
     const prev = this.queue;
     let release;
@@ -567,7 +581,18 @@ export class AgentStore {
       }
       candidate.revision = expectedRevision;
 
+      validateRunnerPairingTransition(this.state.pairing, candidate.pairing);
+
       validateSnapshot(candidate, this.binding, this.sourceFingerprint);
+
+      // Pairing retries can race before either has retained the first import.
+      // A validated no-op under this same store lock must not write a second
+      // checkpoint (or poison an accepted import on an unnecessary disk write).
+      if (skipUnchanged) {
+        const unchanged = structuredClone(this.state);
+        unchanged.revision = expectedRevision;
+        if (isDeepStrictEqual(candidate, unchanged)) return structuredClone(this.state);
+      }
 
       try {
         await this.store.save(COMPOSITE_KEY, candidate);

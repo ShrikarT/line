@@ -31,6 +31,23 @@ import {
 import { decodeAgentDraw } from '../server/agent-midnight.mjs';
 import { organizationSigningBytes } from '../server/organization-auth.mjs';
 
+for (const stop of ['revoked','expired','fence-lost'] as const) test(`quote retry cannot request another supplier transaction after authorization is ${stop}`,async()=>{
+  let now=10000,quotes=0,prepared=0,fenceLost=false;
+  const env=await setupTestEnvironment({now:()=>now,writerFence:async()=>{if(fenceLost)throw Error('Controlled lost writer fence');},customSupplier:{createOrder:async()=>{quotes++;throw Error('Original quote acknowledgement unknown');}},customAdapter:{prepareDraw:async()=>{prepared++;throw Error('Must not prepare');}}});
+  try {
+    await env.runner.activateDelegation({scope:env.scope,proof:env.proof,book:env.book});
+    const orderId=randomUUID();
+    assert.equal((await env.runner.submitTask({orderId,grantId:env.scope.grantId,facilityAddress:env.facilityAddress,serviceId:'line-doc-extract-v1',document:'Retained source',objective:'Review source'}))?.status,'quote_pending');
+    if(stop==='revoked')await env.store.commit(state=>{state.grants[env.scope.grantId].revoked=true;});
+    if(stop==='expired')now=env.scope.expiresAt;
+    if(stop==='fence-lost')fenceLost=true;
+    const result=await env.runner.continueTask(orderId);
+    assert.equal(quotes,1,'revocation/expiry/fence loss must stop before the supplier quote boundary');
+    assert.equal(prepared,0);assert.equal(result?.status,'approval_needed');
+    assert.equal(env.store.getTask(orderId)?.orderId,orderId,'the unresolved original supplier order stays retained');
+  } finally {await env.cleanup();}
+});
+
 function createHex(fillByte = 0x11): string {
   return Buffer.alloc(32, fillByte).toString('hex');
 }

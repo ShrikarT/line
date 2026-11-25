@@ -1,5 +1,6 @@
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, statSync } from 'node:fs';
 import * as L from '@midnight-ntwrk/ledger-v8';
+import { isDeepStrictEqual } from 'node:util';
 import { u8aToHex } from '@polkadot/util';
 import { SucceedEntirely } from '@midnight-ntwrk/midnight-js-types';
 import { sanitizeServiceError } from '../src/lib/runtime/endpoints.ts';
@@ -13,6 +14,37 @@ const copy=value=>structuredClone(value);
  */
 export class NativeOperationJournal {
  assertJournalWritable(){if(this.persistenceUncertain)throw Error('Supplier storage is uncertain. Stop and reopen its retained state before continuing.');}
+ /** Observe the exact retained operation without submitting, promoting its
+  * candidate, or clearing its journal. Even a finalized observation is not a
+  * durable quiescence/retirement decision. The owner must serialize this read
+  * against its mutations, just as it does for reconciliation. */
+ async observePending(){
+  this.assertJournalWritable();
+  const pending=copy(this.state.pending);
+  if(!pending)return {status:'no-pending-operation',pendingOperation:false};
+  if(!/^[a-z0-9-]{1,100}$/.test(pending.id))throw Error('Invalid retained operation identifier.');
+  const path=`${this.directory??DIR}/${pending.id}.bin`;
+  if(!pending.record&&!existsSync(path))return {status:'unsigned-preparation',pendingOperation:true,operationId:pending.id,contractAddress:this.state.contractAddress};
+  // A recorded operation with missing/corrupt bytes remains blocked. Never
+  // reconstruct or replace a transaction merely to inspect its status.
+  let size,raw;
+  try{size=statSync(path).size;if(size>=1&&size<=4*1024*1024)raw=new Uint8Array(readFileSync(path));}
+  catch{throw Error('Retained supplier transaction bytes are unavailable. Keep the operation blocked.');}
+  if(size<1||size>4*1024*1024)throw Error('Retained supplier transaction exceeds inspection bounds.');
+  const tx=L.Transaction.deserialize('signature','proof','binding',raw);
+  if(!Buffer.from(tx.serialize()).equals(Buffer.from(raw)))throw Error('Retained supplier transaction is not canonical.');
+  const actual=this.transactionRecord(copy(pending),tx),row=pending.record??actual;
+  for(const key of ['id','kind','name','contractAddress','txId','txHash'])if(actual[key]!==row[key])throw Error('Retained supplier transaction journal mismatch.');
+  const reference={operationId:pending.id,contractAddress:row.contractAddress,circuit:row.name,identifier:row.txId,originalTransactionHash:row.txHash};
+  if(row.disposition==='prepared')return {...reference,status:'prepared-not-submitted-by-journal',pendingOperation:true};
+  if(!['submission-attempted','submitted'].includes(row.disposition))throw Error('Retained supplier submission disposition is unresolved.');
+  if(typeof this.reader?.readOutcome!=='function')throw Error('Configure explicit finalized outcome inspection before retiring the supplier journal.');
+  const observed=await this.reader.readOutcome({kind:row.kind,name:row.name,identifier:row.txId},row.contractAddress);
+  this.assertJournalWritable();
+  if(!isDeepStrictEqual(this.state.pending,pending))throw Error('The supplier operation changed during inspection.');
+  if(observed?.networkFinalityVerified!==true||!['success','failure'].includes(observed.outcome)||!observed.raw?.identifiers().includes(row.txId)||!Number.isSafeInteger(observed.transaction?.block?.height)||observed.transaction.block.height<1||!Number.isSafeInteger(observed.finalizedHead?.height)||observed.finalizedHead.height<observed.transaction.block.height||!/^[0-9a-f]{64}$/.test(observed.canonicalHash)||!/^[0-9a-f]{64}$/.test(observed.transaction.hash))throw Error('The original supplier operation has no exact finalized outcome.');
+  return {...reference,status:`finalized-${observed.outcome}-observed`,pendingOperation:true,publishedTransactionHash:observed.transaction.hash,blockHeight:observed.transaction.block.height,blockHash:observed.canonicalHash,finalizedHead:copy(observed.finalizedHead)};
+ }
  async journalAndSubmit(tx){
     this.assertJournalWritable();
     if(!this.state.pending)throw Error('Submission has no durable operation context.');

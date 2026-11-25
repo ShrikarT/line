@@ -65,3 +65,15 @@ test('expired authorization cannot post a new quote while existing obligations r
   assert.equal(f.quotes(), 0);
   assert.equal((await client.getOrder(id)).order.id, id);
 });
+
+test('retirement inspection authenticates the owner and excludes another facility even for unsigned preparation',async()=>{
+  const f=fixture(),client=new AgentSupplierClient(f.options);
+  await assert.rejects(client.observePending(),/cannot safely inspect/);
+  f.service.observePending=async()=>({status:'unsigned-preparation',pendingOperation:true,contractAddress:'ff'.repeat(32),operationId:'another-owner'});
+  await assert.rejects(client.observePending(),/Another supplier operation/);
+  f.service.observePending=async()=>({status:'no-pending-operation',pendingOperation:false});
+  f.setNow(f.scope.expiresAt);
+  assert.deepEqual(await client.observePending(),{status:'no-pending-operation',pendingOperation:false});
+  f.setOwner(false);
+  await assert.rejects(client.observePending(),/does not own/);
+});
